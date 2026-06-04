@@ -36,6 +36,9 @@ class WebDropApp {
       deviceInfoEl.textContent = `Device: ${this.deviceType} (isIOS: ${DeviceDetector.getCapabilities().isIOS})`;
     }
 
+    // Notify the UI layer
+    window.dispatchEvent(new CustomEvent('webdrop:ready', { detail: { deviceType: this.deviceType } }));
+
     this.wsClient.connect(this.displayName, this.deviceType);
 
     bus.on('users:discovered', users => {
