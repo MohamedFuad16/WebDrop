@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="theme-color" content="#f4f4f2">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data: ws: wss:; connect-src 'self' ws: wss:; media-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
+  <title>WebDrop</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <aside class="desktop-gate" aria-label="Mobile only notice">
+    <div class="desktop-gate__mark" aria-hidden="true">W</div>
+    <h1>Open WebDrop on mobile</h1>
+    <p>WebDrop is designed for mobile handoff. Open this on your phone to transfer nearby files.</p>
+  </aside>
+
+  <main class="mobile-shell" aria-labelledby="appTitle">
+    <section class="mobile-frame" aria-label="WebDrop mobile transfer app">
+      <header class="app-bar">
+        <div class="brand-mark" aria-hidden="true">W</div>
+        <div class="connection-chip" id="connectionChip" data-state="idle" aria-live="polite">
+          <span class="connection-dot"></span>
+          <span id="connectionText">Offline</span>
+        </div>
+      </header>
+
+      <section class="hero-copy">
+        <p class="eyebrow">Nearby peer transfer</p>
+        <h1 id="appTitle">Drop files nearby in real-time.</h1>
+        <p class="hero-meta" id="statusNote">Discovery uses WebSocket signaling, then WebRTC data channels for direct transfer.</p>
+      </section>
+
+      <section class="action-row" aria-label="Discovery controls">
+        <button class="primary-button" id="connectButton" type="button">Start discovery</button>
+        <button class="secondary-button" id="soundButton" type="button">Prime proximity</button>
+      </section>
+
+      <section class="transfer-stage" aria-label="Nearby users and transfer card">
+        <div class="orbit-layer" aria-hidden="true">
+          <span class="orbit orbit--wide"></span>
+          <span class="orbit orbit--tilt"></span>
+          <span class="orbit orbit--tight"></span>
+        </div>
+
+        <div class="particle-field" id="particleField" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+
+        <div class="users-layer" id="usersLayer" aria-live="polite">
+          <button class="empty-search" id="emptySearch" type="button" aria-label="Searching for nearby users">
+            <span aria-hidden="true">+</span>
+          </button>
+        </div>
+
+        <label class="drop-zone transfer-card" id="dropZone" for="fileInput">
+          <input id="fileInput" type="file" multiple>
+          <span class="transfer-card__tab" aria-hidden="true"></span>
+          <span class="transfer-card__halo" aria-hidden="true"></span>
+          <span class="transfer-card__header">
+            <span>
+              <span class="transfer-kicker">WebDrop</span>
+              <span class="transfer-title" id="transferTitle">Ready to receive</span>
+            </span>
+            <span class="transfer-icon" aria-hidden="true">+</span>
+          </span>
+          <span class="drop-zone__meta" id="dropZoneMeta">Choose files or drag them onto the card</span>
+          <span class="transfer-card__footer">
+            <span class="status-value" id="fileSummary">0 files</span>
+            <span class="status-value" id="scoreSummary">0 pts</span>
+          </span>
+          <span class="progress-track" aria-hidden="true">
+            <span id="progressBar"></span>
+          </span>
+        </label>
+      </section>
+
+      <section class="phone-gallery" aria-hidden="true">
+        <article class="phone-card phone-card--left">
+          <span class="phone-speaker"></span>
+          <span class="phone-photo"></span>
+          <span class="phone-line"></span>
+          <span class="phone-chip"></span>
+        </article>
+        <article class="phone-card phone-card--center">
+          <span class="phone-speaker"></span>
+          <span class="phone-photo"></span>
+          <span class="phone-line"></span>
+          <span class="phone-chip"></span>
+        </article>
+        <article class="phone-card phone-card--right">
+          <span class="phone-speaker"></span>
+          <span class="phone-photo"></span>
+          <span class="phone-line"></span>
+          <span class="phone-chip"></span>
+        </article>
+      </section>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
