@@ -165,14 +165,23 @@
           <span data-ja="アイコンを表示" data-en="Show Icons">アイコンを表示</span>
           <input type="checkbox" id="toggle-icons" checked>
         </div>
-        <div class="setting-item">
-          <span data-ja="QRペアリング" data-en="QR Pairing">QRペアリング</span>
-          <div style="display:flex;gap:8px">
-            <button class="qr-mini-btn" id="btnCreateQR" data-ja="作成" data-en="Create">作成</button>
-            <button class="qr-mini-btn" id="btnScanQR" data-ja="スキャン" data-en="Scan">スキャン</button>
+        <div class="setting-item" id="qr-pairing-row">
+          <div class="qr-pairing-info">
+            <span id="qrPairingLabel" data-ja="QRペアリング" data-en="QR Pairing">QRペアリング</span>
+            <span class="qr-device-sub" id="qrDeviceSub"></span>
           </div>
+          <!-- Button injected by JS based on device type -->
+          <button class="qr-mini-btn qr-mini-btn--primary" id="btnQRAction"></button>
         </div>
         <hr class="divider">
+        <!-- Device banner -->
+        <div class="device-banner" id="deviceBanner">
+          <span class="device-banner-icon" id="deviceBannerIcon"></span>
+          <div class="device-banner-text">
+            <span class="device-banner-name" id="deviceBannerName"></span>
+            <span class="device-banner-role" id="deviceBannerRole"></span>
+          </div>
+        </div>
         <div class="setting-item" style="opacity:0.5;font-size:11px;" id="deviceInfoLabel">
           Device: detecting…
         </div>
@@ -671,10 +680,71 @@
       document.querySelectorAll('.person').forEach(p => { p.style.opacity = e.target.checked ? '1' : '0'; });
     });
 
-    /* ── QR pairing ── */
-    $('btnCreateQR').addEventListener('click', async () => {
+    /* ────────────────────────────────────
+       Device Detection
+    ──────────────────────────────────── */
+    const DEVICE = (function detectDevice() {
+      const ua  = navigator.userAgent  || '';
+      const pf  = navigator.platform   || '';
+      const vnd = navigator.vendor     || '';
+
+      // iPhone / iPod / older iPad
+      if (/iPhone|iPod/.test(ua) && !window.MSStream) {
+        return { type: 'iPhone', label: 'iPhone', icon: '📱', qrRole: 'scan' };
+      }
+      // iPad (modern iPads report MacIntel platform when desktop mode is off)
+      if (/iPad/.test(ua) || (pf === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+        return { type: 'iPad', label: 'iPad', icon: '📱', qrRole: 'scan' };
+      }
+      // Android
+      if (/Android/i.test(ua)) {
+        const isTablet = !/Mobile/.test(ua);
+        return { type: 'Android', label: isTablet ? 'Android Tablet' : 'Android', icon: '🤖', qrRole: 'scan' };
+      }
+      // macOS
+      if (/Mac/.test(pf) || /Macintosh/.test(ua)) {
+        return { type: 'Mac', label: 'Mac', icon: '💻', qrRole: 'create' };
+      }
+      // Windows
+      if (/Win/.test(pf) || /Windows/.test(ua)) {
+        return { type: 'Windows', label: 'Windows PC', icon: '🖥️', qrRole: 'create' };
+      }
+      // Linux / Other Desktop
+      return { type: 'Desktop', label: 'Desktop', icon: '🖥️', qrRole: 'create' };
+    })();
+
+    /* Apply device info to Settings UI */
+    function applyDeviceUI() {
+      // Device banner
+      $('deviceBannerIcon').textContent = DEVICE.icon;
+      $('deviceBannerName').textContent = DEVICE.label;
+      $('deviceBannerRole').textContent = DEVICE.qrRole === 'create'
+        ? t('QRコードを作成してモバイルに表示', 'Creates QR code for mobile to scan')
+        : t('PCのQRコードをスキャンして接続', 'Scans QR code shown on PC');
+
+      // QR action button text
+      const btn = $('btnQRAction');
+      if (DEVICE.qrRole === 'create') {
+        btn.textContent = t('QRコード表示', 'Show QR');
+        btn.dataset.role = 'create';
+      } else {
+        btn.textContent = t('QRスキャン', 'Scan QR');
+        btn.dataset.role = 'scan';
+      }
+
+      // Sub-label
+      $('qrDeviceSub').textContent = DEVICE.qrRole === 'create'
+        ? t('送信側', 'Sender')
+        : t('受信側', 'Receiver');
+
+      // Also update the status label
+      $('deviceInfoLabel').textContent = `${DEVICE.icon} ${DEVICE.label} (${DEVICE.type})`;
+    }
+
+    /* ── QR island helpers ── */
+    async function openQRCreate() {
       $('settingsModal').classList.remove('active');
-      $('islandScanMode').style.display  = 'none';
+      $('islandScanMode').style.display   = 'none';
       $('islandCreateMode').style.display = 'block';
       $('dynamicIsland').classList.add('active');
 
@@ -683,39 +753,66 @@
       try {
         if (window.QRCode) {
           await QRCode.toCanvas(canvas, `webdrop:${sessionId}`, {
-            width: 200, margin: 1,
+            width: 220, margin: 1,
             color: { dark: '#000000', light: '#ffffff' }
           });
         }
       } catch (err) { console.error('QR generation failed', err); }
-    });
+    }
 
-    $('btnScanQR').addEventListener('click', async () => {
+    async function openQRScan() {
       $('settingsModal').classList.remove('active');
-      $('islandScanMode').style.display  = 'block';
+      $('islandScanMode').style.display   = 'block';
       $('islandCreateMode').style.display = 'none';
       $('dynamicIsland').classList.add('active');
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
         $('qr-video').srcObject = stream;
       } catch {
         showToast(t('カメラへのアクセスが拒否されました', 'Camera access denied'));
         $('dynamicIsland').classList.remove('active');
       }
-    });
+    }
 
-    // Close dynamic island when clicking outside
-    document.addEventListener('click', e => {
-      const island = $('dynamicIsland');
-      if (island.classList.contains('active') && !island.contains(e.target) &&
-          !$('btnCreateQR').contains(e.target) && !$('btnScanQR').contains(e.target)) {
-        island.classList.remove('active');
-        if ($('qr-video').srcObject) {
-          $('qr-video').srcObject.getTracks().forEach(t => t.stop());
-          $('qr-video').srcObject = null;
-        }
+    function closeIsland() {
+      $('dynamicIsland').classList.remove('active');
+      const vid = $('qr-video');
+      if (vid.srcObject) {
+        vid.srcObject.getTracks().forEach(tr => tr.stop());
+        vid.srcObject = null;
+      }
+    }
+
+    /* Single QR action button — role decided by device */
+    $('btnQRAction').addEventListener('click', () => {
+      if ($('btnQRAction').dataset.role === 'create') {
+        openQRCreate();
+      } else {
+        openQRScan();
       }
     });
+
+    /* Tap the Dynamic Island itself to close it */
+    $('dynamicIsland').addEventListener('click', e => {
+      // Only close if already expanded and clicking the island background (not the canvas/video)
+      if ($('dynamicIsland').classList.contains('active') &&
+          (e.target === $('dynamicIsland') || e.target === $('islandScanMode') || e.target === $('islandCreateMode'))) {
+        closeIsland();
+      }
+    });
+
+    // Close island when clicking outside
+    document.addEventListener('click', e => {
+      const island = $('dynamicIsland');
+      if (island.classList.contains('active') &&
+          !island.contains(e.target) &&
+          !$('btnQRAction').contains(e.target)) {
+        closeIsland();
+      }
+    });
+
 
     /* ────────────────────────────────────
        WebDrop module events
@@ -731,14 +828,16 @@
        Init state
     ──────────────────────────────────── */
     setState(STATE.IDLE);
-    setStatDot('ws', 'connecting'); // will update to connected/disconnected from module events
+    setStatDot('ws', 'connecting'); // will update via module events
 
-    // Restore cached permission dots immediately (no need to re-ask)
+    // Apply device-specific UI immediately
+    applyDeviceUI();
+
+    // Restore cached permission dots immediately (no re-ask)
     (['mic','bump','tilt']).forEach(key => {
       const cached = PermCache.get(key);
       if (cached) setStatDot(key, cached);
     });
-    // Mic also controls ultra dot
     const cachedMic = PermCache.get('mic');
     if (cachedMic) setStatDot('ultra', cachedMic);
   </script>

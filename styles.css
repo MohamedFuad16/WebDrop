@@ -395,10 +395,41 @@ body {
 .upload-btn:hover { background: rgba(255,255,255,0.2); }
 .qr-mini-btn {
   background: rgba(255,255,255,0.1); border: none; color: #fff;
-  padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 12px;
-  transition: background 0.2s;
+  padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  transition: background 0.2s; font-family: var(--font);
 }
 .qr-mini-btn:hover { background: rgba(255,255,255,0.2); }
+
+/* Primary QR button (device-aware, replaces Create/Scan pair) */
+.qr-mini-btn--primary {
+  background: linear-gradient(135deg,#1a6ef5,#0a50d0);
+  font-weight: 600;
+  padding: 8px 16px;
+}
+.qr-mini-btn--primary:hover { opacity: 0.88; background: linear-gradient(135deg,#1a6ef5,#0a50d0); }
+
+/* QR pairing row sub-info */
+.qr-pairing-info {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.qr-device-sub {
+  font-size: 10px; color: #666; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* Device banner (shown inside settings) */
+.device-banner {
+  display: flex; align-items: center; gap: 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.device-banner-icon { font-size: 28px; line-height: 1; }
+.device-banner-text { display: flex; flex-direction: column; gap: 3px; }
+.device-banner-name { font-size: 15px; font-weight: 600; color: #e8e8e8; }
+.device-banner-role { font-size: 11px; color: #888; line-height: 1.4; }
+
 
 /* ─── Dynamic Island ────────────────────────────── */
 .dynamic-island {
