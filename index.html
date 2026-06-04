@@ -1,109 +1,301 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="format-detection" content="telephone=no">
-  <meta name="theme-color" content="#f4f4f2">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data: ws: wss:; connect-src 'self' ws: wss:; media-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>WebDrop</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
+
 <body>
-  <aside class="desktop-gate" aria-label="Mobile only notice">
-    <div class="desktop-gate__mark" aria-hidden="true">W</div>
-    <h1>Open WebDrop on mobile</h1>
-    <p>WebDrop is designed for mobile handoff. Open this on your phone to transfer nearby files.</p>
-  </aside>
 
-  <main class="mobile-shell" aria-labelledby="appTitle">
-    <section class="mobile-frame" aria-label="WebDrop mobile transfer app">
-      <header class="app-bar">
-        <div class="brand-mark" aria-hidden="true">W</div>
-        <div class="connection-chip" id="connectionChip" data-state="idle" aria-live="polite">
-          <span class="connection-dot"></span>
-          <span id="connectionText">Offline</span>
+  <!-- Settings Option -->
+  <div class="settings-container">
+    <button class="settings-btn" title="Settings" onclick="document.getElementById('settingsModal').classList.add('active')">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
+    <input type="file" id="document-upload" hidden multiple accept=".pdf,.doc,.docx,.txt">
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="settings-modal" id="settingsModal">
+    <div class="settings-content">
+      <div class="settings-header">
+        <h3>Settings</h3>
+        <button class="close-settings" onclick="document.getElementById('settingsModal').classList.remove('active')">&times;</button>
+      </div>
+      <div class="settings-body">
+        <div class="setting-item">
+          <span>Profile Picture</span>
+          <label for="profile-upload" class="upload-btn">Upload</label>
+          <input type="file" id="profile-upload" hidden accept="image/*">
         </div>
-      </header>
-
-      <section class="hero-copy">
-        <p class="eyebrow">Nearby peer transfer</p>
-        <h1 id="appTitle">Drop files nearby in real-time.</h1>
-        <p class="hero-meta" id="statusNote">Discovery uses WebSocket signaling, then WebRTC data channels for direct transfer.</p>
-      </section>
-
-      <section class="action-row" aria-label="Discovery controls">
-        <button class="primary-button" id="connectButton" type="button">Start discovery</button>
-        <button class="secondary-button" id="soundButton" type="button">Prime proximity</button>
-      </section>
-
-      <section class="transfer-stage" aria-label="Nearby users and transfer card">
-        <div class="orbit-layer" aria-hidden="true">
-          <span class="orbit orbit--wide"></span>
-          <span class="orbit orbit--tilt"></span>
-          <span class="orbit orbit--tight"></span>
+        <div class="setting-item">
+          <span>Background Color</span>
+          <input type="color" id="bg-color-picker" value="#000000">
         </div>
-
-        <div class="particle-field" id="particleField" aria-hidden="true">
-          <span></span>
-          <span></span>
-          <span></span>
-          <span></span>
-          <span></span>
-          <span></span>
+        <div class="setting-item">
+          <span>Orbit Intensity</span>
+          <input type="range" id="orbit-intensity" min="0.05" max="1" step="0.05" value="0.3">
         </div>
-
-        <div class="users-layer" id="usersLayer" aria-live="polite">
-          <button class="empty-search" id="emptySearch" type="button" aria-label="Searching for nearby users">
-            <span aria-hidden="true">+</span>
-          </button>
+        <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.1); margin: 10px 0;">
+        <div class="setting-item">
+          <span>Show Folder</span>
+          <input type="checkbox" id="toggle-folder" checked>
         </div>
+        <div class="setting-item">
+          <span>Show Orbit Lines</span>
+          <input type="checkbox" id="toggle-orbits" checked>
+        </div>
+        <div class="setting-item">
+          <span>Show Icons</span>
+          <input type="checkbox" id="toggle-icons" checked>
+        </div>
+        <div class="setting-item">
+          <span>QR Scanner</span>
+          <input type="checkbox" id="toggle-qr">
+        </div>
+      </div>
+    </div>
+  </div>
 
-        <label class="drop-zone transfer-card" id="dropZone" for="fileInput">
-          <input id="fileInput" type="file" multiple>
-          <span class="transfer-card__tab" aria-hidden="true"></span>
-          <span class="transfer-card__halo" aria-hidden="true"></span>
-          <span class="transfer-card__header">
-            <span>
-              <span class="transfer-kicker">WebDrop</span>
-              <span class="transfer-title" id="transferTitle">Ready to receive</span>
-            </span>
-            <span class="transfer-icon" aria-hidden="true">+</span>
-          </span>
-          <span class="drop-zone__meta" id="dropZoneMeta">Choose files or drag them onto the card</span>
-          <span class="transfer-card__footer">
-            <span class="status-value" id="fileSummary">0 files</span>
-            <span class="status-value" id="scoreSummary">0 pts</span>
-          </span>
-          <span class="progress-track" aria-hidden="true">
-            <span id="progressBar"></span>
-          </span>
-        </label>
-      </section>
+  <!-- Dynamic Island -->
+  <div class="dynamic-island" id="dynamicIsland">
+    <div class="island-content">
+      <video id="qr-video" autoplay playsinline></video>
+      <div class="qr-overlay">
+        <div class="qr-frame"></div>
+        <p>Scan to unlock bike</p>
+      </div>
+    </div>
+  </div>
 
-      <section class="phone-gallery" aria-hidden="true">
-        <article class="phone-card phone-card--left">
-          <span class="phone-speaker"></span>
-          <span class="phone-photo"></span>
-          <span class="phone-line"></span>
-          <span class="phone-chip"></span>
-        </article>
-        <article class="phone-card phone-card--center">
-          <span class="phone-speaker"></span>
-          <span class="phone-photo"></span>
-          <span class="phone-line"></span>
-          <span class="phone-chip"></span>
-        </article>
-        <article class="phone-card phone-card--right">
-          <span class="phone-speaker"></span>
-          <span class="phone-photo"></span>
-          <span class="phone-line"></span>
-          <span class="phone-chip"></span>
-        </article>
-      </section>
-    </section>
-  </main>
+  <!-- Debug & Status Panel -->
+  <div id="debugPanel" class="debug-panel">
+    <h4>Debug & Status</h4>
+    <p id="deviceInfo">Device: Unknown</p>
+    <p id="statusNote">Idle</p>
+    <p id="fileSummary"></p>
+    <div class="progress-container">
+      <div id="progressBar" class="progress-bar"></div>
+    </div>
+    <div class="debug-actions">
+      <button onclick="window.WebDrop && window.WebDrop.proximityEngine.bump.simulateBump()">Simulate Bump</button>
+      <button onclick="window.WebDrop && window.WebDrop.proximityEngine.tilt.simulateTilt()">Simulate Tilt</button>
+      <button onclick="window.WebDrop && window.WebDrop.proximityEngine.audioChime.simulateChimeDetection()">Simulate Chime</button>
+      <button onclick="window.WebDrop && window.WebDrop.simulateHighScore()">Simulate >70 Score</button>
+    </div>
+  </div>
 
-  <script src="app.js"></script>
+  <div class="folder" onclick="this.classList.toggle('is-open')">
+    <div class="orbits">
+      <div class="orbit">
+        <div class="person">
+          <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Brian&backgroundColor=b6e3f4" alt="User" id="my-profile-pic" />
+          <span>Brian's iPhone</span>
+        </div>
+      </div>
+      <div class="orbit">
+        <div class="person">
+          <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex&backgroundColor=ffdfbf" alt="User" />
+          <span>Alex's iPad</span>
+        </div>
+      </div>
+      <div class="orbit">
+        <div class="person">
+          <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah&backgroundColor=c0aede" alt="User" />
+          <span>Sarah's Mac</span>
+        </div>
+      </div>
+    </div>
+    <div class="ripples">
+      <div class="ripple"></div>
+      <div class="ripple"></div>
+      <div class="ripple"></div>
+    </div>
+    <div class="folder-back"></div>
+
+    <div class="paper-stack" id="paper-stack" onclick="event.stopPropagation(); document.getElementById('document-upload').click();">
+      <div class="paper default-paper">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        <span>Upload</span>
+      </div>
+    </div>
+
+    <div class="folder-front">
+      <div class="folder-front-header">
+        <span class="folder-title">Documents</span>
+        <button class="folder-action-btn" onclick="event.stopPropagation(); openActionSheet();">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="7" y1="17" x2="17" y2="7"></line>
+            <polyline points="7 7 17 7 17 17"></polyline>
+          </svg>
+        </button>
+      </div>
+      <div class="folder-front-footer">
+        <span class="folder-count">0 files</span>
+        <div class="folder-storage">
+          <span class="folder-storage-text">0/500 MB</span>
+          <div class="folder-storage-bars">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Sheet UI -->
+  <div class="sheet-overlay" id="sheetOverlay"></div>
+  <div class="bottom-sheet" id="actionSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-content">
+      <button class="sheet-btn" id="btnSend">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg> 
+        Send File
+      </button>
+      <button class="sheet-btn" id="btnReceive">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="8 17 12 21 16 17"></polyline>
+          <line x1="12" y1="12" x2="12" y2="21"></line>
+          <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path>
+        </svg>
+        Receive File
+      </button>
+      <button class="sheet-btn sheet-cancel" id="btnCancelAction">Cancel</button>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+  <script>
+    // Keep UI event listeners that don't depend on modules
+    
+    // Bottom Sheet Logic
+    const sheet = document.getElementById('actionSheet');
+    const sheetOverlay = document.getElementById('sheetOverlay');
+    const folderEl = document.querySelector('.folder');
+    
+    window.openActionSheet = function() {
+      sheet.classList.add('active');
+      sheetOverlay.classList.add('active');
+    };
+    
+    function closeActionSheet() {
+      sheet.classList.remove('active');
+      sheetOverlay.classList.remove('active');
+    }
+
+    document.getElementById('btnCancelAction')?.addEventListener('click', closeActionSheet);
+    sheetOverlay?.addEventListener('click', closeActionSheet);
+
+    document.getElementById('btnSend')?.addEventListener('click', () => {
+      closeActionSheet();
+      folderEl.classList.remove('is-receiving');
+      folderEl.classList.add('is-sending');
+      document.getElementById('document-upload').click();
+    });
+
+    document.getElementById('btnReceive')?.addEventListener('click', () => {
+      closeActionSheet();
+      folderEl.classList.remove('is-sending');
+      folderEl.classList.add('is-receiving');
+    });
+    document.getElementById('profile-upload')?.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          document.getElementById('my-profile-pic').src = event.target.result;
+        }
+        reader.readAsDataURL(file);
+      }
+    });
+
+    document.getElementById('bg-color-picker')?.addEventListener('input', function(e) {
+      document.body.style.background = e.target.value;
+    });
+
+    document.getElementById('orbit-intensity')?.addEventListener('input', function(e) {
+      document.querySelectorAll('.orbit').forEach(orbit => {
+        orbit.style.borderColor = `rgba(255, 255, 255, ${e.target.value})`;
+      });
+    });
+
+    // Toggles
+    document.getElementById('toggle-folder')?.addEventListener('change', e => {
+      const display = e.target.checked ? 'block' : 'none';
+      document.querySelector('.folder-back').style.display = display;
+      document.querySelector('.folder-front').style.display = display;
+      document.getElementById('paper-stack').style.display = display;
+    });
+
+    document.getElementById('toggle-orbits')?.addEventListener('change', e => {
+      document.querySelectorAll('.orbit').forEach(orbit => {
+        orbit.style.borderStyle = e.target.checked ? 'dashed' : 'none';
+      });
+    });
+
+    document.getElementById('toggle-icons')?.addEventListener('change', e => {
+      document.querySelectorAll('.person').forEach(person => {
+        person.style.display = e.target.checked ? 'flex' : 'none';
+      });
+    });
+    
+    // File upload handled by WebRTC now, but we keep the visual paper stack update here for demo
+    let totalFiles = 0;
+    document.getElementById('document-upload')?.addEventListener('change', function(e) {
+      const files = e.target.files;
+      if (files.length > 0 && window.WebDrop) {
+        // Send to WebDrop app logic
+        Array.from(files).forEach(f => window.WebDrop.webrtcClient.sendFile(f));
+        
+        // Update visual stack
+        const paperStack = document.getElementById('paper-stack');
+        if (totalFiles === 0) paperStack.innerHTML = '';
+        
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const paper = document.createElement('div');
+          paper.className = 'paper';
+          const offset = Math.min(totalFiles + i, 4) * 8;
+          paper.style.bottom = `${offset}px`;
+          paper.style.transform = `scale(${1 - offset*0.01})`;
+          paper.style.zIndex = totalFiles + i;
+          paper.innerHTML = `
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span title="${file.name}">${file.name}</span>
+          `;
+          paperStack.appendChild(paper);
+        }
+        totalFiles += files.length;
+        folderEl.classList.remove('is-open');
+      }
+    });
+  </script>
 </body>
+
 </html>
