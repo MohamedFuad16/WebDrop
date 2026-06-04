@@ -14,13 +14,10 @@ export class WebSocketClient {
       this.connected = true;
       this.send({
         type: 'announce',
-        payload: {
-          clientId: this.clientId,
-          displayName,
-          deviceType
-        }
+        payload: { clientId: this.clientId, displayName, deviceType }
       });
       this.bus.emit('ws:connected');
+      window.dispatchEvent(new CustomEvent('webdrop:ws:connected'));
     });
 
     this.socket.addEventListener('message', (event) => {
@@ -35,6 +32,7 @@ export class WebSocketClient {
     this.socket.addEventListener('close', () => {
       this.connected = false;
       this.bus.emit('ws:disconnected');
+      window.dispatchEvent(new CustomEvent('webdrop:ws:disconnected'));
       setTimeout(() => this.connect(displayName, deviceType), 3000);
     });
   }

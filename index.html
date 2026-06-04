@@ -1,293 +1,519 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>WebDrop</title>
+  <title>ウェブドロップ | WebDrop</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <!-- QR code generation -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <!-- QR code scanning -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
 
 <body>
 
-  <!-- Settings Button -->
+  <!-- ── Settings Button ── -->
   <div class="settings-container">
-    <button class="settings-btn" id="settingsBtn" title="Settings" aria-label="Open Settings">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <button class="settings-btn" id="settingsBtn" aria-label="設定 / Settings">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"></circle>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
       </svg>
     </button>
+    <!-- Hidden inputs -->
     <input type="file" id="document-upload" hidden multiple accept="*/*">
+    <input type="file" id="profile-upload" hidden accept="image/*">
   </div>
 
-  <!-- Dynamic Island (QR Scanner) -->
+  <!-- ── Dynamic Island (QR Scanner / Creator) ── -->
   <div class="dynamic-island" id="dynamicIsland">
     <div class="island-content">
-      <video id="qr-video" autoplay playsinline></video>
-      <div class="qr-overlay">
-        <div class="qr-frame"></div>
-        <p>Scan QR to pair</p>
+      <div class="island-mode" id="islandScanMode">
+        <video id="qr-video" autoplay playsinline muted></video>
+        <div class="qr-overlay">
+          <div class="qr-corner qr-corner--tl"></div>
+          <div class="qr-corner qr-corner--tr"></div>
+          <div class="qr-corner qr-corner--bl"></div>
+          <div class="qr-corner qr-corner--br"></div>
+          <p data-ja="QRコードをスキャン" data-en="Scan QR Code">QRコードをスキャン</p>
+        </div>
+      </div>
+      <div class="island-mode" id="islandCreateMode" style="display:none;">
+        <div class="qr-create-inner">
+          <canvas id="qr-canvas"></canvas>
+          <p data-ja="このQRコードをスキャン" data-en="Scan this to connect">このQRコードをスキャン</p>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Main scene: orbits + folder, centered on screen -->
+  <!-- ── Scene: zero-size centred anchor for all spatial elements ── -->
   <div class="scene" id="scene">
 
-    <!-- Orbit rings (behind everything) -->
+    <!-- Orbit rings -->
     <div class="orbit-ring orbit-ring--1"></div>
     <div class="orbit-ring orbit-ring--2"></div>
     <div class="orbit-ring orbit-ring--3"></div>
 
-    <!-- Ripple rings (shown during send/receive) -->
-    <div class="ripple-ring ripple-ring--1" id="ripple1"></div>
-    <div class="ripple-ring ripple-ring--2" id="ripple2"></div>
-    <div class="ripple-ring ripple-ring--3" id="ripple3"></div>
+    <!-- Ripple rings (appear during search) -->
+    <div class="ripple-ring ripple-ring--1"></div>
+    <div class="ripple-ring ripple-ring--2"></div>
+    <div class="ripple-ring ripple-ring--3"></div>
 
-    <!-- Nearby user avatars, each orbiting at a set position -->
-    <div class="person-wrapper" style="--orbit-r: 210px; --orbit-angle: 0deg; --anim-dur: 25s">
-      <div class="person">
+    <!-- Nearby person avatars -->
+    <div class="person-wrapper" style="--orbit-r:210px;--orbit-angle:0deg;--anim-dur:25s">
+      <div class="person" data-peer-id="brian">
         <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Brian&backgroundColor=b6e3f4" alt="Brian" id="my-profile-pic">
         <span>Brian's iPhone</span>
       </div>
     </div>
-    <div class="person-wrapper" style="--orbit-r: 310px; --orbit-angle: 120deg; --anim-dur: 40s">
-      <div class="person">
+    <div class="person-wrapper" style="--orbit-r:310px;--orbit-angle:130deg;--anim-dur:38s">
+      <div class="person" data-peer-id="alex">
         <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex&backgroundColor=ffdfbf" alt="Alex">
         <span>Alex's iPad</span>
       </div>
     </div>
-    <div class="person-wrapper" style="--orbit-r: 410px; --orbit-angle: 240deg; --anim-dur: 60s">
-      <div class="person">
+    <div class="person-wrapper" style="--orbit-r:410px;--orbit-angle:250deg;--anim-dur:55s">
+      <div class="person" data-peer-id="sarah">
         <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah&backgroundColor=c0aede" alt="Sarah">
         <span>Sarah's Mac</span>
       </div>
     </div>
 
-    <!-- Central folder -->
+    <!-- ── Central Folder ── -->
     <div class="folder" id="folderEl">
+
+      <!-- Folder body (back) -->
       <div class="folder-back"></div>
 
-      <div class="paper-stack" id="paper-stack">
-        <div class="paper default-paper">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Paper / file card stack (sits INSIDE folder, covered by front when closed) -->
+      <div class="paper-stack" id="paper-stack" role="button" aria-label="ファイルを選択 / Select file">
+        <div class="paper default-paper" id="defaultPaper">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-            <polyline points="10 9 9 9 8 9"></polyline>
+            <line x1="12" y1="12" x2="12" y2="18"></line>
+            <line x1="9" y1="15" x2="15" y2="15"></line>
           </svg>
-          <span>Add Files</span>
+          <span class="paper-label" data-ja="追加" data-en="Add">追加</span>
         </div>
       </div>
 
+      <!-- Folder front face (glassmorphism lid) -->
       <div class="folder-front" id="folderFront">
         <div class="folder-front-header">
-          <span class="folder-title">WebDrop</span>
-          <button class="folder-action-btn" id="folderActionBtn" aria-label="Send or Receive">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="7" y1="17" x2="17" y2="7"></line>
-              <polyline points="7 7 17 7 17 17"></polyline>
+          <span class="folder-title" data-ja="ウェブドロップ" data-en="WebDrop">ウェブドロップ</span>
+          <!-- Send/Receive action button — glows when file is ready -->
+          <button class="folder-action-btn" id="folderActionBtn" aria-label="送信・受信 / Send or Receive" disabled>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
             </svg>
           </button>
         </div>
         <div class="folder-front-footer">
-          <span class="folder-count" id="folder-count">0 files</span>
+          <span class="folder-count" id="folder-count">0 <span data-ja="ファイル" data-en="files">ファイル</span></span>
           <div class="folder-storage">
             <span class="folder-storage-text" id="folder-storage-text">0/500 MB</span>
             <div class="folder-storage-bars" id="folder-bars">
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
-              <div class="bar"></div>
+              <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+              <div class="bar"></div><div class="bar"></div>
             </div>
           </div>
         </div>
       </div>
+
+    </div><!-- /folder -->
+
+    <!-- Searching label (appears below folder during search) -->
+    <div class="searching-label" id="searchingLabel">
+      <div class="searching-spinner"></div>
+      <span data-ja="端末を検索中…" data-en="Searching for devices…">端末を検索中…</span>
     </div>
 
   </div><!-- /scene -->
 
-  <!-- Settings Modal (outside scene) -->
+  <!-- ── Settings Modal ── -->
   <div class="settings-modal" id="settingsModal" role="dialog" aria-modal="true">
     <div class="settings-content">
       <div class="settings-header">
-        <h3>Settings</h3>
-        <button class="close-settings" id="closeSettings" aria-label="Close">&times;</button>
+        <h3 data-ja="設定" data-en="Settings">設定</h3>
+        <button class="close-settings" id="closeSettings" aria-label="閉じる / Close">&times;</button>
       </div>
       <div class="settings-body">
         <div class="setting-item">
-          <span>Profile Picture</span>
-          <label for="profile-upload" class="upload-btn">Upload</label>
-          <input type="file" id="profile-upload" hidden accept="image/*">
+          <span data-ja="プロフィール写真" data-en="Profile Photo">プロフィール写真</span>
+          <label for="profile-upload" class="upload-btn" data-ja="変更" data-en="Change">変更</label>
         </div>
         <div class="setting-item">
-          <span>Background Color</span>
+          <span data-ja="背景色" data-en="Background">背景色</span>
           <input type="color" id="bg-color-picker" value="#000000">
         </div>
         <div class="setting-item">
-          <span>Orbit Intensity</span>
+          <span data-ja="軌道の強さ" data-en="Orbit Intensity">軌道の強さ</span>
           <input type="range" id="orbit-intensity" min="0.05" max="1" step="0.05" value="0.3">
         </div>
-        <hr style="border:0;border-top:1px solid rgba(255,255,255,0.1);margin:10px 0;">
+        <hr class="divider">
         <div class="setting-item">
-          <span>Show Orbit Lines</span>
+          <span data-ja="軌道を表示" data-en="Show Orbits">軌道を表示</span>
           <input type="checkbox" id="toggle-orbits" checked>
         </div>
         <div class="setting-item">
-          <span>Show Icons</span>
+          <span data-ja="アイコンを表示" data-en="Show Icons">アイコンを表示</span>
           <input type="checkbox" id="toggle-icons" checked>
         </div>
         <div class="setting-item">
-          <span>QR Scanner</span>
-          <input type="checkbox" id="toggle-qr">
+          <span data-ja="QRペアリング" data-en="QR Pairing">QRペアリング</span>
+          <div style="display:flex;gap:8px">
+            <button class="qr-mini-btn" id="btnCreateQR" data-ja="作成" data-en="Create">作成</button>
+            <button class="qr-mini-btn" id="btnScanQR" data-ja="スキャン" data-en="Scan">スキャン</button>
+          </div>
         </div>
-        <hr style="border:0;border-top:1px solid rgba(255,255,255,0.1);margin:10px 0;">
-        <div class="setting-item">
-          <span style="font-size:11px;color:#666;" id="deviceInfoLabel">Detecting device…</span>
+        <hr class="divider">
+        <div class="setting-item" style="opacity:0.5;font-size:11px;" id="deviceInfoLabel">
+          Device: detecting…
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Action Bottom Sheet (outside scene, fixed to screen) -->
+  <!-- ── Action Bottom Sheet ── -->
   <div class="sheet-backdrop" id="sheetBackdrop"></div>
-  <div class="bottom-sheet" id="actionSheet" role="dialog" aria-modal="true" aria-label="File Actions">
+  <div class="bottom-sheet" id="actionSheet" role="dialog" aria-modal="true">
     <div class="sheet-handle"></div>
-    <p class="sheet-title">Choose Action</p>
+    <p class="sheet-title" data-ja="アクションを選択" data-en="Choose Action">アクションを選択</p>
     <div class="sheet-content">
       <button class="sheet-btn sheet-btn--send" id="btnSend">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="22" y1="2" x2="11" y2="13"></line>
           <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
         </svg>
-        <span>Send File</span>
+        <div class="sheet-btn-text">
+          <span class="sheet-btn-title" data-ja="ファイルを送信" data-en="Send File">ファイルを送信</span>
+          <span class="sheet-btn-sub" data-ja="ファイルを選択して送信" data-en="Pick a file to send">ファイルを選択して送信</span>
+        </div>
       </button>
       <button class="sheet-btn sheet-btn--receive" id="btnReceive">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="8 17 12 21 16 17"></polyline>
           <line x1="12" y1="12" x2="12" y2="21"></line>
           <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path>
         </svg>
-        <span>Receive File</span>
+        <div class="sheet-btn-text">
+          <span class="sheet-btn-title" data-ja="ファイルを受信" data-en="Receive File">ファイルを受信</span>
+          <span class="sheet-btn-sub" data-ja="ファイルの受信を待機" data-en="Wait for incoming file">ファイルの受信を待機</span>
+        </div>
       </button>
     </div>
-    <button class="sheet-cancel" id="btnCancelSheet">Cancel</button>
+    <button class="sheet-cancel" id="btnCancelSheet" data-ja="キャンセル" data-en="Cancel">キャンセル</button>
   </div>
 
-  <!-- Status Toast -->
+  <!-- ── Status Toast ── -->
   <div class="status-toast" id="statusToast"></div>
+
+  <!-- ── Debug / Status Bar (bottom strip) ── -->
+  <div class="status-bar" id="statusBar">
+    <div class="stat-item" id="stat-mic">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+      <span data-ja="マイク" data-en="Mic">マイク</span>
+      <span class="stat-dot" data-status="unknown"></span>
+    </div>
+    <div class="stat-item" id="stat-ws">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+      <span data-ja="接続" data-en="WS">接続</span>
+      <span class="stat-dot" data-status="unknown"></span>
+    </div>
+    <div class="stat-item" id="stat-tilt">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+      <span data-ja="傾き" data-en="Tilt">傾き</span>
+      <span class="stat-dot" data-status="unknown"></span>
+    </div>
+    <div class="stat-item" id="stat-bump">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+      <span data-ja="振動" data-en="Bump">振動</span>
+      <span class="stat-dot" data-status="unknown"></span>
+    </div>
+    <div class="stat-item" id="stat-ultra">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+      <span data-ja="超音波" data-en="Ultra">超音波</span>
+      <span class="stat-dot" data-status="unknown"></span>
+    </div>
+  </div>
+
+  <!-- ── Permission Request Overlay ── -->
+  <div class="perm-overlay" id="permOverlay" style="display:none;">
+    <div class="perm-card">
+      <div class="perm-icon">🎤</div>
+      <h3 id="permTitle">マイクへのアクセス</h3>
+      <p id="permDesc">近くの端末を超音波で検出するためにマイクが必要です。</p>
+      <button class="perm-allow-btn" id="permAllowBtn" data-ja="許可する" data-en="Allow">許可する</button>
+      <button class="perm-skip-btn" id="permSkipBtn" data-ja="スキップ" data-en="Skip">スキップ</button>
+    </div>
+  </div>
 
   <script type="module" src="app.js"></script>
   <script>
-    /* ── Helpers ── */
+    'use strict';
+
+    /* ────────────────────────────────────
+       i18n — detect browser language
+    ──────────────────────────────────── */
+    const LANG = navigator.language.startsWith('ja') ? 'ja' : 'en';
+    document.documentElement.lang = LANG === 'ja' ? 'ja' : 'en';
+
+    function applyI18n() {
+      document.querySelectorAll('[data-ja]').forEach(el => {
+        el.textContent = LANG === 'ja' ? el.dataset.ja : el.dataset.en;
+      });
+    }
+    applyI18n();
+
+    function t(ja, en) { return LANG === 'ja' ? ja : en; }
+
+    /* ────────────────────────────────────
+       Utility
+    ──────────────────────────────────── */
     const $ = id => document.getElementById(id);
-    const folderEl   = $('folderEl');
-    const paperStack = $('paper-stack');
-    const sheet      = $('actionSheet');
-    const backdrop   = $('sheetBackdrop');
 
-    let totalFiles = 0;
+    const folderEl    = $('folderEl');
+    const paperStack  = $('paper-stack');
+    const sheet       = $('actionSheet');
+    const backdrop    = $('sheetBackdrop');
+    const actionBtn   = $('folderActionBtn');
+    const searchLabel = $('searchingLabel');
+
+    let totalFiles  = 0;
     let totalSizeMB = 0;
-    const MAX_MB = 500;
+    const MAX_MB    = 500;
 
-    /* ── Toast ── */
-    function showToast(msg, duration = 2500) {
-      const t = $('statusToast');
-      t.textContent = msg;
-      t.classList.add('show');
-      clearTimeout(t._timer);
-      t._timer = setTimeout(() => t.classList.remove('show'), duration);
+    /* ────────────────────────────────────
+       App State Machine
+    ──────────────────────────────────── */
+    const STATE = { IDLE: 'idle', OPEN: 'open', SHEET: 'sheet',
+                    FILE_READY: 'file_ready', SEARCHING: 'searching' };
+    let appState = STATE.IDLE;
+
+    function setState(next) {
+      appState = next;
+      folderEl.dataset.state = next;
+      $('scene').dataset.state = next;
+      searchLabel.classList.toggle('visible', next === STATE.SEARCHING);
+      actionBtn.disabled = next !== STATE.FILE_READY && next !== STATE.SEARCHING;
     }
 
-    /* ── Bottom Sheet ── */
+    /* ────────────────────────────────────
+       Toast
+    ──────────────────────────────────── */
+    function showToast(msg, ms = 2500) {
+      const el = $('statusToast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.remove('show'), ms);
+    }
+
+    /* ────────────────────────────────────
+       Status bar helpers
+    ──────────────────────────────────── */
+    function setStatDot(key, status) { // 'granted'|'denied'|'unknown'|'connected'|'disconnected'
+      const el = document.querySelector(`#stat-${key} .stat-dot`);
+      if (el) el.dataset.status = status;
+    }
+
+    /* ────────────────────────────────────
+       Permission Requests
+    ──────────────────────────────────── */
+    async function requestMic() {
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
+        setStatDot('mic', 'granted');
+        setStatDot('ultra', 'granted');
+        return true;
+      } catch {
+        setStatDot('mic', 'denied');
+        setStatDot('ultra', 'denied');
+        return false;
+      }
+    }
+
+    async function requestMotion() {
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        try {
+          const r = await DeviceMotionEvent.requestPermission();
+          setStatDot('bump', r === 'granted' ? 'granted' : 'denied');
+          return r === 'granted';
+        } catch { setStatDot('bump', 'denied'); return false; }
+      }
+      // Android / Desktop — always available
+      window.addEventListener('devicemotion', () => {}, { once: true });
+      setStatDot('bump', 'granted');
+      return true;
+    }
+
+    async function requestOrientation() {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          const r = await DeviceOrientationEvent.requestPermission();
+          setStatDot('tilt', r === 'granted' ? 'granted' : 'denied');
+          return r === 'granted';
+        } catch { setStatDot('tilt', 'denied'); return false; }
+      }
+      window.addEventListener('deviceorientation', () => {}, { once: true });
+      setStatDot('tilt', 'granted');
+      return true;
+    }
+
+    async function requestAllPermissions() {
+      await requestMic();
+      await requestMotion();
+      await requestOrientation();
+    }
+
+    /* ────────────────────────────────────
+       Folder click → open / close
+    ──────────────────────────────────── */
+    folderEl.addEventListener('click', () => {
+      if (appState === STATE.IDLE || appState === STATE.FILE_READY) {
+        setState(appState === STATE.IDLE ? STATE.OPEN : STATE.FILE_READY);
+        folderEl.classList.toggle('is-open');
+      } else if (appState === STATE.OPEN) {
+        folderEl.classList.remove('is-open');
+        setState(STATE.IDLE);
+      }
+    });
+
+    /* ────────────────────────────────────
+       Paper stack click → open sheet
+    ──────────────────────────────────── */
+    paperStack.addEventListener('click', e => {
+      e.stopPropagation();
+      if (appState === STATE.OPEN || appState === STATE.FILE_READY) {
+        openSheet();
+      } else if (appState === STATE.IDLE) {
+        // Open folder first then sheet
+        folderEl.classList.add('is-open');
+        setState(STATE.OPEN);
+        setTimeout(openSheet, 350);
+      }
+    });
+
+    /* ────────────────────────────────────
+       Action button (send when file ready)
+    ──────────────────────────────────── */
+    actionBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (appState === STATE.FILE_READY) {
+        startSearching();
+      }
+    });
+
+    /* ────────────────────────────────────
+       Bottom Sheet
+    ──────────────────────────────────── */
     function openSheet() {
       sheet.classList.add('active');
       backdrop.classList.add('active');
+      setState(STATE.SHEET);
     }
     function closeSheet() {
       sheet.classList.remove('active');
       backdrop.classList.remove('active');
+      // Restore previous state
+      if (totalFiles > 0) {
+        setState(STATE.FILE_READY);
+        folderEl.classList.remove('is-open');
+      } else {
+        setState(STATE.OPEN);
+      }
     }
-    window.openActionSheet = openSheet;
 
     $('btnCancelSheet').addEventListener('click', closeSheet);
     backdrop.addEventListener('click', closeSheet);
 
     $('btnSend').addEventListener('click', () => {
       closeSheet();
-      folderEl.classList.remove('is-receiving');
-      folderEl.classList.add('is-sending');
+      folderEl.classList.remove('is-open');
+      // Request permissions on first send attempt
+      requestAllPermissions();
       $('document-upload').click();
     });
 
     $('btnReceive').addEventListener('click', () => {
       closeSheet();
-      folderEl.classList.remove('is-sending');
-      folderEl.classList.add('is-receiving');
-      showToast('Waiting for incoming file…');
+      folderEl.classList.remove('is-open');
+      setState(STATE.SEARCHING);
+      showToast(t('ファイルの受信を待機中…', 'Waiting for incoming file…'), 4000);
+      requestAllPermissions();
     });
 
-    /* ── Folder toggle (open/close) ── */
-    folderEl.addEventListener('click', () => folderEl.classList.toggle('is-open'));
-
-    /* ── Folder action button → open sheet ── */
-    $('folderActionBtn').addEventListener('click', e => {
-      e.stopPropagation();
-      openSheet();
-    });
-
-    /* ── File upload → update paper stack ── */
+    /* ────────────────────────────────────
+       File Upload → paper preview
+    ──────────────────────────────────── */
     $('document-upload').addEventListener('change', function(e) {
-      const files = e.target.files;
+      const files = Array.from(e.target.files);
       if (!files.length) return;
 
-      // Hand off to WebRTC if available
-      if (window.WebDrop) {
-        Array.from(files).forEach(f => window.WebDrop.webrtcClient.sendFile(f));
-      }
+      if (window.WebDrop) files.forEach(f => window.WebDrop.webrtcClient.sendFile(f));
 
+      // Clear default paper on first upload
       if (totalFiles === 0) paperStack.innerHTML = '';
 
-      Array.from(files).forEach((file, i) => {
-        const sizeMB = Math.max(0.1, file.size / (1024 * 1024));
-        totalSizeMB = Math.min(MAX_MB, totalSizeMB + sizeMB);
+      files.forEach((file, i) => {
+        totalSizeMB = Math.min(MAX_MB, totalSizeMB + Math.max(0.1, file.size / 1048576));
 
-        const paper = document.createElement('div');
+        const paper  = document.createElement('div');
         paper.className = 'paper';
-        const stackIdx = Math.min(totalFiles + i, 4);
-        const offset   = stackIdx * 8;
-        paper.style.bottom    = `${offset}px`;
-        paper.style.transform = `translateX(-50%) scale(${1 - stackIdx * 0.02})`;
-        paper.style.zIndex    = totalFiles + i;
+        const stackIdx  = Math.min(totalFiles + i, 3);
+        const offset    = stackIdx * 6;
+        paper.style.cssText = `bottom:${offset}px;z-index:${totalFiles+i};`;
+
+        // Determine icon colour by extension
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        const iconColor = ext === 'pdf' ? '#e53935'
+          : ['doc','docx'].includes(ext) ? '#1565c0'
+          : ['jpg','jpeg','png','gif','webp'].includes(ext) ? '#6a1b9a'
+          : '#37474f';
+
         paper.innerHTML = `
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
             <line x1="16" y1="13" x2="8" y2="13"></line>
             <line x1="16" y1="17" x2="8" y2="17"></line>
           </svg>
-          <span title="${file.name}">${file.name}</span>`;
+          <span class="paper-filename" title="${file.name}">${file.name}</span>`;
+
         paperStack.appendChild(paper);
         totalFiles++;
       });
 
-      // Update folder footer
-      $('folder-count').textContent = `${totalFiles} file${totalFiles !== 1 ? 's' : ''}`;
+      // Update footer
+      $('folder-count').innerHTML = `${totalFiles} <span data-ja="ファイル" data-en="files">${t('ファイル','files')}</span>`;
       $('folder-storage-text').textContent = `${Math.round(totalSizeMB)}/${MAX_MB} MB`;
-      const bars = document.querySelectorAll('#folder-bars .bar');
+      const bars   = document.querySelectorAll('#folder-bars .bar');
       const filled = Math.round((totalSizeMB / MAX_MB) * bars.length);
       bars.forEach((b, i) => b.classList.toggle('full', i < filled));
 
       folderEl.classList.remove('is-open');
-      showToast(`${files.length} file(s) ready to send`);
+      setState(STATE.FILE_READY);
+      showToast(t(`${files.length}件のファイルを準備完了`, `${files.length} file(s) ready — tap ↗ to send`));
       e.target.value = '';
     });
 
-    /* ── Settings ── */
+    /* ────────────────────────────────────
+       Searching / Pulsating state
+    ──────────────────────────────────── */
+    function startSearching() {
+      setState(STATE.SEARCHING);
+      showToast(t('端末を検索中…', 'Searching for devices…'), 6000);
+    }
+
+    /* ────────────────────────────────────
+       Settings
+    ──────────────────────────────────── */
     $('settingsBtn').addEventListener('click', () => $('settingsModal').classList.add('active'));
     $('closeSettings').addEventListener('click', () => $('settingsModal').classList.remove('active'));
     $('settingsModal').addEventListener('click', e => {
@@ -297,14 +523,12 @@
     $('profile-upload').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = ev => { $('my-profile-pic').src = ev.target.result; };
-      reader.readAsDataURL(file);
+      const r = new FileReader();
+      r.onload = ev => { $('my-profile-pic').src = ev.target.result; };
+      r.readAsDataURL(file);
     });
 
-    $('bg-color-picker').addEventListener('input', e => {
-      document.body.style.background = e.target.value;
-    });
+    $('bg-color-picker').addEventListener('input', e => { document.body.style.background = e.target.value; });
 
     $('orbit-intensity').addEventListener('input', e => {
       document.querySelectorAll('.orbit-ring').forEach(r => {
@@ -319,24 +543,48 @@
     });
 
     $('toggle-icons').addEventListener('change', e => {
-      document.querySelectorAll('.person').forEach(p => {
-        p.style.display = e.target.checked ? 'flex' : 'none';
-      });
+      document.querySelectorAll('.person').forEach(p => { p.style.opacity = e.target.checked ? '1' : '0'; });
     });
 
-    $('toggle-qr').addEventListener('change', async e => {
-      if (e.target.checked) {
-        $('dynamicIsland').classList.add('active');
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-          $('qr-video').srcObject = stream;
-        } catch (err) {
-          showToast('Camera access denied');
-          e.target.checked = false;
-          $('dynamicIsland').classList.remove('active');
+    /* ── QR pairing ── */
+    $('btnCreateQR').addEventListener('click', async () => {
+      $('settingsModal').classList.remove('active');
+      $('islandScanMode').style.display  = 'none';
+      $('islandCreateMode').style.display = 'block';
+      $('dynamicIsland').classList.add('active');
+
+      const sessionId = crypto.randomUUID();
+      const canvas    = $('qr-canvas');
+      try {
+        if (window.QRCode) {
+          await QRCode.toCanvas(canvas, `webdrop:${sessionId}`, {
+            width: 200, margin: 1,
+            color: { dark: '#000000', light: '#ffffff' }
+          });
         }
-      } else {
+      } catch (err) { console.error('QR generation failed', err); }
+    });
+
+    $('btnScanQR').addEventListener('click', async () => {
+      $('settingsModal').classList.remove('active');
+      $('islandScanMode').style.display  = 'block';
+      $('islandCreateMode').style.display = 'none';
+      $('dynamicIsland').classList.add('active');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        $('qr-video').srcObject = stream;
+      } catch {
+        showToast(t('カメラへのアクセスが拒否されました', 'Camera access denied'));
         $('dynamicIsland').classList.remove('active');
+      }
+    });
+
+    // Close dynamic island when clicking outside
+    document.addEventListener('click', e => {
+      const island = $('dynamicIsland');
+      if (island.classList.contains('active') && !island.contains(e.target) &&
+          !$('btnCreateQR').contains(e.target) && !$('btnScanQR').contains(e.target)) {
+        island.classList.remove('active');
         if ($('qr-video').srcObject) {
           $('qr-video').srcObject.getTracks().forEach(t => t.stop());
           $('qr-video').srcObject = null;
@@ -344,11 +592,20 @@
       }
     });
 
-    /* ── Device info (populated by ES module app.js) ── */
+    /* ────────────────────────────────────
+       WebDrop module events
+    ──────────────────────────────────── */
     window.addEventListener('webdrop:ready', e => {
       $('deviceInfoLabel').textContent = `Device: ${e.detail.deviceType}`;
     });
-  </script>
-</body>
+    window.addEventListener('webdrop:ws:connected', () => setStatDot('ws', 'connected'));
+    window.addEventListener('webdrop:ws:disconnected', () => setStatDot('ws', 'disconnected'));
 
+    /* ────────────────────────────────────
+       Init state
+    ──────────────────────────────────── */
+    setState(STATE.IDLE);
+  </script>
+
+</body>
 </html>
