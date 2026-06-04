@@ -324,48 +324,173 @@
     }
 
     /* ────────────────────────────────────
-       Permission Requests
+       Permission Cache (localStorage)
     ──────────────────────────────────── */
-    async function requestMic() {
-      try {
-        await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
-        setStatDot('mic', 'granted');
-        setStatDot('ultra', 'granted');
-        return true;
-      } catch {
-        setStatDot('mic', 'denied');
-        setStatDot('ultra', 'denied');
-        return false;
-      }
+    const PermCache = {
+      get:  key => localStorage.getItem(`wd_perm_${key}`),
+      set:  (key, val) => localStorage.setItem(`wd_perm_${key}`, val),
+      clear: key => localStorage.removeItem(`wd_perm_${key}`)
+    };
+
+    /* Generic permission overlay (sequential, one at a time) */
+    const permQueue = [];
+    let permRunning = false;
+
+    function queuePermOverlay(opts) {
+      return new Promise(resolve => {
+        permQueue.push({ ...opts, resolve });
+        if (!permRunning) runNextPerm();
+      });
     }
 
+    function runNextPerm() {
+      if (!permQueue.length) { permRunning = false; return; }
+      permRunning = true;
+      const { icon, title, desc, onAllow, resolve } = permQueue.shift();
+
+      $('permOverlay').style.display = 'flex';
+      $('permOverlay').querySelector('.perm-icon').textContent   = icon;
+      $('permTitle').textContent = title;
+      $('permDesc').textContent  = desc;
+
+      const allowBtn = $('permAllowBtn');
+      const skipBtn  = $('permSkipBtn');
+
+      const cleanup = () => { $('permOverlay').style.display = 'none'; };
+
+      allowBtn.onclick = async () => {
+        cleanup();
+        const result = await onAllow();
+        resolve(result);
+        runNextPerm();
+      };
+      skipBtn.onclick = () => {
+        cleanup();
+        resolve(false);
+        runNextPerm();
+      };
+    }
+
+    /* ── Microphone (ultrasound) ── */
+    async function requestMic() {
+      const cached = PermCache.get('mic');
+      if (cached === 'granted') { setStatDot('mic', 'granted'); setStatDot('ultra', 'granted'); return true; }
+      if (cached === 'denied')  { setStatDot('mic', 'denied');  setStatDot('ultra', 'denied');  return false; }
+
+      setStatDot('mic',   'checking');
+      setStatDot('ultra', 'checking');
+
+      // Check without prompting first (Chrome/Android)
+      try {
+        const perm = await navigator.permissions.query({ name: 'microphone' });
+        if (perm.state === 'granted') {
+          PermCache.set('mic', 'granted');
+          setStatDot('mic', 'granted'); setStatDot('ultra', 'granted');
+          return true;
+        }
+        if (perm.state === 'denied') {
+          PermCache.set('mic', 'denied');
+          setStatDot('mic', 'denied'); setStatDot('ultra', 'denied');
+          return false;
+        }
+      } catch {/* query not supported */}
+
+      // Need to ask via overlay
+      return queuePermOverlay({
+        icon: '🎤',
+        title: t('マイクへのアクセス', 'Microphone Access'),
+        desc: t(
+          '近くの端末を超音波で検出するためにマイクが必要です。録音はしません。',
+          'Required for ultrasound proximity detection. No audio is recorded.'
+        ),
+        onAllow: async () => {
+          try {
+            await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
+            PermCache.set('mic', 'granted');
+            setStatDot('mic', 'granted'); setStatDot('ultra', 'granted');
+            return true;
+          } catch {
+            PermCache.set('mic', 'denied');
+            setStatDot('mic', 'denied'); setStatDot('ultra', 'denied');
+            return false;
+          }
+        }
+      });
+    }
+
+    /* ── Bump (DeviceMotion) ── */
     async function requestMotion() {
+      const cached = PermCache.get('bump');
+      if (cached === 'granted') { setStatDot('bump', 'granted'); return true; }
+      if (cached === 'denied')  { setStatDot('bump', 'denied');  return false; }
+
+      // iOS 13+ requires explicit prompt (must come from user gesture)
       if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-        try {
-          const r = await DeviceMotionEvent.requestPermission();
-          setStatDot('bump', r === 'granted' ? 'granted' : 'denied');
-          return r === 'granted';
-        } catch { setStatDot('bump', 'denied'); return false; }
+        setStatDot('bump', 'checking');
+        return queuePermOverlay({
+          icon: '📳',
+          title: t('振動検出の許可', 'Motion Detection'),
+          desc: t(
+            '2台の端末を近づけたときのバンプを検出します。',
+            'Detects when two devices are bumped together for proximity pairing.'
+          ),
+          onAllow: async () => {
+            try {
+              const r = await DeviceMotionEvent.requestPermission();
+              PermCache.set('bump', r);
+              setStatDot('bump', r === 'granted' ? 'granted' : 'denied');
+              return r === 'granted';
+            } catch {
+              PermCache.set('bump', 'denied');
+              setStatDot('bump', 'denied');
+              return false;
+            }
+          }
+        });
       }
-      // Android / Desktop — always available
-      window.addEventListener('devicemotion', () => {}, { once: true });
+
+      // Android / Desktop — always available, no prompt needed
+      PermCache.set('bump', 'granted');
       setStatDot('bump', 'granted');
       return true;
     }
 
+    /* ── Tilt (DeviceOrientation) ── */
     async function requestOrientation() {
+      const cached = PermCache.get('tilt');
+      if (cached === 'granted') { setStatDot('tilt', 'granted'); return true; }
+      if (cached === 'denied')  { setStatDot('tilt', 'denied');  return false; }
+
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-          const r = await DeviceOrientationEvent.requestPermission();
-          setStatDot('tilt', r === 'granted' ? 'granted' : 'denied');
-          return r === 'granted';
-        } catch { setStatDot('tilt', 'denied'); return false; }
+        setStatDot('tilt', 'checking');
+        return queuePermOverlay({
+          icon: '📐',
+          title: t('傾き検出の許可', 'Orientation Access'),
+          desc: t(
+            '端末を傾けて相手に向けることで接続を確立します。',
+            'Used to pair devices by pointing them at each other.'
+          ),
+          onAllow: async () => {
+            try {
+              const r = await DeviceOrientationEvent.requestPermission();
+              PermCache.set('tilt', r);
+              setStatDot('tilt', r === 'granted' ? 'granted' : 'denied');
+              return r === 'granted';
+            } catch {
+              PermCache.set('tilt', 'denied');
+              setStatDot('tilt', 'denied');
+              return false;
+            }
+          }
+        });
       }
-      window.addEventListener('deviceorientation', () => {}, { once: true });
+
+      PermCache.set('tilt', 'granted');
       setStatDot('tilt', 'granted');
       return true;
     }
 
+    /* Request all permissions sequentially */
     async function requestAllPermissions() {
       await requestMic();
       await requestMotion();
@@ -598,13 +723,24 @@
     window.addEventListener('webdrop:ready', e => {
       $('deviceInfoLabel').textContent = `Device: ${e.detail.deviceType}`;
     });
-    window.addEventListener('webdrop:ws:connected', () => setStatDot('ws', 'connected'));
-    window.addEventListener('webdrop:ws:disconnected', () => setStatDot('ws', 'disconnected'));
+    window.addEventListener('webdrop:ws:connecting',    () => setStatDot('ws', 'connecting'));
+    window.addEventListener('webdrop:ws:connected',     () => setStatDot('ws', 'connected'));
+    window.addEventListener('webdrop:ws:disconnected',  () => setStatDot('ws', 'disconnected'));
 
     /* ────────────────────────────────────
        Init state
     ──────────────────────────────────── */
     setState(STATE.IDLE);
+    setStatDot('ws', 'connecting'); // will update to connected/disconnected from module events
+
+    // Restore cached permission dots immediately (no need to re-ask)
+    (['mic','bump','tilt']).forEach(key => {
+      const cached = PermCache.get(key);
+      if (cached) setStatDot(key, cached);
+    });
+    // Mic also controls ultra dot
+    const cachedMic = PermCache.get('mic');
+    if (cachedMic) setStatDot('ultra', cachedMic);
   </script>
 
 </body>

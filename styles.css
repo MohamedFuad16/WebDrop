@@ -71,14 +71,17 @@ body {
 
 /* Show when scene is in searching state */
 .scene[data-state="searching"] .ripple-ring { display: block; }
-.scene[data-state="searching"] .ripple-ring { animation: pulseRipple 2.4s ease-out infinite; }
+.scene[data-state="searching"] .ripple-ring {
+  animation: pulseRipple 4.8s cubic-bezier(0.2, 0, 0.6, 1) infinite;
+}
 .ripple-ring--1 { animation-delay:  0s !important; }
-.ripple-ring--2 { animation-delay: -0.8s !important; }
-.ripple-ring--3 { animation-delay: -1.6s !important; }
+.ripple-ring--2 { animation-delay: -1.6s !important; }
+.ripple-ring--3 { animation-delay: -3.2s !important; }
 
 @keyframes pulseRipple {
-  0%   { width: 260px; height: 260px; opacity: 0.9; border-style: solid; }
-  100% { width: 900px; height: 900px; opacity: 0; border-style: dashed; }
+  0%   { width: 260px; height: 260px; opacity: 0.75; border-style: solid; }
+  60%  { opacity: 0.15; }
+  100% { width: 860px; height: 860px; opacity: 0; border-style: dashed; }
 }
 
 /* ─── Person wrappers (orbit animation) ─────────── */
@@ -558,7 +561,20 @@ body {
   background: #ff453a;
   box-shadow: 0 0 6px rgba(255,69,58,0.6);
 }
-.stat-dot[data-status="unknown"] { background: #555; }
+.stat-dot[data-status="connecting"] {
+  background: #ff9f0a;
+  animation: blinkDot 1.4s ease-in-out infinite;
+}
+.stat-dot[data-status="checking"] {
+  background: #636366;
+  animation: blinkDot 1.4s ease-in-out infinite;
+}
+.stat-dot[data-status="unknown"] { background: #3a3a3c; }
+
+@keyframes blinkDot {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.25; }
+}
 
 /* ─── Permission overlay ────────────────────────── */
 .perm-overlay {
