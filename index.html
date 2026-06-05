@@ -6,11 +6,11 @@
   <title>ウェブドロップ | WebDrop</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260605">
   <!-- QR code generation -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="js/lib/qrcode.min.js"></script>
   <!-- QR code scanning -->
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script src="js/lib/jsQR.min.js"></script>
 </head>
 
 <body>
@@ -43,7 +43,11 @@
       </div>
       <div class="island-mode" id="islandCreateMode" style="display:none;">
         <div class="qr-create-inner">
-          <canvas id="qr-canvas"></canvas>
+          <!-- Use <img> not <canvas> — avoids hidden-element zero-size rendering bug -->
+          <img id="qr-img" alt="QR Code" style="width:200px;height:200px;border-radius:8px;display:none;">
+          <div class="qr-spinner" id="qrSpinner">
+            <div class="searching-spinner" style="width:28px;height:28px;border-width:3px;"></div>
+          </div>
           <p data-ja="このQRコードをスキャン" data-en="Scan this to connect">このQRコードをスキャン</p>
         </div>
       </div>
@@ -63,25 +67,16 @@
     <div class="ripple-ring ripple-ring--2"></div>
     <div class="ripple-ring ripple-ring--3"></div>
 
-    <!-- Nearby person avatars -->
-    <div class="person-wrapper" style="--orbit-r:210px;--orbit-angle:0deg;--anim-dur:25s">
-      <div class="person" data-peer-id="brian">
-        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Brian&backgroundColor=b6e3f4" alt="Brian" id="my-profile-pic">
-        <span>Brian's iPhone</span>
+    <!-- Nearby person avatars — injected by JS from WebSocket peers -->
+    <!-- Self avatar always visible at orbit 1 -->
+    <div class="person-wrapper" id="selfWrapper" style="--orbit-r:210px;--orbit-angle:0deg;--anim-dur:0s;animation:none;transform:translate(-50%,-50%) translateX(0) translateY(calc(-1 * 210px));">
+      <div class="person" id="selfPerson" data-peer-id="self">
+        <img id="my-profile-pic" src="" alt="Me">
+        <span id="myNameLabel"></span>
       </div>
     </div>
-    <div class="person-wrapper" style="--orbit-r:310px;--orbit-angle:130deg;--anim-dur:38s">
-      <div class="person" data-peer-id="alex">
-        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex&backgroundColor=ffdfbf" alt="Alex">
-        <span>Alex's iPad</span>
-      </div>
-    </div>
-    <div class="person-wrapper" style="--orbit-r:410px;--orbit-angle:250deg;--anim-dur:55s">
-      <div class="person" data-peer-id="sarah">
-        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah&backgroundColor=c0aede" alt="Sarah">
-        <span>Sarah's Mac</span>
-      </div>
-    </div>
+    <!-- Dynamic peers container -->
+    <div id="peersContainer"></div>
 
     <!-- ── Central Folder ── -->
     <div class="folder" id="folderEl">
@@ -140,32 +135,52 @@
   <div class="settings-modal" id="settingsModal" role="dialog" aria-modal="true">
     <div class="settings-content">
       <div class="settings-header">
-        <h3 data-ja="設定" data-en="Settings">設定</h3>
+        <div>
+          <h3 data-ja="設定" data-en="Settings">設定</h3>
+          <p class="settings-subtitle" data-ja="接続と表示を管理" data-en="Connection and appearance">接続と表示を管理</p>
+        </div>
         <button class="close-settings" id="closeSettings" aria-label="閉じる / Close">&times;</button>
       </div>
       <div class="settings-body">
-        <div class="setting-item">
-          <span data-ja="プロフィール写真" data-en="Profile Photo">プロフィール写真</span>
-          <label for="profile-upload" class="upload-btn" data-ja="変更" data-en="Change">変更</label>
+        <!-- User profile row -->
+        <div class="setting-item setting-item--profile">
+          <div class="user-identity">
+            <img id="settings-avatar" src="" alt="Avatar" class="settings-avatar">
+            <div class="user-identity-text">
+              <input type="text" id="userNameInput" class="username-input" placeholder="ユーザー名 / Your Name" maxlength="24">
+              <span class="user-id-label" id="userIdLabel"></span>
+            </div>
+          </div>
+          <label for="profile-upload" class="upload-btn" data-ja="写真" data-en="Photo">写真</label>
         </div>
-        <div class="setting-item">
+        <div class="settings-connection">
+          <span class="settings-connection-dot" id="settingsWsDot" data-status="connecting"></span>
+          <div class="settings-connection-copy">
+            <span data-ja="シグナリングサーバー" data-en="Signaling server">シグナリングサーバー</span>
+            <small id="settingsWsState" data-ja="接続中…" data-en="Connecting…">接続中…</small>
+          </div>
+        </div>
+        <div class="setting-item setting-item--control">
           <span data-ja="背景色" data-en="Background">背景色</span>
           <input type="color" id="bg-color-picker" value="#000000">
         </div>
-        <div class="setting-item">
+        <div class="setting-item setting-item--control">
           <span data-ja="軌道の強さ" data-en="Orbit Intensity">軌道の強さ</span>
           <input type="range" id="orbit-intensity" min="0.05" max="1" step="0.05" value="0.3">
         </div>
-        <hr class="divider">
-        <div class="setting-item">
+        <div class="setting-item setting-item--control">
           <span data-ja="軌道を表示" data-en="Show Orbits">軌道を表示</span>
           <input type="checkbox" id="toggle-orbits" checked>
         </div>
-        <div class="setting-item">
+        <div class="setting-item setting-item--control">
+          <span data-ja="実写真のみ表示" data-en="Real Photos Only">実写真のみ表示</span>
+          <input type="checkbox" id="toggle-real-photos">
+        </div>
+        <div class="setting-item setting-item--control">
           <span data-ja="アイコンを表示" data-en="Show Icons">アイコンを表示</span>
           <input type="checkbox" id="toggle-icons" checked>
         </div>
-        <div class="setting-item" id="qr-pairing-row">
+        <div class="setting-item setting-item--qr" id="qr-pairing-row">
           <div class="qr-pairing-info">
             <span id="qrPairingLabel" data-ja="QRペアリング" data-en="QR Pairing">QRペアリング</span>
             <span class="qr-device-sub" id="qrDeviceSub"></span>
@@ -263,7 +278,7 @@
     </div>
   </div>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=20260605"></script>
   <script>
     'use strict';
 
@@ -638,28 +653,177 @@
     });
 
     /* ────────────────────────────────────
-       Searching / Pulsating state
+       User Identity  (localStorage-persisted)
     ──────────────────────────────────── */
-    function startSearching() {
-      setState(STATE.SEARCHING);
-      showToast(t('端末を検索中…', 'Searching for devices…'), 6000);
+    const USER = {
+      id:    localStorage.getItem('wd_user_id')    || crypto.randomUUID(),
+      name:  localStorage.getItem('wd_user_name')  || '',
+      photo: localStorage.getItem('wd_user_photo') || ''   // base64 data URL
+    };
+
+    // Persist ID immediately
+    localStorage.setItem('wd_user_id', USER.id);
+
+    // Generate default name from device type if none stored yet
+    if (!USER.name) {
+      const adjectives = LANG === 'ja'
+        ? ['素早い','明るい','青い','緑の','赤い']
+        : ['Swift', 'Bright', 'Cool', 'Quick', 'Clear'];
+      const nouns = LANG === 'ja'
+        ? ['ドロップ','ウェーブ','リンク','フロー']
+        : ['Drop', 'Wave', 'Link', 'Flow'];
+      // Will be set after DEVICE is defined — stored after DEVICE block
     }
 
-    /* ────────────────────────────────────
-       Settings
-    ──────────────────────────────────── */
-    $('settingsBtn').addEventListener('click', () => $('settingsModal').classList.add('active'));
-    $('closeSettings').addEventListener('click', () => $('settingsModal').classList.remove('active'));
-    $('settingsModal').addEventListener('click', e => {
-      if (e.target === $('settingsModal')) $('settingsModal').classList.remove('active');
+    function applyUserIdentity() {
+      const name = USER.name || `${DEVICE.label} ${USER.id.slice(0, 4).toUpperCase()}`;
+      // Self avatar in orbit
+      $('myNameLabel').textContent = name;
+      const selfImg = $('my-profile-pic');
+      selfImg.src = USER.photo
+        || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(USER.id)}&backgroundColor=b6e3f4`;
+      // Settings panel
+      $('settings-avatar').src = selfImg.src;
+      $('userNameInput').value = name;
+      $('userIdLabel').textContent = `ID: ${USER.id.slice(0, 8)}…`;
+      $('selfPerson').dataset.hasPhoto = USER.photo ? 'true' : 'false';
+    }
+
+    /* Save name when user edits the input */
+    document.addEventListener('DOMContentLoaded', () => {});  // warmup
+    // (fired after DOMContentLoaded since this is in an inline script at end of body)
+    $('userNameInput').addEventListener('input', e => {
+      USER.name = e.target.value.trim();
+      localStorage.setItem('wd_user_name', USER.name);
+      $('myNameLabel').textContent = USER.name || `${DEVICE.label} ${USER.id.slice(0,4).toUpperCase()}`;
+      if (window.WebDrop) {
+        window.WebDrop.displayName = USER.name || $('myNameLabel').textContent;
+      }
+      broadcastMyProfile();
     });
 
+    /* Profile photo upload — stores base64, updates both orbit + settings avatars */
     $('profile-upload').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
-      const r = new FileReader();
-      r.onload = ev => { $('my-profile-pic').src = ev.target.result; };
-      r.readAsDataURL(file);
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const dataUrl = ev.target.result;
+        USER.photo = dataUrl;
+        localStorage.setItem('wd_user_photo', dataUrl);
+        // Update all avatar instances
+        $('my-profile-pic').src   = dataUrl;
+        $('settings-avatar').src  = dataUrl;
+        // Mark self orbit element as having a real photo
+        $('selfPerson').dataset.hasPhoto = 'true';
+        broadcastMyProfile();
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    });
+
+    /* Broadcast my profile to all connected peers via WebSocket */
+    function broadcastMyProfile() {
+      if (window.WebDrop && window.WebDrop.wsClient) {
+        window.WebDrop.wsClient.send({
+          type: 'profile_update',
+          payload: {
+            userId:    USER.id,
+            name:      USER.name || $('myNameLabel').textContent,
+            photoUrl:  USER.photo,
+            deviceType: DEVICE.type
+          }
+        });
+      }
+    }
+
+    /* ── Peer Orbit Rendering ── */
+    const ORBIT_RADII  = [210, 310, 410];
+    const ORBIT_DURS   = [25, 38, 55];
+    const ORBIT_ANGLES = [90, 210, 330]; // deg offsets for peers (self is at 0)
+    const peerMap      = new Map(); // peerId → { name, photo, hasPhoto, el }
+
+    function renderPeer(peerId, name, photoUrl, deviceType) {
+      const showReal    = $('toggle-real-photos').checked;
+      const showIcons   = $('toggle-icons').checked;
+      const hasPhoto    = !!photoUrl;
+
+      if (peerMap.has(peerId)) {
+        // Update existing
+        const entry = peerMap.get(peerId);
+        entry.name    = name;
+        entry.photo   = photoUrl;
+        entry.hasPhoto = hasPhoto;
+        const img  = entry.el.querySelector('img');
+        const span = entry.el.querySelector('span');
+        img.src    = photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(peerId)}&backgroundColor=c0aede`;
+        span.textContent = name;
+        entry.el.closest('.person-wrapper').style.display =
+          (showReal && !hasPhoto) || !showIcons ? 'none' : '';
+        return;
+      }
+
+      // New peer — pick next available orbit slot
+      const slotIdx = peerMap.size;
+      const r   = ORBIT_RADII[slotIdx]  || (410 + (slotIdx - 2) * 80);
+      const ang = ORBIT_ANGLES[slotIdx] || (slotIdx * 120);
+      const dur = ORBIT_DURS[slotIdx]   || 60;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'person-wrapper';
+      wrapper.style.cssText = `--orbit-r:${r}px;--orbit-angle:${ang}deg;--anim-dur:${dur}s`;
+
+      const imgSrc = photoUrl
+        || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(peerId)}&backgroundColor=c0aede`;
+
+      wrapper.innerHTML = `
+        <div class="person" data-peer-id="${peerId}" data-has-photo="${hasPhoto}">
+          <img src="${imgSrc}" alt="${name}">
+          <span>${name}</span>
+        </div>`;
+
+      if ((showReal && !hasPhoto) || !showIcons) wrapper.style.display = 'none';
+
+      $('peersContainer').appendChild(wrapper);
+      peerMap.set(peerId, { name, photo: photoUrl, hasPhoto, el: wrapper.querySelector('.person') });
+    }
+
+    function removePeer(peerId) {
+      const entry = peerMap.get(peerId);
+      if (entry) { entry.el.closest('.person-wrapper').remove(); peerMap.delete(peerId); }
+    }
+
+    /* Receive profile updates from remote peers */
+    window.addEventListener('webdrop:profile_update', e => {
+      const { userId, name, photoUrl, deviceType } = e.detail;
+      if (userId === USER.id) return; // ignore self
+      renderPeer(userId, name, photoUrl, deviceType);
+    });
+
+    /* When WebSocket delivers users list */
+    window.addEventListener('webdrop:users_discovered', e => {
+      const users = e.detail;
+      const activePeerIds = new Set();
+      users.forEach(u => {
+        if (u.clientId !== USER.id) {
+          activePeerIds.add(u.clientId);
+          renderPeer(u.clientId, u.displayName, u.photoUrl || '', u.deviceType);
+        }
+      });
+      peerMap.forEach((entry, peerId) => {
+        if (!activePeerIds.has(peerId)) removePeer(peerId);
+      });
+    });
+
+    /* ── Real Photos Toggle ── */
+    $('toggle-real-photos').addEventListener('change', e => {
+      const showRealOnly = e.target.checked;
+      // Self orbit: always show (user themselves)
+      // Peers
+      peerMap.forEach((entry, peerId) => {
+        const hide = showRealOnly && !entry.hasPhoto;
+        entry.el.closest('.person-wrapper').style.display = hide ? 'none' : '';
+      });
     });
 
     $('bg-color-picker').addEventListener('input', e => { document.body.style.background = e.target.value; });
@@ -677,8 +841,16 @@
     });
 
     $('toggle-icons').addEventListener('change', e => {
-      document.querySelectorAll('.person').forEach(p => { p.style.opacity = e.target.checked ? '1' : '0'; });
+      const show = e.target.checked;
+      $('selfWrapper').style.display = show ? '' : 'none';
+      peerMap.forEach(entry => {
+        const showRealOnly = $('toggle-real-photos').checked;
+        const hide = !show || (showRealOnly && !entry.hasPhoto);
+        entry.el.closest('.person-wrapper').style.display = hide ? 'none' : '';
+      });
     });
+
+
 
     /* ────────────────────────────────────
        Device Detection
@@ -742,22 +914,113 @@
     }
 
     /* ── QR island helpers ── */
+    let qrScanFrameId = null;
+    const qrScanCanvas = document.createElement('canvas');
+    const qrScanContext = qrScanCanvas.getContext('2d', { willReadFrequently: true });
+
+    function parseQrPayload(rawValue) {
+      try {
+        const payload = JSON.parse(rawValue);
+        const sessionId = payload.sessionId || payload.sess;
+        const peerId = payload.peerId || payload.uid;
+        if (!sessionId || !peerId) return null;
+        return { sessionId, peerId, name: payload.name || '' };
+      } catch {
+        return null;
+      }
+    }
+
+    function pairFromQrPayload(rawValue) {
+      const payload = parseQrPayload(rawValue);
+      if (!payload) {
+        showToast(t('WebDropのQRコードではありません', 'This is not a WebDrop QR code'));
+        return false;
+      }
+      if (!window.WebDrop?.wsClient?.connected) {
+        showToast(t('サーバーに接続してから再試行してください', 'Connect to the server and try again'));
+        return false;
+      }
+      window.WebDrop.wsClient.joinQrSession(payload.sessionId, payload.peerId);
+      closeIsland();
+      showToast(t('端末に接続中…', `Connecting to ${payload.name || 'device'}…`));
+      return true;
+    }
+
+    function scanQrFrame() {
+      const video = $('qr-video');
+      if (!video.srcObject || !qrScanContext) return;
+
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth && video.videoHeight) {
+        qrScanCanvas.width = video.videoWidth;
+        qrScanCanvas.height = video.videoHeight;
+        qrScanContext.drawImage(video, 0, 0, qrScanCanvas.width, qrScanCanvas.height);
+        const frame = qrScanContext.getImageData(0, 0, qrScanCanvas.width, qrScanCanvas.height);
+        const result = typeof jsQR === 'function'
+          ? jsQR(frame.data, frame.width, frame.height, { inversionAttempts: 'dontInvert' })
+          : null;
+        if (result && pairFromQrPayload(result.data)) return;
+      }
+
+      qrScanFrameId = requestAnimationFrame(scanQrFrame);
+    }
+
+    window.WebDropQR = { parsePayload: parseQrPayload };
+
     async function openQRCreate() {
       $('settingsModal').classList.remove('active');
+      if (!window.WebDrop?.wsClient?.connected) {
+        showToast(t('サーバーに接続中です', 'Connecting to the server…'));
+        window.WebDrop?.wsClient?.connect(window.WebDrop.displayName, window.WebDrop.deviceType);
+        return;
+      }
       $('islandScanMode').style.display   = 'none';
       $('islandCreateMode').style.display = 'block';
       $('dynamicIsland').classList.add('active');
 
+      const qrImg     = $('qr-img');
+      const spinner   = $('qrSpinner');
+      qrImg.style.display    = 'none';
+      spinner.style.display  = 'flex';
+
       const sessionId = crypto.randomUUID();
-      const canvas    = $('qr-canvas');
+      $('dynamicIsland').dataset.qrSessionId = sessionId;
+      window.WebDrop.wsClient.createQrSession(sessionId);
+
+      // Build payload: include the live server session and peer identity.
+      const payload = JSON.stringify({
+        type: 'webdrop-pair',
+        version: 1,
+        peerId: USER.id,
+        name: USER.name || $('myNameLabel').textContent,
+        sessionId
+      });
+
+      // Wait for island animation to complete before generating
+      await new Promise(r => setTimeout(r, 500));
+
       try {
-        if (window.QRCode) {
-          await QRCode.toCanvas(canvas, `webdrop:${sessionId}`, {
-            width: 220, margin: 1,
-            color: { dark: '#000000', light: '#ffffff' }
+        if (typeof QRCode !== 'undefined' && QRCode.toDataURL) {
+          const dataUrl = await QRCode.toDataURL(payload, {
+            width: 200, margin: 2,
+            color: { dark: '#000000', light: '#ffffff' },
+            errorCorrectionLevel: 'M'
           });
+          qrImg.src          = dataUrl;
+          qrImg.style.display   = 'block';
+          spinner.style.display = 'none';
+        } else {
+          // Library not yet loaded — retry after short delay
+          await new Promise(r => setTimeout(r, 1200));
+          const dataUrl = await QRCode.toDataURL(payload, { width: 200, margin: 2 });
+          qrImg.src          = dataUrl;
+          qrImg.style.display   = 'block';
+          spinner.style.display = 'none';
         }
-      } catch (err) { console.error('QR generation failed', err); }
+      } catch (err) {
+        console.error('QR generation failed:', err);
+        spinner.style.display = 'none';
+        showToast(t('QR生成失敗', 'QR generation failed'));
+      }
     }
 
     async function openQRScan() {
@@ -769,7 +1032,10 @@
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
         });
-        $('qr-video').srcObject = stream;
+        const video = $('qr-video');
+        video.srcObject = stream;
+        await video.play();
+        qrScanFrameId = requestAnimationFrame(scanQrFrame);
       } catch {
         showToast(t('カメラへのアクセスが拒否されました', 'Camera access denied'));
         $('dynamicIsland').classList.remove('active');
@@ -778,6 +1044,9 @@
 
     function closeIsland() {
       $('dynamicIsland').classList.remove('active');
+      delete $('dynamicIsland').dataset.qrSessionId;
+      cancelAnimationFrame(qrScanFrameId);
+      qrScanFrameId = null;
       const vid = $('qr-video');
       if (vid.srcObject) {
         vid.srcObject.getTracks().forEach(tr => tr.stop());
@@ -813,33 +1082,84 @@
       }
     });
 
+    /* ────────────────────────────────────
+       Settings modal open/close
+    ──────────────────────────────────── */
+    $('settingsBtn').addEventListener('click', () => {
+      $('settingsModal').classList.add('active');
+      document.querySelector('.settings-content').scrollTop = 0;
+    });
+    $('closeSettings').addEventListener('click', () => $('settingsModal').classList.remove('active'));
+    $('settingsModal').addEventListener('click', e => {
+      if (e.target === $('settingsModal')) $('settingsModal').classList.remove('active');
+    });
+
+    /* Searching / Pulsating state */
+    function startSearching() {
+      setState(STATE.SEARCHING);
+      showToast(t('端末を検索中…', 'Searching for devices…'), 6000);
+    }
 
     /* ────────────────────────────────────
        WebDrop module events
     ──────────────────────────────────── */
     window.addEventListener('webdrop:ready', e => {
-      $('deviceInfoLabel').textContent = `Device: ${e.detail.deviceType}`;
+      $('deviceInfoLabel').textContent = `${DEVICE.icon} ${DEVICE.label}`;
+      // Broadcast our profile as soon as WS is ready
+      broadcastMyProfile();
     });
-    window.addEventListener('webdrop:ws:connecting',    () => setStatDot('ws', 'connecting'));
-    window.addEventListener('webdrop:ws:connected',     () => setStatDot('ws', 'connected'));
-    window.addEventListener('webdrop:ws:disconnected',  () => setStatDot('ws', 'disconnected'));
+    window.addEventListener('webdrop:ws:connecting', () => {
+      setStatDot('ws', 'connecting');
+      $('settingsWsDot').dataset.status = 'connecting';
+      $('settingsWsState').textContent = t('接続中…', 'Connecting…');
+    });
+    window.addEventListener('webdrop:ws:connected', () => {
+      setStatDot('ws', 'connected');
+      $('settingsWsDot').dataset.status = 'connected';
+      $('settingsWsState').textContent = t('接続済み', 'Connected');
+      broadcastMyProfile();
+    });
+    window.addEventListener('webdrop:ws:disconnected', () => {
+      setStatDot('ws', 'disconnected');
+      $('settingsWsDot').dataset.status = 'disconnected';
+      $('settingsWsState').textContent = t('再接続中…', 'Reconnecting…');
+    });
+    window.addEventListener('webdrop:qr:paired', e => {
+      closeIsland();
+      showToast(t('端末と接続しました', `Connected to ${e.detail.peer?.displayName || 'device'}`), 4000);
+    });
 
     /* ────────────────────────────────────
-       Init state
+       Init
     ──────────────────────────────────── */
     setState(STATE.IDLE);
-    setStatDot('ws', 'connecting'); // will update via module events
+    setStatDot('ws', 'connecting');
 
-    // Apply device-specific UI immediately
+    // Apply device-specific QR button + banner
     applyDeviceUI();
 
-    // Restore cached permission dots immediately (no re-ask)
-    (['mic','bump','tilt']).forEach(key => {
-      const cached = PermCache.get(key);
-      if (cached) setStatDot(key, cached);
-    });
-    const cachedMic = PermCache.get('mic');
-    if (cachedMic) setStatDot('ultra', cachedMic);
+    // Apply user identity (name, photo, avatar)
+    // applyUserIdentity() needs DEVICE to be defined first — it's above us, we're good
+    applyUserIdentity();
+
+    // Hide proximity-sensor dots for QR-only devices (Mac/iPhone — they use QR alone)
+    const isQROnly = DEVICE.qrRole === 'create' || DEVICE.type === 'iPhone' || DEVICE.type === 'iPad';
+    if (isQROnly) {
+      ['stat-mic','stat-ultra','stat-tilt','stat-bump'].forEach(id => {
+        const el = $(id);
+        if (el) el.style.opacity = '0.3';
+      });
+      // Pre-mark as N/A
+      ['mic','ultra','tilt','bump'].forEach(k => setStatDot(k, 'unknown'));
+    } else {
+      // Restore cached permission dots for proximity-capable devices
+      (['mic','bump','tilt']).forEach(key => {
+        const cached = PermCache.get(key);
+        if (cached) setStatDot(key, cached);
+      });
+      const cachedMic = PermCache.get('mic');
+      if (cachedMic) setStatDot('ultra', cachedMic);
+    }
   </script>
 
 </body>

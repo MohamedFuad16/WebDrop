@@ -1,5 +1,18 @@
+function resolveSignalingUrl() {
+  const queryOverride = new URLSearchParams(window.location.search).get("ws");
+  const storedOverride = localStorage.getItem("webdrop-signaling-url");
+  const explicitOverride = window.WEBDROP_SIGNALING_URL;
+
+  if (explicitOverride || queryOverride || storedOverride) {
+    return explicitOverride || queryOverride || storedOverride;
+  }
+
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}/ws`;
+}
+
 export const CONFIG = {
-  signalingUrl: "wss://webdrop-signaling.vercel.app/", // Replace with actual URL
+  signalingUrl: resolveSignalingUrl(),
   proximityThreshold: 70, // 70+ means handshake ready
   chunkSize: 16 * 1024,
   scoring: {
