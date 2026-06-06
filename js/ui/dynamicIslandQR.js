@@ -30,14 +30,23 @@ export class DynamicIslandQR {
   async showScanCode() {
     this.reveal();
     this.active = true;
+    document.body.classList.add('qr-scanning');
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 640, max: 960 },
+          height: { ideal: 480, max: 720 },
+          frameRate: { ideal: 15, max: 20 }
+        }
+      });
       this.video.srcObject = this.stream;
       
       // Real implementation would run jsQR inside a requestAnimationFrame loop
       // to decode the video frames.
     } catch (err) {
       console.error("Camera access denied.", err);
+      this.close();
     }
   }
 
@@ -49,6 +58,7 @@ export class DynamicIslandQR {
       this.island.classList.remove('island-closing');
     }, 1120);
     this.active = false;
+    document.body.classList.remove('qr-scanning');
     if (this.stream) {
       this.stream.getTracks().forEach(track => track.stop());
       this.stream = null;
