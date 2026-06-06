@@ -5,10 +5,22 @@ export class DynamicIslandQR {
     this.video = document.getElementById('qr-video');
     this.stream = null;
     this.active = false;
+    this.transitionTimer = null;
+  }
+
+  reveal() {
+    clearTimeout(this.transitionTimer);
+    this.island.classList.remove('active', 'island-closing');
+    this.island.classList.add('island-opening');
+    void this.island.offsetWidth;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      this.island.classList.add('active');
+      this.island.classList.remove('island-opening');
+    }));
   }
 
   showCreateCode(sessionId) {
-    this.island.classList.add('active');
+    this.reveal();
     this.active = true;
     // In real implementation, generate QR code with a library like qrcode.js
     // and render it into the island content
@@ -16,7 +28,7 @@ export class DynamicIslandQR {
   }
 
   async showScanCode() {
-    this.island.classList.add('active');
+    this.reveal();
     this.active = true;
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
@@ -30,7 +42,12 @@ export class DynamicIslandQR {
   }
 
   close() {
-    this.island.classList.remove('active');
+    clearTimeout(this.transitionTimer);
+    this.island.classList.remove('active', 'island-opening');
+    this.island.classList.add('island-closing');
+    this.transitionTimer = setTimeout(() => {
+      this.island.classList.remove('island-closing');
+    }, 1120);
     this.active = false;
     if (this.stream) {
       this.stream.getTracks().forEach(track => track.stop());
