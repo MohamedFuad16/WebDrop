@@ -1295,6 +1295,8 @@ body {
 }
 
 .dynamic-island[data-mode="scan"] .island-content {
+  inset: 0 0 10px;
+  border-radius: 0 0 24px 24px;
   background: #020203;
 }
 
@@ -1431,6 +1433,11 @@ body {
   .dynamic-island.active .island-content {
     inset: max(70px, calc(var(--island-safe-top) + 12px)) 10px 10px;
     border-radius: 22px;
+  }
+
+  .dynamic-island[data-mode="scan"].active .island-content {
+    inset: 0 0 8px;
+    border-radius: 0 0 22px 22px;
   }
 
   .qr-corner--tl { top: calc(50% - 104px); left: calc(50% - 104px); }
@@ -1597,6 +1604,22 @@ body {
   visibility: visible;
   pointer-events: auto;
   transform: translateX(-50%) translateY(0) scale(1);
+}
+
+body.qr-scanning .orbit-ring,
+body.qr-scanning .ripple-ring,
+body.qr-scanning .person-wrapper,
+body.qr-scanning .person {
+  animation-play-state: paused !important;
+}
+
+body.qr-scanning .folder,
+body.qr-scanning .person,
+body.qr-scanning .settings-btn,
+body.qr-scanning .status-bar {
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .settings-content {

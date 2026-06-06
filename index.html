@@ -941,7 +941,12 @@
     }
 
     /* ── QR island helpers ── */
-    let qrScanFrameId = null;
+    const QR_SCAN_INTERVAL_MS = 180;
+    const QR_SCAN_MAX_WIDTH = 420;
+    let qrScanTimerId = null;
+    let qrScanSession = 0;
+    let lastQrValue = '';
+    let lastQrValueAt = 0;
     const qrScanCanvas = document.createElement('canvas');
     const qrScanContext = qrScanCanvas.getContext('2d', { willReadFrequently: true });
 
@@ -980,7 +985,12 @@
     function pairFromQrPayload(rawValue) {
       const payload = parseQrPayload(rawValue);
       if (!payload) {
-        showToast(t('WebDropのQRコードではありません', 'This is not a WebDrop QR code'));
+        const now = Date.now();
+        if (rawValue !== lastQrValue || now - lastQrValueAt > 4000) {
+          lastQrValue = rawValue;
+          lastQrValueAt = now;
+          showToast(t('WebDropのQRコードではありません', 'This is not a WebDrop QR code'));
+        }
         return false;
       }
       if (!window.WebDrop?.wsClient?.connected) {
@@ -998,9 +1008,14 @@
       if (!video.srcObject || !qrScanContext) return;
 
       if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth && video.videoHeight) {
-        qrScanCanvas.width = video.videoWidth;
-        qrScanCanvas.height = video.videoHeight;
-        qrScanContext.drawImage(video, 0, 0, qrScanCanvas.width, qrScanCanvas.height);
+        const scale = Math.min(1, QR_SCAN_MAX_WIDTH / video.videoWidth);
+        const scanWidth = Math.round(video.videoWidth * scale);
+        const scanHeight = Math.round(video.videoHeight * scale);
+        if (qrScanCanvas.width !== scanWidth || qrScanCanvas.height !== scanHeight) {
+          qrScanCanvas.width = scanWidth;
+          qrScanCanvas.height = scanHeight;
+        }
+        qrScanContext.drawImage(video, 0, 0, scanWidth, scanHeight);
         const frame = qrScanContext.getImageData(0, 0, qrScanCanvas.width, qrScanCanvas.height);
         const result = typeof jsQR === 'function'
           ? jsQR(frame.data, frame.width, frame.height, { inversionAttempts: 'dontInvert' })
@@ -1008,7 +1023,7 @@
         if (result && pairFromQrPayload(result.data)) return;
       }
 
-      qrScanFrameId = requestAnimationFrame(scanQrFrame);
+      qrScanTimerId = setTimeout(scanQrFrame, QR_SCAN_INTERVAL_MS);
     }
 
     window.WebDropQR = { parsePayload: parseQrPayload, openScan: () => openQRScan() };
@@ -1075,14 +1090,28 @@
       $('islandScanMode').style.display   = 'block';
       $('islandCreateMode').style.display = 'none';
       revealIsland('scan');
+      document.body.classList.add('qr-scanning');
+      const scanSession = ++qrScanSession;
+      // Start the camera after the shell settles so camera startup cannot jank the reveal.
+      await new Promise(r => setTimeout(r, 1080));
+      if (scanSession !== qrScanSession) return;
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 640, max: 960 },
+            height: { ideal: 480, max: 720 },
+            frameRate: { ideal: 15, max: 20 }
+          }
         });
+        if (scanSession !== qrScanSession) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
         const video = $('qr-video');
         video.srcObject = stream;
         await video.play();
-        qrScanFrameId = requestAnimationFrame(scanQrFrame);
+        qrScanTimerId = setTimeout(scanQrFrame, QR_SCAN_INTERVAL_MS);
       } catch {
         showToast(t('カメラへのアクセスが拒否されました', 'Camera access denied'));
         closeIsland();
@@ -1096,12 +1125,14 @@
       island.classList.add('island-closing');
       island.setAttribute('aria-expanded', 'false');
       delete island.dataset.qrSessionId;
+      qrScanSession += 1;
+      document.body.classList.remove('qr-scanning');
       islandTransitionTimer = setTimeout(() => {
         island.classList.remove('island-closing');
         delete island.dataset.mode;
       }, 1120);
-      cancelAnimationFrame(qrScanFrameId);
-      qrScanFrameId = null;
+      clearTimeout(qrScanTimerId);
+      qrScanTimerId = null;
       const vid = $('qr-video');
       if (vid.srcObject) {
         vid.srcObject.getTracks().forEach(tr => tr.stop());
@@ -1141,6 +1172,13 @@
           !folderQrBtn.contains(e.target)) {
         closeIsland();
       }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && $('dynamicIsland').dataset.mode === 'scan') closeIsland();
+    });
+    window.addEventListener('pagehide', () => {
+      if ($('dynamicIsland').dataset.mode === 'scan') closeIsland();
     });
 
     /* ────────────────────────────────────
