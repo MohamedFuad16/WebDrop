@@ -957,6 +957,26 @@
       }
     }
 
+    let islandTransitionTimer = null;
+
+    function revealIsland(mode) {
+      const island = $('dynamicIsland');
+      clearTimeout(islandTransitionTimer);
+      island.classList.remove('active', 'island-closing');
+      island.classList.add('island-opening');
+      island.dataset.mode = mode;
+      island.setAttribute('aria-expanded', 'true');
+
+      // Give the browser one collapsed frame above the safe area, then unfold.
+      void island.offsetWidth;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        island.classList.add('active');
+        island.classList.remove('island-opening');
+      }));
+
+      return island;
+    }
+
     function pairFromQrPayload(rawValue) {
       const payload = parseQrPayload(rawValue);
       if (!payload) {
@@ -1002,10 +1022,7 @@
       }
       $('islandScanMode').style.display   = 'none';
       $('islandCreateMode').style.display = 'block';
-      const island = $('dynamicIsland');
-      island.dataset.mode = 'create';
-      island.setAttribute('aria-expanded', 'true');
-      island.classList.add('active');
+      revealIsland('create');
 
       const qrImg     = $('qr-img');
       const spinner   = $('qrSpinner');
@@ -1025,8 +1042,8 @@
         sessionId
       });
 
-      // Wait for island animation to complete before generating
-      await new Promise(r => setTimeout(r, 500));
+      // Let the shell finish unfolding before replacing the loading state.
+      await new Promise(r => setTimeout(r, 1120));
 
       try {
         if (typeof QRCode !== 'undefined' && QRCode.toDataURL) {
@@ -1057,10 +1074,7 @@
       $('settingsModal').classList.remove('active');
       $('islandScanMode').style.display   = 'block';
       $('islandCreateMode').style.display = 'none';
-      const island = $('dynamicIsland');
-      island.dataset.mode = 'scan';
-      island.setAttribute('aria-expanded', 'true');
-      island.classList.add('active');
+      revealIsland('scan');
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -1071,18 +1085,21 @@
         qrScanFrameId = requestAnimationFrame(scanQrFrame);
       } catch {
         showToast(t('カメラへのアクセスが拒否されました', 'Camera access denied'));
-        island.classList.remove('active');
-        island.setAttribute('aria-expanded', 'false');
-        delete island.dataset.mode;
+        closeIsland();
       }
     }
 
     function closeIsland() {
       const island = $('dynamicIsland');
-      island.classList.remove('active');
+      clearTimeout(islandTransitionTimer);
+      island.classList.remove('active', 'island-opening');
+      island.classList.add('island-closing');
       island.setAttribute('aria-expanded', 'false');
       delete island.dataset.qrSessionId;
-      delete island.dataset.mode;
+      islandTransitionTimer = setTimeout(() => {
+        island.classList.remove('island-closing');
+        delete island.dataset.mode;
+      }, 1120);
       cancelAnimationFrame(qrScanFrameId);
       qrScanFrameId = null;
       const vid = $('qr-video');
