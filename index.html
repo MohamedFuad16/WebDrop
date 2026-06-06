@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ウェブドロップ | WebDrop</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -18,9 +18,10 @@
   <!-- ── Settings Button ── -->
   <div class="settings-container">
     <button class="settings-btn" id="settingsBtn" aria-label="設定 / Settings">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"></circle>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="7.25" stroke="currentColor" stroke-width="2.1"></circle>
+        <circle cx="12" cy="12" r="2.7" stroke="currentColor" stroke-width="2.1"></circle>
+        <path d="M12 2.8v2.15M12 19.05v2.15M2.8 12h2.15M19.05 12h2.15" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"></path>
       </svg>
     </button>
     <!-- Hidden inputs -->
@@ -29,7 +30,7 @@
   </div>
 
   <!-- ── Dynamic Island (QR Scanner / Creator) ── -->
-  <div class="dynamic-island" id="dynamicIsland">
+  <div class="dynamic-island" id="dynamicIsland" aria-label="QR pairing" aria-expanded="false">
     <div class="island-content">
       <div class="island-mode" id="islandScanMode">
         <video id="qr-video" autoplay playsinline muted></video>
@@ -87,11 +88,11 @@
       <!-- Paper / file card stack (sits INSIDE folder, covered by front when closed) -->
       <div class="paper-stack" id="paper-stack" role="button" aria-label="ファイルを選択 / Select file">
         <div class="paper default-paper" id="defaultPaper">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="12" y1="12" x2="12" y2="18"></line>
-            <line x1="9" y1="15" x2="15" y2="15"></line>
+          <svg class="default-file-icon" width="46" height="46" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M28 6H15a5 5 0 0 0-5 5v26a5 5 0 0 0 5 5h18a5 5 0 0 0 5-5V16L28 6z"></path>
+            <path d="M28 6v10h10"></path>
+            <path d="M24 21v12"></path>
+            <path d="M18 27h12"></path>
           </svg>
           <span class="paper-label" data-ja="追加" data-en="Add">追加</span>
         </div>
@@ -102,12 +103,24 @@
         <div class="folder-front-header">
           <span class="folder-title" data-ja="ウェブドロップ" data-en="WebDrop">ウェブドロップ</span>
           <!-- Send/Receive action button — glows when file is ready -->
-          <button class="folder-action-btn" id="folderActionBtn" aria-label="送信・受信 / Send or Receive" disabled>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
-          </button>
+          <div class="folder-action-rail">
+            <button class="folder-action-btn" id="folderActionBtn" aria-label="送信・受信 / Send or Receive" disabled>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+            <button class="folder-qr-btn folder-action-btn" id="folderQrBtn" aria-label="QRスキャン / Scan QR">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.35" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h6v6H4z"></path>
+                <path d="M14 4h6v6h-6z"></path>
+                <path d="M4 14h6v6H4z"></path>
+                <path d="M14 14h2"></path>
+                <path d="M20 14v2"></path>
+                <path d="M16 18h4v2"></path>
+              </svg>
+            </button>
+          </div>
         </div>
         <div class="folder-front-footer">
           <span class="folder-count" id="folder-count">0 <span data-ja="ファイル" data-en="files">ファイル</span></span>
@@ -307,6 +320,7 @@
     const sheet       = $('actionSheet');
     const backdrop    = $('sheetBackdrop');
     const actionBtn   = $('folderActionBtn');
+    const folderQrBtn = $('folderQrBtn');
     const searchLabel = $('searchingLabel');
 
     let totalFiles  = 0;
@@ -525,28 +539,23 @@
        Folder click → open / close
     ──────────────────────────────────── */
     folderEl.addEventListener('click', () => {
-      if (appState === STATE.IDLE || appState === STATE.FILE_READY) {
-        setState(appState === STATE.IDLE ? STATE.OPEN : STATE.FILE_READY);
-        folderEl.classList.toggle('is-open');
-      } else if (appState === STATE.OPEN) {
-        folderEl.classList.remove('is-open');
-        setState(STATE.IDLE);
-      }
+      const nextOpen = !folderEl.classList.contains('is-open');
+      folderEl.classList.toggle('is-open', nextOpen);
+      setState(nextOpen ? STATE.OPEN : (totalFiles > 0 ? STATE.FILE_READY : STATE.IDLE));
     });
 
     /* ────────────────────────────────────
        Paper stack click → open sheet
     ──────────────────────────────────── */
     paperStack.addEventListener('click', e => {
+      if (!folderEl.classList.contains('is-open')) return;
+
+      const frontTop = $('folderFront').getBoundingClientRect().top;
+      const clickedVisiblePaper = e.clientY < frontTop - 8;
+      if (!clickedVisiblePaper) return;
+
       e.stopPropagation();
-      if (appState === STATE.OPEN || appState === STATE.FILE_READY) {
-        openSheet();
-      } else if (appState === STATE.IDLE) {
-        // Open folder first then sheet
-        folderEl.classList.add('is-open');
-        setState(STATE.OPEN);
-        setTimeout(openSheet, 350);
-      }
+      openSheet();
     });
 
     /* ────────────────────────────────────
@@ -664,6 +673,25 @@
     // Persist ID immediately
     localStorage.setItem('wd_user_id', USER.id);
 
+    function fallbackAvatar(seed) {
+      let hash = 0;
+      for (const ch of seed) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+      const skin = ['#ffd2a1', '#f2b37e', '#d89262', '#f6c7a0'][hash % 4];
+      const hair = ['#f58aa9', '#d8c37f', '#7f5438', '#22242b'][(hash >> 2) % 4];
+      const shirt = ['#4f8cff', '#42d982', '#9b8cff', '#f2b85b'][(hash >> 4) % 4];
+      const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+          <rect width="96" height="96" rx="48" fill="#bdeaff"/>
+          <circle cx="48" cy="42" r="22" fill="${skin}"/>
+          <path d="M26 38c3-18 16-25 31-21 9 2 14 9 14 19-13-7-29-5-45 2z" fill="${hair}"/>
+          <path d="M25 96c4-22 15-32 23-32s19 10 23 32H25z" fill="${shirt}"/>
+          <path d="M40 45h16" stroke="#25262a" stroke-width="4" stroke-linecap="round"/>
+          <circle cx="39" cy="39" r="3" fill="#25262a"/>
+          <circle cx="57" cy="39" r="3" fill="#25262a"/>
+        </svg>`;
+      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    }
+
     // Generate default name from device type if none stored yet
     if (!USER.name) {
       const adjectives = LANG === 'ja'
@@ -681,7 +709,7 @@
       $('myNameLabel').textContent = name;
       const selfImg = $('my-profile-pic');
       selfImg.src = USER.photo
-        || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(USER.id)}&backgroundColor=b6e3f4`;
+        || fallbackAvatar(USER.id);
       // Settings panel
       $('settings-avatar').src = selfImg.src;
       $('userNameInput').value = name;
@@ -756,7 +784,7 @@
         entry.hasPhoto = hasPhoto;
         const img  = entry.el.querySelector('img');
         const span = entry.el.querySelector('span');
-        img.src    = photoUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(peerId)}&backgroundColor=c0aede`;
+        img.src    = photoUrl || fallbackAvatar(peerId);
         span.textContent = name;
         entry.el.closest('.person-wrapper').style.display =
           (showReal && !hasPhoto) || !showIcons ? 'none' : '';
@@ -773,8 +801,7 @@
       wrapper.className = 'person-wrapper';
       wrapper.style.cssText = `--orbit-r:${r}px;--orbit-angle:${ang}deg;--anim-dur:${dur}s`;
 
-      const imgSrc = photoUrl
-        || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(peerId)}&backgroundColor=c0aede`;
+      const imgSrc = photoUrl || fallbackAvatar(peerId);
 
       wrapper.innerHTML = `
         <div class="person" data-peer-id="${peerId}" data-has-photo="${hasPhoto}">
@@ -964,7 +991,7 @@
       qrScanFrameId = requestAnimationFrame(scanQrFrame);
     }
 
-    window.WebDropQR = { parsePayload: parseQrPayload };
+    window.WebDropQR = { parsePayload: parseQrPayload, openScan: () => openQRScan() };
 
     async function openQRCreate() {
       $('settingsModal').classList.remove('active');
@@ -975,7 +1002,10 @@
       }
       $('islandScanMode').style.display   = 'none';
       $('islandCreateMode').style.display = 'block';
-      $('dynamicIsland').classList.add('active');
+      const island = $('dynamicIsland');
+      island.dataset.mode = 'create';
+      island.setAttribute('aria-expanded', 'true');
+      island.classList.add('active');
 
       const qrImg     = $('qr-img');
       const spinner   = $('qrSpinner');
@@ -1027,7 +1057,10 @@
       $('settingsModal').classList.remove('active');
       $('islandScanMode').style.display   = 'block';
       $('islandCreateMode').style.display = 'none';
-      $('dynamicIsland').classList.add('active');
+      const island = $('dynamicIsland');
+      island.dataset.mode = 'scan';
+      island.setAttribute('aria-expanded', 'true');
+      island.classList.add('active');
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -1038,13 +1071,18 @@
         qrScanFrameId = requestAnimationFrame(scanQrFrame);
       } catch {
         showToast(t('カメラへのアクセスが拒否されました', 'Camera access denied'));
-        $('dynamicIsland').classList.remove('active');
+        island.classList.remove('active');
+        island.setAttribute('aria-expanded', 'false');
+        delete island.dataset.mode;
       }
     }
 
     function closeIsland() {
-      $('dynamicIsland').classList.remove('active');
-      delete $('dynamicIsland').dataset.qrSessionId;
+      const island = $('dynamicIsland');
+      island.classList.remove('active');
+      island.setAttribute('aria-expanded', 'false');
+      delete island.dataset.qrSessionId;
+      delete island.dataset.mode;
       cancelAnimationFrame(qrScanFrameId);
       qrScanFrameId = null;
       const vid = $('qr-video');
@@ -1063,6 +1101,11 @@
       }
     });
 
+    folderQrBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      openQRScan();
+    });
+
     /* Tap the Dynamic Island itself to close it */
     $('dynamicIsland').addEventListener('click', e => {
       // Only close if already expanded and clicking the island background (not the canvas/video)
@@ -1077,7 +1120,8 @@
       const island = $('dynamicIsland');
       if (island.classList.contains('active') &&
           !island.contains(e.target) &&
-          !$('btnQRAction').contains(e.target)) {
+          !$('btnQRAction').contains(e.target) &&
+          !folderQrBtn.contains(e.target)) {
         closeIsland();
       }
     });
