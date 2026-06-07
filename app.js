@@ -95,8 +95,15 @@ class WebDropApp {
       }
     });
 
-    // Start proximity listening if permissions exist
-    this.proximityEngine.startListening();
+    window.addEventListener('webdrop:proximity:start', () => {
+      this.proximityEngine.startListening();
+    });
+    window.addEventListener('webdrop:proximity:stop', () => {
+      this.proximityEngine.stopListening();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.proximityEngine.stopListening();
+    });
 
     window.addEventListener('online', () => this.wsClient.connect(this.displayName, this.deviceType));
   }

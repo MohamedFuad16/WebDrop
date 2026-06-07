@@ -15,15 +15,42 @@ export class ProximityScoringEngine {
     this.bump = new BumpDetectionSensor();
     this.tilt = new TiltDetectionSensor();
     this.network = new NetworkHintSensor();
+    this.active = false;
+    this.stopTimer = null;
+    this.handleNetworkCandidate = ({ userId, candidate }) => {
+      this.network.recordIceCandidate(userId, candidate);
+    };
+    this.networkBound = false;
   }
 
-  startListening() {
+  startListening({ durationMs = 45000 } = {}) {
+    if (this.active) {
+      this.extendListening(durationMs);
+      return;
+    }
+    this.active = true;
     this.bump.startListening();
     this.tilt.startListening();
     // Network hints are driven by ICE events
-    this.bus.on("network:candidate", ({ userId, candidate }) => {
-      this.network.recordIceCandidate(userId, candidate);
-    });
+    if (!this.networkBound) {
+      this.bus.on("network:candidate", this.handleNetworkCandidate);
+      this.networkBound = true;
+    }
+    this.extendListening(durationMs);
+  }
+
+  extendListening(durationMs = 45000) {
+    clearTimeout(this.stopTimer);
+    this.stopTimer = setTimeout(() => this.stopListening(), durationMs);
+  }
+
+  stopListening() {
+    clearTimeout(this.stopTimer);
+    this.stopTimer = null;
+    this.active = false;
+    this.bump.stopListening();
+    this.tilt.stopListening();
+    this.ultrasound.stopListening();
   }
 
   async calculateScore(user) {

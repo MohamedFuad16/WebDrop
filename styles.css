@@ -8,7 +8,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --font: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", "Noto Sans JP", sans-serif;
   --orbit-1: 210px;
   --orbit-2: 310px;
   --orbit-3: 410px;
@@ -1724,7 +1724,8 @@ body.qr-scanning .status-bar {
 }
 
 #selfWrapper {
-  animation: selfFloat 5.4s ease-in-out infinite !important;
+  --anim-dur: 36s;
+  animation: orbitPerson var(--anim-dur) linear infinite !important;
   z-index: 6;
 }
 
@@ -1738,12 +1739,7 @@ body.qr-scanning .status-bar {
 }
 
 .person {
-  animation: avatarBreath 4.8s ease-in-out infinite;
-}
-
-@keyframes avatarBreath {
-  0%, 100% { filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.46)); }
-  50% { filter: drop-shadow(0 17px 24px rgba(0, 0, 0, 0.58)); }
+  animation: none;
 }
 
 .settings-btn {
@@ -1956,16 +1952,8 @@ body.qr-scanning .status-bar {
 
 @media (max-width: 430px) {
   #selfWrapper {
-    animation-name: selfFloatMobile !important;
-  }
-
-  @keyframes selfFloatMobile {
-    0%, 100% {
-      transform: translate(-50%, -50%) translateY(calc(-1 * var(--orbit-1) - 4px));
-    }
-    50% {
-      transform: translate(-50%, -50%) translateY(calc(-1 * var(--orbit-1) - 17px));
-    }
+    --anim-dur: 34s;
+    animation-name: orbitPerson !important;
   }
 
   .folder-title {
@@ -1995,5 +1983,211 @@ body.qr-scanning .status-bar {
 
   .sheet-btn {
     min-height: 88px;
+  }
+}
+
+/* ─── Performance and UX cleanup pass ───────────── */
+body,
+button,
+input {
+  font-family: var(--font);
+  letter-spacing: 0;
+}
+
+.person {
+  will-change: transform;
+}
+
+.person img {
+  background: #d8f4ff;
+  object-fit: cover;
+}
+
+#selfPerson img,
+.settings-avatar {
+  image-rendering: auto;
+}
+
+.default-paper {
+  width: 196px;
+  height: 148px;
+  border-radius: 20px;
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.18);
+  background:
+    radial-gradient(circle at 50% 22%, rgba(255, 255, 255, 0.24), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.055)),
+    linear-gradient(145deg, #626368 0%, #303136 46%, #18191c 100%);
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.46),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.52);
+}
+
+.default-paper::before {
+  top: 82px;
+  height: 6px;
+  left: 34px;
+  right: 34px;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 20px 0 rgba(255, 255, 255, 0.1);
+}
+
+.default-paper::after {
+  display: none;
+}
+
+.default-file-icon {
+  width: 56px;
+  height: 56px;
+  color: rgba(255, 255, 255, 0.74);
+  transform: translateY(-3px);
+  filter: drop-shadow(0 12px 16px rgba(0, 0, 0, 0.42));
+}
+
+.settings-modal {
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.settings-content {
+  width: min(456px, calc(100vw - 28px));
+  border-radius: 26px;
+  padding: 24px 24px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #18181a;
+  box-shadow:
+    0 28px 78px rgba(0, 0, 0, 0.78),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.settings-header {
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+
+.settings-header h3 {
+  font-size: 25px;
+  line-height: 1.08;
+  font-weight: 760;
+}
+
+.settings-subtitle {
+  margin-top: 8px;
+  font-size: 15px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.close-settings {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  font-size: 28px;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.settings-body {
+  gap: 10px;
+}
+
+.setting-item,
+.settings-connection,
+.device-banner {
+  min-height: 62px;
+  border-radius: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #202124;
+  color: rgba(255, 255, 255, 0.86);
+  box-shadow: none;
+}
+
+.setting-item--profile {
+  min-height: 92px;
+  background: #222734;
+  border-color: rgba(108, 145, 255, 0.34);
+}
+
+.settings-avatar {
+  width: 62px;
+  height: 62px;
+  border-radius: 18px;
+}
+
+.username-input {
+  font-size: 18px;
+  font-weight: 760;
+}
+
+.user-id-label,
+.qr-device-sub,
+.settings-connection-copy small,
+.device-banner-role {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.settings-connection-copy span,
+.device-banner-name,
+.setting-item--qr #qrPairingLabel {
+  font-size: 16px;
+  font-weight: 720;
+}
+
+.upload-btn,
+.qr-mini-btn {
+  min-height: 40px;
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.qr-mini-btn--primary {
+  min-width: 108px;
+  background: #f4f7ff;
+  box-shadow: none;
+}
+
+.bottom-sheet {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #18181a;
+}
+
+.sheet-btn {
+  background: #202124;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 430px) {
+  .default-paper {
+    width: 154px;
+    height: 120px;
+    border-radius: 17px;
+  }
+
+  .default-file-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .settings-content {
+    width: 100%;
+    max-height: calc(100dvh - max(22px, env(safe-area-inset-top, 0px) + 18px));
+    padding: 22px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+    border-radius: 30px 30px 0 0;
+  }
+
+  .settings-header h3 {
+    font-size: 29px;
+  }
+
+  .setting-item,
+  .settings-connection,
+  .device-banner {
+    padding: 13px 14px;
   }
 }

@@ -70,7 +70,7 @@
 
     <!-- Nearby person avatars — injected by JS from WebSocket peers -->
     <!-- Self avatar always visible at orbit 1 -->
-    <div class="person-wrapper" id="selfWrapper" style="--orbit-r:210px;--orbit-angle:0deg;--anim-dur:0s;animation:none;transform:translate(-50%,-50%) translateX(0) translateY(calc(-1 * 210px));">
+    <div class="person-wrapper" id="selfWrapper" style="--orbit-r:210px;--orbit-angle:-12deg;--anim-dur:36s;">
       <div class="person" id="selfPerson" data-peer-id="self">
         <img id="my-profile-pic" src="" alt="Me">
         <span id="myNameLabel"></span>
@@ -88,11 +88,11 @@
       <!-- Paper / file card stack (sits INSIDE folder, covered by front when closed) -->
       <div class="paper-stack" id="paper-stack" role="button" aria-label="ファイルを選択 / Select file">
         <div class="paper default-paper" id="defaultPaper">
-          <svg class="default-file-icon" width="46" height="46" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M28 6H15a5 5 0 0 0-5 5v26a5 5 0 0 0 5 5h18a5 5 0 0 0 5-5V16L28 6z"></path>
-            <path d="M28 6v10h10"></path>
-            <path d="M24 21v12"></path>
-            <path d="M18 27h12"></path>
+          <svg class="default-file-icon" width="54" height="54" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <path d="M38 10H23a7 7 0 0 0-7 7v30a7 7 0 0 0 7 7h18a7 7 0 0 0 7-7V20L38 10Z" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round"></path>
+            <path d="M38 10v11h10" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round"></path>
+            <path d="M32 27v18M23 36h18" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"></path>
+            <path d="M21 50h22" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".25"></path>
           </svg>
           <span class="paper-label" data-ja="追加" data-en="Add">追加</span>
         </div>
@@ -340,6 +340,9 @@
       $('scene').dataset.state = next;
       searchLabel.classList.toggle('visible', next === STATE.SEARCHING);
       actionBtn.disabled = next !== STATE.FILE_READY && next !== STATE.SEARCHING;
+      if (next !== STATE.SEARCHING) {
+        window.dispatchEvent(new CustomEvent('webdrop:proximity:stop'));
+      }
     }
 
     /* ────────────────────────────────────
@@ -409,6 +412,10 @@
       };
     }
 
+    function isProximityHardwareNeeded() {
+      return DEVICE.qrRole !== 'create' && DEVICE.type !== 'iPhone' && DEVICE.type !== 'iPad';
+    }
+
     /* ── Microphone (ultrasound) ── */
     async function requestMic() {
       const cached = PermCache.get('mic');
@@ -443,7 +450,10 @@
         ),
         onAllow: async () => {
           try {
-            await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+            });
+            stream.getTracks().forEach(track => track.stop());
             PermCache.set('mic', 'granted');
             setStatDot('mic', 'granted'); setStatDot('ultra', 'granted');
             return true;
@@ -530,9 +540,12 @@
 
     /* Request all permissions sequentially */
     async function requestAllPermissions() {
+      if (!isProximityHardwareNeeded()) return false;
       await requestMic();
       await requestMotion();
       await requestOrientation();
+      window.dispatchEvent(new CustomEvent('webdrop:proximity:start'));
+      return true;
     }
 
     /* ────────────────────────────────────
@@ -676,18 +689,31 @@
     function fallbackAvatar(seed) {
       let hash = 0;
       for (const ch of seed) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-      const skin = ['#ffd2a1', '#f2b37e', '#d89262', '#f6c7a0'][hash % 4];
-      const hair = ['#f58aa9', '#d8c37f', '#7f5438', '#22242b'][(hash >> 2) % 4];
-      const shirt = ['#4f8cff', '#42d982', '#9b8cff', '#f2b85b'][(hash >> 4) % 4];
+      const skin = ['#f5c79f', '#d99a6d', '#9f684c', '#6f4938'][hash % 4];
+      const hair = ['#1f2024', '#513326', '#d6c06a', '#111114'][(hash >> 2) % 4];
+      const shirt = ['#0f1116', '#1d2739', '#242025', '#18251f'][(hash >> 4) % 4];
+      const accent = ['#79d7ff', '#88ffa8', '#bba4ff', '#ffd37a'][(hash >> 6) % 4];
       const svg = `
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
-          <rect width="96" height="96" rx="48" fill="#bdeaff"/>
-          <circle cx="48" cy="42" r="22" fill="${skin}"/>
-          <path d="M26 38c3-18 16-25 31-21 9 2 14 9 14 19-13-7-29-5-45 2z" fill="${hair}"/>
-          <path d="M25 96c4-22 15-32 23-32s19 10 23 32H25z" fill="${shirt}"/>
-          <path d="M40 45h16" stroke="#25262a" stroke-width="4" stroke-linecap="round"/>
-          <circle cx="39" cy="39" r="3" fill="#25262a"/>
-          <circle cx="57" cy="39" r="3" fill="#25262a"/>
+          <defs>
+            <linearGradient id="bg" x1="22" y1="8" x2="76" y2="92">
+              <stop stop-color="#dff8ff"/><stop offset=".58" stop-color="#9ee7ff"/><stop offset="1" stop-color="${accent}"/>
+            </linearGradient>
+            <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="8" stdDeviation="5" flood-color="#000" flood-opacity=".18"/>
+            </filter>
+          </defs>
+          <rect width="96" height="96" rx="48" fill="url(#bg)"/>
+          <circle cx="72" cy="19" r="9" fill="#fff" opacity=".24"/>
+          <g filter="url(#soft)">
+            <path d="M21 96c4-24 15-36 27-36s23 12 27 36H21z" fill="${shirt}"/>
+            <circle cx="48" cy="42" r="21" fill="${skin}"/>
+            <path d="M27 38c3-17 16-26 34-22 9 2 15 8 16 20-14-7-32-7-50 2z" fill="${hair}"/>
+            <path d="M32 41h32" stroke="#111318" stroke-width="5" stroke-linecap="round" opacity=".9"/>
+            <circle cx="39" cy="40" r="3" fill="#111318"/>
+            <circle cx="57" cy="40" r="3" fill="#111318"/>
+            <path d="M42 51c3 2 9 2 12 0" stroke="#111318" stroke-width="3" stroke-linecap="round" opacity=".42"/>
+          </g>
         </svg>`;
       return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
     }
@@ -1197,6 +1223,7 @@
     function startSearching() {
       setState(STATE.SEARCHING);
       showToast(t('端末を検索中…', 'Searching for devices…'), 6000);
+      requestAllPermissions();
     }
 
     /* ────────────────────────────────────

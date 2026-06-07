@@ -3,6 +3,8 @@ export class UltrasoundSensor {
     this.audioContext = null;
     this.oscillator = null;
     this.analyser = null;
+    this.mediaStream = null;
+    this.source = null;
     this.audioReady = false;
   }
 
@@ -46,6 +48,27 @@ export class UltrasoundSensor {
     return Math.min(50, Math.round((maxVal / 255) * 50));
   }
 
+  stopListening() {
+    this.stopChirp();
+    if (this.mediaStream) {
+      this.mediaStream.getTracks().forEach(track => track.stop());
+      this.mediaStream = null;
+    }
+    if (this.source) {
+      this.source.disconnect();
+      this.source = null;
+    }
+    if (this.analyser) {
+      this.analyser.disconnect();
+      this.analyser = null;
+    }
+    if (this.audioContext && this.audioContext.state !== "closed") {
+      this.audioContext.close().catch(() => {});
+    }
+    this.audioContext = null;
+    this.audioReady = false;
+  }
+
   async ensureAudioGraph(requestPermission = false) {
     if (this.audioContext && this.analyser) return;
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -56,14 +79,14 @@ export class UltrasoundSensor {
     if (this.audioContext.state === "suspended") {
       await this.audioContext.resume();
     }
-    const stream = await navigator.mediaDevices.getUserMedia({
+    this.mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
     });
 
-    const source = this.audioContext.createMediaStreamSource(stream);
+    this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
     this.analyser = this.audioContext.createAnalyser();
     this.analyser.fftSize = 4096;
-    source.connect(this.analyser);
+    this.source.connect(this.analyser);
     this.audioReady = true;
   }
 }
