@@ -138,11 +138,12 @@ export function createController({
   });
 
   async function sendSelectedFiles() {
-    const { files, connectedPeerId } = store.getState();
+    const { files, connectedPeerId, transfer: activeTransfer } = store.getState();
     if (!connectedPeerId) {
       view.toast(view.translate("connectFirst"));
       return;
     }
+    if (activeTransfer) return;
     if (!files.length) {
       view.openFilePicker();
       return;
@@ -206,6 +207,7 @@ export function createController({
     view.closeAllSheets();
     view.toast(view.translate("disconnecting"));
     await wait(920);
+    transport.close?.();
     await signaling.disconnectPeer(current.connectedPeerId);
     store.patch({
       mode: "lobby",

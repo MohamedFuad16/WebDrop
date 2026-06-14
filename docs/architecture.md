@@ -9,7 +9,7 @@ This checkout now contains a first-run static, modular WebDrop v2 app plus archi
 - `gemini-code-1781434503037.md` contains an MVP technical specification.
 - `js/` contains the app state machine, controller, adapters, proximity, transport, transfer, storage client, and UI renderer.
 - `workers/storage-worker.js` contains the receive-side storage worker scaffold.
-- `graphify-out/` exists, but Graphify was intentionally not used for this pass.
+- `graphify-out/` exists, but the current index may be stale or unrelated. Follow `AGENTS.md`: try graph traversal first, record stale results when encountered, then keep any direct reads scoped to the task.
 
 The deployed site at `https://web-drop-lyart.vercel.app/` is a reference surface only. It should inform product behavior, interaction vocabulary, and visual intent, but it is not a source to clone into this repository.
 

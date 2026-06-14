@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="820" viewBox="0 0 1300 820" role="img" aria-labelledby="title desc">
+  <title id="title">WebDrop transfer flow</title>
+  <desc id="desc">End-to-end transfer flow from discovery and invite through verification, WebRTC negotiation, RTCDataChannel chunks, receive storage, and export.</desc>
+  <defs>
+    <style>
+      .bg{fill:#f8faf8}.swim{fill:#fff;stroke:#d3d7d5;stroke-width:2}.box{fill:#fff;stroke:#20232b;stroke-width:2}.meta{fill:#f0eaff;stroke:#7b61ff}.data{fill:#e9fff7;stroke:#218261}.store{fill:#eaf4ff;stroke:#286fcb}.warn{fill:#fff5e7;stroke:#cb7925}.title{font:700 28px Arial,sans-serif;fill:#15171c}.lane{font:700 18px Arial,sans-serif;fill:#15171c}.label{font:700 15px Arial,sans-serif;fill:#15171c}.small{font:12px Arial,sans-serif;fill:#4e5158}.arrow{stroke:#282a31;stroke-width:2.3;fill:none;marker-end:url(#arrow)}.dash{stroke-dasharray:7 7}.dataLine{stroke:#218261}.metaLine{stroke:#7b61ff}.storeLine{stroke:#286fcb}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#282a31"/></marker>
+  </defs>
+  <rect class="bg" width="1300" height="820" rx="24"/>
+  <text class="title" x="46" y="58">Invite, negotiation, transfer, and storage flow</text>
+  <rect class="swim" x="45" y="105" width="1210" height="145" rx="18"/>
+  <text class="lane" x="72" y="140">Sender browser</text>
+  <rect class="swim" x="45" y="285" width="1210" height="145" rx="18"/>
+  <text class="lane" x="72" y="320">Signaling boundary</text>
+  <rect class="swim" x="45" y="465" width="1210" height="145" rx="18"/>
+  <text class="lane" x="72" y="500">Receiver browser</text>
+  <rect class="swim" x="45" y="645" width="1210" height="115" rx="18"/>
+  <text class="lane" x="72" y="680">Storage and export</text>
+
+  <rect class="box" x="190" y="137" width="130" height="72" rx="12"/><text class="label" x="220" y="167">Select peer</text><text class="small" x="212" y="190">orbit button</text>
+  <rect class="box" x="390" y="137" width="130" height="72" rx="12"/><text class="label" x="425" y="167">Swipe</text><text class="small" x="414" y="190">connect intent</text>
+  <rect class="box" x="590" y="137" width="130" height="72" rx="12"/><text class="label" x="613" y="167">Preflight</text><text class="small" x="607" y="190">RTCPeerConnection</text>
+  <rect class="box" x="790" y="137" width="130" height="72" rx="12"/><text class="label" x="819" y="167">Choose</text><text class="small" x="814" y="190">File objects</text>
+  <rect class="data" x="990" y="137" width="150" height="72" rx="12"/><text class="label" x="1014" y="167">Chunk send</text><text class="small" x="1010" y="190">Blob.slice + buffers</text>
+
+  <rect class="meta" x="190" y="317" width="130" height="72" rx="12"/><text class="label" x="224" y="347">Invite</text><text class="small" x="206" y="370">metadata only</text>
+  <rect class="meta" x="390" y="317" width="130" height="72" rx="12"/><text class="label" x="418" y="347">Accept</text><text class="small" x="405" y="370">pairing session</text>
+  <rect class="meta" x="590" y="317" width="130" height="72" rx="12"/><text class="label" x="626" y="347">SDP</text><text class="small" x="615" y="370">offer/answer</text>
+  <rect class="meta" x="790" y="317" width="130" height="72" rx="12"/><text class="label" x="823" y="347">ICE</text><text class="small" x="807" y="370">candidate exchange</text>
+  <rect class="warn" x="990" y="317" width="150" height="72" rx="12"/><text class="label" x="1019" y="347">TURN creds</text><text class="small" x="1013" y="370">backend-roadmap</text>
+
+  <rect class="box" x="190" y="497" width="130" height="72" rx="12"/><text class="label" x="210" y="527">Peer sheet</text><text class="small" x="214" y="550">accept/verify</text>
+  <rect class="box" x="390" y="497" width="130" height="72" rx="12"/><text class="label" x="415" y="527">Ceremony</text><text class="small" x="410" y="550">QR/audio/motion</text>
+  <rect class="box" x="590" y="497" width="130" height="72" rx="12"/><text class="label" x="621" y="527">Channel</text><text class="small" x="614" y="550">ordered binary</text>
+  <rect class="data" x="790" y="497" width="130" height="72" rx="12"/><text class="label" x="822" y="527">Receive</text><text class="small" x="811" y="550">ArrayBuffers</text>
+  <rect class="data" x="990" y="497" width="150" height="72" rx="12"/><text class="label" x="1011" y="527">Backpressure</text><text class="small" x="1013" y="550">ACKs and buffering</text>
+
+  <rect class="store" x="390" y="674" width="150" height="58" rx="12"/><text class="label" x="420" y="700">OPFS writer</text><text class="small" x="413" y="721">large-file target</text>
+  <rect class="store" x="590" y="674" width="150" height="58" rx="12"/><text class="label" x="615" y="700">IndexedDB</text><text class="small" x="615" y="721">fallback chunks</text>
+  <rect class="store" x="790" y="674" width="150" height="58" rx="12"/><text class="label" x="825" y="700">Memory</text><text class="small" x="805" y="721">small-file fallback</text>
+  <rect class="store" x="990" y="674" width="150" height="58" rx="12"/><text class="label" x="1036" y="700">Export</text><text class="small" x="1018" y="721">download/share</text>
+
+  <path class="arrow" d="M320 173 H390"/>
+  <path class="arrow metaLine dash" d="M455 209 V317"/>
+  <path class="arrow metaLine dash" d="M520 353 H590"/>
+  <path class="arrow metaLine dash" d="M720 353 H790"/>
+  <path class="arrow metaLine dash" d="M920 353 H990"/>
+  <path class="arrow" d="M520 173 H590"/>
+  <path class="arrow" d="M720 173 H790"/>
+  <path class="arrow dataLine" d="M920 173 H990"/>
+  <path class="arrow dataLine" d="M1065 209 V497"/>
+  <path class="arrow dataLine" d="M990 533 H920"/>
+  <path class="arrow storeLine" d="M855 569 C855 630 465 630 465 674"/>
+  <path class="arrow storeLine" d="M855 569 C855 637 665 637 665 674"/>
+  <path class="arrow storeLine" d="M855 569 C855 637 865 637 865 674"/>
+  <path class="arrow storeLine" d="M940 703 H990"/>
+  <text class="small" x="1020" y="610">Production payloads never cross WebSocket signaling.</text>
+</svg>

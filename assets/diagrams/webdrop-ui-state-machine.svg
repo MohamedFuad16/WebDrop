@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc">
+  <title id="title">WebDrop UI state machine</title>
+  <desc id="desc">State machine from lobby through intent, verifying, connected, transferring, disconnecting, complete, and failed states.</desc>
+  <defs>
+    <style>
+      .bg{fill:#fbfbf8}.node{fill:#fff;stroke:#22242a;stroke-width:2}.gate{fill:#eaf5ff;stroke:#296fd1}.warn{fill:#fff2df;stroke:#c97818}.end{fill:#eefaf0;stroke:#248455}.fail{fill:#fff0f2;stroke:#c93b50}.title{font:700 28px Arial,sans-serif;fill:#16171b}.label{font:700 17px Arial,sans-serif;fill:#16171b}.small{font:13px Arial,sans-serif;fill:#4b4d55}.arrow{stroke:#2c2e36;stroke-width:2.5;fill:none;marker-end:url(#arrow)}.dash{stroke-dasharray:8 8}.guard{font:12px Arial,sans-serif;fill:#5a5d66}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#2c2e36"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1200" height="700" rx="24"/>
+  <text class="title" x="50" y="58">UI state machine and control gates</text>
+  <text class="small" x="50" y="86">Current code uses modes such as lobby, intent, verifying, connected, and disconnecting. The guide documents complete and failed as production result states.</text>
+
+  <rect class="node" x="60" y="170" width="150" height="84" rx="16"/>
+  <text class="label" x="93" y="205">lobby</text>
+  <text class="small" x="82" y="230">orbits visible</text>
+
+  <rect class="node" x="280" y="170" width="150" height="84" rx="16"/>
+  <text class="label" x="325" y="205">intent</text>
+  <text class="small" x="298" y="230">peer sheet open</text>
+
+  <rect class="gate" x="500" y="170" width="160" height="84" rx="16"/>
+  <text class="label" x="540" y="205">verifying</text>
+  <text class="small" x="525" y="230">proximity score</text>
+
+  <rect class="gate" x="730" y="170" width="170" height="84" rx="16"/>
+  <text class="label" x="778" y="205">connected</text>
+  <text class="small" x="746" y="230">dock and sheets enabled</text>
+
+  <rect class="warn" x="975" y="170" width="160" height="84" rx="16"/>
+  <text class="label" x="1011" y="205">transferring</text>
+  <text class="small" x="1002" y="230">progress updates</text>
+
+  <rect class="warn" x="730" y="420" width="170" height="84" rx="16"/>
+  <text class="label" x="767" y="455">disconnecting</text>
+  <text class="small" x="768" y="480">release animation</text>
+
+  <rect class="end" x="975" y="420" width="160" height="84" rx="16"/>
+  <text class="label" x="1026" y="455">complete</text>
+  <text class="small" x="1007" y="480">result and export</text>
+
+  <rect class="fail" x="500" y="420" width="160" height="84" rx="16"/>
+  <text class="label" x="553" y="455">failed</text>
+  <text class="small" x="527" y="480">fallback/retry path</text>
+
+  <path class="arrow" d="M210 212 H280"/>
+  <text class="guard" x="225" y="200">peer-select</text>
+  <path class="arrow" d="M430 212 H500"/>
+  <text class="guard" x="443" y="200">swipe-connect</text>
+  <path class="arrow" d="M660 212 H730"/>
+  <text class="guard" x="674" y="200">score passes</text>
+  <path class="arrow" d="M900 212 H975"/>
+  <text class="guard" x="915" y="200">send files</text>
+  <path class="arrow" d="M1055 254 V420"/>
+  <text class="guard" x="1070" y="342">done</text>
+  <path class="arrow" d="M815 254 V420"/>
+  <text class="guard" x="830" y="342">disconnect</text>
+  <path class="arrow" d="M730 462 H660"/>
+  <path class="arrow" d="M500 462 C340 462 135 360 135 254"/>
+  <text class="guard" x="277" y="454">QR fallback or retry</text>
+  <path class="arrow" d="M815 420 C815 340 390 345 135 254"/>
+  <text class="guard" x="410" y="332">returns to lobby</text>
+  <path class="arrow dash" d="M580 254 V420"/>
+  <text class="guard" x="596" y="345">ceremony fails</text>
+
+  <rect class="node" x="82" y="565" width="1035" height="74" rx="16"/>
+  <text class="label" x="110" y="595">Important gate</text>
+  <text class="small" x="230" y="595">`data-connection-tray` is hidden until `mode === "connected"` or `mode === "disconnecting"`, so send/receive/chat controls are not first-screen affordances.</text>
+  <text class="small" x="230" y="618">Production states should add explicit completion and failure views rather than relying only on toasts.</text>
+</svg>

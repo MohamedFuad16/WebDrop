@@ -52,6 +52,7 @@ export class AppView extends Emitter {
       sendSwipeControl: document.querySelector("[data-send-swipe-control]"),
       sendSwipeThumb: document.querySelector("[data-send-swipe-thumb]"),
       sendSwipeText: document.querySelector("[data-send-swipe-text]"),
+      sendConfirm: document.querySelector(".send-confirm"),
       nameInput: document.querySelector("[data-name-input]"),
       fileInput: document.querySelector("[data-file-input]"),
       selectedFiles: document.querySelector("[data-selected-files]"),
@@ -261,12 +262,15 @@ export class AppView extends Emitter {
       ? state.peers.filter((peer) => peer.id !== state.connectedPeerId)
       : state.peers;
     this.nodes.peerOrbits.innerHTML = orbitPeers.map((peer, index) => {
-      const stage = peerStage(peer, state);
+      const stage = normalizedPeerStage(peer, state);
       const layout = state.connectedPeerId
         ? CONNECTED_LAYOUT[index % CONNECTED_LAYOUT.length]
-        : { ringIndex: peer.ringIndex ?? index % ORBIT_RADII.length, angle: peer.angle ?? index * 72 };
+        : peerOrbitLayout(peer, index);
       const radius = `calc(var(--orbit-size) * ${ORBIT_RADII[layout.ringIndex]})`;
       const duration = 58 + layout.ringIndex * 6;
+      const peerId = escapeHtml(String(peer.id || ""));
+      const peerName = escapeHtml(String(peer.name || ""));
+      const peerLabel = escapeHtml(this.translate("openPeer", { name: peer.name || "" }));
       return `
         <div
           class="peer-node"
@@ -274,10 +278,10 @@ export class AppView extends Emitter {
           data-ring-index="${layout.ringIndex}"
           style="--angle:${layout.angle}deg;--radius:${radius};--orbit-duration:${duration}s"
         >
-          <button type="button" data-peer-id="${peer.id}" aria-label="${this.translate("openPeer", { name: peer.name })}">
+          <button type="button" data-peer-id="${peerId}" aria-label="${peerLabel}">
             ${staticAvatarMarkup(peer.avatar)}
           </button>
-          <span>${peer.name}</span>
+          <span>${peerName}</span>
         </div>
       `;
     }).join("");
@@ -336,6 +340,9 @@ export class AppView extends Emitter {
       this.nodes.sendSwipeControl.classList.toggle("is-ready", state.files.length > 0);
       if (!state.files.length) this.resetSendSwipe?.();
       this.nodes.sendSwipeText.textContent = this.translate(state.files.length > 0 ? "swipeSend" : "chooseFirst");
+    }
+    if (this.nodes.sendConfirm) {
+      this.nodes.sendConfirm.hidden = state.files.length === 0;
     }
     this.nodes.selectedFiles.innerHTML = state.files.map((file) => `
       <div class="selected-file">
@@ -633,12 +640,23 @@ function fileType(file, t) {
   return t("file");
 }
 
-function peerStage(peer, state) {
+function normalizedPeerStage(peer, state) {
   if (state.connectedPeerId === peer.id) return "near";
   if (state.mode === "connected") return "lobby";
   if (state.selectedPeerId === peer.id && state.mode === "verifying") return "verify";
   if (state.pendingInviteId === peer.id || peer.stage === "intent") return "intent";
-  return peer.stage || "lobby";
+  return ["lobby", "near", "intent", "verify"].includes(peer.stage) ? peer.stage : "lobby";
+}
+
+function peerOrbitLayout(peer, index) {
+  const ring = Number(peer.ringIndex ?? index);
+  const angle = Number(peer.angle ?? index * 72);
+  return {
+    ringIndex: Number.isInteger(ring) && ring >= 0 && ring < ORBIT_RADII.length
+      ? ring
+      : index % ORBIT_RADII.length,
+    angle: Number.isFinite(angle) ? angle : index * 72
+  };
 }
 
 function visibleReceivedItems(state) {

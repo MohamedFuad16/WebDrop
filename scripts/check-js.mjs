@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-const roots = ["js", "workers"];
+const roots = ["js", "workers", "scripts"];
 const files = ["service-worker.js"];
 
 for (const root of roots) {
@@ -19,6 +19,8 @@ function collect(dir, out) {
     const path = join(dir, entry);
     const stat = statSync(path);
     if (stat.isDirectory()) collect(path, out);
-    if (stat.isFile() && path.endsWith(".js")) out.push(path);
+    if (stat.isFile() && [".js", ".mjs", ".cjs"].some((extension) => path.endsWith(extension))) {
+      out.push(path);
+    }
   }
 }

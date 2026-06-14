@@ -2,5 +2,15 @@
 **/.DS_Store
 __pycache__/
 *.pyc
+*.pyo
+.env
+.env.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+coverage/
+dist/
+build/
+temp/
 tmp/
 node_modules/

@@ -2,11 +2,11 @@
 
 ## Scope rules
 
-For the corrected implementation pass on 2026-06-14, runtime files are in scope. Do not use Graphify for this project unless the user reverses that instruction.
+For the docs/assets safety pass, runtime files are out of scope unless a narrow asset reference requires checking them.
 
 ## Navigation rules for this repo
 
-The user corrected the target for this pass: use direct file access only and do not use Graphify.
+Follow `AGENTS.md`: use graph traversal before large repository reads. If the graph is stale or unrelated, record that finding and keep direct file reads scoped to the active packet.
 
 Before any future edit, inspect the current relevant files first. This repo has architecture notes and generated-looking artifacts that can easily drift from intended product behavior, so avoid assuming that a folder name implies an implemented subsystem.
 
@@ -21,7 +21,7 @@ As of this pass:
 - `js/app.js` boots the modular static app.
 - `js/core/controller.js` owns the state transitions that gate file controls.
 - `workers/storage-worker.js` is the receiver storage worker scaffold.
-- The repository is not currently a Git working tree from this directory.
+- The repository is a Git working tree from this directory; preserve unrelated local changes.
 
 Update these facts when the runtime structure changes.
 

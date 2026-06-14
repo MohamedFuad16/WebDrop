@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -146,7 +146,7 @@
             <strong data-i18n="profileRing">Profile ring</strong>
             <span data-i18n="whiteDefault">White is the default</span>
           </div>
-          <div class="ring-choice" data-ring-choice aria-label="Profile ring color" data-i18n-aria="profileRingColor">
+          <div class="ring-choice" data-ring-choice role="group" aria-label="Profile ring color" data-i18n-aria="profileRingColor">
             <button type="button" data-action="select-ring" data-ring="#ffffff" style="--swatch:#ffffff" aria-label="White ring" data-i18n-aria="whiteRing"></button>
             <button type="button" data-action="select-ring" data-ring="#7fb2ff" style="--swatch:#7fb2ff" aria-label="Blue ring" data-i18n-aria="blueRing"></button>
             <button type="button" data-action="select-ring" data-ring="#65d0a3" style="--swatch:#65d0a3" aria-label="Green ring" data-i18n-aria="greenRing"></button>
@@ -156,11 +156,11 @@
         </div>
         <label class="field">
           <span data-i18n="deviceName">Device name</span>
-          <input data-name-input value="Mac 9D9D" maxlength="22">
+          <input data-name-input type="text" value="Mac 9D9D" maxlength="22">
         </label>
         <div class="language-setting">
           <span data-i18n="language">Language</span>
-          <div class="language-choice" aria-label="Language" data-i18n-aria="languageMode">
+          <div class="language-choice" role="group" aria-label="Language" data-i18n-aria="languageMode">
             <button type="button" data-action="set-language-en" data-locale="en" data-i18n="english">English</button>
             <button type="button" data-action="set-language-ja" data-locale="ja" data-i18n="japanese">Japanese</button>
           </div>
@@ -196,7 +196,7 @@
         <h2 data-i18n="informationTitle">WebDrop details</h2>
         <div class="motion-setting information-motion">
           <span data-i18n="orbitMotion">Orbit motion</span>
-          <div class="motion-choice" aria-label="Orbit motion" data-i18n-aria="orbitMotion">
+          <div class="motion-choice" role="group" aria-label="Orbit motion" data-i18n-aria="orbitMotion">
             <button type="button" data-action="set-motion-on" data-motion-value="on" data-i18n="motionOn">On</button>
             <button type="button" data-action="set-motion-paused" data-motion-value="paused" data-i18n="motionPaused">Paused</button>
           </div>
@@ -233,7 +233,7 @@
           <span data-i18n="chooseFiles">Choose files</span>
         </button>
         <div class="selected-files" data-selected-files hidden></div>
-        <div class="swipe-control swipe-control--vertical send-swipe" data-send-swipe-control aria-label="Swipe up to send" data-i18n-aria="swipeSend">
+        <div class="swipe-control swipe-control--vertical send-swipe" data-send-swipe-control role="group" aria-label="Swipe up to send" data-i18n-aria="swipeSend">
           <span class="swipe-text" data-send-swipe-text data-i18n="swipeSend">Swipe up to send</span>
           <button class="swipe-thumb" type="button" data-send-swipe-thumb aria-label="Swipe up to send" data-i18n-aria="swipeSend">
             <svg viewBox="0 0 24 24" aria-hidden="true">

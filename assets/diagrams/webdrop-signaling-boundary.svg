@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-labelledby="title desc">
+  <title id="title">WebDrop signaling boundary</title>
+  <desc id="desc">Diagram contrasting metadata sent over WebSocket signaling with file payload chunks sent over RTCDataChannel.</desc>
+  <defs>
+    <style>
+      .bg{fill:#faf9f6}.browser{fill:#fff;stroke:#1d2028;stroke-width:2}.server{fill:#f1edff;stroke:#7059e8;stroke-width:2}.data{fill:#e9fff7;stroke:#217d60;stroke-width:2}.block{fill:#fff0f0;stroke:#c54151;stroke-width:2}.title{font:700 28px Arial,sans-serif;fill:#15171c}.label{font:700 18px Arial,sans-serif;fill:#15171c}.small{font:13px Arial,sans-serif;fill:#4d5058}.arrow{stroke:#2b2e36;stroke-width:2.4;fill:none;marker-end:url(#arrow)}.meta{stroke:#7059e8;stroke-dasharray:8 8}.payload{stroke:#217d60;stroke-width:4}.no{stroke:#c54151;stroke-width:4}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#2b2e36"/></marker>
+  </defs>
+  <rect class="bg" width="1200" height="640" rx="24"/>
+  <text class="title" x="52" y="60">WebSocket signaling is not the file transport</text>
+  <rect class="browser" x="70" y="150" width="280" height="280" rx="24"/>
+  <text class="label" x="126" y="195">Sender browser</text>
+  <text class="small" x="110" y="235">File picker</text>
+  <text class="small" x="110" y="260">Blob.slice()</text>
+  <text class="small" x="110" y="285">ArrayBuffer chunks</text>
+  <text class="small" x="110" y="310">RTCDataChannel send()</text>
+
+  <rect class="server" x="460" y="135" width="280" height="160" rx="24"/>
+  <text class="label" x="530" y="178">Signaling server</text>
+  <text class="small" x="500" y="215">presence, invite, pairing</text>
+  <text class="small" x="500" y="240">SDP offer/answer, ICE</text>
+  <text class="small" x="500" y="265">TURN credential policy</text>
+
+  <rect class="browser" x="850" y="150" width="280" height="280" rx="24"/>
+  <text class="label" x="902" y="195">Receiver browser</text>
+  <text class="small" x="890" y="235">RTCDataChannel onmessage</text>
+  <text class="small" x="890" y="260">worker writeChunk()</text>
+  <text class="small" x="890" y="285">OPFS or IndexedDB</text>
+  <text class="small" x="890" y="310">export after finalize()</text>
+
+  <rect class="data" x="410" y="430" width="380" height="78" rx="18"/>
+  <text class="label" x="492" y="465">Encrypted WebRTC data path</text>
+  <text class="small" x="470" y="488">Direct peer path when ICE selects host/srflx/prflx; TURN relay only if needed.</text>
+
+  <rect class="block" x="460" y="540" width="280" height="52" rx="16"/>
+  <text class="label" x="506" y="574">No file bytes here</text>
+
+  <path class="arrow meta" d="M350 205 C405 170 420 168 460 170"/>
+  <path class="arrow meta" d="M740 170 C785 168 800 170 850 205"/>
+  <path class="arrow payload" d="M350 342 C500 455 700 455 850 342"/>
+  <path class="no" d="M370 565 H460"/>
+  <path class="no" d="M740 565 H830"/>
+  <text class="small" x="378" y="145">JSON metadata</text>
+  <text class="small" x="762" y="145">JSON metadata</text>
+  <text class="small" x="514" y="400">binary payload chunks</text>
+</svg>

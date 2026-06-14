@@ -1,0 +1,25 @@
+{
+  "title": "WebDrop folder safety push",
+  "slug": "webdrop-folder-safety-push",
+  "status": "complete",
+  "approval": {
+    "push_main": "approved_by_user",
+    "force_push": "not_approved",
+    "remove_obvious_junk": "approved_by_user"
+  },
+  "packets": {
+    "hygiene-agent": "complete",
+    "frontend-agent": "complete",
+    "runtime-agent": "complete",
+    "docs-agent": "complete"
+  },
+  "verification": {
+    "npm_check": "passed",
+    "python_compile": "passed",
+    "svg_validation": "passed",
+    "docs_links": "passed",
+    "pdf_structure": "passed",
+    "responsive_smoke": "passed",
+    "git_push": "pending_after_commit"
+  }
+}

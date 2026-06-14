@@ -7,6 +7,7 @@ export class WebRtcTransport {
   }
 
   async preflight() {
+    this.close();
     const iceServers = await this.turnConfig.getIceServers();
     if (!("RTCPeerConnection" in window)) return "failed";
     this.peerConnection = new RTCPeerConnection({ iceServers });
@@ -31,6 +32,21 @@ export class WebRtcTransport {
     if (this.channel?.readyState === "open") {
       this.channel.send(chunk);
     }
+  }
+
+  close() {
+    try {
+      this.channel?.close();
+    } catch {
+      // Closing is best-effort; stale browser channels should not block disconnect.
+    }
+    try {
+      this.peerConnection?.close();
+    } catch {
+      // Closing is best-effort; stale browser transports should not block reconnect.
+    }
+    this.channel = null;
+    this.peerConnection = null;
   }
 }
 

@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">WebDrop system map</title>
+  <desc id="desc">A layered architecture map showing the static client, UI controller, proximity, signaling, WebRTC transport, transfer engine, and receive storage worker.</desc>
+  <defs>
+    <style>
+      .bg{fill:#f7f7f3}.lane{fill:#fff;stroke:#d8d7ce;stroke-width:2}.box{fill:#ffffff;stroke:#212126;stroke-width:2}.soft{fill:#eef6ff;stroke:#4077d8}.warn{fill:#fff4df;stroke:#d98729}.ok{fill:#ecfff7;stroke:#2e8c64}.muted{fill:#f1f1ef;stroke:#99968d}.title{font:700 28px Arial,sans-serif;fill:#19191d}.label{font:700 18px Arial,sans-serif;fill:#19191d}.text{font:14px Arial,sans-serif;fill:#33343a}.small{font:12px Arial,sans-serif;fill:#55575e}.arrow{stroke:#30323a;stroke-width:2.4;fill:none;marker-end:url(#arrow)}.dash{stroke-dasharray:8 8}.meta{stroke:#7b68ee}.data{stroke:#1f8f68}.storage{stroke:#2b72d6}
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#30323a"/>
+    </marker>
+  </defs>
+  <rect class="bg" width="1200" height="760" rx="24"/>
+  <text class="title" x="48" y="58">WebDrop v2: static client architecture</text>
+  <text class="text" x="48" y="88">Current repository implementation: HTML/CSS/vanilla JS modules, mock signaling, WebRTC-ready transport, and a storage worker scaffold.</text>
+
+  <rect class="lane" x="40" y="120" width="1120" height="170" rx="20"/>
+  <text class="label" x="68" y="154">Presentation layer</text>
+  <rect class="box soft" x="70" y="180" width="210" height="72" rx="14"/>
+  <text class="label" x="92" y="209">index.html</text>
+  <text class="small" x="92" y="232">static shell and sheet DOM</text>
+  <rect class="box soft" x="330" y="180" width="250" height="72" rx="14"/>
+  <text class="label" x="352" y="209">css/*.css</text>
+  <text class="small" x="352" y="232">orbit, connected dock, sheets</text>
+  <rect class="box soft" x="630" y="180" width="250" height="72" rx="14"/>
+  <text class="label" x="652" y="209">js/ui/app-view.js</text>
+  <text class="small" x="652" y="232">render, sheets, swipe gestures</text>
+  <rect class="box soft" x="930" y="180" width="190" height="72" rx="14"/>
+  <text class="label" x="952" y="209">assets/icons</text>
+  <text class="small" x="952" y="232">profile avatars and mark</text>
+
+  <rect class="lane" x="40" y="320" width="1120" height="172" rx="20"/>
+  <text class="label" x="68" y="354">Application control layer</text>
+  <rect class="box" x="70" y="382" width="230" height="72" rx="14"/>
+  <text class="label" x="92" y="411">js/app.js</text>
+  <text class="small" x="92" y="434">bootstrap and dependency wiring</text>
+  <rect class="box" x="350" y="382" width="230" height="72" rx="14"/>
+  <text class="label" x="372" y="411">core/state.js</text>
+  <text class="small" x="372" y="434">small observable store</text>
+  <rect class="box" x="630" y="382" width="250" height="72" rx="14"/>
+  <text class="label" x="652" y="411">core/controller.js</text>
+  <text class="small" x="652" y="434">state transitions and event policy</text>
+  <rect class="box" x="930" y="382" width="190" height="72" rx="14"/>
+  <text class="label" x="952" y="411">config/i18n.js</text>
+  <text class="small" x="952" y="434">English/Japanese labels</text>
+
+  <rect class="lane" x="40" y="520" width="1120" height="174" rx="20"/>
+  <text class="label" x="68" y="554">Service and transport layer</text>
+  <rect class="box warn" x="70" y="582" width="200" height="72" rx="14"/>
+  <text class="label" x="92" y="611">Mock signaling</text>
+  <text class="small" x="92" y="634">local peer list and invites</text>
+  <rect class="box warn" x="300" y="582" width="200" height="72" rx="14"/>
+  <text class="label" x="322" y="611">WebSocket adapter</text>
+  <text class="small" x="322" y="634">production boundary, no URL</text>
+  <rect class="box ok" x="530" y="582" width="190" height="72" rx="14"/>
+  <text class="label" x="552" y="611">Proximity engine</text>
+  <text class="small" x="552" y="634">capability-weighted ceremony</text>
+  <rect class="box ok" x="750" y="582" width="190" height="72" rx="14"/>
+  <text class="label" x="772" y="611">WebRTC transport</text>
+  <text class="small" x="772" y="634">RTCPeerConnection + channel</text>
+  <rect class="box ok" x="970" y="582" width="150" height="72" rx="14"/>
+  <text class="label" x="992" y="611">Transfer</text>
+  <text class="small" x="992" y="634">64 KiB chunk loop</text>
+
+  <rect class="box muted" x="435" y="705" width="330" height="38" rx="12"/>
+  <text class="small" x="458" y="729">workers/storage-worker.js detects OPFS, IndexedDB, or memory</text>
+
+  <path class="arrow" d="M280 216 H330"/>
+  <path class="arrow" d="M580 216 H630"/>
+  <path class="arrow" d="M185 382 V252"/>
+  <path class="arrow" d="M300 418 H350"/>
+  <path class="arrow" d="M580 418 H630"/>
+  <path class="arrow meta dash" d="M755 454 C755 520 400 520 400 582"/>
+  <path class="arrow meta dash" d="M755 454 C780 520 400 520 400 582"/>
+  <path class="arrow meta dash" d="M755 454 C830 520 170 520 170 582"/>
+  <path class="arrow data" d="M755 454 C830 530 845 540 845 582"/>
+  <path class="arrow data" d="M940 618 H970"/>
+  <path class="arrow storage" d="M1045 654 C1045 720 765 720 765 724"/>
+  <text class="small" x="790" y="503" fill="#1f8f68">file payload path</text>
+  <text class="small" x="430" y="503" fill="#7b68ee">metadata/signaling path</text>
+</svg>

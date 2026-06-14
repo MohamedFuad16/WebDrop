@@ -1,4 +1,4 @@
-const CACHE_NAME = "webdrop-v2-static-16";
+const CACHE_NAME = "webdrop-v2-static-17";
 const AVATAR_FRAMES = Array.from({ length: 8 }, (_, userIndex) =>
   Array.from(
     { length: 6 },
@@ -16,6 +16,20 @@ const ASSETS = [
   "./js/app.js",
   "./js/config/avatar-options.js",
   "./js/config/i18n.js",
+  "./js/core/controller.js",
+  "./js/core/state.js",
+  "./js/services/capabilities.js",
+  "./js/services/mock-signaling.js",
+  "./js/services/proximity-engine.js",
+  "./js/services/transfer-engine.js",
+  "./js/services/turn-config.js",
+  "./js/services/webrtc-transport.js",
+  "./js/services/websocket-signaling.js",
+  "./js/storage/storage-client.js",
+  "./js/ui/app-view.js",
+  "./js/utils/emitter.js",
+  "./js/utils/format.js",
+  "./workers/storage-worker.js",
   "./assets/icons/webdrop-mark.svg",
   "./assets/icons/avatars/user-01.png",
   "./assets/icons/avatars/user-02.png",

@@ -37,8 +37,12 @@
 @media (prefers-reduced-motion: reduce) {
   .peer-node,
   .orbit-ring,
-  .identity-cluster::after,
-  .connection-tray {
+  .avatar-frame,
+  .avatar--self::before,
+  .peer-overlap::before,
+  .identity-cluster,
+  .connection-tray,
+  .chat-row {
     animation: none !important;
   }
 
