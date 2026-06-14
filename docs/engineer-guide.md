@@ -1,0 +1,95 @@
+# Engineer Guide
+
+## Scope rules
+
+For the corrected implementation pass on 2026-06-14, runtime files are in scope. Do not use Graphify for this project unless the user reverses that instruction.
+
+## Navigation rules for this repo
+
+The user corrected the target for this pass: use direct file access only and do not use Graphify.
+
+Before any future edit, inspect the current relevant files first. This repo has architecture notes and generated-looking artifacts that can easily drift from intended product behavior, so avoid assuming that a folder name implies an implemented subsystem.
+
+The deployed site at `https://web-drop-lyart.vercel.app/` may be used as a product reference. It should not be copied wholesale, treated as the source of truth for local code, or cloned into this checkout.
+
+## Current implementation facts
+
+As of this pass:
+
+- The active local runnable artifact is `index.html`.
+- The old architecture HTML page was deleted during the corrected rebuild.
+- `js/app.js` boots the modular static app.
+- `js/core/controller.js` owns the state transitions that gate file controls.
+- `workers/storage-worker.js` is the receiver storage worker scaffold.
+- The repository is not currently a Git working tree from this directory.
+
+Update these facts when the runtime structure changes.
+
+## UI implementation contract
+
+The self/user icon must be centered in the orbital UI.
+
+Implementation guidance:
+
+- Treat the local user as the origin of the orbit, not as an orbiting item.
+- Keep the self/user icon anchored in the center across desktop and mobile layouts.
+- Position peers around that center by state and confidence.
+- Ensure peer animations cannot push or visually displace the centered self icon.
+
+Folder, send, and receive controls must only appear after a connected state.
+
+Implementation guidance:
+
+- Hide file-transfer controls during searching, available, invited, and verifying states.
+- Show transfer controls only for a selected connected peer.
+- The folder/tray must be absent from the first screen and must only appear when `mode === "connected"`.
+- If there is no selected connected peer, the primary UI should stay in discovery, pairing, or connection guidance mode.
+- Avoid showing send/receive action sheets as a generic first-screen affordance.
+
+## State machine reference
+
+Use explicit states rather than independent booleans:
+
+```text
+idle
+searching
+available
+inviting
+verifying
+connected
+transferring
+complete
+failed
+```
+
+Controls by state:
+
+- `idle`, `searching`: show local identity, QR access, and discovery status.
+- `available`: show peers and invite affordance.
+- `inviting`, `verifying`: show pairing progress and cancellation.
+- `connected`: show folder, send, and receive controls.
+- `transferring`: show progress, cancel, and transfer details.
+- `complete`, `failed`: show result and recovery action.
+
+## Architecture invariants
+
+Keep these boundaries stable:
+
+- WebSocket signaling carries metadata only.
+- WebRTC `RTCDataChannel` carries file chunks.
+- TURN is fallback transport, not the default happy path.
+- Relay mode should be capped and disclosed.
+- Receiver storage writes chunks incrementally.
+- Large received files should not be assembled as one giant in-memory `Blob`.
+- QR remains the universal fallback when audio or motion permissions are unavailable.
+
+## Verification checklist
+
+For future runtime edits, verify:
+
+- The self/user icon remains visually centered at mobile and desktop sizes.
+- Send/receive controls are absent before connected state.
+- Send/receive controls appear for a selected connected peer.
+- No file bytes are sent through signaling code.
+- Large receive paths stream to OPFS or IndexedDB rather than memory.
+- Relay mode applies a clear cap and user-facing explanation.

@@ -1,0 +1,323 @@
+# Agent History
+
+## 2026-06-14 Documentation correction
+
+Scope:
+- Created documentation only.
+- Did not edit `proximity_architecture_monkeytype_v2.html`, `js/`, `workers/`, or other runtime artifacts.
+- Did not use Graphify for this pass, per corrected user instruction.
+
+Files inspected before editing:
+- `proximity_architecture_monkeytype_v2.html` (removed later during corrected rebuild)
+- `gemini-code-1781434503037.md`
+- `docs/`
+- `js/`
+- `workers/`
+- `assets/`
+
+Observed repository state:
+- The local checkout initially contained a single static architecture page: `proximity_architecture_monkeytype_v2.html`.
+- `docs/` existed but was empty before this pass.
+- `js/` contains empty module directories and no implementation files.
+- `workers/` exists but contains no worker files.
+- Existing Graphify artifacts are present under `graphify-out/`, but they were intentionally not used.
+
+Reference handling:
+- `https://web-drop-lyart.vercel.app/` was treated as a product reference only.
+- The reference surface shows WebDrop-style QR pairing, searching/discovery state, settings, and send/receive actions.
+- The reference was not cloned or copied into local runtime files.
+
+Corrected architecture decisions recorded:
+- The self/user icon is the fixed center of the orbital UI.
+- Peer devices orbit around the centered self/user icon by state and confidence.
+- Folder, send, and receive controls are hidden until the app reaches a connected state with a selected peer.
+- Discovery, searching, available, and verification states must not expose file-transfer controls.
+- Signaling carries presence, invite, session, proximity, and ICE metadata only.
+- File payloads move over WebRTC `RTCDataChannel`, with TURN relay as a fallback and relay-mode caps.
+- Receiver storage should stream chunks to OPFS first, IndexedDB second, and memory only for small files.
+
+## 2026-06-14 Corrected runtime rebuild
+
+Scope:
+- Deleted the incorrect folder-centered HTML/CSS implementation attempt.
+- Rebuilt the static app directly from files, without Graphify.
+- Used `https://web-drop-lyart.vercel.app/` only as a mobile-first reference for black canvas, orbit language, status rail, and bottom-sheet behavior.
+- Did not copy the reference UI or preserve its centered-folder layout.
+
+Runtime implemented:
+- `index.html` is an app shell.
+- `css/` is split by base, orbit, connected controls, sheets, and responsive behavior.
+- `js/` is split into state, controller, UI, signaling adapters, proximity, WebRTC, transfer, storage, and utilities.
+- `workers/storage-worker.js` handles receive-session storage messages.
+- `service-worker.js` caches the static shell.
+- The earlier `proximity_architecture_monkeytype_v2.html` file was deleted per the instruction to remove old HTML/CSS and redo from scratch.
+
+Corrected UI invariant:
+- The self/user avatar is the center of the orbital UI in every state.
+- Peers orbit around the centered self/user avatar.
+- The folder/file tray is hidden in lobby, invite, and verification states.
+- Folder, send, receive, and disconnect controls appear only after `mode === "connected"`.
+
+Agent status:
+- Two workers were restarted after the correction.
+- Documentation worker completed `agenthistory.md`, `docs/architecture.md`, and `docs/engineer-guide.md`.
+- Verification/docs worker completed `assets/diagrams/orbital-ui-state-gating.md` plus reference/current screenshots. Its local screenshot targeted the old static architecture page and is historical gap evidence, not the new app state.
+
+## 2026-06-14 Reference UI orbit repair
+
+Scope:
+- Reworked the reference-styled mobile UI after screenshot review from the in-app browser.
+- Kept the app static and vanilla JS.
+- Used the required graph traversal first; the graph index returned unrelated/stale React nodes, so edits stayed narrowly scoped to the known static app files.
+
+Files changed:
+- `index.html`
+- `css/base.css`
+- `css/orbit.css`
+- `css/connected.css`
+- `css/sheets.css`
+- `css/responsive.css`
+- `js/app.js`
+- `js/core/controller.js`
+- `js/ui/app-view.js`
+
+Fixes completed:
+- Centered the orbit as a viewport-bounded square so the self avatar, peer icons, and all four rings remain visible on phone widths.
+- Removed the capability footer row (`Mic`, `WS`, `Tilt`, `Bump`, `Ultra`) from the UI.
+- Replaced the floating "send a message" composer with a connected-only bottom dock containing exactly three icon actions: send files, received files, and chat.
+- Added separate soft bottom sheets for send, receive, and chat actions.
+- Kept the receive badge hidden until `receivedCount > 0`; opening the receive sheet does not create a fake receive.
+- Fixed peer avatar treatment so orbit avatars use the same circular profile style as the nearby-candidate friend strip.
+- Added smooth orbit animation for peer nodes, with reduced-motion support preserved.
+- Replaced the settings sheet close affordance with a compact icon button matching the sheet style.
+- Removed nonessential connection toasts so they do not cover the bottom dock.
+
+Verification evidence:
+- `npm run check` passed.
+- Local static server switched from Python `http.server` to a Node static server with `Cache-Control: no-store` for stable browser QA.
+- Browser smoke was run at mobile viewports matching iPhone/Android classes: 360x800, 390x844, 412x915, and 430x932.
+- Evidence across those viewports: `peerCount: 4`, `visiblePeers: 4`, `overflowX: false`, dock hidden before connection, dock visible after swipe connection, and dock button count `3`.
+- Final 390x844 center metrics: lobby `selfCenterDelta: [0, 0]`; connected `selfCenterDelta: [0, 0]`; receive badge hidden initially; capability/footer text absent; composer text absent.
+- Screenshots saved:
+  - `assets/screenshots/fixed-orbit-lobby-light.png`
+  - `assets/screenshots/fixed-orbit-connected-light.png`
+  - `assets/screenshots/fixed-send-sheet-light.png`
+  - `assets/screenshots/fixed-chat-sheet-light.png`
+
+## 2026-06-14 Orbit motion and profile refinement
+
+Scope:
+- Refined the accepted light/dark WebDrop visual system without generating a replacement concept.
+- Started the local Node static server on `127.0.0.1:4180` with `Cache-Control: no-store`.
+- Used the required graph traversal first; the graph remained stale and unrelated, so edits stayed scoped to the static orbit, sheets, state, controller, and mock signaling files.
+
+Implementation:
+- Replaced generic gray dotted circles with four softly colored segmented rings aligned to lobby, invite, verification, and nearby radii.
+- Removed the self-avatar online pin that appeared as a stray dot.
+- Added a settings profile-picture control with square center-cropping, 256px WebP encoding, preview, and local persistence.
+- Added animated enter/exit states for peer, settings, send, receive, and chat sheets plus backdrop fade.
+- Changed connected identity geometry to two equal-size overlapping avatars with shared halo and breathing animations.
+- Connected peer avatar now acts as the disconnect control.
+- Enforced one active peer connection: selecting a second peer is blocked until disconnect.
+- Expanded mock presence to five peers and added `assets/icons/avatar-sora.svg`.
+- Distributed mock peers across all four ring depths with a shared orbital cadence and stable phase spacing.
+- Hid orbit labels until hover/focus; device identity copy now sits below the orbit boundary to keep moving paths unobstructed.
+- Moved transient toast notifications below the header so they do not cover sheets or the bottom dock.
+
+Verification:
+- `npm run check` passed throughout the final pass.
+- Profile upload test confirmed WebP data URL rendering, matching preview, and `localStorage` persistence.
+- Sheet tests confirmed open state, interpolated closing state, delayed hidden state, and backdrop cleanup.
+- Connected geometry at 390x844: self `78x78`, peer `78x78`, overlap `33px`, animations `connectedBreathe` and `connectionHalo`.
+- Second-peer test preserved the Aki connection and displayed the one-at-a-time warning without opening another peer sheet.
+- Time-sampled orbit QA ran across 360x800, 390x844, and 430x932 with five peers and four rings.
+- Final sampled result across all three viewports: zero peer/self contacts, zero peer/peer contacts, zero peer/topbar or peer/identity-copy contacts, zero clipping, and zero horizontal overflow.
+- Screenshots saved:
+  - `assets/screenshots/motion-five-peer-lobby.png`
+  - `assets/screenshots/motion-connected-venn.png`
+  - `assets/screenshots/motion-settings-profile.png`
+  - `assets/screenshots/motion-send-sheet.png`
+
+## 2026-06-14 Five-ring and supplied-avatar correction
+
+Scope:
+- Followed graph-first navigation. The available graph remained stale for this static app, so file reads stayed limited to the orbit, settings, controller, mock signaling, cache, and directly connected styles.
+- Used `assets/icons/user_icons.png` as the approved profile source and extracted eight square avatar assets into `assets/icons/avatars/`.
+
+Implementation:
+- Replaced the four stage-sized rings and decorative pulse circles with five explicit orbit lanes using one shared dash pattern, thickness, opacity, and animation cadence.
+- Decoupled peer placement from invite/proximity state. The first five mock peers occupy five distinct rings; two additional peers share the outer lanes at fixed opposite phases.
+- Expanded mock presence to seven peers and moved every peer plus the current user onto the supplied avatar set.
+- Reserved the center during a connection: the connected peer is removed from orbit rendering, the remaining six peers move to outer-safe slots, and the center contains exactly two equal-size Venn avatars.
+- Removed the top-left status dot and changed the subtitle to `Connected with <name>` while a session is active.
+- Replaced profile uploads with an eight-item horizontal swipe carousel and five selectable ring colors. White is the default; avatar and ring choices persist locally.
+- Added a fixed 14px idle gap between the send sheet's file chooser and Send button.
+- Bumped the production service-worker cache to `webdrop-v2-static-6`.
+
+Verification:
+- `npm run check` and direct `node --check` module validation passed.
+- Live browser QA used `http://127.0.0.1:4180/` with no console errors or warnings.
+- Mobile viewport checks passed at 360x800, 390x844, 412x915, and 430x932: five rings visible, seven peers visible, no peer contacts, no horizontal overflow, and no topbar collision.
+- The first five peer ring indices were `0, 1, 2, 3, 4`.
+- Connected QA: Aki was absent from the orbit DOM, six peers remained outside the center, the Venn avatars were equal size with a 28px overlap, and the status read `Connected with Aki`.
+- One-peer enforcement kept the Aki connection active when Ren was selected and displayed the disconnect-first notice.
+- Settings QA rendered eight avatar choices and five ring swatches; icon and ring changes survived reload. The browser was restored to the first avatar and default white ring after testing.
+- Send-sheet QA measured a 14px gap between `Choose files` and `Send`.
+
+## 2026-06-14 Four-ring App Clip motion and localization refinement
+
+Scope:
+- Used graph traversal first; the graph index remained stale and unrelated, so implementation reads stayed limited to the known static WebDrop UI, controller, state, mock signaling, cache, and styles.
+- Delegated a bounded read-only animation research packet and integrated its source-backed recommendations.
+- Added the user's follow-up settings pagination and orbit-alignment corrections during the same live QA pass.
+
+Implementation:
+- Moved the device name to the exact top-center position between the WebDrop status and right-side controls.
+- Removed the redundant searching status below the device name and removed duplicate Light/Dark controls from Settings.
+- Replaced five conic dotted rings with four rounded SVG capsule-dash rings inspired by the visual language of App Clip codes.
+- Increased ring separation, enlarged the innermost blue ring, and aligned peer paths to the exact SVG circle-radius formula.
+- Removed peer labels from orbit layout flow and positioned them absolutely, eliminating the transform-center displacement.
+- Added complete English/Japanese localization for static copy, dynamic connection text, all sheets, empty states, placeholders, file labels, toasts, and accessibility labels.
+- Added a persisted language selector and a persisted orbit-motion pause control.
+- Moved Design reference and Service status into a dedicated App information sheet with Back and Close controls.
+- Increased profile-icon carousel spacing to 13px with 8px top and 12px bottom safety padding.
+- Refined sheet motion to 340ms open / 240ms close, backdrop motion to 180ms / 140ms, transition-completion cleanup, transform/opacity-only continuous motion, a single connected halo pulse, and targeted reduced-motion behavior.
+- Bumped the production service-worker cache to `webdrop-v2-static-8`.
+
+Verification:
+- `npm run check` and direct module syntax validation passed.
+- Browser QA verified English and Japanese settings, information, peer connection, send, receive, and chat sheets.
+- Information pagination preserved the backdrop, hid the previous sheet, supported Back, and supported direct Close.
+- Four-phone matrix passed at 360x800, 390x844, 412x915, and 430x932.
+- Every viewport reported four rings, seven peers, zero peer contacts, zero adjacent-lane contacts, zero horizontal overflow, zero topbar overlap, and exact top-center device status.
+- After removing peer labels from layout, all peer portraits measured `0px` maximum radial path error.
+- Innermost blue-ring clearance measured 12.6px, 11.6px, 12.2px, and 13.8px across the four tested viewports.
+- Browser console reported no warnings or errors.
+- The final app state was restored to an English lobby with orbit motion enabled.
+
+## 2026-06-15 Receive PDFs and file-flow polish
+
+Scope:
+- Followed graph-first navigation before file reads. The current graph index was still stale for the live UI modules, so reads stayed scoped to the known app shell, view, controller, styles, i18n, and service worker.
+- Attempted the requested subagent for screenshot/PDF inventory, but the subagent failed because its refresh token was revoked. Completed the packet sequentially in this thread.
+
+Implementation:
+- Fixed the empty send rail so the swipe thumb no longer overlays `Choose files first`.
+- Replaced the choose-file glyph with a cleaner document-plus icon and verified it does not overlap the label.
+- Added a fourth connected dock action for direct disconnect with a red link-break icon.
+- Moved Orbit motion into App information and replaced the old Reference use / Service status rows with app-specific cards.
+- Fixed device-name editing so the final character can be deleted without immediately restoring `WebDrop Device`.
+- Added localized demo PDF entries to the receive sheet, filtered by current app language, and made the Open action a real link.
+- Created 29 UI-element screenshots under `output/screenshots/ui-elements/`.
+- Generated `output/pdf/webdrop-demo-en.pdf` and `output/pdf/webdrop-demo-ja.pdf` as 17-page demo guides with overview, stack, and UI-element explanations.
+- Bumped the production service-worker cache to `webdrop-v2-static-10` and cached the two PDF deliverables.
+
+Verification:
+- `npm run check` passed.
+- Direct `node --check` passed for the edited JS modules and service worker.
+- Final Playwright QA used system Chrome against `http://127.0.0.1:4180/` with no console errors and no failed requests.
+- Device-name QA confirmed an empty input remains empty while editing, then `Fuad Mac` updates the top-center device label.
+- Send-sheet QA measured an 8px gap between the file-plus icon and `Choose files`, with no overlap; the empty send swipe thumb opacity was `0`.
+- Receive-sheet QA showed only `WebDrop Demo Guide EN.pdf` in English and only `WebDrop デモガイド JP.pdf` in Japanese.
+- The linked English and Japanese PDFs returned HTTP 200 from the local server.
+- App information contained Orbit motion and no longer contained Reference use or Service status.
+- The new dock disconnect button returned the app to lobby mode.
+- PDF QA rendered Quick Look thumbnails for both PDFs and extracted text with `pypdf`; both PDFs contained 17 pages.
+
+## 2026-06-15 Context-focused avatar motion review
+
+Scope:
+- Paused all PDF regeneration at the user's request until the live avatar motion is approved.
+- Followed graph-first navigation; the graph result was unrelated/stale, so reads stayed scoped to the peer sheet, app view, avatar styles, and service worker.
+
+Implementation:
+- Corrected the source-sheet interpretation from an invalid 4x2 sprite assumption to the actual 3x2, six-expression layout.
+- Added `scripts/build-avatar-frames.py` and generated 48 centered, circular, transparent PNG frames under `assets/icons/animated/`.
+- Removed checkerboard backgrounds, blank frames, partial faces, and displaced sprite positioning.
+- Changed expression motion to a 36-second eased cycle, holding each expression for roughly six seconds.
+- Limited expression animation by context:
+  - Lobby center/self avatar: animated.
+  - Orbiting nearby peers: static.
+  - Connected Venn pair: static and equal-size.
+  - Connect-sheet selected candidate and friend strip: animated.
+  - Settings profile-icon carousel: animated.
+- Added the selected peer's animated profile beside the Nearby candidate name.
+- Fixed connect-swipe overlap by reserving separate text space and hiding the label immediately while the thumb is moving.
+- Bumped the service-worker cache to `webdrop-v2-static-13`.
+
+Verification:
+- `npm run check` passed.
+- Browser QA used system Chrome at 430x932 with no failed requests, warnings, or errors.
+- Lobby measured six center frames, zero orbit animation frames, and seven static orbit avatars.
+- Connect sheet measured six selected-candidate frames and five animated friend icons.
+- Settings measured eight animated profile choices with 48 total frames.
+- Connected mode measured zero expression-animation frames and one static image for each equal-size Venn avatar.
+- Connect-sheet layout and swipe separation passed at 393x852, 430x932, 412x915, and 360x800.
+- PDF screenshot capture and PDF regeneration remain pending explicit user approval.
+
+## 2026-06-15 Locale, chat, connected spacing, and 1.0.2 PDF finalization
+
+Scope:
+- Followed graph-first navigation first. The graph index remained stale/unrelated, so reads stayed scoped to the known WebDrop app shell, controller, view, locale config, orbit/chat CSS, screenshot capture, PDF generator, and service worker.
+- Continued the approved PDF packet after the user authorized PDF generation, with independent visual QA.
+
+Implementation:
+- Fixed the vertical swipe-to-send rail so the thumb no longer overlaps the text after a file is selected.
+- Added `App version` / `1.0.2` at the bottom of Settings and localized it.
+- Added browser-language detection:
+  - Japanese browser locale selects Japanese.
+  - English browser locale selects English.
+  - Unsupported browser locale falls back to English.
+  - Manual language switching still stores `webdrop.locale` in `localStorage` and overrides browser language on later loads.
+- Reworked the chat sheet into a scrollable bubble conversation with outgoing blue bubbles, incoming soft bubbles, smooth scroll-to-bottom, and a mock peer reply.
+- Reduced the connected Venn avatars in connected mode and expanded the innermost blue ring so the ring remains visible behind the pair.
+- Slowed and softened disconnect dissolve timing from an abrupt removal to a longer blur/fade/scale release.
+- Hardened pointer capture so synthetic QA swipes cannot throw when a pointer is not capturable.
+- Refreshed `output/screenshots/ui-elements/` with 30 current screenshots, including the updated chat bubble sheet and connected ring spacing.
+- Rebuilt `output/pdf/webdrop-demo-en.pdf` and `output/pdf/webdrop-demo-ja.pdf` as 23-page guides from the current screenshots.
+- Updated PDF presentation assets for dock icons so receive and disconnect no longer show clipped screenshot backgrounds.
+- Bumped the service-worker cache to `webdrop-v2-static-16`.
+
+Verification:
+- Local static server is running at `http://127.0.0.1:4180/`.
+- `npm run check` passed.
+- Direct syntax checks passed for edited JS, capture script, service worker, and PDF generator.
+- Browser QA confirmed:
+  - `ja-JP` without stored locale renders Japanese.
+  - `en-US` without stored locale renders English.
+  - `fr-FR` without stored locale falls back to English.
+  - Stored `ja` overrides English browser locale.
+  - Stored `en` overrides Japanese browser locale.
+  - Connected Venn avatars are equal at ~73px and have ~22px horizontal / ~44px vertical inner-ring clearance.
+  - Chat generated 3 outgoing and 3 incoming bubbles, remained scrollable, and stayed at the bottom.
+  - Disconnect entered `disconnecting` mid-animation and returned to `lobby` after the dissolve.
+  - Browser errors were zero after pointer-capture hardening.
+- PDF verification:
+  - `output/pdf/webdrop-demo-en.pdf`: 23 pages, version 1.0.2 present, overview/architecture/chat/roadmap text present.
+  - `output/pdf/webdrop-demo-ja.pdf`: 23 pages, version 1.0.2 present, overview/architecture/chat/roadmap text present.
+  - Poppler rendered all 46 PDF pages to PNG.
+  - Independent QA agent reviewed all rendered pages and returned PASS after the final icon-crop fix.
+
+## 2026-06-15 Japanese PDF font and localized screenshot correction
+
+Scope:
+- Corrected the Japanese PDF typography and screenshot source before publishing the project to GitHub.
+- Kept graph-first navigation first; the graph result was stale/unrelated, so reads stayed scoped to the screenshot capture and PDF generator scripts.
+
+Implementation:
+- Added a PDF-ready Source Han Sans JP static Normal font at `assets/fonts/SourceHanSansJP-Normal-static.ttf`.
+- Updated the PDF generator so Japanese pages embed `SourceHanSansJP-Normal`.
+- Made UI screenshot capture locale-aware:
+  - English screenshots now go to `output/screenshots/ui-elements-en/`.
+  - Japanese screenshots now go to `output/screenshots/ui-elements-ja/`.
+- Updated PDF generation so the English guide uses English screenshots and the Japanese guide uses Japanese app screenshots.
+- Removed the legacy mixed `output/screenshots/ui-elements/` folder to avoid future inventory confusion.
+- Regenerated `output/pdf/webdrop-demo-en.pdf` and `output/pdf/webdrop-demo-ja.pdf`.
+
+Verification:
+- `npm run check` passed.
+- `node --check scripts/capture-ui-elements.cjs` passed.
+- `python3 -m py_compile scripts/generate-demo-pdfs.py` passed.
+- Rendered both PDFs to PNG pages: 23 English pages and 23 Japanese pages.
+- Confirmed the Japanese PDF embeds `SourceHanSansJP-Normal`.
+- Visually checked the Japanese contact sheet; UI screenshots are now Japanese app screens.

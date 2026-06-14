@@ -1,0 +1,38 @@
+{
+  "title": "WebDrop orbit localization motion refinement",
+  "slug": "webdrop-orbit-localization-motion-refinement",
+  "created_at": "2026-06-14T14:28:47+00:00",
+  "status": "completed",
+  "approval": {
+    "required": false,
+    "granted": true,
+    "notes": "Local non-destructive frontend changes only."
+  },
+  "packets": [
+    {
+      "id": "motion-research",
+      "owner": "subagent",
+      "status": "completed"
+    },
+    {
+      "id": "implementation",
+      "owner": "lead",
+      "status": "completed"
+    },
+    {
+      "id": "verification",
+      "owner": "lead",
+      "status": "completed"
+    }
+  ],
+  "verification": {
+    "status": "passed",
+    "checks": [
+      "npm run check",
+      "English and Japanese interaction QA",
+      "360x800, 390x844, 412x915, 430x932 responsive matrix",
+      "zero collision and exact orbit-path alignment",
+      "console warning and error audit"
+    ]
+  }
+}

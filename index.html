@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f3f3f1">
+    <meta
+      name="description"
+      content="WebDrop v2 mobile-first proximity file transfer prototype."
+    >
+    <title>WebDrop v2</title>
+    <link rel="icon" href="assets/icons/webdrop-mark.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/orbit.css">
+    <link rel="stylesheet" href="css/connected.css">
+    <link rel="stylesheet" href="css/sheets.css">
+    <link rel="stylesheet" href="css/responsive.css">
+  </head>
+  <body>
+    <div id="app" class="app-shell" data-mode="lobby" data-theme="light">
+      <header class="topbar" aria-label="Application status" data-i18n-aria="appStatus">
+        <div class="brand-lockup">
+          <div>
+            <strong>WebDrop</strong>
+            <span data-connection-label data-i18n="lookingNearby">Looking nearby</span>
+          </div>
+        </div>
+        <div class="device-status" aria-live="polite">
+          <strong data-device-name>Mac 9D9D</strong>
+        </div>
+        <div class="topbar-actions">
+          <button class="icon-button" type="button" data-action="settings" aria-label="Settings" data-i18n-aria="settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 8.25a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5Z"></path>
+              <path d="M19.1 13.5a7.85 7.85 0 0 0 0-3l2-1.5-2-3.4-2.4 1a7.1 7.1 0 0 0-2.4-1.4L14 2h-4l-.4 3.2a7.1 7.1 0 0 0-2.4 1.4l-2.4-1-2 3.4 2 1.5a7.85 7.85 0 0 0 0 3l-2 1.5 2 3.4 2.4-1a7.1 7.1 0 0 0 2.4 1.4L10 22h4l.4-3.2a7.1 7.1 0 0 0 2.4-1.4l2.4 1 2-3.4-2.1-1.5Z"></path>
+            </svg>
+          </button>
+          <button class="icon-button theme-button" type="button" data-action="toggle-theme" aria-label="Toggle light and dark mode" data-i18n-aria="themeToggle">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3.4v2.1M12 18.5v2.1M4.4 12H2.3M21.7 12h-2.1M6.6 6.6 5.1 5.1M18.9 18.9l-1.5-1.5M17.4 6.6l1.5-1.5M5.1 18.9l1.5-1.5"></path>
+              <circle cx="12" cy="12" r="4.5"></circle>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="main-stage" aria-live="polite">
+        <section class="orbit-scene" aria-label="Nearby peers" data-i18n-aria="nearbyPeers">
+          <svg class="orbit-ring orbit-ring--one" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="47"></circle>
+          </svg>
+          <svg class="orbit-ring orbit-ring--two" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="47"></circle>
+          </svg>
+          <svg class="orbit-ring orbit-ring--three" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="47"></circle>
+          </svg>
+          <svg class="orbit-ring orbit-ring--four" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="47"></circle>
+          </svg>
+
+          <div class="peer-orbits" data-peer-orbits></div>
+
+          <section class="identity-core" aria-label="This device" data-i18n-aria="thisDevice">
+            <div class="identity-cluster" data-identity-cluster>
+              <div class="avatar avatar--self" data-self-avatar>
+                <span class="avatar-animation" data-self-avatar-image aria-hidden="true"></span>
+              </div>
+              <button class="peer-overlap" data-connected-peer data-action="disconnect" type="button" hidden aria-label="Disconnect current peer" data-i18n-aria="disconnectPeer"></button>
+            </div>
+          </section>
+
+          <section class="connection-tray" data-connection-tray hidden aria-label="Connected actions" data-i18n-aria="connectedActions">
+            <div class="action-dock">
+              <button class="dock-button dock-button--send" type="button" data-action="open-send-sheet" aria-label="Send files" data-i18n-aria="sendFiles">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4.8 8c0-1.1.8-1.9 1.9-1.9h4l1.8 2h4.8c1.1 0 1.9.8 1.9 1.9v7.1c0 1.1-.8 1.9-1.9 1.9H6.7c-1.1 0-1.9-.8-1.9-1.9V8Z"></path>
+                  <path d="M12 15V9.8M9.9 11.9 12 9.8l2.1 2.1"></path>
+                </svg>
+              </button>
+              <button class="dock-button dock-button--receive" type="button" data-action="open-receive-sheet" aria-label="Received files" data-i18n-aria="receivedFiles">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4.8 8c0-1.1.8-1.9 1.9-1.9h4l1.8 2h4.8c1.1 0 1.9.8 1.9 1.9v7.1c0 1.1-.8 1.9-1.9 1.9H6.7c-1.1 0-1.9-.8-1.9-1.9V8Z"></path>
+                  <path d="M12 10v5.2M9.9 13.1l2.1 2.1 2.1-2.1"></path>
+                </svg>
+                <span class="receive-badge" data-receive-badge hidden>0</span>
+              </button>
+              <button class="dock-button dock-button--chat" type="button" data-action="open-chat-sheet" aria-label="Chat with peer" data-i18n-aria="chatWithPeer">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 6.8c0-1.1.8-1.8 1.8-1.8h10.4c1 0 1.8.7 1.8 1.8v6.6c0 1.1-.8 1.8-1.8 1.8H11l-4.5 3.3v-3.3c-.9-.1-1.5-.8-1.5-1.8V6.8Z"></path>
+                  <path d="M8.5 9.5h7M8.5 12.4h4.8"></path>
+                </svg>
+              </button>
+              <button class="dock-button dock-button--disconnect" type="button" data-action="disconnect" aria-label="Disconnect" data-i18n-aria="disconnectPeer">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8.2 8.2 4.9 4.9M15.8 15.8l3.3 3.3M9.1 14.9l-1.5 1.5a3.7 3.7 0 0 1-5.2-5.2l2.2-2.2M14.9 9.1l1.5-1.5a3.7 3.7 0 0 1 5.2 5.2l-2.2 2.2M8.2 15.8 15.8 8.2"></path>
+                </svg>
+              </button>
+            </div>
+          </section>
+        </section>
+      </main>
+
+      <div class="sheet-backdrop" data-backdrop data-action="close-all-sheets" hidden></div>
+
+      <section class="bottom-sheet" data-peer-sheet hidden role="dialog" aria-modal="true" aria-label="Peer actions" data-i18n-aria="peerActions">
+        <span class="sheet-handle" aria-hidden="true"></span>
+        <p class="sheet-kicker" data-i18n="nearbyCandidate">Nearby candidate</p>
+        <div class="peer-candidate-heading">
+          <span class="peer-candidate-avatar avatar-animation" data-sheet-peer-avatar aria-hidden="true"></span>
+          <h2 data-sheet-peer-name>Invite peer</h2>
+        </div>
+        <p data-sheet-copy>Swipe right to connect. File controls stay hidden until the connection is ready.</p>
+        <div class="friend-strip" data-friend-strip aria-hidden="true"></div>
+        <div class="sheet-actions">
+          <div class="swipe-control" data-swipe-control>
+            <span class="swipe-text" data-swipe-text data-i18n="swipeConnect">Swipe to connect</span>
+            <button class="swipe-thumb" type="button" data-swipe-thumb aria-label="Swipe to connect" data-i18n-aria="swipeConnect">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 12h13M13 6l6 6-6 6"></path>
+              </svg>
+            </button>
+          </div>
+          <button type="button" class="sheet-cancel" data-action="close-sheet" data-i18n="cancel">Cancel</button>
+        </div>
+      </section>
+
+      <section class="bottom-sheet" data-settings-sheet hidden role="dialog" aria-modal="true" aria-label="Settings" data-i18n-aria="settingsDialog">
+        <button class="sheet-close-icon" type="button" data-action="close-settings" aria-label="Close settings" data-i18n-aria="closeSettings">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18"></path>
+          </svg>
+        </button>
+        <span class="sheet-handle" aria-hidden="true"></span>
+        <p class="sheet-kicker" data-i18n="prototypeSettings">Prototype settings</p>
+        <h2>WebDrop v2</h2>
+        <div class="avatar-setting">
+          <div class="setting-heading">
+            <strong data-i18n="profileIcon">Profile icon</strong>
+            <span data-i18n="swipeChoose">Swipe and tap to choose</span>
+          </div>
+          <div class="avatar-carousel" data-avatar-carousel role="listbox" aria-label="Profile icons" data-i18n-aria="profileIcons"></div>
+        </div>
+        <div class="ring-setting">
+          <div class="setting-heading">
+            <strong data-i18n="profileRing">Profile ring</strong>
+            <span data-i18n="whiteDefault">White is the default</span>
+          </div>
+          <div class="ring-choice" data-ring-choice aria-label="Profile ring color" data-i18n-aria="profileRingColor">
+            <button type="button" data-action="select-ring" data-ring="#ffffff" style="--swatch:#ffffff" aria-label="White ring" data-i18n-aria="whiteRing"></button>
+            <button type="button" data-action="select-ring" data-ring="#7fb2ff" style="--swatch:#7fb2ff" aria-label="Blue ring" data-i18n-aria="blueRing"></button>
+            <button type="button" data-action="select-ring" data-ring="#65d0a3" style="--swatch:#65d0a3" aria-label="Green ring" data-i18n-aria="greenRing"></button>
+            <button type="button" data-action="select-ring" data-ring="#b4a2ff" style="--swatch:#b4a2ff" aria-label="Purple ring" data-i18n-aria="purpleRing"></button>
+            <button type="button" data-action="select-ring" data-ring="#ff9cac" style="--swatch:#ff9cac" aria-label="Rose ring" data-i18n-aria="roseRing"></button>
+          </div>
+        </div>
+        <label class="field">
+          <span data-i18n="deviceName">Device name</span>
+          <input data-name-input value="Mac 9D9D" maxlength="22">
+        </label>
+        <div class="language-setting">
+          <span data-i18n="language">Language</span>
+          <div class="language-choice" aria-label="Language" data-i18n-aria="languageMode">
+            <button type="button" data-action="set-language-en" data-locale="en" data-i18n="english">English</button>
+            <button type="button" data-action="set-language-ja" data-locale="ja" data-i18n="japanese">Japanese</button>
+          </div>
+        </div>
+        <button class="settings-link" type="button" data-action="open-information">
+          <span>
+            <strong data-i18n="appInformation">App information</strong>
+            <small data-i18n="appInformationCopy">Design and service details</small>
+          </span>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m9 5 7 7-7 7"></path>
+          </svg>
+        </button>
+        <div class="app-version">
+          <span data-i18n="appVersion">App version</span>
+          <strong>1.0.2</strong>
+        </div>
+      </section>
+
+      <section class="bottom-sheet information-sheet" data-information-sheet hidden role="dialog" aria-modal="true" aria-label="App information" data-i18n-aria="informationDialog">
+        <button class="sheet-back-icon" type="button" data-action="back-to-settings" aria-label="Back to settings" data-i18n-aria="backToSettings">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m15 5-7 7 7 7"></path>
+          </svg>
+        </button>
+        <button class="sheet-close-icon" type="button" data-action="close-information" aria-label="Close app information" data-i18n-aria="closeInformation">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18"></path>
+          </svg>
+        </button>
+        <span class="sheet-handle" aria-hidden="true"></span>
+        <p class="sheet-kicker" data-i18n="informationKicker">About this prototype</p>
+        <h2 data-i18n="informationTitle">WebDrop details</h2>
+        <div class="motion-setting information-motion">
+          <span data-i18n="orbitMotion">Orbit motion</span>
+          <div class="motion-choice" aria-label="Orbit motion" data-i18n-aria="orbitMotion">
+            <button type="button" data-action="set-motion-on" data-motion-value="on" data-i18n="motionOn">On</button>
+            <button type="button" data-action="set-motion-paused" data-motion-value="paused" data-i18n="motionPaused">Paused</button>
+          </div>
+        </div>
+        <div class="info-row">
+          <strong data-i18n="appInfoNearbyTitle">Nearby-first transfer</strong>
+          <span data-i18n="appInfoNearbyCopy">WebDrop pairs nearby devices before showing file controls, keeping the main screen focused on presence.</span>
+        </div>
+        <div class="info-row">
+          <strong data-i18n="appInfoStackTitle">Static web stack</strong>
+          <span data-i18n="appInfoStackCopy">This prototype uses HTML, CSS, vanilla JavaScript modules, workers, mock signaling, and WebRTC-ready adapters.</span>
+        </div>
+        <div class="info-row">
+          <strong data-i18n="appInfoFilesTitle">File flow</strong>
+          <span data-i18n="appInfoFilesCopy">Files are chosen in the send sheet, confirmed by swipe-up, and received guides are available as demo PDFs.</span>
+        </div>
+      </section>
+
+      <section class="bottom-sheet action-sheet" data-send-sheet hidden role="dialog" aria-modal="true" aria-label="Send files" data-i18n-aria="sendDialog">
+        <button class="sheet-close-icon" type="button" data-action="close-action-sheet" aria-label="Close send sheet" data-i18n-aria="closeSend">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18"></path>
+          </svg>
+        </button>
+        <span class="sheet-handle" aria-hidden="true"></span>
+        <p class="sheet-kicker" data-i18n="send">Send</p>
+        <h2 data-send-title>Select files</h2>
+        <p data-send-copy>Choose files for the connected device, then send when the list looks right.</p>
+        <button class="sheet-primary sheet-primary--soft" type="button" data-action="choose-files">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 3.8c0-.8.6-1.4 1.4-1.4h6.2L19 7.8v12.8c0 .8-.6 1.4-1.4 1.4H7.4c-.8 0-1.4-.6-1.4-1.4V3.8Z"></path>
+            <path d="M13.5 2.7V8h5.2M9.2 15.1h5.6M12 12.3v5.6"></path>
+          </svg>
+          <span data-i18n="chooseFiles">Choose files</span>
+        </button>
+        <div class="selected-files" data-selected-files hidden></div>
+        <div class="swipe-control swipe-control--vertical send-swipe" data-send-swipe-control aria-label="Swipe up to send" data-i18n-aria="swipeSend">
+          <span class="swipe-text" data-send-swipe-text data-i18n="swipeSend">Swipe up to send</span>
+          <button class="swipe-thumb" type="button" data-send-swipe-thumb aria-label="Swipe up to send" data-i18n-aria="swipeSend">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 19V6M6 12l6-6 6 6"></path>
+            </svg>
+          </button>
+        </div>
+        <button class="sheet-primary send-confirm" type="button" data-action="send" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 4 9.6 14.4"></path>
+            <path d="M20 4 14 21l-4.4-6.6L3 10l17-6Z"></path>
+          </svg>
+          <span data-i18n="send">Send</span>
+        </button>
+      </section>
+
+      <section class="bottom-sheet action-sheet" data-receive-sheet hidden role="dialog" aria-modal="true" aria-label="Received files" data-i18n-aria="receiveDialog">
+        <button class="sheet-close-icon" type="button" data-action="close-action-sheet" aria-label="Close receive sheet" data-i18n-aria="closeReceive">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18"></path>
+          </svg>
+        </button>
+        <span class="sheet-handle" aria-hidden="true"></span>
+        <p class="sheet-kicker" data-i18n="receive">Receive</p>
+        <h2 data-i18n="receivedFilesTitle">Received files</h2>
+        <div class="received-list" data-received-list></div>
+      </section>
+
+      <section class="bottom-sheet action-sheet" data-chat-sheet hidden role="dialog" aria-modal="true" aria-label="Chat with peer" data-i18n-aria="chatDialog">
+        <button class="sheet-close-icon" type="button" data-action="close-action-sheet" aria-label="Close chat sheet" data-i18n-aria="closeChat">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18"></path>
+          </svg>
+        </button>
+        <span class="sheet-handle" aria-hidden="true"></span>
+        <p class="sheet-kicker" data-i18n="chat">Chat</p>
+        <h2 data-chat-title>Message peer</h2>
+        <div class="chat-panel" data-chat-panel>
+          <p data-i18n="noMessages">No messages yet.</p>
+        </div>
+        <label class="chat-box">
+          <span data-i18n="message">Message</span>
+          <textarea data-chat-input rows="3" placeholder="Type a short note" data-i18n-placeholder="typeNote"></textarea>
+        </label>
+        <button class="sheet-primary" type="button" data-action="send-chat">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 4 9.6 14.4"></path>
+            <path d="M20 4 14 21l-4.4-6.6L3 10l17-6Z"></path>
+          </svg>
+          <span data-i18n="sendMessage">Send message</span>
+        </button>
+      </section>
+
+      <section class="toast" data-toast hidden role="status"></section>
+      <input data-file-input type="file" multiple hidden>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

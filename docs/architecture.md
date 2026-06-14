@@ -1,0 +1,120 @@
+# WebDrop Architecture
+
+## Current repository state
+
+This checkout now contains a first-run static, modular WebDrop v2 app plus architecture notes.
+
+- `index.html` is the active static app shell.
+- The earlier `proximity_architecture_monkeytype_v2.html` page was removed during the corrected rebuild.
+- `gemini-code-1781434503037.md` contains an MVP technical specification.
+- `js/` contains the app state machine, controller, adapters, proximity, transport, transfer, storage client, and UI renderer.
+- `workers/storage-worker.js` contains the receive-side storage worker scaffold.
+- `graphify-out/` exists, but Graphify was intentionally not used for this pass.
+
+The deployed site at `https://web-drop-lyart.vercel.app/` is a reference surface only. It should inform product behavior, interaction vocabulary, and visual intent, but it is not a source to clone into this repository.
+
+## Product model
+
+WebDrop is a browser-native nearby file-transfer system. It should feel like a zero-install AirDrop-style flow while staying inside normal web platform constraints.
+
+The product separates three concerns:
+
+1. Static delivery: HTML, CSS, JavaScript, assets, and worker files served over HTTPS.
+2. Signaling and coordination: WebSocket metadata for presence, invites, session state, proximity evidence, offers, answers, and ICE candidates.
+3. Payload transport: encrypted browser-to-browser file chunks over WebRTC `RTCDataChannel`.
+
+The signaling server is a coordinator, not a file server. It must never accept or relay file bytes.
+
+## Runtime lanes
+
+### Static client lane
+
+The browser client owns:
+
+- Orbital discovery UI.
+- Local device identity and capability checks.
+- QR, audio, motion, and manual pairing ceremonies.
+- WebRTC peer setup.
+- Chunked file read and send.
+- Streaming receive, hash, and export flow.
+- User-facing state transitions.
+
+### Signaling lane
+
+The WebSocket lane owns:
+
+- Online presence.
+- Invite and acceptance messages.
+- Short-lived pairing sessions.
+- Proximity telemetry summaries.
+- WebRTC SDP and ICE exchange.
+- TURN credential minting policy, if needed.
+
+It must reject binary payloads, cap message sizes, validate origin/session tokens, and rate-limit pairing attempts.
+
+### Data lane
+
+The data lane uses WebRTC:
+
+- Control channel for transfer metadata, progress, ACKs, pause/resume, and cancellation.
+- File channel for ordered binary chunks.
+- STUN for direct path discovery.
+- TURN only when direct connectivity fails.
+
+Direct WebRTC can allow larger transfers after receiver storage checks. TURN relay mode should be visible to users and capped because relay traffic has server bandwidth cost.
+
+## Orbital UI contract
+
+The orbital UI is a state machine, not decorative motion.
+
+The self/user icon is always centered. It represents the local browser session and must not orbit, drift, or be laid out as a peer. Other devices are placed around that fixed center according to their state.
+
+Suggested rings:
+
+- Searching: no confirmed peers; show scanning state around the centered self icon.
+- Available: peer is online through signaling but not verified nearby.
+- Invited: peer has an active short-lived pairing session.
+- Verifying: QR, audio, motion, or manual ceremony is running.
+- Connected: selected peer is ready for transfer.
+- Transferring: connected peer has an active send or receive stream.
+- Complete or failed: transfer ended with a clear next action.
+
+Folder, send, and receive controls must only appear after the connected state. They should not be visible during searching, discovery, available-online, invite, or proximity-verification states. In the current app this is enforced by `data-mode="connected"` and the `[data-connection-tray]` element.
+
+## Proximity and trust
+
+Web browsers do not expose universal native nearby-device APIs across iOS Safari, Android Chrome, and desktop browsers. WebDrop therefore uses explicit pairing and confidence signals rather than pretending that online presence equals physical proximity.
+
+Supported evidence can include:
+
+- QR token exchange.
+- Acoustic nonce or chirp verification.
+- Motion or tilt correlation.
+- User invite and explicit acceptance.
+- WebRTC path quality and latency.
+- Server-observed coarse network hints.
+
+QR should remain the reliable fallback when microphone, motion, or audio playback permissions fail.
+
+## Storage model
+
+The receiver should avoid holding the entire file in memory.
+
+Preferred storage ladder:
+
+1. OPFS worker writer for large files.
+2. IndexedDB chunk store when OPFS is unavailable.
+3. In-memory buffer only for small files.
+
+Hashing should be incremental. Export should stream from the selected storage backend where possible.
+
+## Failure policy
+
+Failures should move the user to the next viable path:
+
+- Microphone denied: offer QR pairing.
+- Motion unavailable: continue with QR or explicit invite.
+- Direct WebRTC fails: try TURN relay.
+- TURN relay selected: show relay-mode cap before transfer.
+- Storage estimate insufficient: reject before accepting the incoming file.
+- Peer disconnects: keep partial state only if resume support exists; otherwise clear it predictably.

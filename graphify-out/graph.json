@@ -1,0 +1,678 @@
+{
+  "nodes": [
+    {
+      "id": "mermaid_free_diagrams_reference_md",
+      "label": "mermaid_free_diagrams_reference.md",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_mermaid_free_production_documentation_diagrams",
+      "label": "Mermaid-Free Production Documentation Diagrams",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_1_system_architecture_diagram_ascii_version",
+      "label": "1. System Architecture Diagram — ASCII Version",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L15"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_1",
+      "label": "code:text (┌───────────────────────────────────────────────────────────)",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L17"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_2_presence_ring_ui_diagram_ascii_version",
+      "label": "2. Presence Ring UI Diagram — ASCII Version",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L92"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_2",
+      "label": "code:text (┌───────────────────────────────────────────────────────────)",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L94"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_correct_ui_meaning",
+      "label": "Correct UI meaning",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L130"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_3",
+      "label": "code:text (Ring 4  = Available online users)",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L132"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_3_full_runtime_flow_diagram",
+      "label": "3. Full Runtime Flow Diagram",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L142"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_4",
+      "label": "code:text (┌─────────────────────┐)",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L144"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_4_signaling_sequence_diagram_ascii_version",
+      "label": "4. Signaling Sequence Diagram — ASCII Version",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L277"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_5",
+      "label": "code:text (Client A                         Signaling Server           )",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L279"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_5_webrtc_preflight_and_path_classification",
+      "label": "5. WebRTC Preflight and Path Classification",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L322"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_6",
+      "label": "code:text (┌──────────────────────────────┐)",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L324"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_6_storage_pipeline_diagram",
+      "label": "6. Storage Pipeline Diagram",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L383"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_7",
+      "label": "code:text (Sender Device                                      Receiver )",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L385"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_7_storage_selection_diagram",
+      "label": "7. Storage Selection Diagram",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L443"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_8",
+      "label": "code:text (┌──────────────────────────────┐)",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L445"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_8_transfer_state_machine_ascii_version",
+      "label": "8. Transfer State Machine — ASCII Version",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L502"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_9",
+      "label": "code:text ([App Loaded])",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L504"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_9_cleaner_documentation_wording",
+      "label": "9. Cleaner Documentation Wording",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L580"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_architecture_summary",
+      "label": "Architecture Summary",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L584"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_proximity_summary",
+      "label": "Proximity Summary",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L588"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_storage_summary",
+      "label": "Storage Summary",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L592"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_10_if_you_need_real_rendered_images",
+      "label": "10. If You Need Real Rendered Images",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L598"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_option_a_draw_io_diagrams_net",
+      "label": "Option A — draw.io / diagrams.net",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L602"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_10",
+      "label": "code:text (Vercel Static Hosting)",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L608"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_11",
+      "label": "code:text (SVG for docs)",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L620"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_option_b_svg_diagrams",
+      "label": "Option B — SVG diagrams",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L626"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_option_c_figma",
+      "label": "Option C — Figma",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L630"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_option_d_ascii",
+      "label": "Option D — ASCII",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L634"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_11_practical_recommendation",
+      "label": "11. Practical Recommendation",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L640"
+    },
+    {
+      "id": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_12",
+      "label": "code:text (README.md:)",
+      "file_type": "document",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L644"
+    },
+    {
+      "id": "gemini_code_1781434503037_md",
+      "label": "gemini-code-1781434503037.md",
+      "file_type": "document",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "web_drop_v2_gemini_code_1781434503037_technical_specification_cross_platform_web_native_file_sharing_engine_mvp",
+      "label": "Technical Specification: Cross-Platform Web-Native File-Sharing Engine (MVP)",
+      "file_type": "document",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L1"
+    },
+    {
+      "id": "web_drop_v2_gemini_code_1781434503037_1_system_topology_architectural_principles",
+      "label": "1. System Topology & Architectural Principles",
+      "file_type": "document",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L7"
+    },
+    {
+      "id": "web_drop_v2_gemini_code_1781434503037_the_core_separation_rules",
+      "label": "The Core Separation Rules",
+      "file_type": "document",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L13"
+    },
+    {
+      "id": "web_drop_v2_gemini_code_1781434503037_2_the_network_obstacle_symmetric_nat_carrier_grade_nat_cgnat",
+      "label": "2. The Network Obstacle: Symmetric NAT & Carrier-Grade NAT (CGNAT)",
+      "file_type": "document",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L20"
+    },
+    {
+      "id": "web_drop_v2_gemini_code_1781434503037_how_home_nat_cone_nat_vs_symmetric_nat_behaves",
+      "label": "How Home NAT (Cone NAT) vs. Symmetric NAT Behaves",
+      "file_type": "document",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L26"
+    },
+    {
+      "id": "web_drop_v2_gemini_code_1781434503037_the_turn_safety_net",
+      "label": "The TURN Safety Net",
+      "file_type": "document",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L30"
+    },
+    {
+      "id": "web_drop_v2_gemini_code_1781434503037_3_webrtc_data_infrastructure_server_economics",
+      "label": "3. WebRTC Data Infrastructure & Server Economics",
+      "file_type": "document",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L39"
+    },
+    {
+      "id": "web_drop_v2_gemini_code_1781434503037_the_network_infrastructure_breakdown",
+      "label": "The Network Infrastructure Breakdown",
+      "file_type": "document",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L43"
+    },
+    {
+      "id": "web_drop_v2_gemini_code_1781434503037_4_hardware_integrated_proximity_matching_ui_presentation",
+      "label": "4. Hardware-Integrated Proximity Matching & UI Presentation",
+      "file_type": "document",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L54"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "links": [
+    {
+      "source": "mermaid_free_diagrams_reference_md",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_mermaid_free_production_documentation_diagrams",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "mermaid_free_diagrams_reference_md",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_1_system_architecture_diagram_ascii_version",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_1_system_architecture_diagram_ascii_version",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_1",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "mermaid_free_diagrams_reference_md",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_2_presence_ring_ui_diagram_ascii_version",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L92",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_2_presence_ring_ui_diagram_ascii_version",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_2",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L94",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_2_presence_ring_ui_diagram_ascii_version",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_correct_ui_meaning",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L130",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_correct_ui_meaning",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_3",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L132",
+      "weight": 1.0
+    },
+    {
+      "source": "mermaid_free_diagrams_reference_md",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_3_full_runtime_flow_diagram",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L142",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_3_full_runtime_flow_diagram",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_4",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L144",
+      "weight": 1.0
+    },
+    {
+      "source": "mermaid_free_diagrams_reference_md",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_4_signaling_sequence_diagram_ascii_version",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L277",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_4_signaling_sequence_diagram_ascii_version",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_5",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L279",
+      "weight": 1.0
+    },
+    {
+      "source": "mermaid_free_diagrams_reference_md",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_5_webrtc_preflight_and_path_classification",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L322",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_5_webrtc_preflight_and_path_classification",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_6",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L324",
+      "weight": 1.0
+    },
+    {
+      "source": "mermaid_free_diagrams_reference_md",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_6_storage_pipeline_diagram",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L383",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_6_storage_pipeline_diagram",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_7",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L385",
+      "weight": 1.0
+    },
+    {
+      "source": "mermaid_free_diagrams_reference_md",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_7_storage_selection_diagram",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L443",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_7_storage_selection_diagram",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_8",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L445",
+      "weight": 1.0
+    },
+    {
+      "source": "mermaid_free_diagrams_reference_md",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_8_transfer_state_machine_ascii_version",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L502",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_8_transfer_state_machine_ascii_version",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_9",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L504",
+      "weight": 1.0
+    },
+    {
+      "source": "mermaid_free_diagrams_reference_md",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_9_cleaner_documentation_wording",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L580",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_9_cleaner_documentation_wording",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_architecture_summary",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L584",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_9_cleaner_documentation_wording",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_proximity_summary",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L588",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_9_cleaner_documentation_wording",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_storage_summary",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L592",
+      "weight": 1.0
+    },
+    {
+      "source": "mermaid_free_diagrams_reference_md",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_10_if_you_need_real_rendered_images",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L598",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_10_if_you_need_real_rendered_images",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_option_a_draw_io_diagrams_net",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L602",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_option_a_draw_io_diagrams_net",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_10",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L608",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_option_a_draw_io_diagrams_net",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_11",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L620",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_10_if_you_need_real_rendered_images",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_option_b_svg_diagrams",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L626",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_10_if_you_need_real_rendered_images",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_option_c_figma",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L630",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_10_if_you_need_real_rendered_images",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_option_d_ascii",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L634",
+      "weight": 1.0
+    },
+    {
+      "source": "mermaid_free_diagrams_reference_md",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_11_practical_recommendation",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L640",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_mermaid_free_diagrams_reference_11_practical_recommendation",
+      "target": "web_drop_v2_mermaid_free_diagrams_reference_codeblock_12",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "mermaid_free_diagrams_reference.md",
+      "source_location": "L644",
+      "weight": 1.0
+    },
+    {
+      "source": "gemini_code_1781434503037_md",
+      "target": "web_drop_v2_gemini_code_1781434503037_technical_specification_cross_platform_web_native_file_sharing_engine_mvp",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_gemini_code_1781434503037_technical_specification_cross_platform_web_native_file_sharing_engine_mvp",
+      "target": "web_drop_v2_gemini_code_1781434503037_1_system_topology_architectural_principles",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_gemini_code_1781434503037_1_system_topology_architectural_principles",
+      "target": "web_drop_v2_gemini_code_1781434503037_the_core_separation_rules",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_gemini_code_1781434503037_technical_specification_cross_platform_web_native_file_sharing_engine_mvp",
+      "target": "web_drop_v2_gemini_code_1781434503037_2_the_network_obstacle_symmetric_nat_carrier_grade_nat_cgnat",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_gemini_code_1781434503037_2_the_network_obstacle_symmetric_nat_carrier_grade_nat_cgnat",
+      "target": "web_drop_v2_gemini_code_1781434503037_how_home_nat_cone_nat_vs_symmetric_nat_behaves",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L26",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_gemini_code_1781434503037_2_the_network_obstacle_symmetric_nat_carrier_grade_nat_cgnat",
+      "target": "web_drop_v2_gemini_code_1781434503037_the_turn_safety_net",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_gemini_code_1781434503037_technical_specification_cross_platform_web_native_file_sharing_engine_mvp",
+      "target": "web_drop_v2_gemini_code_1781434503037_3_webrtc_data_infrastructure_server_economics",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L39",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_gemini_code_1781434503037_3_webrtc_data_infrastructure_server_economics",
+      "target": "web_drop_v2_gemini_code_1781434503037_the_network_infrastructure_breakdown",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L43",
+      "weight": 1.0
+    },
+    {
+      "source": "web_drop_v2_gemini_code_1781434503037_technical_specification_cross_platform_web_native_file_sharing_engine_mvp",
+      "target": "web_drop_v2_gemini_code_1781434503037_4_hardware_integrated_proximity_matching_ui_presentation",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "gemini-code-1781434503037.md",
+      "source_location": "L54",
+      "weight": 1.0
+    }
+  ]
+}

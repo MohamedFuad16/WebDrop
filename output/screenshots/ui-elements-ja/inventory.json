@@ -1,0 +1,182 @@
+[
+  {
+    "name": "app-light",
+    "file": "app-light.png",
+    "label": "Light home screen",
+    "description": "The main nearby-device surface in light mode, with the title, device name, four orbits, a gently animated self icon, and static orbit peers."
+  },
+  {
+    "name": "topbar-brand",
+    "file": "topbar-brand.png",
+    "label": "WebDrop status pill",
+    "description": "Shows the WebDrop label and nearby or connected status without exposing transfer controls too early."
+  },
+  {
+    "name": "topbar-device-name",
+    "file": "topbar-device-name.png",
+    "label": "Device name",
+    "description": "The current device name is centered in the top header, away from the orbit geometry."
+  },
+  {
+    "name": "settings-icon",
+    "file": "settings-icon.png",
+    "label": "Settings icon",
+    "description": "Opens the settings sheet for profile icon, ring color, language, app information, and version."
+  },
+  {
+    "name": "theme-icon",
+    "file": "theme-icon.png",
+    "label": "Theme toggle",
+    "description": "Switches between light and dark mode from the main screen."
+  },
+  {
+    "name": "topbar-actions",
+    "file": "topbar-actions.png",
+    "label": "Header actions",
+    "description": "Settings and theme controls are grouped in the top-right header area."
+  },
+  {
+    "name": "orbit-empty",
+    "file": "orbit-empty.png",
+    "label": "Orbit layers without peers",
+    "description": "The clean App Clip-inspired orbit pattern before showing nearby devices."
+  },
+  {
+    "name": "orbit-with-peers",
+    "file": "orbit-with-peers.png",
+    "label": "Orbit layers with peers",
+    "description": "Nearby candidates sit on separate rings with static profile icons so orbital movement remains calm."
+  },
+  {
+    "name": "connect-sheet",
+    "file": "connect-sheet.png",
+    "label": "Connect sheet",
+    "description": "Peer selection opens a bottom sheet where the user confirms by swiping right."
+  },
+  {
+    "name": "connect-friend-strip",
+    "file": "connect-friend-strip.png",
+    "label": "Friend strip",
+    "description": "The candidate strip uses the same profile style as the orbit icons, with a small overlap and visible circular edges."
+  },
+  {
+    "name": "orbit-connected",
+    "file": "orbit-connected.png",
+    "label": "Connected Venn state",
+    "description": "The current device and selected peer overlap as an equal-size, static Venn-style pair with animated connected rings."
+  },
+  {
+    "name": "topbar-brand-connected",
+    "file": "topbar-brand-connected.png",
+    "label": "Connected status pill",
+    "description": "After connection, the status line names the connected peer."
+  },
+  {
+    "name": "dock-actions",
+    "file": "dock-actions.png",
+    "label": "Connected dock",
+    "description": "Send, receive, chat, and disconnect appear only after the connection is verified."
+  },
+  {
+    "name": "dock-send-icon",
+    "file": "dock-send-icon.png",
+    "label": "Send icon",
+    "description": "Opens the send sheet."
+  },
+  {
+    "name": "dock-receive-icon",
+    "file": "dock-receive-icon.png",
+    "label": "Receive icon",
+    "description": "Opens received files and shows a badge when files are available."
+  },
+  {
+    "name": "dock-chat-icon",
+    "file": "dock-chat-icon.png",
+    "label": "Chat icon",
+    "description": "Opens the peer chat sheet."
+  },
+  {
+    "name": "dock-disconnect-icon",
+    "file": "dock-disconnect-icon.png",
+    "label": "Disconnect icon",
+    "description": "Disconnects directly with a short release animation."
+  },
+  {
+    "name": "send-sheet-empty",
+    "file": "send-sheet-empty.png",
+    "label": "Send sheet before file selection",
+    "description": "The user chooses files first; the send swipe remains disabled until a file is selected."
+  },
+  {
+    "name": "send-sheet-selected",
+    "file": "send-sheet-selected.png",
+    "label": "Send sheet after file selection",
+    "description": "A selected file appears in the list and the swipe-up send control keeps its icon below the text."
+  },
+  {
+    "name": "receive-sheet",
+    "file": "receive-sheet.png",
+    "label": "Receive sheet",
+    "description": "Received demo PDFs appear here with an Open action and the dock badge reflects the count."
+  },
+  {
+    "name": "chat-sheet",
+    "file": "chat-sheet.png",
+    "label": "Chat sheet",
+    "description": "Chat is separated into its own scrollable bubble conversation instead of sharing the file tray."
+  },
+  {
+    "name": "settings-sheet",
+    "file": "settings-sheet.png",
+    "label": "Settings sheet",
+    "description": "Settings hold profile, ring, device name, language, and app information."
+  },
+  {
+    "name": "settings-profile-icons",
+    "file": "settings-profile-icons.png",
+    "label": "Profile icon selector",
+    "description": "Users swipe across the provided character icons instead of uploading a photo."
+  },
+  {
+    "name": "settings-profile-ring",
+    "file": "settings-profile-ring.png",
+    "label": "Profile ring selector",
+    "description": "The default ring is white, with optional blue, green, purple, and rose choices."
+  },
+  {
+    "name": "settings-device-name",
+    "file": "settings-device-name.png",
+    "label": "Device name field",
+    "description": "The device name can be edited, including clearing the final character without an unwanted reset."
+  },
+  {
+    "name": "settings-language",
+    "file": "settings-language.png",
+    "label": "Language selector",
+    "description": "Switches every app label between English and Japanese."
+  },
+  {
+    "name": "settings-app-info-link",
+    "file": "settings-app-info-link.png",
+    "label": "App information link",
+    "description": "Moves design, stack, and orbit motion details into a separate sheet."
+  },
+  {
+    "name": "settings-app-version",
+    "file": "settings-app-version.png",
+    "label": "App version",
+    "description": "Shows the current prototype version, 1.0.2, at the bottom of Settings."
+  },
+  {
+    "name": "app-information-sheet",
+    "file": "app-information-sheet.png",
+    "label": "App information sheet",
+    "description": "Explains the prototype and contains orbit motion controls without cluttering the settings page."
+  },
+  {
+    "name": "app-dark",
+    "file": "app-dark.png",
+    "label": "Dark home screen",
+    "description": "The same nearby-device UI in dark mode."
+  }
+]

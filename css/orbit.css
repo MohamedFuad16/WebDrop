@@ -1,0 +1,434 @@
+.orbit-scene {
+  position: relative;
+  --orbit-size: min(92vw, calc(100dvh - 178px), 560px);
+  --peer-avatar: clamp(32px, 9vw, 42px);
+  --connected-avatar: clamp(70px, 20vw, 84px);
+  width: var(--orbit-size);
+  height: var(--orbit-size);
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+}
+
+.app-shell[data-mode="connected"] .orbit-scene,
+.app-shell[data-mode="disconnecting"] .orbit-scene {
+  --connected-avatar: clamp(60px, 17vw, 74px);
+}
+
+.orbit-ring {
+  position: absolute;
+  overflow: visible;
+  border-radius: 999px;
+  pointer-events: none;
+  opacity: .78;
+  animation: ringDrift var(--ring-duration, 120s) linear infinite;
+  transform-origin: center;
+}
+
+.orbit-ring circle {
+  fill: none;
+  stroke: var(--ring-color);
+  stroke-width: 5px;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.orbit-ring--one {
+  --ring-color: color-mix(in srgb, var(--purple) 56%, var(--ink) 8%);
+  --ring-duration: 132s;
+  width: 90%;
+  height: 90%;
+}
+
+.orbit-ring--one circle {
+  stroke-dasharray: 22 12 7 10 15 13;
+}
+
+.orbit-ring--two {
+  --ring-color: color-mix(in srgb, var(--orange) 58%, var(--ink) 7%);
+  --ring-duration: 124s;
+  width: 68%;
+  height: 68%;
+  animation-direction: reverse;
+}
+
+.orbit-ring--two circle {
+  stroke-dasharray: 15 9 5 8 21 12;
+}
+
+.orbit-ring--three {
+  --ring-color: color-mix(in srgb, var(--mint) 66%, var(--ink) 8%);
+  --ring-duration: 116s;
+  width: 46%;
+  height: 46%;
+}
+
+.orbit-ring--three circle {
+  stroke-dasharray: 9 8 18 10 5 8;
+}
+
+.orbit-ring--four {
+  --ring-color: color-mix(in srgb, var(--blue) 70%, var(--ink) 7%);
+  --ring-duration: 108s;
+  width: 30%;
+  height: 30%;
+  animation-direction: reverse;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--blue) 12%, transparent));
+}
+
+.app-shell[data-mode="connected"] .orbit-ring--four,
+.app-shell[data-mode="disconnecting"] .orbit-ring--four {
+  width: 37%;
+  height: 37%;
+  opacity: .9;
+}
+
+.orbit-ring--four circle {
+  stroke-dasharray: 7 7 13 9;
+}
+
+.peer-orbits {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.peer-node {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--peer-avatar);
+  height: var(--peer-avatar);
+  transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(var(--radius) * -1)) rotate(calc(var(--angle) * -1));
+  animation: orbitSpin var(--orbit-duration, 46s) linear infinite;
+  animation-delay: var(--orbit-delay, 0s);
+  transition: opacity var(--motion-control) ease;
+  pointer-events: auto;
+}
+
+.peer-node button {
+  position: relative;
+  width: var(--peer-avatar);
+  height: var(--peer-avatar);
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--ink);
+  background: #ffffff;
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--ink) 15%, transparent);
+  cursor: pointer;
+  transition:
+    transform var(--motion-control) var(--ease-out),
+    box-shadow var(--motion-control) ease;
+}
+
+.peer-node button::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 3px solid var(--avatar-ring, #ffffff);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.peer-node img,
+.peer-node .avatar-animation {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.peer-node img {
+  object-fit: cover;
+}
+
+.peer-node > span {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  max-width: 76px;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: clamp(10px, 2.8vw, 12px);
+  font-weight: 660;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, -3px);
+  transition: opacity .18s ease, transform .18s ease;
+  pointer-events: none;
+}
+
+.peer-node:hover > span,
+.peer-node:focus-within > span {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.peer-node[data-stage="intent"] {
+  --avatar-ring: #ffffff;
+}
+
+.peer-node[data-stage="verify"] {
+  --avatar-ring: #ffffff;
+}
+
+.peer-node[data-stage="near"] {
+  --avatar-ring: #ffffff;
+}
+
+.identity-core {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.identity-cluster {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(92px, 25vw, 112px);
+  height: clamp(72px, 20vw, 88px);
+}
+
+.avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--panel-solid);
+}
+
+.avatar--self {
+  width: var(--connected-avatar);
+  height: var(--connected-avatar);
+  z-index: 2;
+  border: 0;
+  box-shadow: 0 16px 38px color-mix(in srgb, var(--ink) 15%, transparent);
+}
+
+.avatar--self::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 4px solid var(--self-ring, #ffffff);
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .8);
+  pointer-events: none;
+}
+
+.avatar img,
+.avatar .avatar-animation {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.avatar img {
+  object-fit: cover;
+}
+
+.peer-overlap {
+  position: absolute;
+  right: 0;
+  z-index: 3;
+  width: var(--connected-avatar);
+  height: var(--connected-avatar);
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: transparent;
+  background: var(--panel-solid);
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--ink) 12%, transparent);
+  cursor: pointer;
+  transform: translateX(0);
+}
+
+.peer-overlap img,
+.peer-overlap .avatar-animation {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.peer-overlap img {
+  object-fit: cover;
+}
+
+.peer-overlap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 4px solid #ffffff;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.app-shell[data-mode="connected"] .identity-cluster,
+.app-shell[data-mode="disconnecting"] .identity-cluster {
+  width: calc(var(--connected-avatar) * 1.58);
+  height: var(--connected-avatar);
+  --state-ring: var(--green);
+  --state-ring-soft: color-mix(in srgb, var(--green) 28%, transparent);
+}
+
+.app-shell[data-mode="disconnecting"] .identity-cluster {
+  --state-ring: #ff5b6b;
+  --state-ring-soft: color-mix(in srgb, #ff5b6b 28%, transparent);
+  animation: disconnectClusterOut 880ms var(--ease-standard) forwards;
+}
+
+.app-shell[data-mode="connected"][data-transfer-state="transferring"] .identity-cluster,
+.app-shell[data-mode="disconnecting"][data-transfer-state="transferring"] .identity-cluster {
+  --state-ring: var(--blue);
+  --state-ring-soft: color-mix(in srgb, var(--blue) 34%, transparent);
+}
+
+.app-shell[data-mode="connected"] .avatar--self,
+.app-shell[data-mode="disconnecting"] .avatar--self {
+  position: absolute;
+  left: 0;
+}
+
+.app-shell[data-mode="connected"] .avatar--self::before,
+.app-shell[data-mode="connected"] .peer-overlap::before,
+.app-shell[data-mode="disconnecting"] .avatar--self::before,
+.app-shell[data-mode="disconnecting"] .peer-overlap::before {
+  border-color: var(--state-ring);
+  box-shadow:
+    0 0 0 3px var(--state-ring-soft),
+    inset 0 0 0 1px rgba(255, 255, 255, .78);
+  animation: connectedRingPulse 2.4s var(--ease-standard) infinite;
+}
+
+.app-shell[data-mode="connected"] .peer-overlap::before,
+.app-shell[data-mode="disconnecting"] .peer-overlap::before {
+  animation-delay: .24s;
+}
+
+.app-shell[data-mode="connected"][data-transfer-state="transferring"] .avatar--self::before,
+.app-shell[data-mode="connected"][data-transfer-state="transferring"] .peer-overlap::before,
+.app-shell[data-mode="disconnecting"][data-transfer-state="transferring"] .avatar--self::before,
+.app-shell[data-mode="disconnecting"][data-transfer-state="transferring"] .peer-overlap::before {
+  animation-name: transferRingPulse;
+  animation-duration: 1.35s;
+}
+
+.avatar-animation {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: inherit;
+  isolation: isolate;
+}
+
+.avatar-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  animation: avatarFrameFade 36s ease-in-out infinite;
+  animation-delay: calc(var(--avatar-frame-delay, 0s) + var(--avatar-stagger, 0s));
+  will-change: opacity;
+}
+
+.app-shell[data-motion="paused"] .peer-node,
+.app-shell[data-motion="paused"] .orbit-ring,
+.app-shell[data-motion="paused"] .avatar-frame,
+.app-shell[data-motion="paused"] .avatar--self::before,
+.app-shell[data-motion="paused"] .peer-overlap::before,
+.app-shell[data-sheet-open="true"] .peer-node,
+.app-shell[data-sheet-open="true"] .orbit-ring,
+.orbit-scene:focus-within .peer-node,
+.orbit-scene:focus-within .orbit-ring {
+  animation-play-state: paused;
+}
+
+@keyframes orbitSpin {
+  from {
+    transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(var(--radius) * -1)) rotate(calc(var(--angle) * -1));
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(calc(var(--angle) + 360deg)) translateY(calc(var(--radius) * -1)) rotate(calc((var(--angle) + 360deg) * -1));
+  }
+}
+
+@keyframes ringDrift {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes avatarFrameFade {
+  0%,
+  11% {
+    opacity: 1;
+  }
+  16.667%,
+  95% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes disconnectClusterOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    filter: saturate(1) blur(0);
+  }
+  46% {
+    opacity: .9;
+    transform: scale(.97);
+    filter: saturate(.94) blur(.2px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(.84) translateY(6px);
+    filter: saturate(.65) blur(4px);
+  }
+}
+
+@keyframes connectedRingPulse {
+  0%,
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+  50% {
+    filter: brightness(1.08);
+    transform: scale(1.035);
+  }
+}
+
+@keyframes transferRingPulse {
+  0%,
+  100% {
+    border-color: var(--state-ring);
+    box-shadow:
+      0 0 0 2px var(--state-ring-soft),
+      0 0 0 0 color-mix(in srgb, var(--state-ring) 0%, transparent),
+      inset 0 0 0 1px rgba(255, 255, 255, .78);
+  }
+  50% {
+    border-color: color-mix(in srgb, var(--state-ring) 72%, #ffffff);
+    box-shadow:
+      0 0 0 4px var(--state-ring-soft),
+      0 0 0 8px color-mix(in srgb, var(--state-ring) 16%, transparent),
+      inset 0 0 0 1px rgba(255, 255, 255, .78);
+  }
+}
