@@ -143,9 +143,9 @@
   flex: 0 0 52px;
   width: 52px;
   height: 52px;
-  border: 4px solid var(--panel-solid);
+  border: 4px solid #ffffff;
   border-radius: 50%;
-  background: var(--panel-solid);
+  background: #ffffff;
   box-shadow: 0 9px 22px color-mix(in srgb, var(--ink) 11%, transparent);
 }
 
@@ -172,9 +172,9 @@
   width: 50px;
   height: 50px;
   margin-left: -5px;
-  border: 4px solid var(--panel-solid);
+  border: 4px solid #ffffff;
   border-radius: 50%;
-  background: var(--avatar-bg, #d8d1ff);
+  background: #ffffff;
   box-shadow: 0 10px 24px color-mix(in srgb, var(--ink) 10%, transparent);
 }
 
@@ -191,10 +191,10 @@
 .friend-strip > span:not(.avatar-animation) {
   display: grid;
   place-items: center;
-  color: var(--ink);
+  color: #202124;
   font-size: 24px;
   font-weight: 300;
-  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  background: #ffffff;
 }
 
 .sheet-actions {

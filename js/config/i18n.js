@@ -128,15 +128,14 @@ const MESSAGES = {
     qrScanStatus: "Open the camera to verify this nearby connection.",
     startCamera: "Start camera",
     cameraRequest: "Requesting camera access",
-    cameraUnavailable: "Camera unavailable. Cancel and use sound + motion.",
+    cameraUnavailable: "Camera unavailable. Cancel and try again.",
     qrLooking: "Looking for the secure WebDrop code",
     qrDetectorUnavailable: "QR scanning is unavailable in this browser.",
     qrConnected: "Nearby connection verified",
     qrInvalid: "That code was not valid. Try scanning again.",
     qrCancelled: "QR verification cancelled.",
     signalingLost: "The signaling connection was interrupted. Reconnecting...",
-    connectionRejected: "The nearby connection could not be confirmed.",
-    useSoundMotion: "Use sound + motion"
+    connectionRejected: "The nearby connection could not be confirmed."
   },
   ja: {
     appStatus: "アプリの状態",
@@ -267,15 +266,14 @@ const MESSAGES = {
     qrScanStatus: "カメラを開いて近くの接続を確認します。",
     startCamera: "カメラを起動",
     cameraRequest: "カメラの許可を確認中",
-    cameraUnavailable: "カメラを利用できません。キャンセルして音と動きを使用してください。",
+    cameraUnavailable: "カメラを利用できません。キャンセルしてもう一度お試しください。",
     qrLooking: "安全なWebDropコードを検索中",
     qrDetectorUnavailable: "このブラウザではQR読み取りを利用できません。",
     qrConnected: "近くの接続を確認しました",
     qrInvalid: "このコードは無効です。もう一度読み取ってください。",
     qrCancelled: "QR確認をキャンセルしました。",
     signalingLost: "シグナリング接続が中断されました。再接続しています...",
-    connectionRejected: "近くの接続を確認できませんでした。",
-    useSoundMotion: "音と動きを使用"
+    connectionRejected: "近くの接続を確認できませんでした。"
   }
 };
 

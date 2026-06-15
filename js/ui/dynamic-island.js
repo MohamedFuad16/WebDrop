@@ -16,7 +16,6 @@ export class DynamicIsland extends Emitter {
       title: this.root?.querySelector("[data-island-qr-title]"),
       status: this.root?.querySelector("[data-island-qr-status]"),
       camera: this.root?.querySelector("[data-island-camera]"),
-      fallback: this.root?.querySelector("[data-island-fallback]"),
       cancel: this.root?.querySelector("[data-island-cancel]"),
       scanner: this.root?.querySelector("[data-island-scanner]"),
       canvas: this.root?.querySelector("[data-island-qr-canvas]"),
@@ -41,7 +40,6 @@ export class DynamicIsland extends Emitter {
     this.copyKeys = { title: null, status: null };
     this.backgroundNodes = [...document.querySelectorAll(".topbar, .main-stage, .connection-tray, [data-backdrop], [data-sheet]")];
     this.nodes.camera?.addEventListener("click", () => this.startCamera());
-    this.nodes.fallback?.addEventListener("click", () => this.emit("fallback"));
     this.nodes.cancel?.addEventListener("click", () => this.emit("cancel"));
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && this.state.startsWith("qr-")) {
@@ -261,7 +259,6 @@ export class DynamicIsland extends Emitter {
       this.nodes.status.textContent = this.translate(this.copyKeys.status);
     }
     if (this.nodes.camera) this.nodes.camera.textContent = this.translate("startCamera");
-    if (this.nodes.fallback) this.nodes.fallback.textContent = this.translate("useSoundMotion");
   }
 
   renderPeople(self, peer) {

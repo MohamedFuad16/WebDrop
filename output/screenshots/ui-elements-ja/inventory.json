@@ -159,7 +159,7 @@
     "name": "settings-app-version",
     "file": "settings-app-version.png",
     "label": "App version",
-    "description": "Shows the current prototype version, 1.0.9, at the bottom of Settings."
+    "description": "Shows the current prototype version, 1.0.10, at the bottom of Settings."
   },
   {
     "name": "app-information-sheet",

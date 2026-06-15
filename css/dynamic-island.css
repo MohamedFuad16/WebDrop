@@ -52,7 +52,7 @@
     height 580ms var(--ease-out),
     border-radius 580ms var(--ease-out),
     border-color 260ms ease 120ms,
-    opacity 180ms ease 360ms,
+    opacity 220ms ease 80ms,
     transform 580ms var(--ease-out);
   pointer-events: none;
 }
@@ -99,6 +99,7 @@
   color: rgba(255, 255, 255, .72);
   background: rgba(255, 255, 255, .09);
   cursor: pointer;
+  transition: opacity 120ms ease, transform 180ms var(--ease-out);
 }
 
 .webdrop-island__cancel svg {
@@ -111,6 +112,20 @@
 
 .webdrop-island[data-state="connected"] .webdrop-island__cancel {
   display: none;
+}
+
+.webdrop-island[data-state="closing"] .webdrop-island__pill,
+.webdrop-island[data-state="closed"] .webdrop-island__pill,
+.webdrop-island[data-state="closing"] .webdrop-island__cancel,
+.webdrop-island[data-state="closed"] .webdrop-island__cancel {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-8px) scale(.84);
+  pointer-events: none;
+}
+
+.webdrop-island[data-state="closing"] .webdrop-island__cancel,
+.webdrop-island[data-state="closed"] .webdrop-island__cancel {
+  transform: translateY(-8px) scale(.84);
 }
 
 .webdrop-island__connection {
@@ -216,7 +231,12 @@
 }
 
 .webdrop-island__qr-copy strong {
-  font-size: clamp(18px, 5vw, 25px);
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(17px, 4.4vw, 25px);
+  line-height: 1.08;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .webdrop-island__qr-copy span {
@@ -238,17 +258,7 @@
   cursor: pointer;
 }
 
-.webdrop-island__qr-copy .webdrop-island__fallback {
-  color: var(--island-ink);
-  border: 1px solid color-mix(in srgb, var(--island-ink) 16%, transparent);
-  background: transparent;
-}
-
 .webdrop-island[data-state="qr-display"] [data-island-camera] {
-  display: none;
-}
-
-.webdrop-island[data-state="qr-display"] [data-island-fallback] {
   display: none;
 }
 

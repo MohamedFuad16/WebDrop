@@ -19,7 +19,7 @@ import { getRuntimeFlags } from "../js/config/runtime-flags.js";
 test("package metadata, lockfile, and verification scripts stay in sync", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const lockJson = JSON.parse(await readFile(new URL("../package-lock.json", import.meta.url), "utf8"));
-  assert.equal(packageJson.version, "1.0.9");
+  assert.equal(packageJson.version, "1.0.10");
   assert.equal(lockJson.version, packageJson.version);
   assert.equal(lockJson.packages[""].version, packageJson.version);
   assert.deepEqual(lockJson.packages[""].dependencies, packageJson.dependencies);
@@ -47,11 +47,14 @@ test("orbit peers avoid duplicate rings and App Information exposes QR preview",
   const viewSource = await readFile(new URL("../js/ui/app-view.js", import.meta.url), "utf8");
 
   assert.match(orbitCss, /\.peer-node button[\s\S]*?background: transparent;/);
+  assert.match(orbitCss, /\.peer-node img,[\s\S]*?\.peer-node \.avatar-animation[\s\S]*?border: 3px solid #ffffff;[\s\S]*?background: #ffffff;/);
   assert.doesNotMatch(orbitCss, /\.peer-node button::before/);
   assert.match(islandCss, /\.webdrop-island\[data-state="closing"\][\s\S]*?width: 126px;[\s\S]*?height: 36px;/);
-  assert.match(islandCss, /opacity 180ms ease 360ms/);
+  assert.match(islandCss, /opacity 220ms ease 80ms/);
+  assert.match(islandCss, /\.webdrop-island\[data-state="closing"\] \.webdrop-island__pill,[\s\S]*?\.webdrop-island\[data-state="closing"\] \.webdrop-island__cancel/);
   assert.match(html, /data-action="toggle-qr-preview"/);
   assert.match(html, /role="switch"[\s\S]*?data-qr-preview-toggle/);
+  assert.doesNotMatch(html, /data-island-fallback/);
   assert.match(viewSource, /toggleQrScannerPreview\(\)/);
   assert.match(viewSource, /closeQrScannerPreview\(\)/);
 });

@@ -1,23 +1,23 @@
 {
   "/Users/mfuad16/Documents/web_drop_v2/service-worker.js": {
-    "mtime": 1781530616.8739798,
-    "hash": "e7afb62961aa8346b04a35203d19adeb"
+    "mtime": 1781532361.1091304,
+    "hash": "c7888a70ed994daafb7cc7c5dc151c2f"
   },
   "/Users/mfuad16/Documents/web_drop_v2/test/connection-choreography.test.js": {
     "mtime": 1781524155.4562726,
     "hash": "d0c9d3aad32d4ffd89348c59e0549ec2"
   },
   "/Users/mfuad16/Documents/web_drop_v2/test/production-readiness.test.js": {
-    "mtime": 1781530616.8842108,
-    "hash": "f433145f35100203451e0830a3eaefe4"
+    "mtime": 1781532376.5324066,
+    "hash": "157a17ef3c6d4a871869dc6503bf4c07"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/app.js": {
     "mtime": 1781529353.3453565,
     "hash": "54d1c707f71a9cd86ddc88d8611ee601"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/ui/dynamic-island.js": {
-    "mtime": 1781530227.602546,
-    "hash": "bce3aae2a321d8a2ad87d49e2a9962f6"
+    "mtime": 1781532455.5278363,
+    "hash": "fe16f40de05c3b401def717f45938f37"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/ui/app-view.js": {
     "mtime": 1781530227.6013072,
@@ -44,8 +44,8 @@
     "hash": "e417e700810cb1698a3d91daa07b9eed"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/config/i18n.js": {
-    "mtime": 1781530227.6006696,
-    "hash": "04c0da8e0285e882bab61628f432ec72"
+    "mtime": 1781532470.2794194,
+    "hash": "c7df44e3646dad0d76124882866b4fac"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/utils/format.js": {
     "mtime": 1781441018.4219906,
@@ -156,8 +156,8 @@
     "hash": "999a6a6643fb6bfd3b5266198738b1a0"
   },
   "/Users/mfuad16/Documents/web_drop_v2/scripts/generate-demo-pdfs.py": {
-    "mtime": 1781530616.8825338,
-    "hash": "a7aed5edffa767e8a2bcbfa02287b29a"
+    "mtime": 1781532361.1140394,
+    "hash": "90117e09d6f8befc7ebdabb0d13e8bd1"
   },
   "/Users/mfuad16/Documents/web_drop_v2/scripts/check-js.mjs": {
     "mtime": 1781524054.55451,
@@ -176,12 +176,12 @@
     "hash": "4869816aa70342a373164ef9c75b9a1f"
   },
   "/Users/mfuad16/Documents/web_drop_v2/index.html": {
-    "mtime": 1781530616.8730724,
-    "hash": "8e8535f1c44ef8412dfe1cadad96a309"
+    "mtime": 1781532361.1086714,
+    "hash": "d08b88ae427ad3eb85f37b4e554e1f33"
   },
   "/Users/mfuad16/Documents/web_drop_v2/agenthistory.md": {
-    "mtime": 1781530732.2037928,
-    "hash": "0bce5db1564dddf6375ca2eeca8d9acb"
+    "mtime": 1781532873.7168193,
+    "hash": "0d942b619f74e12bea43889738d00989"
   },
   "/Users/mfuad16/Documents/web_drop_v2/aws cloud server/README.md": {
     "mtime": 1781526606.5877647,
@@ -192,16 +192,16 @@
     "hash": "e9ff70a54fd2916bcd07491b6500bbdb"
   },
   "/Users/mfuad16/Documents/web_drop_v2/docs/engineer-guide.md": {
-    "mtime": 1781530616.8755138,
-    "hash": "f1b26b10c6f949072e1ab3956fc8f78c"
+    "mtime": 1781532361.1105778,
+    "hash": "f5e8288fbed94616492d95f4e99e1fbf"
   },
   "/Users/mfuad16/Documents/web_drop_v2/docs/architecture.md": {
-    "mtime": 1781530616.8751175,
-    "hash": "0c1afd28962b47a7bdc2eaae6e150d1b"
+    "mtime": 1781532361.1100757,
+    "hash": "d2758b9f61e9a6bb34dce142ff00fb9f"
   },
   "/Users/mfuad16/Documents/web_drop_v2/docs/webdrop-complete-guide.md": {
-    "mtime": 1781530616.8803,
-    "hash": "54344085398ccf90c4c1de7b7c115699"
+    "mtime": 1781532361.1126022,
+    "hash": "521b1f5c0c6ca84bab4d649e064d4912"
   },
   "/Users/mfuad16/Documents/web_drop_v2/docs/deployment-sizing.md": {
     "mtime": 1781526737.7929404,
@@ -212,252 +212,252 @@
     "hash": "5768d38658e12efd2e0b2d94810a5dae"
   },
   "/Users/mfuad16/Documents/web_drop_v2/docs/implementation-checklist.md": {
-    "mtime": 1781530616.8758576,
-    "hash": "bdb8557428beccdeb835e2eafdaad34d"
+    "mtime": 1781532361.111559,
+    "hash": "b7de1215a50e5aa8b81a52247df513ac"
   },
   "/Users/mfuad16/Documents/web_drop_v2/assets/diagrams/orbital-ui-state-gating.md": {
     "mtime": 1781441486.9060533,
     "hash": "487ff681fec7413b648b27f8c623cec8"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/pdf/webdrop-demo-ja.pdf": {
-    "mtime": 1781530817.4028757,
-    "hash": "6a69244cbbb3c92252a28960b0c6e0fe"
+    "mtime": 1781532792.6903677,
+    "hash": "3c3d15626412aad97f46f8ef4f26085d"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/pdf/webdrop-demo-en.pdf": {
-    "mtime": 1781530816.6314845,
-    "hash": "67836c66e9e93bf23e4a173c763e2610"
+    "mtime": 1781532791.947764,
+    "hash": "76c3751657b5084f958fd491f06271db"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/receive-sheet.png": {
-    "mtime": 1781530770.3893921,
+    "mtime": 1781532752.8006153,
     "hash": "c8d1566fee8ece33eb279b8de737df34"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/dock-send-icon.png": {
-    "mtime": 1781530768.6139724,
+    "mtime": 1781532750.9729376,
     "hash": "22749cf071f8610e1d12691098c25c22"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/dock-chat-icon.png": {
-    "mtime": 1781530768.6814651,
+    "mtime": 1781532751.0401902,
     "hash": "31f2568cc030b0c16a8e1dc64ea18583"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/theme-icon.png": {
-    "mtime": 1781530764.7989163,
+    "mtime": 1781532747.1228802,
     "hash": "b32672bc03f30e7e4742ec83956719e3"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/settings-profile-icons.png": {
-    "mtime": 1781530773.137038,
-    "hash": "934748ca5de11d08db5dda37131f90ac"
+    "mtime": 1781532755.4791584,
+    "hash": "5b91b5894c7358e2b7226ef5ba3634f7"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/settings-profile-ring.png": {
-    "mtime": 1781530773.1840792,
-    "hash": "65159e1a93201062c3be83c2f2f9182d"
+    "mtime": 1781532755.523029,
+    "hash": "4cb5215ab7b20665a18069b33d2c85ff"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/topbar-brand.png": {
-    "mtime": 1781530764.7336442,
+    "mtime": 1781532747.0568674,
     "hash": "d930fba67b1b5e2118e58729b0ea701d"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/settings-app-info-link.png": {
-    "mtime": 1781530773.2474794,
+    "mtime": 1781532755.5893705,
     "hash": "31496c8c8cd1bb3f811f778e8da18ca1"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/topbar-actions.png": {
-    "mtime": 1781530764.8340242,
+    "mtime": 1781532747.1567807,
     "hash": "5ee2aff986c2c57e5f9d41c3c8072f81"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/app-information-sheet.png": {
-    "mtime": 1781530774.3173857,
-    "hash": "9ae014d42a5298facaa766d929fdae48"
+    "mtime": 1781532756.6434538,
+    "hash": "f161ef74947da0b3216c61ce46944577"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/settings-device-name.png": {
-    "mtime": 1781530773.0728526,
-    "hash": "fb6f4c714bbdab80effaccb4200275e1"
+    "mtime": 1781532755.4404652,
+    "hash": "b268750b2e7d51952cead21e862f1063"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/chat-sheet.png": {
-    "mtime": 1781530771.7864978,
-    "hash": "9b3f3ecc8540676f99018160c57a7170"
+    "mtime": 1781532754.1650677,
+    "hash": "a9b91640c07e1793500c225c45366054"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/app-light.png": {
-    "mtime": 1781530764.701904,
-    "hash": "a4edb2212cfeb8fb1be053981ee14ad6"
+    "mtime": 1781532747.0119848,
+    "hash": "dc41627c92ecece6ce6f053625ab2ce2"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/topbar-brand-connected.png": {
-    "mtime": 1781530768.5375721,
+    "mtime": 1781532750.874637,
     "hash": "2df0d06c8a83fe4f3112087fa005cb39"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/app-dark.png": {
-    "mtime": 1781530774.6248212,
-    "hash": "26bbccc41afe3471195dc05ca3a2b70d"
+    "mtime": 1781532756.9140508,
+    "hash": "97cf88d917e18cb009af61e4fbe86af2"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/settings-sheet.png": {
-    "mtime": 1781530773.0327425,
-    "hash": "268174adbfc63d05a6912142cc779e9e"
+    "mtime": 1781532755.4065654,
+    "hash": "e30c5992e1041da4768cd458b334dedf"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/dock-disconnect-icon.png": {
-    "mtime": 1781530768.71485,
-    "hash": "991c6428e1f09ce8d4d968cd86a20297"
+    "mtime": 1781532751.0727303,
+    "hash": "bfc3aff58f8826c8de12d994dd74c88a"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/settings-app-version.png": {
-    "mtime": 1781530773.2832701,
-    "hash": "57ecf589eab5127878cf4dc6e9bd7f62"
+    "mtime": 1781532755.6233,
+    "hash": "69d036f7c90cbf19328d62a6a649f182"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/send-sheet-selected.png": {
-    "mtime": 1781530769.4563468,
-    "hash": "261a98c68ec0ef241615b62dc5c2e55e"
+    "mtime": 1781532751.810413,
+    "hash": "4fdb0ba51cabd8a83b4ab22f26b36807"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/orbit-empty.png": {
-    "mtime": 1781530764.9536147,
-    "hash": "27bd9f43ad2d4795f0e17afb4deb0de0"
+    "mtime": 1781532747.2739947,
+    "hash": "af7154f498ba3ecbe0e2672e7ac27f49"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/connect-sheet.png": {
-    "mtime": 1781530765.6013162,
-    "hash": "6d6beb55c6d91c7f33aed648c11740d7"
+    "mtime": 1781532747.9228964,
+    "hash": "fad0038fb6047fc80f82d823b3703e46"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/settings-icon.png": {
-    "mtime": 1781530764.7687337,
+    "mtime": 1781532747.0918345,
     "hash": "d06453bdf7671fc781bb2f0b830d7313"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/orbit-with-peers.png": {
-    "mtime": 1781530765.0984964,
-    "hash": "40ee699cf40ca9fd4dd46968493bf83b"
+    "mtime": 1781532747.4226532,
+    "hash": "37941e808412a207f66d836b55c02421"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/settings-language.png": {
-    "mtime": 1781530773.2163231,
+    "mtime": 1781532755.5569904,
     "hash": "37ef5c0891b69ead484574705f829f15"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/orbit-connected.png": {
-    "mtime": 1781530768.4867175,
-    "hash": "d174ef9f724f0d0a712ea2d7bab1e8ef"
+    "mtime": 1781532750.8361633,
+    "hash": "7a778283a1a9425f5dbc6a17bb66e53c"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/dock-actions.png": {
-    "mtime": 1781530768.5833547,
+    "mtime": 1781532750.9242117,
     "hash": "d6ac855ec82335cc1537f203d32fca19"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/dock-receive-icon.png": {
-    "mtime": 1781530768.647763,
+    "mtime": 1781532751.0059006,
     "hash": "2882cd85f26c14f4d775e69d6de3e732"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/connect-friend-strip.png": {
-    "mtime": 1781530765.647159,
-    "hash": "ec41f78b6b59c15d73f8599e8eaf3c6f"
+    "mtime": 1781532747.997079,
+    "hash": "2b49abb4e5212920ef1a54278ff3e03b"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-en/send-sheet-empty.png": {
-    "mtime": 1781530769.1981142,
-    "hash": "c1d001f50905da4a29090930750ef7de"
+    "mtime": 1781532751.5584157,
+    "hash": "dc36325caef960497a509724a569123a"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/receive-sheet.png": {
-    "mtime": 1781530798.2120192,
+    "mtime": 1781532774.7543607,
     "hash": "2fc986ea900c857e73911087b2e7d572"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/dock-send-icon.png": {
-    "mtime": 1781530796.429445,
+    "mtime": 1781532772.9884586,
     "hash": "22749cf071f8610e1d12691098c25c22"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/dock-chat-icon.png": {
-    "mtime": 1781530796.4966452,
+    "mtime": 1781532773.0538542,
     "hash": "31f2568cc030b0c16a8e1dc64ea18583"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/theme-icon.png": {
-    "mtime": 1781530792.5970333,
+    "mtime": 1781532769.1059346,
     "hash": "fee32ba45c2cffffadd0e1f10254c2b6"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/settings-profile-icons.png": {
-    "mtime": 1781530800.9303572,
-    "hash": "237a31f395961fb378776e080ecfc387"
+    "mtime": 1781532777.5697591,
+    "hash": "f986a58cb340021d4c413fb8342f76c4"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/settings-profile-ring.png": {
-    "mtime": 1781530800.968607,
-    "hash": "71a7273630266f03631b57b1957fd72b"
+    "mtime": 1781532777.606357,
+    "hash": "60828b219421be848f9149e4e063ad39"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/topbar-brand.png": {
-    "mtime": 1781530792.5301645,
+    "mtime": 1781532769.0256336,
     "hash": "be9e028b71b1d03b0948075ca8f4dd05"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/settings-app-info-link.png": {
-    "mtime": 1781530801.0466993,
+    "mtime": 1781532777.6724303,
     "hash": "34d26f962e784bf411a3c706d01fdf76"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/topbar-actions.png": {
-    "mtime": 1781530792.6301036,
+    "mtime": 1781532769.139367,
     "hash": "ff8e2b291d56c3756a87c22b84b10535"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/app-information-sheet.png": {
-    "mtime": 1781530802.100838,
-    "hash": "ba14081f4d2050179d2170916b2f4d13"
+    "mtime": 1781532778.7316651,
+    "hash": "593776c2fa46c5753ec5aaed6e870284"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/settings-device-name.png": {
-    "mtime": 1781530800.8692932,
-    "hash": "f6ed25c88ce97246c3c294ac8a5c95af"
+    "mtime": 1781532777.5108793,
+    "hash": "663af27ca39ee819d3bb822d8a1aa9ac"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/chat-sheet.png": {
-    "mtime": 1781530799.581562,
-    "hash": "22f5025975cff72886e5d78b7e8f5228"
+    "mtime": 1781532776.1696613,
+    "hash": "af258c820751bc7c270837b64c229a66"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/app-light.png": {
-    "mtime": 1781530792.497595,
-    "hash": "714b5385507fdd6b3b6f7223501519a3"
+    "mtime": 1781532768.9904685,
+    "hash": "563242099e48597c4425d6d2157047e1"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/topbar-brand-connected.png": {
-    "mtime": 1781530796.3494074,
+    "mtime": 1781532772.8963914,
     "hash": "90f45597d1c969104c67233fe5cd01d2"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/app-dark.png": {
-    "mtime": 1781530802.487611,
-    "hash": "68172b3fbdc1d5735d53fd0c7b3d0b24"
+    "mtime": 1781532779.0731366,
+    "hash": "ec07c261c5b67fe9ee04ac38e9bf3e8d"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/settings-sheet.png": {
-    "mtime": 1781530800.8125362,
-    "hash": "40a6e446e17cd4fe48f43259aaf8d54f"
+    "mtime": 1781532777.4649134,
+    "hash": "de69eca98e334ff8813d1c295a1df463"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/dock-disconnect-icon.png": {
-    "mtime": 1781530796.5292096,
+    "mtime": 1781532773.092612,
     "hash": "991c6428e1f09ce8d4d968cd86a20297"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/settings-app-version.png": {
-    "mtime": 1781530801.078287,
-    "hash": "d5fb8ff2be7cc1412920a1c4804d018e"
+    "mtime": 1781532777.7055006,
+    "hash": "3db7f85e0767a697a2810a30f7fe3bcd"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/send-sheet-selected.png": {
-    "mtime": 1781530797.2797306,
-    "hash": "3f3d56aac1f2ecabfab5d1225159e3c1"
+    "mtime": 1781532773.82561,
+    "hash": "3c28a4b59f1e2d57b1c121cc1924d2dc"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/orbit-empty.png": {
-    "mtime": 1781530792.7525299,
-    "hash": "65b0b3c9e3b4a0a14b7c27113054498a"
+    "mtime": 1781532769.2606459,
+    "hash": "af7154f498ba3ecbe0e2672e7ac27f49"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/connect-sheet.png": {
-    "mtime": 1781530793.3975375,
-    "hash": "9c01e50ee083f8d3922d1dcc94fd528c"
+    "mtime": 1781532769.9411275,
+    "hash": "4a9b8ebd5c0549754f9359870c723601"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/settings-icon.png": {
-    "mtime": 1781530792.5674937,
+    "mtime": 1781532769.0741498,
     "hash": "9d5d190921b01e18ef4abe7c76326a41"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/orbit-with-peers.png": {
-    "mtime": 1781530792.897141,
-    "hash": "19ad1412a399801287c7ec2d52aa1742"
+    "mtime": 1781532769.3985672,
+    "hash": "37941e808412a207f66d836b55c02421"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/settings-language.png": {
-    "mtime": 1781530801.0140724,
+    "mtime": 1781532777.6388648,
     "hash": "d848228f83c0b84d78b65bbc9237d5bc"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/orbit-connected.png": {
-    "mtime": 1781530796.3004677,
-    "hash": "d40f2b2c5d86ecbdb031918e0304e1b6"
+    "mtime": 1781532772.8495755,
+    "hash": "7a778283a1a9425f5dbc6a17bb66e53c"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/dock-actions.png": {
-    "mtime": 1781530796.3980496,
+    "mtime": 1781532772.9418225,
     "hash": "f4ba2bc08f21d65c453c416707c30e64"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/dock-receive-icon.png": {
-    "mtime": 1781530796.4619858,
+    "mtime": 1781532773.0203702,
     "hash": "2e9ce702e942423ddc2ef1923e668ff8"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/connect-friend-strip.png": {
-    "mtime": 1781530793.438241,
-    "hash": "0b8e625059557f3f8a86f0b882b0913a"
+    "mtime": 1781532770.0080218,
+    "hash": "8bbf5eb9d1fbb4905c149b9689e84d86"
   },
   "/Users/mfuad16/Documents/web_drop_v2/output/screenshots/ui-elements-ja/send-sheet-empty.png": {
-    "mtime": 1781530797.017832,
-    "hash": "82cfb8ba518d474af23fec4034febc02"
+    "mtime": 1781532773.5714142,
+    "hash": "a6ca5b82b11e3ce06212d84e4310cd77"
   },
   "/Users/mfuad16/Documents/web_drop_v2/assets/screenshots/reference-web-drop-lyart-home.png": {
     "mtime": 1781440754.8572464,
@@ -1016,27 +1016,27 @@
     "hash": "cd4a537674bbf2b55aaf43cfb1ec1df2"
   },
   "/Users/mfuad16/Documents/web_drop_v2/tmp/pdf-assets/dock-send-icon.png": {
-    "mtime": 1781530817.067235,
+    "mtime": 1781532792.3626916,
     "hash": "a8fbc03612d62d0d9c6ffc9efab7d296"
   },
   "/Users/mfuad16/Documents/web_drop_v2/tmp/pdf-assets/dock-chat-icon.png": {
-    "mtime": 1781530817.080597,
+    "mtime": 1781532792.3757894,
     "hash": "f9401e1aa3d5b85a0d3cb2d47ea32b66"
   },
   "/Users/mfuad16/Documents/web_drop_v2/tmp/pdf-assets/theme-icon.png": {
-    "mtime": 1781530816.756621,
+    "mtime": 1781532792.0671732,
     "hash": "c8649e94c3c2cc12c2471df83ddff240"
   },
   "/Users/mfuad16/Documents/web_drop_v2/tmp/pdf-assets/dock-disconnect-icon.png": {
-    "mtime": 1781530817.0876024,
+    "mtime": 1781532792.3826916,
     "hash": "bf0b5bfafd6279625bc64c27c328499c"
   },
   "/Users/mfuad16/Documents/web_drop_v2/tmp/pdf-assets/settings-icon.png": {
-    "mtime": 1781530816.7538335,
+    "mtime": 1781532792.064541,
     "hash": "89ad7634f12f4dfb1b2435a3b51bdfdd"
   },
   "/Users/mfuad16/Documents/web_drop_v2/tmp/pdf-assets/dock-receive-icon.png": {
-    "mtime": 1781530817.074407,
+    "mtime": 1781532792.3697164,
     "hash": "988aa02220a2b104db9f52a8118092aa"
   }
 }

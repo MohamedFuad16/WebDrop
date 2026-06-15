@@ -557,3 +557,29 @@ Rendered evidence:
 - App Information shows the QR scanner preview switch and the preview opens without requesting camera permission.
 - Closing geometry reduced continuously from the expanded island to its compact pill before opacity reached zero.
 - Browser console remained clear.
+
+## 2026-06-15 Version 1.0.10 ring, QR, and island close polish
+
+Scope:
+- Restored one clean white ring on orbit peer avatars after the 1.0.9 duplicate-ring removal went too far.
+- Kept dark-mode nearby candidate and friend-strip avatar circles white so the avatars remain readable.
+- Removed the QR scanner's visible sound/motion fallback action and fallback copy from the Dynamic Island.
+- Prevented the final closing frame from showing the island pill/cancel sliver.
+
+Implementation:
+- Moved the peer ring to `.peer-node img` and `.peer-node .avatar-animation`, leaving the 44px transparent tap target unringed.
+- Forced peer-sheet candidate, friend, and plus circles to white backgrounds/borders in both themes.
+- Made the QR scanner title nowrap with ellipsis protection and removed the fallback button from the app shell.
+- Hid the Dynamic Island pill and cancel control during closing and faded the island earlier while it shrinks.
+- Incremented the app/package/service-worker/docs/generated-output version to `1.0.10`.
+
+Subagent audit:
+- CSS visual audit recommended avatar-level ring restoration, white sheet circles, and early pill/cancel hiding.
+- JS island/QR audit recommended removing the sound/motion scanner path, keeping the QR title one line, and adding close-state guards.
+- Release QA audit identified the 1.0.10 version, screenshots/PDF, and final verification checklist.
+
+Rendered evidence:
+- Mobile QA at 393x852 confirmed peer avatar border `3px rgb(255, 255, 255)`, no `.peer-node button::before`, and zero horizontal overflow.
+- Dark-mode nearby candidate sheet confirmed candidate, friend, and plus circles all render with white backgrounds and borders.
+- QR scanner preview confirmed the title is one line, the fallback element/text is absent, and only Start camera is shown.
+- Dynamic Island close samples confirmed pill and cancel opacity are zero during the closing shrink.

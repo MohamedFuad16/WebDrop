@@ -144,12 +144,15 @@
 .peer-node .avatar-animation {
   width: var(--peer-avatar);
   height: var(--peer-avatar);
+  box-sizing: border-box;
+  border: 3px solid #ffffff;
   border-radius: inherit;
+  background: #ffffff;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--ink) 15%, transparent);
 }
 
 .peer-node img {
   object-fit: cover;
-  filter: drop-shadow(0 8px 12px color-mix(in srgb, var(--ink) 16%, transparent));
 }
 
 .peer-node > span {
