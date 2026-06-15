@@ -14,3 +14,4 @@ build/
 temp/
 tmp/
 node_modules/
+graphify-out/cache/ast/*.json

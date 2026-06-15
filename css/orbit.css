@@ -2,6 +2,7 @@
   position: relative;
   --orbit-size: min(92vw, calc(100dvh - 178px), 560px);
   --peer-avatar: clamp(32px, 9vw, 42px);
+  --peer-hit-target: max(var(--peer-avatar), 44px);
   --connected-avatar: clamp(70px, 20vw, 84px);
   width: var(--orbit-size);
   height: var(--orbit-size);
@@ -13,6 +14,9 @@
 .app-shell[data-mode="connected"] .orbit-scene,
 .app-shell[data-mode="disconnecting"] .orbit-scene {
   --connected-avatar: clamp(60px, 17vw, 74px);
+  --connected-ring-two-size: calc((var(--orbit-size) * .6) + (var(--connected-avatar) * .7334));
+  --connected-ring-three-size: calc((var(--orbit-size) * .3) + (var(--connected-avatar) * 1.4667));
+  --connected-ring-four-size: calc(var(--connected-avatar) * 2.2);
 }
 
 .orbit-ring {
@@ -76,10 +80,22 @@
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--blue) 12%, transparent));
 }
 
+.app-shell[data-mode="connected"] .orbit-ring--two,
+.app-shell[data-mode="disconnecting"] .orbit-ring--two {
+  width: var(--connected-ring-two-size);
+  height: var(--connected-ring-two-size);
+}
+
+.app-shell[data-mode="connected"] .orbit-ring--three,
+.app-shell[data-mode="disconnecting"] .orbit-ring--three {
+  width: var(--connected-ring-three-size);
+  height: var(--connected-ring-three-size);
+}
+
 .app-shell[data-mode="connected"] .orbit-ring--four,
 .app-shell[data-mode="disconnecting"] .orbit-ring--four {
-  width: 37%;
-  height: 37%;
+  width: var(--connected-ring-four-size);
+  height: var(--connected-ring-four-size);
   opacity: .9;
 }
 
@@ -98,8 +114,8 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: var(--peer-avatar);
-  height: var(--peer-avatar);
+  width: var(--peer-hit-target);
+  height: var(--peer-hit-target);
   transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(var(--radius) * -1)) rotate(calc(var(--angle) * -1));
   animation: orbitSpin var(--orbit-duration, 46s) linear infinite;
   animation-delay: var(--orbit-delay, 0s);
@@ -109,8 +125,8 @@
 
 .peer-node button {
   position: relative;
-  width: var(--peer-avatar);
-  height: var(--peer-avatar);
+  width: var(--peer-hit-target);
+  height: var(--peer-hit-target);
   display: grid;
   place-items: center;
   padding: 2px;
@@ -136,8 +152,8 @@
 
 .peer-node img,
 .peer-node .avatar-animation {
-  width: 100%;
-  height: 100%;
+  width: var(--peer-avatar);
+  height: var(--peer-avatar);
   border-radius: inherit;
 }
 

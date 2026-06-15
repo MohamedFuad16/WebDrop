@@ -72,7 +72,11 @@ export function createController({
   });
 
   view.on("peer-select", (peerId) => {
-    const { connectedPeerId } = store.getState();
+    const { connectedPeerId, mode } = store.getState();
+    if (mode === "verifying" || mode === "disconnecting") {
+      view.toast(view.translate(mode === "verifying" ? "verifying" : "disconnecting"));
+      return;
+    }
     if (connectedPeerId) {
       const connectedPeer = findPeer(connectedPeerId);
       view.toast(
@@ -90,33 +94,42 @@ export function createController({
 
   view.on("swipe-connect", async () => {
     if (!activePeerId) return;
-    const currentPeerId = store.getState().connectedPeerId;
+    const initialState = store.getState();
+    if (initialState.mode === "verifying") return;
+    const currentPeerId = initialState.connectedPeerId;
     if (currentPeerId && currentPeerId !== activePeerId) {
       view.closePeerSheet();
       view.toast(view.translate("oneConnection"));
       return;
     }
-    const peer = findPeer(activePeerId);
-    store.patch({ mode: "verifying", pendingInviteId: activePeerId });
+    if (currentPeerId === activePeerId) return;
+    const peerId = activePeerId;
+    const peer = findPeer(peerId);
+    store.patch({ mode: "verifying", pendingInviteId: peerId });
     view.closePeerSheet();
     const result = await proximity.runCeremony({ peer, capabilities: store.getState().capabilities });
-    await signaling.sendProximityTelemetry(activePeerId, result.metrics);
+    if (!isCurrentVerification(peerId)) return;
+    await signaling.sendProximityTelemetry(peerId, result.metrics);
+    if (!isCurrentVerification(peerId)) return;
     if (!result.passed) {
       store.patch({ mode: "lobby", pendingInviteId: null });
       view.toast(view.translate("qrFallback"));
       return;
     }
-    const path = await transport.preflight(activePeerId);
+    const path = await transport.preflight(peerId);
+    if (!isCurrentVerification(peerId)) return;
     store.patch({
       mode: "connected",
-      connectedPeerId: activePeerId,
+      connectedPeerId: peerId,
+      pendingInviteId: null,
       path,
       receivedCount: 1,
       receivedItems: demoPdfItems(),
       peers: store.getState().peers.map((candidate) =>
-        candidate.id === activePeerId ? { ...candidate, stage: "near" } : candidate
+        candidate.id === peerId ? { ...candidate, stage: "near" } : candidate
       )
     });
+    view.pulseConnectionHaptic();
   });
 
   view.on("choose-files", () => view.openFilePicker());
@@ -203,6 +216,7 @@ export function createController({
   view.on("disconnect", async () => {
     const current = store.getState();
     if (!current.connectedPeerId || current.mode === "disconnecting") return;
+    view.pulseDisconnectHaptic();
     store.patch({ mode: "disconnecting", transfer: null });
     view.closeAllSheets();
     view.toast(view.translate("disconnecting"));
@@ -231,6 +245,11 @@ export function createController({
 
   function findPeer(peerId) {
     return store.getState().peers.find((peer) => peer.id === peerId);
+  }
+
+  function isCurrentVerification(peerId) {
+    const state = store.getState();
+    return state.mode === "verifying" && state.pendingInviteId === peerId;
   }
 
   function setTheme(theme) {

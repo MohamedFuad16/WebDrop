@@ -91,11 +91,22 @@
                   <path d="M8.5 9.5h7M8.5 12.4h4.8"></path>
                 </svg>
               </button>
-              <button class="dock-button dock-button--disconnect" type="button" data-action="disconnect" aria-label="Disconnect" data-i18n-aria="disconnectPeer">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M8.2 8.2 4.9 4.9M15.8 15.8l3.3 3.3M9.1 14.9l-1.5 1.5a3.7 3.7 0 0 1-5.2-5.2l2.2-2.2M14.9 9.1l1.5-1.5a3.7 3.7 0 0 1 5.2 5.2l-2.2 2.2M8.2 15.8 15.8 8.2"></path>
-                </svg>
-              </button>
+              <span class="dock-control">
+                <button class="dock-button dock-button--disconnect" type="button" data-action="disconnect" aria-label="Disconnect" data-i18n-aria="disconnectPeer">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8.2 8.2 4.9 4.9M15.8 15.8l3.3 3.3M9.1 14.9l-1.5 1.5a3.7 3.7 0 0 1-5.2-5.2l2.2-2.2M14.9 9.1l1.5-1.5a3.7 3.7 0 0 1 5.2 5.2l-2.2 2.2M8.2 15.8 15.8 8.2"></path>
+                  </svg>
+                </button>
+                <input
+                  class="dock-haptic-switch"
+                  type="checkbox"
+                  switch
+                  tabindex="-1"
+                  aria-hidden="true"
+                  data-action="disconnect"
+                  data-disconnect-haptic
+                >
+              </span>
             </div>
           </section>
         </section>
@@ -120,6 +131,14 @@
                 <path d="M5 12h13M13 6l6 6-6 6"></path>
               </svg>
             </button>
+            <input
+              class="connect-haptic-switch"
+              type="checkbox"
+              switch
+              tabindex="-1"
+              aria-hidden="true"
+              data-connect-haptic
+            >
           </div>
           <button type="button" class="sheet-cancel" data-action="close-sheet" data-i18n="cancel">Cancel</button>
         </div>
@@ -176,7 +195,7 @@
         </button>
         <div class="app-version">
           <span data-i18n="appVersion">App version</span>
-          <strong>1.0.2</strong>
+          <strong>1.0.3</strong>
         </div>
       </section>
 

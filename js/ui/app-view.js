@@ -4,6 +4,11 @@ import { AVATAR_OPTIONS, animatedFramesForAvatar } from "../config/avatar-option
 import { translate } from "../config/i18n.js";
 
 const ORBIT_RADII = [".423", ".32", ".216"];
+const CONNECTED_ORBIT_RADII = [
+  "calc((var(--orbit-size) * .423))",
+  "calc((var(--orbit-size) * .282) + (var(--connected-avatar) * .3447))",
+  "calc((var(--orbit-size) * .141) + (var(--connected-avatar) * .6893))"
+];
 const CONNECTED_LAYOUT = [
   { ringIndex: 0, angle: -30 },
   { ringIndex: 0, angle: 150 },
@@ -30,6 +35,7 @@ export class AppView extends Emitter {
       connectionLabel: document.querySelector("[data-connection-label]"),
       tray: document.querySelector("[data-connection-tray]"),
       connectedPeer: document.querySelector("[data-connected-peer]"),
+      disconnectHaptic: document.querySelector("[data-disconnect-haptic]"),
       peerSheet: document.querySelector("[data-peer-sheet]"),
       settingsSheet: document.querySelector("[data-settings-sheet]"),
       informationSheet: document.querySelector("[data-information-sheet]"),
@@ -49,6 +55,7 @@ export class AppView extends Emitter {
       swipeControl: document.querySelector("[data-swipe-control]"),
       swipeThumb: document.querySelector("[data-swipe-thumb]"),
       swipeText: document.querySelector("[data-swipe-text]"),
+      connectHaptic: document.querySelector("[data-connect-haptic]"),
       sendSwipeControl: document.querySelector("[data-send-swipe-control]"),
       sendSwipeThumb: document.querySelector("[data-send-swipe-thumb]"),
       sendSwipeText: document.querySelector("[data-send-swipe-text]"),
@@ -62,7 +69,8 @@ export class AppView extends Emitter {
     };
     this.sheetHideTimers = new WeakMap();
     this.backdropTimer = null;
-    this.renderAvatarOptions();
+    this.avatarOptionsRendered = false;
+    this.peerRenderSignature = "";
     this.bindEvents();
     this.bindSwipeControls();
     store.subscribe((state) => this.render(state));
@@ -98,6 +106,11 @@ export class AppView extends Emitter {
       event.target.value = "";
     });
 
+    this.nodes.disconnectHaptic?.addEventListener("change", () => {
+      window.requestAnimationFrame(() => {
+        this.nodes.disconnectHaptic.checked = false;
+      });
+    });
   }
 
   bindSwipeControls() {
@@ -108,7 +121,8 @@ export class AppView extends Emitter {
       axis: "x",
       defaultText: "swipeConnect",
       completeText: "connecting",
-      eventName: "swipe-connect"
+      eventName: "swipe-connect",
+      hapticSwitch: this.nodes.connectHaptic
     });
     this.resetSendSwipe = this.bindSwipe({
       control: this.nodes.sendSwipeControl,
@@ -121,11 +135,12 @@ export class AppView extends Emitter {
     });
   }
 
-  bindSwipe({ control, thumb, text, axis, defaultText, completeText, eventName }) {
+  bindSwipe({ control, thumb, text, axis, defaultText, completeText, eventName, hapticSwitch = null }) {
     let dragging = false;
     let startPosition = 0;
     let maxDistance = 0;
     let currentDistance = 0;
+    let allowHapticToggle = false;
     const setX = (value) => {
       currentDistance = Math.max(0, Math.min(maxDistance, value));
       control.style.setProperty("--swipe-x", `${axis === "x" ? currentDistance : 0}px`);
@@ -139,7 +154,8 @@ export class AppView extends Emitter {
     const getPosition = (event) => axis === "x" ? event.clientX : event.clientY;
     const start = (event) => {
       if (!event) return;
-      event.preventDefault();
+      const startedOnHapticSwitch = event.target === hapticSwitch;
+      if (!startedOnHapticSwitch) event.preventDefault();
       dragging = true;
       control.classList.add("is-dragging");
       const controlBox = control.getBoundingClientRect();
@@ -148,7 +164,7 @@ export class AppView extends Emitter {
         ? Math.max(0, controlBox.width - thumbBox.width - 12)
         : Math.max(0, controlBox.height - thumbBox.height - 12);
       const position = getPosition(event);
-      if (event.target !== thumb) {
+      if (event.target !== thumb && !startedOnHapticSwitch) {
         const trackDistance = axis === "x"
           ? position - controlBox.left - thumbBox.width / 2
           : controlBox.bottom - position - thumbBox.height / 2;
@@ -156,7 +172,7 @@ export class AppView extends Emitter {
       }
       startPosition = position - (axis === "x" ? currentDistance : -currentDistance);
       try {
-        control.setPointerCapture?.(event.pointerId);
+        (startedOnHapticSwitch ? hapticSwitch : control).setPointerCapture?.(event.pointerId);
       } catch {
         // Some synthetic QA gestures do not create an active pointer capture target.
       }
@@ -173,6 +189,7 @@ export class AppView extends Emitter {
       dragging = false;
       control.classList.remove("is-dragging");
       if (currentDistance >= maxDistance * .78) {
+        allowHapticToggle = true;
         control.classList.add("is-complete");
         text.textContent = this.translate(completeText);
         setX(maxDistance);
@@ -180,14 +197,37 @@ export class AppView extends Emitter {
         window.setTimeout(reset, 900);
         return;
       }
+      allowHapticToggle = false;
       reset();
     };
+    hapticSwitch?.addEventListener("click", (event) => {
+      if (!allowHapticToggle) event.preventDefault();
+      allowHapticToggle = false;
+    });
+    hapticSwitch?.addEventListener("change", () => {
+      window.requestAnimationFrame(() => {
+        hapticSwitch.checked = false;
+      });
+    });
     control.addEventListener("pointerdown", start);
     control.addEventListener("pointermove", move);
     control.addEventListener("pointerup", end);
     control.addEventListener("pointercancel", end);
     control.addEventListener("lostpointercapture", end);
     return reset;
+  }
+
+  pulseConnectionHaptic() {
+    return this.pulseHaptic(28);
+  }
+
+  pulseDisconnectHaptic() {
+    return this.pulseHaptic(34);
+  }
+
+  pulseHaptic(duration) {
+    if (typeof navigator.vibrate !== "function") return false;
+    return navigator.vibrate(duration);
   }
 
   render(state) {
@@ -261,12 +301,29 @@ export class AppView extends Emitter {
     const orbitPeers = state.connectedPeerId
       ? state.peers.filter((peer) => peer.id !== state.connectedPeerId)
       : state.peers;
+    const signature = [
+      state.connectedPeerId || "",
+      state.mode,
+      state.locale || "en",
+      state.motionPaused ? "paused" : "on",
+      ...orbitPeers.map((peer, index) => {
+        const stage = normalizedPeerStage(peer, state);
+        const layout = state.connectedPeerId
+          ? CONNECTED_LAYOUT[index % CONNECTED_LAYOUT.length]
+          : peerOrbitLayout(peer, index);
+        return `${peer.id}:${peer.name}:${peer.avatar}:${stage}:${layout.ringIndex}:${layout.angle}`;
+      })
+    ].join("|");
+    if (signature === this.peerRenderSignature) return;
+    this.peerRenderSignature = signature;
     this.nodes.peerOrbits.innerHTML = orbitPeers.map((peer, index) => {
       const stage = normalizedPeerStage(peer, state);
       const layout = state.connectedPeerId
         ? CONNECTED_LAYOUT[index % CONNECTED_LAYOUT.length]
         : peerOrbitLayout(peer, index);
-      const radius = `calc(var(--orbit-size) * ${ORBIT_RADII[layout.ringIndex]})`;
+      const radius = state.connectedPeerId
+        ? CONNECTED_ORBIT_RADII[layout.ringIndex]
+        : `calc(var(--orbit-size) * ${ORBIT_RADII[layout.ringIndex]})`;
       const duration = 58 + layout.ringIndex * 6;
       const peerId = escapeHtml(String(peer.id || ""));
       const peerName = escapeHtml(String(peer.name || ""));
@@ -299,6 +356,13 @@ export class AppView extends Emitter {
         ${animatedAvatarMarkup(avatar, index)}
       </button>
     `).join("");
+  }
+
+  ensureAvatarOptions() {
+    if (this.avatarOptionsRendered) return;
+    this.renderAvatarOptions();
+    this.avatarOptionsRendered = true;
+    if (this.currentState) this.renderAvatarSettings(this.currentState);
   }
 
   renderAvatarSettings(state) {
@@ -438,6 +502,7 @@ export class AppView extends Emitter {
   }
 
   openSettings() {
+    this.ensureAvatarOptions();
     this.showSheet(this.nodes.settingsSheet);
   }
 
@@ -454,6 +519,7 @@ export class AppView extends Emitter {
   }
 
   backToSettings() {
+    this.ensureAvatarOptions();
     this.hideSheet(
       this.nodes.informationSheet,
       () => this.showSheet(this.nodes.settingsSheet),

@@ -342,6 +342,28 @@
   will-change: transform;
 }
 
+.connect-haptic-switch {
+  position: absolute;
+  z-index: 3;
+  left: 6px;
+  top: 6px;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  opacity: 0;
+  cursor: grab;
+  appearance: auto;
+  -webkit-appearance: auto;
+  clip-path: inset(0 round 17px);
+  transform: translate3d(var(--swipe-x, 0px), var(--swipe-y, 0px), 0);
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.swipe-control.is-dragging .connect-haptic-switch {
+  cursor: grabbing;
+}
+
 .swipe-thumb:active {
   transform: translate3d(var(--swipe-x, 0px), var(--swipe-y, 0px), 0) scale(.97);
 }

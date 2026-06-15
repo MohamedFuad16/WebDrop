@@ -255,7 +255,7 @@ Verification:
 - Connect-sheet layout and swipe separation passed at 393x852, 430x932, 412x915, and 360x800.
 - PDF screenshot capture and PDF regeneration remain pending explicit user approval.
 
-## 2026-06-15 Locale, chat, connected spacing, and 1.0.2 PDF finalization
+## 2026-06-15 Locale, chat, connected spacing, and 1.0.3 PDF finalization
 
 Scope:
 - Followed graph-first navigation first. The graph index remained stale/unrelated, so reads stayed scoped to the known WebDrop app shell, controller, view, locale config, orbit/chat CSS, screenshot capture, PDF generator, and service worker.
@@ -263,7 +263,7 @@ Scope:
 
 Implementation:
 - Fixed the vertical swipe-to-send rail so the thumb no longer overlaps the text after a file is selected.
-- Added `App version` / `1.0.2` at the bottom of Settings and localized it.
+- Added `App version` / `1.0.3` at the bottom of Settings and localized it.
 - Added browser-language detection:
   - Japanese browser locale selects Japanese.
   - English browser locale selects English.
@@ -293,8 +293,8 @@ Verification:
   - Disconnect entered `disconnecting` mid-animation and returned to `lobby` after the dissolve.
   - Browser errors were zero after pointer-capture hardening.
 - PDF verification:
-  - `output/pdf/webdrop-demo-en.pdf`: 23 pages, version 1.0.2 present, overview/architecture/chat/roadmap text present.
-  - `output/pdf/webdrop-demo-ja.pdf`: 23 pages, version 1.0.2 present, overview/architecture/chat/roadmap text present.
+  - `output/pdf/webdrop-demo-en.pdf`: 23 pages, version 1.0.3 present, overview/architecture/chat/roadmap text present.
+  - `output/pdf/webdrop-demo-ja.pdf`: 23 pages, version 1.0.3 present, overview/architecture/chat/roadmap text present.
   - Poppler rendered all 46 PDF pages to PNG.
   - Independent QA agent reviewed all rendered pages and returned PASS after the final icon-crop fix.
 
@@ -321,3 +321,89 @@ Verification:
 - Rendered both PDFs to PNG pages: 23 English pages and 23 Japanese pages.
 - Confirmed the Japanese PDF embeds `SourceHanSansJP-Normal`.
 - Visually checked the Japanese contact sheet; UI screenshots are now Japanese app screens.
+
+## 2026-06-15 Connection haptic progressive enhancement
+
+Scope:
+- Inspected Project Fathom's deployed bundle and public source to verify its iOS haptic technique.
+- Traced WebDrop's existing swipe-to-connect and successful connection transition after a graph-first query returned an unrelated stale graph result.
+
+Implementation:
+- Added a real WebKit native switch control directly over the visible connect thumb while preserving the custom swipe UI.
+- Kept the switch's native appearance intact, made it transparent, and clipped its hit area to the thumb.
+- Allowed the switch to toggle only after a completed connect swipe, then reset it without firing a second interaction.
+- Added a single 28 ms `navigator.vibrate()` pulse after the connection state becomes successful on browsers that support the Vibration API.
+- Bumped the service-worker cache to `webdrop-v2-static-18` for this packet; later packets supersede it with revision `20`.
+
+Limitations:
+- Safari's switch haptic requires a direct user interaction. It cannot be fired later from script on iOS 26.5+, so the iPhone tick is attached to the user's successful confirmation swipe rather than the asynchronous WebRTC completion callback.
+- Desktop browser automation can verify touch-target geometry and state transitions, but not physical device vibration.
+
+Verification:
+- JavaScript syntax checks passed across `js/`, `workers/`, and `service-worker.js`.
+- A controller harness confirmed exactly one haptic pulse after a successful connection.
+- Browser QA at 393x852 confirmed the invisible switch and visible thumb share the same 48x48 bounds.
+- A short tap left the app in lobby mode and the switch unchecked.
+- A completed swipe reached connected mode, showed `Connected with Aki`, exposed the connected action tray, reset the switch, and produced no browser warnings or errors.
+
+## 2026-06-15 Equal connected orbit spacing and disconnect haptic
+
+Scope:
+- Rebalanced connected-mode ring geometry around the wider two-avatar Venn cluster.
+- Added direct-touch disconnect feedback and hardened connection feedback against duplicate completion events.
+- Ran local rendered QA before three independent functional, performance, and static review packets.
+
+Implementation:
+- Derived the innermost connected ring from `--connected-avatar`, then distributed the remaining rings outward at equal radial intervals.
+- Updated connected peer orbit radii to match the recalculated visible paths.
+- Added a transparent native WebKit switch over the bottom disconnect control while retaining the underlying keyboard-accessible button.
+- Added a 34 ms Vibration API fallback when disconnect begins.
+- Added a single-flight verification guard that captures the selected peer and ignores duplicate or stale connection completions.
+- Matched the disconnect haptic wrapper to the 50 px narrow-screen dock size below 380 px.
+- Bumped the service-worker cache to `webdrop-v2-static-19`; the follow-up performance/cache packet supersedes it with revision `20`.
+
+Verification:
+- `npm run check`, direct `node --check`, and `git diff --check` passed.
+- A concurrency harness confirmed three simultaneous connect events produce one ceremony and one connection pulse.
+- Duplicate disconnect events produce one disconnect pulse.
+- At 393x852, connected ring gaps measured 27.95 px, 27.95 px, and 27.96 px.
+- At 430x932, connected ring gaps measured 30.58 px, 30.59 px, and 30.59 px.
+- At 412x915, connected ring gaps measured 29.30 px, 29.30 px, and 29.31 px.
+- The innermost ring retained 16.3-17.8 px clearance around the connected cluster across those devices.
+- All remaining peer centers measured on their assigned recalculated ring paths.
+- The disconnect haptic hit area exactly matched the visible button, entered `disconnecting`, returned to `lobby`, and reset unchecked.
+
+## 2026-06-15 Version 1.0.3 spacing, haptic, cache, and audit closure
+
+Scope:
+- Continued the connected-orbit and disconnect-haptic packet, then bumped the app version for this new fix pass.
+- Ran graph-first navigation first. The MCP graph was stale, so the repo-local Graphify artifact was regenerated and verified with `graphify query`.
+- Used three independent audit lanes for functional bugs, responsive/performance, and final artifact/lint hygiene.
+
+Implementation:
+- Updated the visible app version and package metadata to `1.0.3`.
+- Regenerated English and Japanese UI screenshot inventories and both demo PDFs so all generated artifacts now show version `1.0.3`.
+- Lazy-rendered Settings avatar choices so the 48 profile animation frames are not inserted on the first screen.
+- Added a peer-render signature guard so transfer progress does not rebuild static orbit peer DOM unnecessarily.
+- Reduced the service-worker shell pre-cache to app shell assets only and moved animated avatars/PDFs to runtime caching.
+- Made runtime caching deployment-scope aware for subpath installs and skipped Range requests/partial PDF responses.
+- Increased narrow-mobile peer hit targets to 44 px while keeping the visual avatar size unchanged.
+- Blocked peer reselection while verification/disconnect is in progress, cleared stale `pendingInviteId` after connection, and preserved the single connection pulse.
+- Marked PDFs as binary for Git whitespace checks and ignored regenerated Graphify AST cache shards.
+- Removed ignored local junk files (`.DS_Store` and Python `__pycache__`).
+
+Verification:
+- `npm run check` passed.
+- `git diff --check` passed after adding PDF binary attributes.
+- Direct syntax checks passed for `service-worker.js`, `js/core/controller.js`, `js/ui/app-view.js`, `scripts/capture-ui-elements.cjs`, and `scripts/generate-demo-pdfs.py`.
+- PDF/inventory version checks confirmed `1.0.3` present and `1.0.2` absent in both PDFs and both screenshot inventories.
+- Controller race harness confirmed selecting another peer during verification leaves `selectedPeerId` and `connectedPeerId` on the original peer, clears `pendingInviteId`, and fires one connection pulse.
+- Service-worker VM probe confirmed runtime caching works at root and nested deployment scopes and skips PDF Range requests.
+- Rendered mobile QA passed at 393x852, 430x932, 412x915, and 360x800:
+  - 7 peers render on startup.
+  - Settings avatar frames are not in the startup DOM.
+  - Peer hit targets measure 44 px.
+  - Connected ring gap spread stays under 0.02 px.
+  - Connected cluster keeps visible inner-ring clearance.
+  - Disconnect produces a 34 ms haptic fallback pulse, enters `disconnecting`, returns to `lobby`, and leaves the hidden switch unchecked.
+- A persistent Pixel 8 pass reached connected mode with no console warnings or errors.
