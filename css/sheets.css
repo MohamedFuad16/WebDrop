@@ -442,6 +442,10 @@
   background: var(--panel-subtle);
 }
 
+.settings-device-name {
+  margin-top: 16px;
+}
+
 .ring-setting {
   margin-top: 10px;
 }
@@ -465,11 +469,13 @@
 }
 
 .avatar-carousel {
+  width: min(100%, 281px);
   display: flex;
   gap: 13px;
   overflow-x: auto;
-  padding: 8px 7px 12px;
-  scroll-padding-inline: 7px;
+  margin-inline: auto;
+  padding: 8px 5px 12px;
+  scroll-padding-inline: 5px;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   touch-action: pan-x;
@@ -490,7 +496,8 @@
   background: #ffffff;
   box-shadow: 0 7px 18px color-mix(in srgb, var(--ink) 9%, transparent);
   cursor: pointer;
-  scroll-snap-align: center;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 
 .avatar-carousel button::after {

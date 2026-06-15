@@ -1,5 +1,30 @@
 # Agent History
 
+## 2026-06-15 Production readiness, disabled by default
+
+Scope:
+- Used graph-first navigation, a four-packet dynamic workflow, and separate final audits for proximity, WebRTC/transfer, storage workers, and checklist coverage.
+- Removed the obsolete `gemini-code-1781434503037.md`.
+- Kept production WSS, TURN, real proximity, QR pairing, and real transfer disabled by default.
+
+Implementation:
+- Added a real explicit-gesture microphone and motion permission ceremony.
+- Added coordinated two-peer Web Audio chirp exchange, real correlation, tilt/bump capture, motion reset, and sensor cleanup.
+- Added backend `proximity:ready` / `proximity:start` coordination and verified-only enforcement before RTC, chat, path metrics, and transfer metadata.
+- Added production runtime configuration with dependency-safe flags.
+- Added offer/answer/ICE routing, one-offerer pairing roles, receiver data channels, separate control/file channels, backpressure, manifests, ACK/cancel/retry/progress, and durable completion ACK.
+- Added sender-side incremental SHA-256 and receiver worker hash/byte verification.
+- Added OPFS-first worker writes, IndexedDB fallback, capped memory fallback, quota checks, OPFS failure fallback, export, abort, and cleanup commands.
+- Added backend QR token logic, strict schemas, pairing sessions, Cloudflare TURN credential proxy, path metrics, and payload-safe observability.
+- Added `docs/production-activation.md` and `docs/implementation-checklist.md`.
+
+Verification:
+- Root `npm run check` and `npm test` passed with 10 tests.
+- AWS backend `npm run check` and `npm test` passed with 20 tests.
+- `git diff --check` passed.
+- Browser smoke passed on default desktop and 393x852 mobile viewports with seven peers, hidden pre-connection tray, working peer sheet, and no console warnings/errors.
+- External work remains: EC2 deployment, rotated TURN credentials, real WSS/TURN URLs, staged flag activation, physical-device calibration, two-browser direct/TURN transfer, and load testing.
+
 ## 2026-06-14 Documentation correction
 
 Scope:
@@ -425,3 +450,77 @@ Implementation:
 
 Verification:
 - Browser haptic probe at 393x852 confirmed connect pulses `[120]`, disconnect pulses `[120, 120]`, both hidden switches reset unchecked, connected mode is reached, disconnect returns to lobby, and console logs are clean.
+# 2026-06-15 - Dynamic Island and QR production wiring
+
+- Ported only the connection and QR scanner concepts from the standalone AI Island prototype; replay, pause, reverse, fake scan, and duplicate theme controls were intentionally excluded.
+- Added a responsive, safe-area-aware Dynamic Island surface that follows the app theme, shows both connected identities with a restrained flow animation, and closes smoothly.
+- Wired iPhone-to-iPhone QR verification to backend-issued, one-time pairing tokens using `BarcodeDetector` and explicit camera permission.
+- Exposed sanitized platform capabilities through presence so the controller can choose QR only when both peers are iPhones.
+- Fixed outgoing invite pairing to await acceptance before verification or WebRTC starts.
+- Added a receiver-ready DataChannel barrier before file chunks, extended completion verification for real transfers, and clear completed receive state.
+- Bound Cloudflare TURN credential requests to an ephemeral live signaling-session token and added configured-origin CORS handling.
+- Incremented the app version to 1.0.5.
+
+Final audit closure:
+- Fixed camera permission races, repeated camera starts, stale island close timers, QR dialog focus/dismissal, Japanese accessibility labels, safe-area emergence, short-landscape sizing, and toast stacking.
+- Added invalid QR retry instead of freezing after the first decoded code.
+- Required server confirmation before the accepting peer advances into QR or WebRTC.
+- Resolved verification waiters on peer disconnect, route failure, and signaling loss.
+- Added WebSocket reconnect with exponential backoff and a conservative UI reset when signaling disappears.
+- Required `ALLOWED_ORIGINS` in production and kept TURN access bound to an ephemeral live signaling session.
+- Refreshed active pairing TTL from WebSocket pong, notified only the disconnected peer's partner, and added regression tests.
+- Locked transfer state during hashing/preparation, consumed cancellation, moved completion timeout to the acknowledgement phase, and cleaned failed/canceled protocol entries.
+
+Final verification:
+- Root checks passed with 10/10 tests.
+- AWS server checks passed with 23/23 tests.
+- Responsive rendered QA passed at 393x852, 430x932, 412x915, 852x393 landscape, and 1280x900.
+- QR accessibility, inert background, close/reopen timing, safe-area geometry, connect/disconnect transitions, and horizontal overflow checks passed.
+- The provided Cloudflare identifier returned HTTP 404 as a TURN Key ID. The ignored local `.env` retains the demo values, but relay mode needs a valid Cloudflare TURN Key ID before deployment.
+
+## 2026-06-15 Production readiness final audit lane 6 docs/handoff
+
+Scope:
+- Followed graph-first navigation before direct reads. The MCP graph and repo-local graph references were stale or unrelated for this checkout, so reads stayed scoped to owned docs, the AWS README, and directly connected runtime/backend files needed to verify claims.
+- Owned docs lane files only: `docs/*.md`, `agenthistory.md`, `aws cloud server/README.md`, and `.workflow/production-readiness-final-audit/results/docs-handoff.md`.
+
+Documentation fixes:
+- Aligned docs with app/package/service-worker version `1.0.7`.
+- Removed stale claims that QR UI, WebRTC negotiation, transfer protocol, and receive storage are only future-only work.
+- Clarified the production boundary: the default app remains mock/disabled, while production WSS, QR, proximity, transfer, storage, and TURN paths are implemented behind runtime/deployment gates.
+- Clarified backend responsibility: WebSocket carries metadata only; file bytes stay on WebRTC `RTCDataChannel`; long-lived Cloudflare TURN credentials stay server-side.
+- Added remaining production activation work: EC2 deployment, rotated valid TURN credentials, real WSS/TURN URLs, physical-device calibration, direct/TURN transfer proof, load testing, and shared state before horizontal scaling.
+
+Evidence:
+- `package.json`, `index.html`, and `service-worker.js` report version `1.0.7`.
+- `js/config/runtime-flags.js` keeps dependent production features ineffective unless production signaling has a valid URL.
+- `js/services/webrtc-transport.js`, `js/services/data-channel-transfer-protocol.js`, and `workers/storage-worker.js` contain disabled-gated production transfer/storage implementation.
+- `aws cloud server/src/signaling-hub.js` and tests cover binary rejection, QR issue/verify, proximity enforcement gates, TURN access tokens, and routed metadata messages.
+- Verification commands passed: root `npm run check`, root `npm test` with 25 tests, AWS backend `npm run check`, AWS backend `npm test` with 26 tests, and docs-lane `git diff --check`.
+
+## 2026-06-15 Version 1.0.7 production readiness closure
+
+Scope:
+- Coordinated eight audit lanes covering HTML/accessibility, CSS/responsiveness, app UI JavaScript, transfer/storage, AWS signaling, documentation, security/tests, and rendered browser QA.
+- Rebuilt the repository Graphify artifacts after one audit lane left temporary-folder paths in the manifest.
+
+Implementation:
+- Added keyboard-safe bottom sheets with focus capture/restoration, Tab trapping, and Escape dismissal.
+- Added localized production chat delivery failure handling.
+- Aligned package, visible UI, service worker caches, screenshot catalogs, and both demo PDFs at version `1.0.7`.
+- Loaded Japanese UI text with Source Han Sans JP Normal.
+- Hardened DataChannel framing, worker storage ownership, signaling origin policy, TURN authorization, proximity reporting, and backend operational guidance.
+- Removed ignored `.DS_Store` files, obsolete generated topbar screenshots, and stale reference files.
+
+Verification:
+- Root `npm run verify`: 25/25 tests passed.
+- AWS server checks: 26/26 tests passed.
+- English and Japanese PDFs: 23 pages each, version `1.0.7`; screenshot inventories: 29 PNGs each.
+- Rendered Chrome QA passed at 360, 393, 412, 430, and 1280 px with no overflow or console errors.
+- Dynamic Island verification visibly completed before the connected Venn merge.
+- Settings focus trapping, Escape dismissal, and focus restoration passed.
+- `git diff --check` and secret audits passed.
+
+Production boundary:
+- The implementation is deployment-ready but production paths remain gated until EC2, DNS/TLS, WSS/API URLs, and server-side TURN credentials are configured.
+- Physical-device proximity calibration, two-device direct/TURN transfer proof, staged 10,000-client load testing, monitoring, and shared state for horizontal scaling remain deployment work.

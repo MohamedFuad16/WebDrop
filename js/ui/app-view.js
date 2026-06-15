@@ -2,6 +2,7 @@ import { Emitter } from "../utils/emitter.js";
 import { formatBytes } from "../utils/format.js";
 import { AVATAR_OPTIONS, animatedFramesForAvatar } from "../config/avatar-options.js";
 import { translate } from "../config/i18n.js";
+import { DynamicIsland } from "./dynamic-island.js";
 
 const ORBIT_RADII = [".423", ".32", ".216"];
 const CONNECTED_ORBIT_RADII = [
@@ -31,7 +32,6 @@ export class AppView extends Emitter {
       ringChoice: document.querySelector("[data-ring-choice]"),
       languageChoice: document.querySelector(".language-choice"),
       motionChoice: document.querySelector(".motion-choice"),
-      deviceName: document.querySelector("[data-device-name]"),
       connectionLabel: document.querySelector("[data-connection-label]"),
       tray: document.querySelector("[data-connection-tray]"),
       connectedPeer: document.querySelector("[data-connected-peer]"),
@@ -69,8 +69,13 @@ export class AppView extends Emitter {
     };
     this.sheetHideTimers = new WeakMap();
     this.backdropTimer = null;
+    this.lastFocusedBeforeSheet = null;
     this.avatarOptionsRendered = false;
     this.peerRenderSignature = "";
+    this.dynamicIsland = new DynamicIsland(document, (key, params) => this.translate(key, params));
+    this.dynamicIsland.on("detected", (token) => this.emit("island-qr-detected", token));
+    this.dynamicIsland.on("cancel", () => this.emit("island-cancel"));
+    this.dynamicIsland.on("fallback", () => this.emit("island-fallback"));
     this.bindEvents();
     this.bindSwipeControls();
     store.subscribe((state) => this.render(state));
@@ -94,6 +99,13 @@ export class AppView extends Emitter {
         this.emit(action, actionTarget.dataset.ring);
         return;
       }
+      if (action === "open-received") {
+        this.emit(action, {
+          transferId: actionTarget.dataset.transferId,
+          fileId: actionTarget.dataset.fileId
+        });
+        return;
+      }
       this.emit(action);
     });
 
@@ -110,6 +122,17 @@ export class AppView extends Emitter {
       window.requestAnimationFrame(() => {
         this.nodes.disconnectHaptic.checked = false;
       });
+    });
+
+    this.document.addEventListener("keydown", (event) => {
+      const sheet = this.visibleSheet();
+      if (!sheet) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        this.emit("close-all-sheets");
+        return;
+      }
+      if (event.key === "Tab") this.trapSheetFocus(event, sheet);
     });
   }
 
@@ -184,6 +207,15 @@ export class AppView extends Emitter {
       const delta = getPosition(event) - startPosition;
       setX(axis === "x" ? delta : -delta);
     };
+    const complete = () => {
+      allowHapticToggle = true;
+      control.classList.add("is-complete");
+      text.textContent = this.translate(completeText);
+      setX(maxDistance);
+      if (eventName === "swipe-connect") this.pulseConnectGestureHaptic();
+      this.emit(eventName);
+      window.setTimeout(reset, 900);
+    };
     const end = (event) => {
       if (!dragging) return;
       const completed = currentDistance >= maxDistance * .78;
@@ -191,13 +223,7 @@ export class AppView extends Emitter {
       dragging = false;
       control.classList.remove("is-dragging");
       if (completed) {
-        allowHapticToggle = true;
-        control.classList.add("is-complete");
-        text.textContent = this.translate(completeText);
-        setX(maxDistance);
-        if (eventName === "swipe-connect") this.pulseConnectGestureHaptic();
-        this.emit(eventName);
-        window.setTimeout(reset, 900);
+        complete();
         return;
       }
       allowHapticToggle = false;
@@ -218,6 +244,16 @@ export class AppView extends Emitter {
     control.addEventListener("pointerup", end);
     control.addEventListener("pointercancel", end);
     control.addEventListener("lostpointercapture", end);
+    thumb.addEventListener("keydown", (event) => {
+      if (!["Enter", " "].includes(event.key)) return;
+      event.preventDefault();
+      const controlBox = control.getBoundingClientRect();
+      const thumbBox = thumb.getBoundingClientRect();
+      maxDistance = axis === "x"
+        ? Math.max(0, controlBox.width - thumbBox.width - 12)
+        : Math.max(0, controlBox.height - thumbBox.height - 12);
+      complete();
+    });
     return reset;
   }
 
@@ -255,11 +291,10 @@ export class AppView extends Emitter {
     } else {
       renderAnimatedAvatar(this.nodes.selfAvatarImage, state.self.avatar, 0);
     }
-    this.nodes.deviceName.textContent = state.self.name;
     this.nodes.nameInput.value = state.self.name;
     const connectedPeer = state.peers.find((peer) => peer.id === state.connectedPeerId);
     this.nodes.connectionLabel.textContent = connectedPeer
-      ? this.translate("connectedWith", { name: connectedPeer.name.split(" ")[0] })
+      ? this.translate("connectedWith", { name: connectedPeer.name })
       : this.translate("lookingNearby");
     this.renderAvatarSettings(state);
     this.renderCapabilities(state.capabilities);
@@ -267,6 +302,35 @@ export class AppView extends Emitter {
     this.renderTray(state);
     this.renderFiles(state);
     this.renderReceiveBadge(state);
+    this.dynamicIsland.sync(state);
+  }
+
+  showIslandQrDisplay(payload) {
+    this.dynamicIsland.showQrDisplay(payload);
+  }
+
+  showIslandConnectionProgress(payload) {
+    this.dynamicIsland.showConnectionProgress(payload.self, payload.peer);
+  }
+
+  finishIslandConnectionTransition() {
+    return this.dynamicIsland.finishConnectionTransition();
+  }
+
+  showIslandQrScanner(payload) {
+    this.dynamicIsland.showQrScanner(payload);
+  }
+
+  markIslandQrSuccess() {
+    this.dynamicIsland.markSuccess();
+  }
+
+  retryIslandQrScanner() {
+    this.dynamicIsland.retryScanner();
+  }
+
+  closeDynamicIsland() {
+    this.dynamicIsland.close();
   }
 
   renderLocale(state) {
@@ -462,7 +526,7 @@ export class AppView extends Emitter {
         </div>
         ${item.url
           ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${this.translate("open")}</a>`
-          : `<button type="button">${this.translate("open")}</button>`}
+          : `<button type="button" data-action="open-received" data-transfer-id="${escapeHtml(item.transferId || "")}" data-file-id="${escapeHtml(item.id || "")}">${this.translate("open")}</button>`}
       </div>
     `).join("");
   }
@@ -508,7 +572,7 @@ export class AppView extends Emitter {
   }
 
   closePeerSheet() {
-    this.hideSheet(this.nodes.peerSheet);
+    return this.hideSheet(this.nodes.peerSheet);
   }
 
   openSettings() {
@@ -579,6 +643,9 @@ export class AppView extends Emitter {
   showSheet(sheet, onShown) {
     const existingTimer = this.sheetHideTimers.get(sheet);
     if (existingTimer) clearTimeout(existingTimer);
+    if (!this.visibleSheet() && !this.lastFocusedBeforeSheet) {
+      this.lastFocusedBeforeSheet = this.document.activeElement;
+    }
     sheet.hidden = false;
     sheet.classList.remove("is-closing");
     this.nodes.app.dataset.sheetOpen = "true";
@@ -586,34 +653,49 @@ export class AppView extends Emitter {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         sheet.classList.add("is-open");
-        if (onShown) this.afterTransition(sheet, onShown);
+        this.afterTransition(sheet, () => {
+          this.focusSheet(sheet);
+          onShown?.();
+        });
       });
     });
   }
 
   hideSheet(sheet, onHidden, { keepBackdrop = false } = {}) {
-    if (sheet.hidden) return;
-    const existingTimer = this.sheetHideTimers.get(sheet);
-    if (existingTimer) clearTimeout(existingTimer);
-    sheet.classList.remove("is-open");
-    sheet.classList.add("is-closing");
-    if (!keepBackdrop) this.hideBackdropIfIdle();
-    const finish = () => {
-      sheet.hidden = true;
-      sheet.classList.remove("is-closing");
-      this.sheetHideTimers.delete(sheet);
-      const anyVisible = [
-        this.nodes.peerSheet,
-        this.nodes.settingsSheet,
-        this.nodes.informationSheet,
-        this.nodes.sendSheet,
-        this.nodes.receiveSheet,
-        this.nodes.chatSheet
-      ].some((node) => !node.hidden);
-      this.nodes.app.dataset.sheetOpen = String(anyVisible);
-      onHidden?.();
-    };
-    this.afterTransition(sheet, finish, true);
+    return new Promise((resolve) => {
+      if (sheet.hidden) {
+        onHidden?.();
+        resolve();
+        return;
+      }
+      const existingTimer = this.sheetHideTimers.get(sheet);
+      if (existingTimer) clearTimeout(existingTimer);
+      sheet.classList.remove("is-open");
+      sheet.classList.add("is-closing");
+      if (!keepBackdrop) this.hideBackdropIfIdle();
+      const finish = () => {
+        sheet.hidden = true;
+        sheet.classList.remove("is-closing");
+        this.sheetHideTimers.delete(sheet);
+        const anyVisible = [
+          this.nodes.peerSheet,
+          this.nodes.settingsSheet,
+          this.nodes.informationSheet,
+          this.nodes.sendSheet,
+          this.nodes.receiveSheet,
+          this.nodes.chatSheet
+        ].some((node) => !node.hidden);
+        this.nodes.app.dataset.sheetOpen = String(anyVisible);
+        onHidden?.();
+        if (!keepBackdrop && !this.visibleSheet()) {
+          const restoreTarget = this.lastFocusedBeforeSheet;
+          this.lastFocusedBeforeSheet = null;
+          restoreTarget?.focus?.({ preventScroll: true });
+        }
+        resolve();
+      };
+      this.afterTransition(sheet, finish, true);
+    });
   }
 
   showBackdrop() {
@@ -657,6 +739,47 @@ export class AppView extends Emitter {
     };
     node.addEventListener("transitionend", onEnd);
     const timer = window.setTimeout(finish, closing ? 420 : 480);
+  }
+
+  visibleSheet() {
+    return [
+      this.nodes.peerSheet,
+      this.nodes.settingsSheet,
+      this.nodes.informationSheet,
+      this.nodes.sendSheet,
+      this.nodes.receiveSheet,
+      this.nodes.chatSheet
+    ].find((sheet) => !sheet.hidden && !sheet.classList.contains("is-closing")) || null;
+  }
+
+  focusableElements(sheet) {
+    return [...sheet.querySelectorAll(
+      "button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])"
+    )].filter((node) => !node.hidden && node.getAttribute("aria-hidden") !== "true");
+  }
+
+  focusSheet(sheet) {
+    const target = this.focusableElements(sheet)[0] || sheet;
+    target.focus({ preventScroll: true });
+  }
+
+  trapSheetFocus(event, sheet) {
+    const focusable = this.focusableElements(sheet);
+    if (!focusable.length) {
+      event.preventDefault();
+      sheet.focus({ preventScroll: true });
+      return;
+    }
+    const active = this.document.activeElement;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && (active === first || !sheet.contains(active))) {
+      event.preventDefault();
+      last.focus({ preventScroll: true });
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus({ preventScroll: true });
+    }
   }
 
   openFilePicker() {

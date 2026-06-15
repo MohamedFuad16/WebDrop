@@ -1,0 +1,98 @@
+const DEFAULT_WEIGHTS = Object.freeze({
+  sound: 0.34,
+  motion: 0.26,
+  bump: 0.2,
+  tilt: 0.12,
+  qr: 0.08
+});
+
+const DEFAULT_THRESHOLDS = Object.freeze({
+  verified: 0.82,
+  review: 0.62
+});
+
+export class ProximityScoreAnalyzer {
+  constructor({ enabled = false, weights = DEFAULT_WEIGHTS, thresholds = DEFAULT_THRESHOLDS } = {}) {
+    this.enabled = Boolean(enabled);
+    this.weights = normalizeWeights(weights);
+    this.thresholds = thresholds;
+  }
+
+  analyze(metrics = {}) {
+    const normalized = normalizeMetrics(metrics);
+    const score = clamp01(Object.entries(this.weights).reduce((total, [key, weight]) => {
+      return total + normalized[key] * weight;
+    }, 0));
+    return {
+      enabled: this.enabled,
+      mode: this.enabled ? "analysis" : "report-only",
+      score,
+      decision: this.classify(score),
+      confidence: confidenceFor(normalized),
+      normalized,
+      reasons: reasonsFor(normalized)
+    };
+  }
+
+  classify(score) {
+    if (!this.enabled) return "not_enforced";
+    if (score >= this.thresholds.verified) return "verified";
+    if (score >= this.thresholds.review) return "review";
+    return "insufficient";
+  }
+
+  policy() {
+    return {
+      enabled: this.enabled,
+      mode: this.enabled ? "analysis" : "report-only",
+      thresholds: this.thresholds,
+      weights: this.weights,
+      note: "Proximity scoring is prepared for backend analysis but is not an enforcement gate unless explicitly enabled."
+    };
+  }
+}
+
+export function normalizeMetrics(metrics = {}) {
+  return {
+    sound: metricValue(metrics.soundCorrelation ?? metrics.sound ?? metrics.audio),
+    motion: metricValue(metrics.motionCorrelation ?? metrics.motion),
+    bump: metricValue(metrics.bumpCorrelation ?? metrics.bump),
+    tilt: metricValue(metrics.tiltMatch ?? metrics.tilt),
+    qr: metricValue(metrics.qrMatch ?? metrics.qr)
+  };
+}
+
+function metricValue(value) {
+  if (typeof value === "boolean") return value ? 1 : 0;
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return clamp01(number);
+}
+
+function normalizeWeights(weights) {
+  const entries = Object.entries({ ...DEFAULT_WEIGHTS, ...weights });
+  const total = entries.reduce((sum, [, value]) => sum + Number(value || 0), 0) || 1;
+  return Object.fromEntries(entries.map(([key, value]) => [key, Number(value || 0) / total]));
+}
+
+function confidenceFor(metrics) {
+  const activeSignals = Object.values(metrics).filter((value) => value > 0).length;
+  if (activeSignals >= 4) return "high";
+  if (activeSignals >= 2) return "medium";
+  if (activeSignals === 1) return "low";
+  return "none";
+}
+
+function reasonsFor(metrics) {
+  const reasons = [];
+  if (metrics.sound > 0) reasons.push("sound-token");
+  if (metrics.motion > 0) reasons.push("motion-correlation");
+  if (metrics.bump > 0) reasons.push("bump-correlation");
+  if (metrics.tilt > 0) reasons.push("tilt-gesture");
+  if (metrics.qr > 0) reasons.push("qr-fallback");
+  return reasons;
+}
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}

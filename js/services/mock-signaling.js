@@ -2,8 +2,8 @@ import { Emitter } from "../utils/emitter.js";
 import { AVATAR_OPTIONS } from "../config/avatar-options.js";
 
 const MOCK_PEERS = [
-  { id: "peer-aki", name: "Aki iPhone", avatar: AVATAR_OPTIONS[1], ringIndex: 0, angle: -52 },
-  { id: "peer-ren", name: "Ren Pixel", avatar: AVATAR_OPTIONS[2], ringIndex: 1, angle: 18 },
+  { id: "peer-aki", name: "Aki iPhone", avatar: AVATAR_OPTIONS[1], ringIndex: 0, angle: -52, capabilities: { platform: { family: "ios", isIOS: true, isIPhone: true, dynamicIslandCapable: true } } },
+  { id: "peer-ren", name: "Ren Pixel", avatar: AVATAR_OPTIONS[2], ringIndex: 1, angle: 18, capabilities: { platform: { family: "android", isIOS: false, isIPhone: false } } },
   { id: "peer-mio", name: "Mio Galaxy", avatar: AVATAR_OPTIONS[3], ringIndex: 2, angle: 92 },
   { id: "peer-noa", name: "Noa Tab", avatar: AVATAR_OPTIONS[4], ringIndex: 0, angle: 68 },
   { id: "peer-sora", name: "Sora Mac", avatar: AVATAR_OPTIONS[5], ringIndex: 1, angle: 198 },
@@ -47,5 +47,25 @@ export class MockSignalingAdapter extends Emitter {
   async disconnectPeer(peerId) {
     this.emit("peers", MOCK_PEERS);
     this.emit("peerDisconnected", { peerId });
+  }
+
+  async issueQrToken(targetId, pairingId) {
+    const token = `mock-webdrop:${pairingId}:${targetId}`;
+    queueMicrotask(() => this.emit("proximity:qr:issued", { token, pairingId, expiresAt: Date.now() + 120000 }));
+    return true;
+  }
+
+  async verifyQrToken(targetId, pairingId) {
+    queueMicrotask(() => this.emit("proximity:qr:verified", {
+      valid: true,
+      pairingId,
+      verifiedAt: new Date().toISOString()
+    }));
+    return true;
+  }
+
+  async sendProximityFallback(peerId, pairingId) {
+    queueMicrotask(() => this.emit("proximity:fallback", { fromId: peerId, pairingId }));
+    return true;
   }
 }

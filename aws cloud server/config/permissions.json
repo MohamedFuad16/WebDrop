@@ -1,0 +1,21 @@
+{
+  "mode": "report-only",
+  "proximityAnalysisEnabled": false,
+  "permissions": {
+    "microphone": {
+      "required": false,
+      "futurePurpose": "Short-lived sound token correlation during proximity ceremony.",
+      "browserPermission": "microphone"
+    },
+    "deviceMotion": {
+      "required": false,
+      "futurePurpose": "Optional bump and tilt gesture correlation on supported secure-context devices.",
+      "browserPermission": "accelerometer/gyroscope"
+    },
+    "qrFallback": {
+      "required": false,
+      "futurePurpose": "Permission-light fallback when microphone or motion is unavailable.",
+      "browserPermission": "camera optional for scanning; manual code entry remains possible"
+    }
+  }
+}

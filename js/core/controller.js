@@ -7,26 +7,196 @@ export function createController({
   futureSignaling,
   proximity,
   transport,
-  transfer
+  transfer,
+  runtime = {}
 }) {
   let activePeerId = null;
+  let incomingInvite = null;
+  const pairingWaiters = new Map();
+  const proximityDecisionWaiters = new Map();
+  const proximityStartWaiters = new Map();
+  const qrIssuedWaiters = new Map();
+  const qrVerifiedWaiters = new Map();
+  let qrScanResolver = null;
+  let qrCancelResolver = null;
+  let qrFallbackResolver = null;
 
   signaling.on("connected", () => {});
+
+  signaling.on("disconnected", () => {
+    if (!runtime.productionSignaling) return;
+    transport.close?.();
+    resolveQrCancellation();
+    clearVerificationWaiters();
+    store.patch({
+      mode: "lobby",
+      connectedPeerId: null,
+      selectedPeerId: null,
+      pendingInviteId: null,
+      pairingId: null,
+      files: [],
+      transfer: null,
+      path: "unknown",
+      chatMessages: []
+    });
+    activePeerId = null;
+    incomingInvite = null;
+    view.closeDynamicIsland();
+    view.toast(view.translate("signalingLost"));
+  });
+
+  signaling.on("route:error", (payload = {}) => {
+    if (payload.targetId) {
+      pairingWaiters.get(payload.targetId)?.(null);
+      pairingWaiters.delete(payload.targetId);
+    }
+    const pairingId = store.getState().pairingId;
+    if (pairingId && payload.type?.startsWith("proximity:qr:")) {
+      qrIssuedWaiters.get(pairingId)?.(null);
+      qrIssuedWaiters.delete(pairingId);
+      qrVerifiedWaiters.get(pairingId)?.(null);
+      qrVerifiedWaiters.delete(pairingId);
+    }
+    view.toast(view.translate("connectionRejected"));
+  });
 
   signaling.on("peers", (peers) => {
     store.patch({ peers });
   });
 
-  signaling.on("inviteAccepted", ({ peerId }) => {
+  signaling.on("inviteAccepted", ({ peerId, pairingId }) => {
     const peer = findPeer(peerId);
+    if (!peer) {
+      pairingWaiters.get(peerId)?.(null);
+      pairingWaiters.delete(peerId);
+      view.toast(view.translate("connectionRejected"));
+      return;
+    }
+    const wasVerifying = store.getState().mode === "verifying";
     activePeerId = peerId;
     store.patch({
-      mode: "intent",
+      mode: wasVerifying ? "verifying" : "intent",
       selectedPeerId: peerId,
-      pendingInviteId: peerId
+      pendingInviteId: peerId,
+      pairingId: pairingId || null
     });
-    view.toast(view.translate("acceptedToast", { name: peer.name }));
+    pairingWaiters.get(peerId)?.({ peerId, pairingId });
+    pairingWaiters.delete(peerId);
+    if (runtime.realTransfer) transport.enable({ peerId, pairingId });
+    if (!wasVerifying) {
+      view.toast(view.translate("acceptedToast", { name: peer.name }));
+      view.openPeerSheet(peer, { peers: store.getState().peers });
+    }
+  });
+
+  signaling.on("invite", (payload) => {
+    const peerId = payload?.fromId;
+    const peer = store.getState().peers.find((candidate) => candidate.id === peerId) || payload?.from;
+    if (!peerId || !peer) return;
+    incomingInvite = { peerId, pairingId: payload.pairingId };
+    activePeerId = peerId;
+    store.patch({ selectedPeerId: peerId, pendingInviteId: peerId, pairingId: payload.pairingId || null });
     view.openPeerSheet(peer, { peers: store.getState().peers });
+  });
+
+  signaling.on("chat:message", (payload) => {
+    const message = payload?.payload || payload;
+    if (!message?.text) return;
+    store.update((state) => ({
+      ...state,
+      chatMessages: [
+        ...state.chatMessages,
+        { id: message.id || `remote-${Date.now()}`, author: "peer", text: message.text }
+      ]
+    }));
+  });
+
+  signaling.on("proximity:decision", (payload) => {
+    if (!payload?.pairVerified || !payload.pairingId) return;
+    proximityDecisionWaiters.get(payload.pairingId)?.(payload);
+    proximityDecisionWaiters.delete(payload.pairingId);
+  });
+
+  signaling.on("proximity:start", (payload) => {
+    if (!payload?.pairingId || !payload?.startAt) return;
+    proximityStartWaiters.get(payload.pairingId)?.(payload);
+    proximityStartWaiters.delete(payload.pairingId);
+  });
+
+  signaling.on("proximity:qr:issued", (payload) => {
+    if (!payload?.pairingId || !payload?.token) return;
+    qrIssuedWaiters.get(payload.pairingId)?.(payload);
+    qrIssuedWaiters.delete(payload.pairingId);
+  });
+
+  signaling.on("proximity:qr:verified", (payload) => {
+    if (!payload?.pairingId) return;
+    qrVerifiedWaiters.get(payload.pairingId)?.(payload);
+    qrVerifiedWaiters.delete(payload.pairingId);
+    if (payload.valid) view.markIslandQrSuccess();
+  });
+
+  signaling.on("proximity:fallback", () => {
+    qrFallbackResolver?.();
+    qrFallbackResolver = null;
+    view.closeDynamicIsland();
+  });
+
+  signaling.on("peerDisconnected", ({ peerId, pairingId } = {}) => {
+    const state = store.getState();
+    const relevantPeerId = state.connectedPeerId || state.pendingInviteId || activePeerId;
+    const relevantPairingId = state.pairingId;
+    if (!relevantPeerId && !relevantPairingId) return;
+    if (peerId && relevantPeerId && relevantPeerId !== peerId) return;
+    if (pairingId && relevantPairingId && relevantPairingId !== pairingId) return;
+    transport.close?.();
+    store.patch({
+      mode: "lobby",
+      connectedPeerId: null,
+      selectedPeerId: null,
+      pendingInviteId: null,
+      pairingId: null,
+      files: [],
+      transfer: null,
+      path: "unknown",
+      chatMessages: []
+    });
+    activePeerId = null;
+    resolveQrCancellation();
+    clearVerificationWaiters();
+    view.closeDynamicIsland();
+    view.toast(view.translate("disconnected"));
+  });
+
+  transfer.on?.("received", (result) => {
+    const receivedItems = (result.files || []).map((file) => ({
+      id: file.fileId,
+      transferId: result.sessionId,
+      name: file.name,
+      size: formatBytes(file.receivedBytes),
+      icon: file.type?.includes("pdf") ? "P" : file.type?.startsWith("image/") ? "◎" : "⌁",
+      storageBackend: file.backend,
+      sha256: file.sha256,
+      ready: true
+    }));
+    store.update((state) => ({
+      ...state,
+      receivedCount: state.receivedCount + receivedItems.length,
+      receivedItems: [...state.receivedItems, ...receivedItems],
+      transfer: null
+    }));
+  });
+
+  transfer.on?.("receive-progress", (progress) => {
+    store.patch({ transfer: { ...progress, direction: "receive" } });
+  });
+
+  transfer.on?.("failed", () => {
+    store.patch({ transfer: null });
+  });
+
+  transfer.on?.("canceled", () => {
+    store.patch({ transfer: null });
   });
 
   view.on("settings", () => view.openSettings());
@@ -40,6 +210,18 @@ export function createController({
   view.on("open-send-sheet", () => view.openSendSheet());
   view.on("open-receive-sheet", () => view.openReceiveSheet());
   view.on("open-chat-sheet", () => view.openChatSheet());
+  view.on("open-received", async ({ transferId, fileId }) => {
+    if (!runtime.realTransfer || !transferId || !fileId) return;
+    try {
+      const exported = await transfer.storage.exportFile(fileId, { sessionId: transferId });
+      if (!exported?.blob) return;
+      const url = URL.createObjectURL(exported.blob);
+      window.open(url, "_blank", "noopener");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      view.toast(view.translate("noReceived"));
+    }
+  });
   view.on("toggle-theme", () => {
     const nextTheme = store.getState().theme === "dark" ? "light" : "dark";
     setTheme(nextTheme);
@@ -87,6 +269,10 @@ export function createController({
       return;
     }
     const peer = findPeer(peerId);
+    if (!peer) {
+      view.toast(view.translate("connectionRejected"));
+      return;
+    }
     activePeerId = peerId;
     store.patch({ selectedPeerId: peerId });
     view.openPeerSheet(peer, { peers: store.getState().peers });
@@ -105,19 +291,83 @@ export function createController({
     if (currentPeerId === activePeerId) return;
     const peerId = activePeerId;
     const peer = findPeer(peerId);
+    if (!peer) {
+      activePeerId = null;
+      store.patch({ selectedPeerId: null, pendingInviteId: null });
+      return;
+    }
+    let productionInitiator = true;
+    const useQrPairing = shouldUseQrPairing(peer);
+    const permissionPromises = runtime.realProximityCeremony && !useQrPairing
+      ? {
+        microphone: proximity.requestMicrophonePermission(),
+        motion: proximity.requestMotionPermission()
+      }
+      : null;
     store.patch({ mode: "verifying", pendingInviteId: peerId });
-    view.closePeerSheet();
-    const result = await proximity.runCeremony({ peer, capabilities: store.getState().capabilities });
+    await view.closePeerSheet();
     if (!isCurrentVerification(peerId)) return;
-    await signaling.sendProximityTelemetry(peerId, result.metrics);
+    view.showIslandConnectionProgress({ self: initialState.self, peer });
+    if (runtime.productionSignaling) {
+      const pairing = await establishProductionPairing(peerId);
+      if (!pairing || !isCurrentVerification(peerId)) {
+        stopProximitySensors();
+        store.patch({ mode: "lobby", pendingInviteId: null, pairingId: null });
+        return;
+      }
+      store.patch({ pairingId: pairing.pairingId });
+      productionInitiator = pairing.initiator !== false;
+    }
+    let result;
+    try {
+      result = useQrPairing
+        ? await runQrPairing(peerId, productionInitiator)
+        : runtime.realProximityCeremony
+          ? await runRealProximityCeremony(peerId, permissionPromises)
+          : await proximity.runCeremony({ peer, capabilities: store.getState().capabilities });
+      if (result?.reason === "qr-fallback-requested" && runtime.realProximityCeremony) {
+        result = await runRealProximityCeremony(peerId, null);
+      }
+    } catch {
+      await resetFailedVerification(peerId);
+      return;
+    }
     if (!isCurrentVerification(peerId)) return;
-    if (!result.passed) {
-      store.patch({ mode: "lobby", pendingInviteId: null });
+    const pairingId = store.getState().pairingId;
+    const verifiedByQr = useQrPairing && result.reason === "qr-verified";
+    const proximityDecision = verifiedByQr
+      ? Promise.resolve({ pairVerified: result.passed })
+      : runtime.realProximityCeremony
+      ? waitForProximityDecision(pairingId, 30000)
+      : Promise.resolve({ pairVerified: true });
+    if (!verifiedByQr) {
+      await signaling.sendProximityTelemetry(peerId, result.metrics, {
+        pairingId
+      });
+    }
+    const decision = await proximityDecision;
+    if (!isCurrentVerification(peerId)) return;
+    if (!result?.passed || !decision?.pairVerified) {
+      view.closeDynamicIsland();
+      if (runtime.productionSignaling && pairingId) {
+        await signaling.disconnectPeer?.(peerId, pairingId);
+      }
+      store.patch({ mode: "lobby", pendingInviteId: null, pairingId: null });
       view.toast(view.translate("qrFallback"));
       return;
     }
-    const path = await transport.preflight(peerId);
+    let path;
+    try {
+      path = runtime.realTransfer
+        ? await connectProductionTransport(peerId, { initiator: productionInitiator })
+        : await transport.preflight(peerId);
+    } catch {
+      await resetFailedVerification(peerId);
+      return;
+    }
     if (!isCurrentVerification(peerId)) return;
+    const islandRetracted = await view.finishIslandConnectionTransition();
+    if (!islandRetracted || !isCurrentVerification(peerId)) return;
     store.patch({
       mode: "connected",
       connectedPeerId: peerId,
@@ -151,8 +401,9 @@ export function createController({
   });
 
   async function sendSelectedFiles() {
-    const { files, connectedPeerId, transfer: activeTransfer } = store.getState();
-    if (!connectedPeerId) {
+    const state = store.getState();
+    const { files, connectedPeerId, pairingId, transfer: activeTransfer } = state;
+    if (!connectedPeerId || state.mode !== "connected") {
       view.toast(view.translate("connectFirst"));
       return;
     }
@@ -161,11 +412,37 @@ export function createController({
       view.openFilePicker();
       return;
     }
-    await transfer.send(files, {
-      onProgress(progress) {
-        store.patch({ transfer: progress });
-      }
-    });
+    try {
+      store.patch({
+        transfer: {
+          direction: "send",
+          stage: "preparing",
+          ratio: 0,
+          transferredBytes: 0,
+          totalBytes: files.reduce((sum, file) => sum + file.size, 0)
+        }
+      });
+      await transfer.send(files, {
+        peerId: connectedPeerId,
+        pairingId,
+        onProgress(progress) {
+          if (!isActiveConnection(connectedPeerId, pairingId)) return;
+          store.patch({ transfer: progress });
+        }
+      });
+    } catch {
+      if (!isActiveConnection(connectedPeerId, pairingId)) return;
+      store.patch({ transfer: null });
+      view.toast(view.translate("transferFailed"));
+      return;
+    }
+    if (!isActiveConnection(connectedPeerId, pairingId)) return;
+    if (runtime.realTransfer) {
+      store.patch({ transfer: null, files: [] });
+      view.closeActionSheets();
+      view.toast(view.translate("transferComplete"));
+      return;
+    }
     const receivedItems = files.slice(0, 3).map((file) => ({
       name: file.name,
       size: formatBytes(file.size),
@@ -185,7 +462,7 @@ export function createController({
   view.on("send", sendSelectedFiles);
   view.on("swipe-send", sendSelectedFiles);
 
-  view.on("send-chat", () => {
+  view.on("send-chat", async () => {
     const message = view.takeChatMessage();
     if (!message) return;
     const peerId = store.getState().connectedPeerId;
@@ -196,6 +473,22 @@ export function createController({
         { id: crypto.randomUUID?.() || `msg-${Date.now()}`, author: "self", text: message }
       ]
     }));
+    if (runtime.productionSignaling && peerId) {
+      try {
+        const sent = await signaling.sendChatMessage?.(peerId, {
+          id: crypto.randomUUID?.() || `msg-${Date.now()}`,
+          text: message,
+          createdAt: new Date().toISOString()
+        }, {
+          pairingId: store.getState().pairingId
+        });
+        if (sent === false) throw new Error("Chat message was not accepted by signaling.");
+      } catch (error) {
+        console.warn("Chat message delivery failed.", error);
+        view.toast(view.translate("messageFailed"));
+      }
+      return;
+    }
     window.setTimeout(() => {
       const state = store.getState();
       if (!peerId || state.connectedPeerId !== peerId || state.mode !== "connected") return;
@@ -219,29 +512,333 @@ export function createController({
     view.pulseDisconnectHaptic();
     store.patch({ mode: "disconnecting", transfer: null });
     view.closeAllSheets();
+    view.closeDynamicIsland();
     view.toast(view.translate("disconnecting"));
     await wait(920);
-    transport.close?.();
-    await signaling.disconnectPeer(current.connectedPeerId);
-    store.patch({
-      mode: "lobby",
-      connectedPeerId: null,
-      selectedPeerId: null,
-      pendingInviteId: null,
-      files: [],
-      transfer: null,
-      path: "unknown",
-      receivedCount: 0,
-      receivedItems: [],
-      chatMessages: []
-    });
-    activePeerId = null;
+    try {
+      transport.close?.();
+      await signaling.disconnectPeer?.(current.connectedPeerId, current.pairingId);
+    } finally {
+      clearVerificationWaiters();
+      resolveQrCancellation();
+      store.patch({
+        mode: "lobby",
+        connectedPeerId: null,
+        selectedPeerId: null,
+        pendingInviteId: null,
+        pairingId: null,
+        files: [],
+        transfer: null,
+        path: "unknown",
+        receivedCount: 0,
+        receivedItems: [],
+        chatMessages: []
+      });
+      activePeerId = null;
+      incomingInvite = null;
+    }
     view.toast(view.translate("disconnected"));
   });
 
   view.on("qr-fallback", () => {
     view.toast(view.translate("qrInfo"));
   });
+
+  view.on("island-qr-detected", (token) => {
+    qrScanResolver?.(token);
+    qrScanResolver = null;
+  });
+
+  view.on("island-cancel", async () => {
+    const current = store.getState();
+    resolveQrCancellation();
+    view.closeDynamicIsland();
+    if (current.pendingInviteId && current.pairingId) {
+      await signaling.disconnectPeer?.(current.pendingInviteId, current.pairingId);
+    }
+    store.patch({
+      mode: "lobby",
+      selectedPeerId: null,
+      pendingInviteId: null,
+      pairingId: null
+    });
+    activePeerId = null;
+    view.toast(view.translate("qrCancelled"));
+  });
+
+  view.on("island-fallback", async () => {
+    const current = store.getState();
+    if (current.pendingInviteId && current.pairingId) {
+      await signaling.sendProximityFallback?.(current.pendingInviteId, current.pairingId);
+    }
+    qrFallbackResolver?.();
+    qrFallbackResolver = null;
+    view.closeDynamicIsland();
+  });
+
+  async function runRealProximityCeremony(peerId, permissionPromises) {
+    const microphonePromise = permissionPromises?.microphone || proximity.requestMicrophonePermission();
+    const motionPromise = permissionPromises?.motion || proximity.requestMotionPermission();
+    const [microphonePermission, motionPermission] = await Promise.all([
+      microphonePromise,
+      motionPromise
+    ]);
+    proximity.resetMotionCapture();
+    if (motionPermission.granted) proximity.startMotionCapture();
+    try {
+      const pairingId = store.getState().pairingId;
+      const startPromise = waitForProximityStart(pairingId, 30000);
+      await signaling.sendProximityReady?.(peerId, pairingId);
+      const start = await startPromise;
+      if (!start) {
+        return {
+          passed: false,
+          score: 0,
+          metrics: { peerId, ceremonyStart: "timeout" },
+          evidence: {},
+          reason: "ceremony-start-timeout"
+        };
+      }
+      const result = await proximity.runRealCeremony({
+        acoustic: microphonePermission.granted,
+        acousticRole: store.getState().self.id < peerId ? "emit" : "detect",
+        startAt: start.startAt,
+        ceremonyDurationMs: start.durationMs,
+        tokenFresh: Boolean(pairingId)
+      });
+      return {
+        ...result,
+        metrics: {
+          ...result.metrics,
+          microphonePermission: microphonePermission.reason || (microphonePermission.granted ? "granted" : "denied"),
+          motionPermission: motionPermission.reason || (motionPermission.granted ? "granted" : "denied"),
+          peerId
+        }
+      };
+    } finally {
+      stopProximitySensors();
+    }
+  }
+
+  function stopProximitySensors() {
+    proximity.stopMotionCapture();
+    proximity.stopAcousticCapture();
+  }
+
+  async function establishProductionPairing(peerId) {
+    if (incomingInvite?.peerId === peerId) {
+      const pairingId = incomingInvite.pairingId;
+      incomingInvite = null;
+      const accepted = waitForPairing(peerId, 30000);
+      await signaling.acceptInvite(peerId, pairingId);
+      const confirmation = await accepted;
+      return confirmation ? { ...confirmation, initiator: false } : null;
+    }
+    const accepted = waitForPairing(peerId, 30000);
+    await signaling.sendInvite(peerId);
+    const pairing = await accepted;
+    return pairing ? { ...pairing, initiator: true } : null;
+  }
+
+  async function runQrPairing(peerId, productionInitiator) {
+    try {
+      const state = store.getState();
+      const pairingId = state.pairingId;
+      const peer = findPeer(peerId);
+      if (!pairingId || !peer) return failedQrResult("missing-pairing");
+      const cancelled = waitForQrCancel();
+      const fallback = waitForQrFallback();
+
+      if (productionInitiator) {
+        const verified = waitForQrVerified(pairingId, 120000);
+        const issued = waitForQrIssued(pairingId, 15000);
+        await signaling.issueQrToken?.(peerId, pairingId);
+        const payload = await Promise.race([issued, cancelled, fallback]);
+        if (payload?.fallback) return failedQrResult("qr-fallback-requested");
+        if (!payload?.token) return failedQrResult("issue-failed");
+        view.showIslandQrDisplay({ self: state.self, peer, token: payload.token });
+        const result = await Promise.race([verified, cancelled, fallback]);
+        if (result?.fallback) return failedQrResult("qr-fallback-requested");
+        if (!result?.valid) return failedQrResult("verification-failed");
+      } else {
+        view.showIslandQrScanner({ self: state.self, peer });
+        while (isCurrentVerification(peerId)) {
+          const token = await Promise.race([waitForQrScan(120000), cancelled, fallback]);
+          if (token?.fallback) return failedQrResult("qr-fallback-requested");
+          if (!token) return failedQrResult("scan-cancelled");
+          const verified = waitForQrVerified(pairingId, 15000);
+          await signaling.verifyQrToken?.(peerId, pairingId, token);
+          const result = await Promise.race([verified, cancelled, fallback]);
+          if (result?.fallback) return failedQrResult("qr-fallback-requested");
+          if (result?.valid) break;
+          view.retryIslandQrScanner();
+        }
+      }
+
+      return {
+        passed: true,
+        score: 1,
+        metrics: { peerId, method: "qr", pairingId },
+        evidence: { qrVerified: true },
+        reason: "qr-verified"
+      };
+    } finally {
+      clearQrTransientWaiters();
+    }
+  }
+
+  function shouldUseQrPairing(peer) {
+    if (!runtime.qrPairing) return false;
+    const selfPlatform = store.getState().capabilities?.platform;
+    const selfCapabilities = store.getState().capabilities;
+    const peerPlatform = peer?.capabilities?.platform;
+    const peerCapabilities = peer?.capabilities;
+    return Boolean(
+      selfPlatform?.isIPhone
+      && peerPlatform?.isIPhone
+      && selfCapabilities?.camera
+      && selfCapabilities?.qrScanner
+      && peerCapabilities?.camera
+      && peerCapabilities?.qrScanner
+    );
+  }
+
+  function waitForQrIssued(pairingId, timeoutMs) {
+    return waitForMapValue(qrIssuedWaiters, pairingId, timeoutMs);
+  }
+
+  function waitForQrVerified(pairingId, timeoutMs) {
+    return waitForMapValue(qrVerifiedWaiters, pairingId, timeoutMs);
+  }
+
+  function waitForMapValue(map, key, timeoutMs) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        map.delete(key);
+        resolve(null);
+      }, timeoutMs);
+      map.set(key, (payload) => {
+        clearTimeout(timer);
+        resolve(payload);
+      });
+    });
+  }
+
+  function waitForQrScan(timeoutMs) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        qrScanResolver = null;
+        resolve(null);
+      }, timeoutMs);
+      qrScanResolver = (token) => {
+        clearTimeout(timer);
+        resolve(token);
+      };
+    });
+  }
+
+  function waitForQrCancel() {
+    return new Promise((resolve) => {
+      qrCancelResolver = () => resolve(null);
+    });
+  }
+
+  function waitForQrFallback() {
+    return new Promise((resolve) => {
+      qrFallbackResolver = () => resolve({ fallback: true });
+    });
+  }
+
+  function resolveQrCancellation() {
+    qrScanResolver?.(null);
+    qrScanResolver = null;
+    qrCancelResolver?.();
+    qrCancelResolver = null;
+    qrFallbackResolver = null;
+  }
+
+  function clearQrTransientWaiters() {
+    qrScanResolver = null;
+    qrCancelResolver = null;
+    qrFallbackResolver = null;
+  }
+
+  function clearVerificationWaiters() {
+    pairingWaiters.forEach((resolve) => resolve(null));
+    pairingWaiters.clear();
+    proximityDecisionWaiters.forEach((resolve) => resolve(null));
+    proximityDecisionWaiters.clear();
+    proximityStartWaiters.forEach((resolve) => resolve(null));
+    proximityStartWaiters.clear();
+    qrIssuedWaiters.forEach((resolve) => resolve(null));
+    qrIssuedWaiters.clear();
+    qrVerifiedWaiters.forEach((resolve) => resolve(null));
+    qrVerifiedWaiters.clear();
+  }
+
+  function failedQrResult(reason) {
+    return {
+      passed: false,
+      score: 0,
+      metrics: { method: "qr", reason },
+      evidence: {},
+      reason
+    };
+  }
+
+  function waitForPairing(peerId, timeoutMs) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        pairingWaiters.delete(peerId);
+        resolve(null);
+      }, timeoutMs);
+      pairingWaiters.set(peerId, (payload) => {
+        clearTimeout(timer);
+        resolve(payload);
+      });
+    });
+  }
+
+  function waitForProximityDecision(pairingId, timeoutMs) {
+    if (!pairingId) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        proximityDecisionWaiters.delete(pairingId);
+        resolve(null);
+      }, timeoutMs);
+      proximityDecisionWaiters.set(pairingId, (payload) => {
+        clearTimeout(timer);
+        resolve(payload);
+      });
+    });
+  }
+
+  function waitForProximityStart(pairingId, timeoutMs) {
+    if (!pairingId) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        proximityStartWaiters.delete(pairingId);
+        resolve(null);
+      }, timeoutMs);
+      proximityStartWaiters.set(pairingId, (payload) => {
+        clearTimeout(timer);
+        resolve(payload);
+      });
+    });
+  }
+
+  async function connectProductionTransport(peerId, { initiator }) {
+    const pairingId = store.getState().pairingId;
+    transport.enable({ peerId, pairingId });
+    await transport.connect(peerId, { pairingId, initiator });
+    await waitForTransportConnection(transport, 30000);
+    const stats = await transport.getPathStats();
+    await signaling.sendPathMetric?.(peerId, {
+      path: stats.path,
+      rttMs: stats.currentRoundTripTime == null ? null : stats.currentRoundTripTime * 1000
+    }, { pairingId });
+    return stats.path;
+  }
 
   function findPeer(peerId) {
     return store.getState().peers.find((peer) => peer.id === peerId);
@@ -250,6 +847,36 @@ export function createController({
   function isCurrentVerification(peerId) {
     const state = store.getState();
     return state.mode === "verifying" && state.pendingInviteId === peerId;
+  }
+
+  function isActiveConnection(peerId, pairingId) {
+    const state = store.getState();
+    return state.mode === "connected"
+      && state.connectedPeerId === peerId
+      && state.pairingId === pairingId;
+  }
+
+  async function resetFailedVerification(peerId) {
+    const { pairingId } = store.getState();
+    stopProximitySensors();
+    resolveQrCancellation();
+    clearVerificationWaiters();
+    view.closeDynamicIsland();
+    if (runtime.productionSignaling && pairingId) {
+      await signaling.disconnectPeer?.(peerId, pairingId).catch(() => {});
+    }
+    if (!isCurrentVerification(peerId)) return;
+    store.patch({
+      mode: "lobby",
+      selectedPeerId: null,
+      pendingInviteId: null,
+      pairingId: null,
+      transfer: null,
+      path: "unknown"
+    });
+    activePeerId = null;
+    incomingInvite = null;
+    view.toast(view.translate("connectionRejected"));
   }
 
   function setTheme(theme) {
@@ -289,4 +916,21 @@ function demoPdfItems() {
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function waitForTransportConnection(transport, timeoutMs) {
+  if (transport.peerConnection?.connectionState === "connected") return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    let cleanup = () => {};
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("Timed out waiting for the remote WebRTC offer."));
+    }, timeoutMs);
+    cleanup = transport.on?.("connection-state", ({ state }) => {
+      if (state !== "connected") return;
+      clearTimeout(timer);
+      cleanup();
+      resolve();
+    }) || cleanup;
+  });
 }

@@ -3,19 +3,13 @@
     "name": "app-light",
     "file": "app-light.png",
     "label": "Light home screen",
-    "description": "The main nearby-device surface in light mode, with the title, device name, four orbits, a gently animated self icon, and static orbit peers."
+    "description": "The main nearby-device surface in light mode, with the WebDrop status, four orbits, a gently animated self icon, and static orbit peers."
   },
   {
     "name": "topbar-brand",
     "file": "topbar-brand.png",
     "label": "WebDrop status pill",
     "description": "Shows the WebDrop label and nearby or connected status without exposing transfer controls too early."
-  },
-  {
-    "name": "topbar-device-name",
-    "file": "topbar-device-name.png",
-    "label": "Device name",
-    "description": "The current device name is centered in the top header, away from the orbit geometry."
   },
   {
     "name": "settings-icon",
@@ -129,7 +123,13 @@
     "name": "settings-sheet",
     "file": "settings-sheet.png",
     "label": "Settings sheet",
-    "description": "Settings hold profile, ring, device name, language, and app information."
+    "description": "Settings hold device name, profile, ring, language, app information, and version."
+  },
+  {
+    "name": "settings-device-name",
+    "file": "settings-device-name.png",
+    "label": "Device name field",
+    "description": "The device name can be edited, including clearing the final character without an unwanted reset."
   },
   {
     "name": "settings-profile-icons",
@@ -142,12 +142,6 @@
     "file": "settings-profile-ring.png",
     "label": "Profile ring selector",
     "description": "The default ring is white, with optional blue, green, purple, and rose choices."
-  },
-  {
-    "name": "settings-device-name",
-    "file": "settings-device-name.png",
-    "label": "Device name field",
-    "description": "The device name can be edited, including clearing the final character without an unwanted reset."
   },
   {
     "name": "settings-language",
@@ -165,7 +159,7 @@
     "name": "settings-app-version",
     "file": "settings-app-version.png",
     "label": "App version",
-    "description": "Shows the current prototype version, 1.0.4, at the bottom of Settings."
+    "description": "Shows the current prototype version, 1.0.7, at the bottom of Settings."
   },
   {
     "name": "app-information-sheet",

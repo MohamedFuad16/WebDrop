@@ -1,10 +1,16 @@
 {
   "name": "webdrop-v2-static",
-  "version": "1.0.4",
+  "version": "1.0.7",
   "private": true,
   "type": "module",
   "scripts": {
+    "audit:secrets": "node scripts/check-js.mjs --secrets-only",
     "check": "node scripts/check-js.mjs",
+    "test": "node --test test/*.test.js",
+    "verify": "npm run check && npm test",
     "serve": "python3 -m http.server 4178"
+  },
+  "dependencies": {
+    "qrcode-generator": "2.0.4"
   }
 }

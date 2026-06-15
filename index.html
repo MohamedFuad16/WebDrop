@@ -13,20 +13,57 @@
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/orbit.css">
     <link rel="stylesheet" href="css/connected.css">
+    <link rel="stylesheet" href="css/dynamic-island.css">
     <link rel="stylesheet" href="css/sheets.css">
     <link rel="stylesheet" href="css/responsive.css">
   </head>
   <body>
     <div id="app" class="app-shell" data-mode="lobby" data-theme="light">
+      <section class="webdrop-island" data-dynamic-island data-state="closed" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true" aria-label="Connection status" data-i18n-aria="islandStatus" tabindex="-1" inert>
+        <button class="webdrop-island__cancel" type="button" data-island-cancel aria-label="Cancel connection" data-i18n-aria="cancelConnection">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg>
+        </button>
+        <div class="webdrop-island__pill" aria-hidden="true"></div>
+        <div class="webdrop-island__content">
+          <div class="webdrop-island__connection" data-island-connection>
+            <div class="webdrop-island__person">
+              <span data-island-self-name>WebDrop</span>
+              <span class="webdrop-island__avatar" data-island-self-avatar aria-hidden="true"></span>
+            </div>
+            <div class="webdrop-island__flow" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <div class="webdrop-island__person">
+              <span data-island-peer-name>Nearby peer</span>
+              <span class="webdrop-island__avatar" data-island-peer-avatar aria-hidden="true"></span>
+            </div>
+          </div>
+          <div class="webdrop-island__qr" data-island-qr>
+            <div class="webdrop-island__qr-copy">
+              <strong data-island-qr-title>Verify nearby connection</strong>
+              <span data-island-qr-status>Preparing a secure QR code</span>
+              <button type="button" data-island-camera>Start camera</button>
+              <button class="webdrop-island__fallback" type="button" data-island-fallback>Use sound + motion</button>
+            </div>
+            <div class="webdrop-island__scanner" data-island-scanner aria-hidden="true">
+              <canvas data-island-qr-canvas width="220" height="220"></canvas>
+              <video data-island-video muted playsinline></video>
+              <span class="webdrop-island__corner corner-tl"></span>
+              <span class="webdrop-island__corner corner-tr"></span>
+              <span class="webdrop-island__corner corner-bl"></span>
+              <span class="webdrop-island__corner corner-br"></span>
+              <span class="webdrop-island__beam"></span>
+              <span class="webdrop-island__success">✓</span>
+            </div>
+          </div>
+        </div>
+      </section>
       <header class="topbar" aria-label="Application status" data-i18n-aria="appStatus">
         <div class="brand-lockup">
           <div>
             <strong>WebDrop</strong>
-            <span data-connection-label data-i18n="lookingNearby">Looking nearby</span>
+            <span data-connection-label data-i18n="lookingNearby" role="status" aria-live="polite" aria-atomic="true">Looking nearby</span>
           </div>
-        </div>
-        <div class="device-status" aria-live="polite">
-          <strong data-device-name>Mac 9D9D</strong>
         </div>
         <div class="topbar-actions">
           <button class="icon-button" type="button" data-action="settings" aria-label="Settings" data-i18n-aria="settings">
@@ -114,14 +151,14 @@
 
       <div class="sheet-backdrop" data-backdrop data-action="close-all-sheets" hidden></div>
 
-      <section class="bottom-sheet" data-peer-sheet hidden role="dialog" aria-modal="true" aria-label="Peer actions" data-i18n-aria="peerActions">
+      <section class="bottom-sheet" data-peer-sheet hidden role="dialog" aria-modal="true" aria-labelledby="peer-actions-title" aria-describedby="peer-actions-copy" aria-label="Peer actions" data-i18n-aria="peerActions" tabindex="-1">
         <span class="sheet-handle" aria-hidden="true"></span>
         <p class="sheet-kicker" data-i18n="nearbyCandidate">Nearby candidate</p>
         <div class="peer-candidate-heading">
           <span class="peer-candidate-avatar avatar-animation" data-sheet-peer-avatar aria-hidden="true"></span>
-          <h2 data-sheet-peer-name>Invite peer</h2>
+          <h2 id="peer-actions-title" data-sheet-peer-name>Invite peer</h2>
         </div>
-        <p data-sheet-copy>Swipe right to connect. File controls stay hidden until the connection is ready.</p>
+        <p id="peer-actions-copy" data-sheet-copy>Swipe right to connect. File controls stay hidden until the connection is ready.</p>
         <div class="friend-strip" data-friend-strip aria-hidden="true"></div>
         <div class="sheet-actions">
           <div class="swipe-control" data-swipe-control>
@@ -144,7 +181,7 @@
         </div>
       </section>
 
-      <section class="bottom-sheet" data-settings-sheet hidden role="dialog" aria-modal="true" aria-label="Settings" data-i18n-aria="settingsDialog">
+      <section class="bottom-sheet" data-settings-sheet hidden role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-label="Settings" data-i18n-aria="settingsDialog" tabindex="-1">
         <button class="sheet-close-icon" type="button" data-action="close-settings" aria-label="Close settings" data-i18n-aria="closeSettings">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="m6 6 12 12M18 6 6 18"></path>
@@ -152,7 +189,11 @@
         </button>
         <span class="sheet-handle" aria-hidden="true"></span>
         <p class="sheet-kicker" data-i18n="prototypeSettings">Prototype settings</p>
-        <h2>WebDrop v2</h2>
+        <h2 id="settings-title">WebDrop v2</h2>
+        <label class="field settings-device-name">
+          <span data-i18n="deviceName">Device name</span>
+          <input data-name-input type="text" value="WebDrop Device" maxlength="22" autocomplete="off" spellcheck="false">
+        </label>
         <div class="avatar-setting">
           <div class="setting-heading">
             <strong data-i18n="profileIcon">Profile icon</strong>
@@ -173,10 +214,6 @@
             <button type="button" data-action="select-ring" data-ring="#ff9cac" style="--swatch:#ff9cac" aria-label="Rose ring" data-i18n-aria="roseRing"></button>
           </div>
         </div>
-        <label class="field">
-          <span data-i18n="deviceName">Device name</span>
-          <input data-name-input type="text" value="Mac 9D9D" maxlength="22">
-        </label>
         <div class="language-setting">
           <span data-i18n="language">Language</span>
           <div class="language-choice" role="group" aria-label="Language" data-i18n-aria="languageMode">
@@ -195,11 +232,11 @@
         </button>
         <div class="app-version">
           <span data-i18n="appVersion">App version</span>
-          <strong>1.0.4</strong>
+          <strong>1.0.7</strong>
         </div>
       </section>
 
-      <section class="bottom-sheet information-sheet" data-information-sheet hidden role="dialog" aria-modal="true" aria-label="App information" data-i18n-aria="informationDialog">
+      <section class="bottom-sheet information-sheet" data-information-sheet hidden role="dialog" aria-modal="true" aria-labelledby="information-title" aria-label="App information" data-i18n-aria="informationDialog" tabindex="-1">
         <button class="sheet-back-icon" type="button" data-action="back-to-settings" aria-label="Back to settings" data-i18n-aria="backToSettings">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="m15 5-7 7 7 7"></path>
@@ -212,7 +249,7 @@
         </button>
         <span class="sheet-handle" aria-hidden="true"></span>
         <p class="sheet-kicker" data-i18n="informationKicker">About this prototype</p>
-        <h2 data-i18n="informationTitle">WebDrop details</h2>
+        <h2 id="information-title" data-i18n="informationTitle">WebDrop details</h2>
         <div class="motion-setting information-motion">
           <span data-i18n="orbitMotion">Orbit motion</span>
           <div class="motion-choice" role="group" aria-label="Orbit motion" data-i18n-aria="orbitMotion">
@@ -234,7 +271,7 @@
         </div>
       </section>
 
-      <section class="bottom-sheet action-sheet" data-send-sheet hidden role="dialog" aria-modal="true" aria-label="Send files" data-i18n-aria="sendDialog">
+      <section class="bottom-sheet action-sheet" data-send-sheet hidden role="dialog" aria-modal="true" aria-labelledby="send-title" aria-describedby="send-copy" aria-label="Send files" data-i18n-aria="sendDialog" tabindex="-1">
         <button class="sheet-close-icon" type="button" data-action="close-action-sheet" aria-label="Close send sheet" data-i18n-aria="closeSend">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="m6 6 12 12M18 6 6 18"></path>
@@ -242,8 +279,8 @@
         </button>
         <span class="sheet-handle" aria-hidden="true"></span>
         <p class="sheet-kicker" data-i18n="send">Send</p>
-        <h2 data-send-title>Select files</h2>
-        <p data-send-copy>Choose files for the connected device, then send when the list looks right.</p>
+        <h2 id="send-title" data-send-title>Select files</h2>
+        <p id="send-copy" data-send-copy>Choose files for the connected device, then send when the list looks right.</p>
         <button class="sheet-primary sheet-primary--soft" type="button" data-action="choose-files">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 3.8c0-.8.6-1.4 1.4-1.4h6.2L19 7.8v12.8c0 .8-.6 1.4-1.4 1.4H7.4c-.8 0-1.4-.6-1.4-1.4V3.8Z"></path>
@@ -269,7 +306,7 @@
         </button>
       </section>
 
-      <section class="bottom-sheet action-sheet" data-receive-sheet hidden role="dialog" aria-modal="true" aria-label="Received files" data-i18n-aria="receiveDialog">
+      <section class="bottom-sheet action-sheet" data-receive-sheet hidden role="dialog" aria-modal="true" aria-labelledby="receive-title" aria-label="Received files" data-i18n-aria="receiveDialog" tabindex="-1">
         <button class="sheet-close-icon" type="button" data-action="close-action-sheet" aria-label="Close receive sheet" data-i18n-aria="closeReceive">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="m6 6 12 12M18 6 6 18"></path>
@@ -277,11 +314,11 @@
         </button>
         <span class="sheet-handle" aria-hidden="true"></span>
         <p class="sheet-kicker" data-i18n="receive">Receive</p>
-        <h2 data-i18n="receivedFilesTitle">Received files</h2>
+        <h2 id="receive-title" data-i18n="receivedFilesTitle">Received files</h2>
         <div class="received-list" data-received-list></div>
       </section>
 
-      <section class="bottom-sheet action-sheet" data-chat-sheet hidden role="dialog" aria-modal="true" aria-label="Chat with peer" data-i18n-aria="chatDialog">
+      <section class="bottom-sheet action-sheet" data-chat-sheet hidden role="dialog" aria-modal="true" aria-labelledby="chat-title" aria-label="Chat with peer" data-i18n-aria="chatDialog" tabindex="-1">
         <button class="sheet-close-icon" type="button" data-action="close-action-sheet" aria-label="Close chat sheet" data-i18n-aria="closeChat">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="m6 6 12 12M18 6 6 18"></path>
@@ -289,7 +326,7 @@
         </button>
         <span class="sheet-handle" aria-hidden="true"></span>
         <p class="sheet-kicker" data-i18n="chat">Chat</p>
-        <h2 data-chat-title>Message peer</h2>
+        <h2 id="chat-title" data-chat-title>Message peer</h2>
         <div class="chat-panel" data-chat-panel>
           <p data-i18n="noMessages">No messages yet.</p>
         </div>
@@ -310,6 +347,7 @@
       <input data-file-input type="file" multiple hidden>
     </div>
 
+    <script src="js/config/runtime-config.js"></script>
     <script type="module" src="js/app.js"></script>
   </body>
 </html>

@@ -17,10 +17,12 @@ The deployed site at `https://web-drop-lyart.vercel.app/` may be used as a produ
 As of this pass:
 
 - The active local runnable artifact is `index.html`.
+- The visible app/package/service-worker version is `1.0.7`.
 - The old architecture HTML page was deleted during the corrected rebuild.
 - `js/app.js` boots the modular static app.
 - `js/core/controller.js` owns the state transitions that gate file controls.
-- `workers/storage-worker.js` is the receiver storage worker scaffold.
+- `workers/storage-worker.js` owns disabled-gated OPFS-first receive storage, IndexedDB fallback, capped memory fallback, quota checks, hash verification, export, abort, and cleanup.
+- `aws cloud server/` owns the deployable signaling backend package; it coordinates metadata only and must not carry file bytes.
 - The repository is a Git working tree from this directory; preserve unrelated local changes.
 
 Update these facts when the runtime structure changes.
@@ -93,3 +95,10 @@ For future runtime edits, verify:
 - No file bytes are sent through signaling code.
 - Large receive paths stream to OPFS or IndexedDB rather than memory.
 - Relay mode applies a clear cap and user-facing explanation.
+
+## Production handoff reminders
+
+- Keep `productionSignaling=false` and production URLs blank until the AWS signaling service is deployed.
+- Configure long-lived Cloudflare TURN credentials only in the EC2 environment file.
+- Run physical iOS/Android calibration before enabling proximity enforcement server-side.
+- Keep any WebSocket message additions schema-validated and metadata-only.

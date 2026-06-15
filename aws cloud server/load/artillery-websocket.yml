@@ -1,0 +1,16 @@
+config:
+  target: "wss://signal.webdrop.example.com"
+  phases:
+    - duration: 120
+      arrivalRate: 2
+      rampTo: 25
+      name: "Safe first ramp below 10k live websocket clients"
+  engines:
+    ws: {}
+scenarios:
+  - engine: ws
+    flow:
+      - connect:
+          url: "/ws"
+      - send: '{"type":"client:hello","payload":{"self":{"id":"load-{{ $randomString() }}","deviceName":"Load Client"}}}'
+      - think: 120

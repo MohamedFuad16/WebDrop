@@ -1,0 +1,21 @@
+{
+  "title": "WebDrop AWS Proximity Readiness",
+  "slug": "proximity-readiness",
+  "status": "complete",
+  "approval": "user requested implementation and subagent audits",
+  "packets": [
+    "protocol-clean-check",
+    "turn-security-clean-check",
+    "nginx-docs-clean-check",
+    "tests-clean-check"
+  ],
+  "proximityAnalysisDefault": "disabled",
+  "permissionPolicyDefault": "report-only",
+  "verification": [
+    "npm run check",
+    "npm test",
+    "local smoke /healthz /api/ice-servers /api/proximity-policy /ws",
+    "secret scan",
+    "git diff --check"
+  ]
+}

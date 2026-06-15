@@ -3,10 +3,6 @@
     --orbit-size: min(68vw, calc(100dvh - 190px), 620px);
   }
 
-  .device-status strong {
-    font-size: 14px;
-  }
-
   .bottom-sheet {
     bottom: 28px;
   }

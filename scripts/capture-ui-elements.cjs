@@ -27,8 +27,7 @@ async function main() {
   await page.evaluate((locale) => {
     localStorage.setItem("webdrop.locale", locale);
   }, CAPTURE_LOCALE);
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => document.querySelectorAll("[data-peer-id]").length > 0);
+  await reloadUntilReady(page);
   await page.waitForTimeout(500);
 
   const inventory = [];
@@ -54,9 +53,8 @@ async function main() {
     inventory.push({ name, file, label, description });
   };
 
-  await add("app-light", ".app-shell", "Light home screen", "The main nearby-device surface in light mode, with the title, device name, four orbits, a gently animated self icon, and static orbit peers.");
+  await add("app-light", ".app-shell", "Light home screen", "The main nearby-device surface in light mode, with the WebDrop status, four orbits, a gently animated self icon, and static orbit peers.");
   await add("topbar-brand", ".brand-lockup", "WebDrop status pill", "Shows the WebDrop label and nearby or connected status without exposing transfer controls too early.", { margin: 8 });
-  await add("topbar-device-name", ".device-status", "Device name", "The current device name is centered in the top header, away from the orbit geometry.", { margin: 8 });
   await add("settings-icon", "[data-action='settings']", "Settings icon", "Opens the settings sheet for profile icon, ring color, language, app information, and version.", { margin: 8 });
   await add("theme-icon", ".theme-button", "Theme toggle", "Switches between light and dark mode from the main screen.", { margin: 8 });
   await add("topbar-actions", ".topbar-actions", "Header actions", "Settings and theme controls are grouped in the top-right header area.", { margin: 8 });
@@ -127,21 +125,20 @@ async function main() {
   await page.click("[data-action='settings']", { force: true });
   await page.waitForSelector("[data-settings-sheet].is-open");
   await page.waitForTimeout(650);
-  await add("settings-sheet", "[data-settings-sheet]", "Settings sheet", "Settings hold profile, ring, device name, language, and app information.", { margin: 2 });
+  await add("settings-sheet", "[data-settings-sheet]", "Settings sheet", "Settings hold device name, profile, ring, language, app information, and version.", { margin: 2 });
+  await add("settings-device-name", ".settings-device-name", "Device name field", "The device name can be edited, including clearing the final character without an unwanted reset.", { margin: 8 });
   await add("settings-profile-icons", ".avatar-setting", "Profile icon selector", "Users swipe across the provided character icons instead of uploading a photo.", { margin: 8 });
   await add("settings-profile-ring", ".ring-setting", "Profile ring selector", "The default ring is white, with optional blue, green, purple, and rose choices.", { margin: 8 });
-  await add("settings-device-name", ".field", "Device name field", "The device name can be edited, including clearing the final character without an unwanted reset.", { margin: 8 });
   await add("settings-language", ".language-setting", "Language selector", "Switches every app label between English and Japanese.", { margin: 8 });
   await add("settings-app-info-link", ".settings-link", "App information link", "Moves design, stack, and orbit motion details into a separate sheet.", { margin: 8 });
-  await add("settings-app-version", ".app-version", "App version", "Shows the current prototype version, 1.0.4, at the bottom of Settings.", { margin: 8 });
+  await add("settings-app-version", ".app-version", "App version", "Shows the current prototype version, 1.0.7, at the bottom of Settings.", { margin: 8 });
   await page.click("[data-action='open-information']", { force: true });
   await page.waitForSelector("[data-information-sheet].is-open");
   await page.waitForTimeout(650);
   await add("app-information-sheet", "[data-information-sheet]", "App information sheet", "Explains the prototype and contains orbit motion controls without cluttering the settings page.", { margin: 2 });
 
   await page.evaluate(() => localStorage.setItem("webdrop.theme", "dark"));
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => document.querySelectorAll("[data-peer-id]").length > 0);
+  await reloadUntilReady(page);
   await add("app-dark", ".app-shell", "Dark home screen", "The same nearby-device UI in dark mode.");
   await page.evaluate(() => {
     localStorage.setItem("webdrop.theme", "light");
@@ -151,6 +148,25 @@ async function main() {
   fs.writeFileSync(path.join(OUT_DIR, "inventory.json"), JSON.stringify(inventory, null, 2));
   await browser.close();
   console.log(`Captured ${inventory.length} UI screenshots in ${OUT_DIR}`);
+}
+
+async function reloadUntilReady(page, attempts = 3) {
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 30000 });
+      await page.waitForFunction(
+        () => document.querySelectorAll("[data-peer-id]").length > 0,
+        null,
+        { timeout: 10000 }
+      );
+      await page.evaluate(() => document.fonts.ready);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
 }
 
 main().catch((error) => {

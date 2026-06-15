@@ -8,6 +8,7 @@ export async function detectCapabilities() {
   const opfs = Boolean(navigator.storage?.getDirectory);
   const indexedDb = "indexedDB" in window;
   const worker = "Worker" in window;
+  const platform = detectPlatform();
 
   return {
     microphone,
@@ -20,6 +21,24 @@ export async function detectCapabilities() {
     opfs,
     indexedDb,
     worker,
-    secure
+    secure,
+    camera: Boolean(navigator.mediaDevices?.getUserMedia) && secure,
+    qrScanner: "BarcodeDetector" in window,
+    platform
+  };
+}
+
+function detectPlatform() {
+  const userAgent = navigator.userAgent || "";
+  const platformName = navigator.userAgentData?.platform || navigator.platform || "";
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+  const isIOS = /iPhone|iPad|iPod/i.test(userAgent)
+    || (/Mac/i.test(platformName) && maxTouchPoints > 1);
+  const isIPhone = /iPhone/i.test(userAgent);
+  return {
+    family: isIOS ? "ios" : /Android/i.test(userAgent) ? "android" : "desktop",
+    isIOS,
+    isIPhone,
+    dynamicIslandCapable: isIPhone && screen.width >= 393 && screen.height >= 852
   };
 }

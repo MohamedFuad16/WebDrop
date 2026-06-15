@@ -10,6 +10,7 @@ import { TransferEngine } from "./services/transfer-engine.js";
 import { StorageClient } from "./storage/storage-client.js";
 import { AppView } from "./ui/app-view.js";
 import { AVATAR_OPTIONS } from "./config/avatar-options.js";
+import { getRuntimeFlags } from "./config/runtime-flags.js";
 
 function browserLocale() {
   const storedLocale = localStorage.getItem("webdrop.locale");
@@ -24,8 +25,8 @@ function browserLocale() {
 const initialState = {
   mode: "lobby",
   self: {
-    id: crypto.randomUUID?.() || `self-${Date.now()}`,
-    name: localStorage.getItem("webdrop.deviceName") || "Mac 9D9D",
+    id: persistentDeviceId(),
+    name: localStorage.getItem("webdrop.deviceName") || defaultDeviceName(),
     avatar: localStorage.getItem("webdrop.avatarChoice") || AVATAR_OPTIONS[0],
     ringColor: localStorage.getItem("webdrop.ringColor") || "#ffffff"
   },
@@ -37,6 +38,7 @@ const initialState = {
   capabilities: {},
   path: "unknown",
   pendingInviteId: null,
+  pairingId: null,
   receivedCount: 0,
   receivedItems: [],
   chatMessages: [],
@@ -47,14 +49,26 @@ const initialState = {
 
 const store = createStore(initialState);
 const view = new AppView(document, store);
+const runtime = getRuntimeFlags();
 
-const signaling = new MockSignalingAdapter();
-const futureSignaling = new WebSocketSignalingAdapter({ url: "" });
-const turnConfig = new TurnConfigProvider();
-const proximity = new ProximityEngine();
-const transport = new WebRtcTransport({ signaling, turnConfig });
+const mockSignaling = new MockSignalingAdapter();
+const futureSignaling = new WebSocketSignalingAdapter({ url: runtime.signalingUrl });
+const signaling = runtime.productionSignaling && runtime.signalingUrl
+  ? futureSignaling
+  : mockSignaling;
+const turnConfig = new TurnConfigProvider({
+  url: runtime.turnConfigUrl,
+  enabled: runtime.productionSignaling && Boolean(runtime.turnConfigUrl),
+  authorizationProvider: () => signaling.getTurnAuthorization?.()
+});
+const proximity = new ProximityEngine({ enabled: runtime.realProximityCeremony });
+const transport = new WebRtcTransport({
+  signaling,
+  turnConfig,
+  enabled: false
+});
 const storage = new StorageClient(new Worker("workers/storage-worker.js", { type: "module" }));
-const transfer = new TransferEngine({ transport, storage });
+const transfer = new TransferEngine({ transport, storage, enabled: runtime.realTransfer });
 
 createController({
   store,
@@ -64,15 +78,31 @@ createController({
   proximity,
   transport,
   transfer,
-  storage
+  storage,
+  runtime
 });
 
 detectCapabilities().then((capabilities) => {
-  store.patch({ capabilities });
+  store.patch({ capabilities: { ...capabilities, runtime } });
   signaling.connect({ self: store.getState().self, capabilities });
 });
 
 const isLocalhost = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
 if ("serviceWorker" in navigator && !isLocalhost) {
   navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+}
+
+function persistentDeviceId() {
+  const stored = localStorage.getItem("webdrop.deviceId");
+  if (stored) return stored;
+  const id = crypto.randomUUID?.() || `self-${Date.now()}`;
+  localStorage.setItem("webdrop.deviceId", id);
+  return id;
+}
+
+function defaultDeviceName() {
+  if (/iPhone/i.test(navigator.userAgent)) return "WebDrop iPhone";
+  if (/iPad/i.test(navigator.userAgent)) return "WebDrop iPad";
+  if (/Android/i.test(navigator.userAgent)) return "WebDrop Android";
+  return "WebDrop Device";
 }

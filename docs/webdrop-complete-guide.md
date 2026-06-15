@@ -1,16 +1,24 @@
 # WebDrop Complete Technical Guide
 
-Version: repository guide authored for WebDrop v2 static prototype  
-Scope: `/Users/mfuad16/Documents/web_drop_v2`  
+Version: WebDrop v2 production-readiness handoff for app version 1.0.7
+Scope: `/Users/mfuad16/Documents/web_drop_v2`
 Primary app entrypoint: `index.html` and `js/app.js`
 
 ![WebDrop system map](../assets/diagrams/webdrop-system-map.svg)
 
 ## How to read this guide
 
-This guide is written for product, engineering, QA, and future backend implementation work. It intentionally separates the current prototype from the production architecture WebDrop is designed to grow into.
+This guide is written for product, engineering, QA, and production handoff work. It intentionally separates the default demo runtime from the production paths that are now wired but still disabled until deployment configuration is supplied.
 
-The current repository is a static browser application. It ships an HTML shell, modular vanilla JavaScript, CSS for the orbit and sheets, a mock signaling adapter, a WebSocket signaling adapter boundary, a WebRTC transport scaffold, a transfer progress simulator, and a receive storage worker scaffold. The app already models the important product boundaries: discovery and trust happen before file controls appear; signaling carries metadata; file bytes belong on an `RTCDataChannel`; and large receives should move toward worker-backed storage rather than one giant in-memory object.
+The current repository ships a static browser application plus an AWS signaling-server package. The default app still runs as a safe static demo: production signaling is off, runtime URLs are blank, and the app uses mock peers without requesting microphone, motion, or camera permissions. Behind those gates, the code now includes production WebSocket signaling, one-time QR token routing, real WebRTC offer/answer/ICE handling, separate control/file data channels, transfer manifests, sender hashing, receiver ACK/cancel/retry semantics, OPFS-first receive storage, IndexedDB fallback, capped memory fallback, and Cloudflare TURN credential proxying. The core product boundaries remain: discovery and trust happen before file controls appear; signaling carries metadata; file bytes belong on an `RTCDataChannel`; and large receives must use worker-backed storage rather than one giant in-memory object.
+
+### Production readiness status
+
+- App/package/service-worker version: `1.0.7`.
+- Default frontend runtime: safe demo mode because `productionSignaling` is `false` and both production URLs are blank in `js/config/runtime-config.js`.
+- Effective feature gating: `js/config/runtime-flags.js` refuses to enable real proximity, real transfer, or QR pairing unless production signaling is enabled with a valid WSS URL.
+- Backend package: `aws cloud server/` contains the Node WebSocket signaling service, QR token provider, TURN credential proxy, nginx/systemd/deploy assets, and load-test assets.
+- Still external: EC2 deployment, DNS/TLS, valid rotated Cloudflare TURN credentials, real WSS/TURN URLs, physical-device proximity calibration, two-browser direct/TURN transfer proof, load testing, and any horizontal-scaling state store.
 
 The production roadmap sections describe the backend and browser-work needed to turn those boundaries into a real multi-device transfer system.
 
@@ -66,14 +74,15 @@ The active implementation is static and module-based. These are the files most d
 | Controller | `js/core/controller.js` | event handling, UI state transitions, connection gate, file selection, mock send, disconnect |
 | UI renderer | `js/ui/app-view.js` | DOM rendering, sheet animation, peer orbit placement, swipe controls, translations |
 | Capabilities | `js/services/capabilities.js` | detects secure context, mic, motion, WebRTC, OPFS, IndexedDB, worker support |
-| Proximity | `js/services/proximity-engine.js` | computes a prototype confidence score from capability-derived metrics |
+| Proximity | `js/services/proximity-engine.js`, `js/services/acoustic-proximity.js`, `js/services/motion-proximity.js` | default mock scoring plus disabled-gated real microphone chirp and motion ceremony |
+| QR/Dynamic Island | `js/ui/dynamic-island.js`, `js/core/controller.js` | disabled-gated iPhone QR display/scan ceremony using backend one-time tokens |
 | Signaling mock | `js/services/mock-signaling.js` | supplies demo peers and emits invite/accept telemetry events |
-| Signaling boundary | `js/services/websocket-signaling.js` | WebSocket adapter shape for future production endpoint |
-| TURN/STUN | `js/services/turn-config.js` | returns current STUN config and future relay policy |
-| WebRTC | `js/services/webrtc-transport.js` | creates an `RTCPeerConnection` and ordered `RTCDataChannel` during preflight |
-| Transfer | `js/services/transfer-engine.js` | iterates selected files in 64 KiB slices and reports progress |
+| Signaling production | `js/services/websocket-signaling.js` | WebSocket adapter with reconnect, routed RTC/QR/transfer/chat messages, and TURN access token handling |
+| TURN/STUN | `js/services/turn-config.js` | uses Cloudflare STUN by default and fetches ephemeral TURN credentials only from the configured backend |
+| WebRTC | `js/services/webrtc-transport.js` | disabled-gated offer/answer/ICE exchange, receiver data channels, path stats, and control/file channels |
+| Transfer | `js/services/transfer-engine.js`, `js/services/data-channel-transfer-protocol.js` | mock progress by default; disabled-gated real manifests, chunks, ACKs, cancel, retry, and completion ACK |
 | Storage client | `js/storage/storage-client.js` | request/response wrapper around the storage worker |
-| Storage worker | `workers/storage-worker.js` | detects OPFS/IndexedDB/memory and currently stores chunks in memory |
+| Storage worker | `workers/storage-worker.js` | disabled-gated OPFS-first writes, IndexedDB chunks, capped memory fallback, quota, hash, export, abort, and cleanup |
 | Offline cache | `service-worker.js` | caches static files and demo PDFs outside localhost |
 
 The existing `docs/architecture.md` and `docs/engineer-guide.md` are concise architecture notes. This guide is the expanded technical package.
@@ -93,7 +102,7 @@ The local Graphify index was checked first, but it appears stale or unrelated fo
 7. Detect capabilities, patch them into state, and connect mock signaling.
 8. Register the service worker outside localhost.
 
-That architecture is deliberately small. There is no bundler, no framework runtime, and no server dependency for the prototype path. The tradeoff is that production networking and receive storage are still skeletal.
+That architecture is deliberately small. There is no bundler, no framework runtime, and no server dependency for the default demo path. The production path is present but inert until `productionSignaling`, a real WSS URL, and the staged feature flags are configured.
 
 <div class="page-break" style="page-break-after: always;"></div>
 
@@ -261,7 +270,7 @@ Intent begins when the user selects a peer. In the mock flow, `inviteAccepted` a
 
 ### Verifying
 
-The verifying state runs the proximity ceremony. In the current prototype this is a timed score based on capabilities. In production, it should include one or more real evidence paths: QR token exchange, acoustic nonce, motion correlation, explicit acceptance, low-latency hints, and server-issued session freshness.
+The verifying state runs the proximity ceremony. In the default demo path this is a timed score based on capabilities. In the production-gated path it can use backend-bound QR token exchange, coordinated acoustic chirps, motion capture, explicit acceptance, and server-issued session freshness. Real thresholds still require physical-device calibration.
 
 ### Connected
 
@@ -398,7 +407,7 @@ If verification fails, the app returns to lobby and shows a QR fallback toast. I
 
 ### Current proximity scoring
 
-`js/services/proximity-engine.js` uses a simple weighted score:
+When real proximity is disabled, `js/services/proximity-engine.js` uses a simple weighted demo score:
 
 | Metric | Current source | Points |
 | --- | --- | --- |
@@ -411,7 +420,7 @@ If verification fails, the app returns to lobby and shows a QR fallback toast. I
 
 The pass threshold is `58`.
 
-This is a product scaffold. It is useful because it demonstrates how multiple evidence signals could become a single decision, but it should not be treated as security. In production, evidence must be bound to short-lived session tokens issued by the backend. A user should not be able to fake proximity by editing local capability values.
+This demo score is useful because it demonstrates how multiple evidence signals become one decision, but it must not be treated as security. The production-gated path binds QR, acoustic, and motion evidence to short-lived pairing sessions issued by the backend. Server enforcement remains disabled by default with `ENABLE_PROXIMITY_ANALYSIS=false` until calibration is complete.
 
 ### Production ceremony model
 
@@ -434,10 +443,10 @@ QR should remain the universal fallback because it works when microphone permiss
 
 WebDrop has two signaling adapters:
 
-- `MockSignalingAdapter` for the current prototype.
-- `WebSocketSignalingAdapter` as the production boundary.
+- `MockSignalingAdapter` for the default static demo.
+- `WebSocketSignalingAdapter` for the production AWS signaling endpoint.
 
-The mock adapter emits demo peers and accepts invite-style method calls. It makes the UI useful without a server. The WebSocket adapter is intentionally unconfigured:
+The mock adapter emits demo peers and accepts invite-style method calls. It makes the UI useful without a server. The WebSocket adapter is intentionally inactive unless a production URL is configured. Its unconfigured event means no endpoint is baked into the static app:
 
 ```js
 if (!this.url) {
@@ -448,7 +457,7 @@ if (!this.url) {
 }
 ```
 
-That is a healthy boundary. The static client can define the message shapes, but production signaling needs server-side origin validation, session management, rate limits, TURN credential minting, and abuse controls.
+That is a healthy boundary. The AWS package supplies the server-side origin validation, session management, rate limits, TURN credential minting, QR token provider, and abuse controls, but it still needs deployment and production environment configuration.
 
 ### Metadata that belongs on signaling
 
@@ -515,17 +524,15 @@ In WebDrop, the target payload lane is an `RTCDataChannel`.
 
 ### Current repository implementation
 
-`js/services/webrtc-transport.js` currently does this in `preflight()`:
+`js/services/webrtc-transport.js` has two paths. In the default demo path, `preflight()` creates a local probe connection and returns a direct/relay guess. When real transfer is enabled, it creates an `RTCPeerConnection`, attaches ordered control and file channels, creates and sends an SDP offer, handles answers and ICE candidates from signaling, attaches receiver data channels, and reports direct/relay path stats:
 
 ```js
-const iceServers = await this.turnConfig.getIceServers();
-this.peerConnection = new RTCPeerConnection({ iceServers });
-this.channel = this.peerConnection.createDataChannel("binary_stream", { ordered: true });
+await this.connect(peerId, { initiator: true });
+this._attachDataChannel(connection.createDataChannel("webdrop-control-v1", { ordered: true }));
+this._attachDataChannel(connection.createDataChannel("webdrop-file-v1", { ordered: true }));
 ```
 
-The method waits briefly and returns a path guess. If `RTCPeerConnection` is missing, it returns `"failed"`. If the browser reports a cellular connection, it returns `"relay"`, otherwise `"direct"`.
-
-This is not a complete WebRTC negotiation. It does not yet create and send SDP offers, receive answers, exchange ICE candidates, wait for `iceConnectionState`, or listen for remote channels. The guide and roadmap treat this as the scaffold for those steps.
+The remaining proof is operational, not just structural: the WSS/TURN backend must be deployed and two real browsers must complete direct and TURN transfers.
 
 ### Production WebRTC sequence
 
@@ -581,7 +588,7 @@ The first option is usually cleaner: keep control and data separate.
 
 ### Chunk size
 
-The prototype uses `64 * 1024`, or 64 KiB, chunks. That is a reasonable starting point. Larger chunks reduce overhead but can increase buffering and latency. Smaller chunks make progress smoother but increase message count.
+The current transfer protocol uses `64 * 1024`, or 64 KiB, chunks. That is a reasonable starting point. Larger chunks reduce overhead but can increase buffering and latency. Smaller chunks make progress smoother but increase message count.
 
 Production chunk size should adapt to:
 
@@ -664,7 +671,7 @@ The sender does not need an ACK for every chunk if the channel is reliable and o
 
 ### Progress semantics
 
-The current prototype reports progress from bytes read:
+The default demo path reports progress from bytes read:
 
 ```js
 onProgress?.({
@@ -675,7 +682,7 @@ onProgress?.({
 });
 ```
 
-Production progress should distinguish:
+The production transfer protocol adds receiver readiness, receiver acknowledgements, completion acknowledgement, cancel, retry, and failure messages. User-facing progress should distinguish:
 
 - Bytes read from local file.
 - Bytes queued to data channel.
@@ -760,19 +767,19 @@ The UI does not need to expose all of this, but the transfer engine needs enough
 
 The complete production flow has three lanes: UI trust, signaling negotiation, and data transfer.
 
-### Current prototype flow
+### Current default demo flow
 
 1. Mock peers appear.
 2. User opens connect sheet.
 3. User swipes to connect.
 4. Proximity score passes.
-5. WebRTC preflight creates a local peer connection and data channel.
+5. WebRTC preflight creates a local probe connection.
 6. Connected state appears.
 7. User chooses files.
 8. Transfer engine reads files in 64 KiB slices and reports progress.
 9. UI appends selected files to the receive list as a local demo.
 
-The current code is excellent for UI and architecture validation, but it does not yet move real bytes between two browser sessions.
+This default path is still the safe offline demo. When production signaling and real transfer are enabled, file bytes move on the WebRTC file data channel while manifests and control metadata stay on the control channel/signaling boundary.
 
 ### Production send flow
 
@@ -833,14 +840,7 @@ if ("indexedDB" in self) return "indexeddb";
 return "memory";
 ```
 
-But it currently stores chunks in an array:
-
-```js
-let chunks = [];
-chunks.push(payload);
-```
-
-That means the current storage worker is a scaffold. It detects the intended backend but does not yet write chunks to OPFS or IndexedDB.
+The worker now writes OPFS chunks first, falls back to IndexedDB chunks, and uses memory only under a 64 MiB cap. It also estimates quota, verifies byte counts and SHA-256 hashes, supports chunked export, and exposes abort/delete cleanup commands. Remaining storage work is browser-matrix validation and smoother UI for large IndexedDB exports.
 
 ### OPFS
 
@@ -1150,11 +1150,11 @@ These metrics tell the team whether the product is actually reliable across real
 
 <div class="page-break" style="page-break-after: always;"></div>
 
-## 21. Current Limitations
+## 21. Current Production Status
 
-The current app is a polished static prototype, not yet a production transfer system.
+The current app is a polished static demo with disabled-gated production transfer code. The codebase is ready for deployment experiments, but it is not yet a proven production service.
 
-### Implemented today
+### Implemented and available in the default app
 
 - Mobile-first static app shell.
 - Orbit lobby with centered self avatar.
@@ -1162,34 +1162,39 @@ The current app is a polished static prototype, not yet a production transfer sy
 - Peer selection and swipe-to-connect sheet.
 - Capability detection.
 - Prototype proximity score.
-- WebRTC preflight scaffold.
+- WebRTC preflight probe.
 - Connected-state dock gating.
 - File picker and selected file rendering.
 - Simulated chunk progress over selected files.
 - Demo received PDF entries.
 - Settings, theme, profile icon, ring color, language, motion preference.
-- Storage worker scaffold with backend detection.
 - Service worker static cache outside localhost.
 
-### Not implemented yet
+### Implemented but disabled or unconfigured
 
-- Real WebSocket signaling endpoint.
-- Real SDP offer/answer exchange.
-- Real ICE candidate exchange.
-- Real remote peer connection.
-- Real `RTCDataChannel` file payload send/receive.
-- Receiver-side OPFS writer.
-- Receiver-side IndexedDB chunk store.
-- Incremental hashing.
-- Resume support.
-- Real QR/acoustic/motion verification.
-- Production TURN credentials.
-- Backend rate limits and schema validation.
-- Transfer failure and retry screens.
+- AWS WebSocket signaling endpoint, schemas, sessions, rate limits, and payload-safe observability.
+- Backend-issued QR tokens and frontend Dynamic Island QR display/scan flow.
+- Real microphone chirp and motion evidence ceremony.
+- Real SDP offer/answer and ICE exchange through signaling.
+- Separate WebRTC control and file data channels.
+- Real file manifests, 64 KiB chunks, backpressure, ACKs, cancel, retry, completion ACK, and sender SHA-256.
+- Receiver-side OPFS writer, IndexedDB chunk store, capped memory fallback, quota checks, byte/hash verification, export, abort, and cleanup.
+- Cloudflare TURN credential proxy with bearer access bound to the live signaling session.
+- Transfer failure, retry, and receive-completion protocol events.
+
+### Remaining before production launch
+
+1. Deploy `aws cloud server/` to EC2 with DNS, nginx, Certbot, systemd, firewall rules, exact `ALLOWED_ORIGINS`, and protected metrics token.
+2. Rotate and configure valid Cloudflare TURN Server credentials on EC2 only; the latest audit recorded the provided Cloudflare identifier returning HTTP 404 as a TURN Key ID.
+3. Configure real `signalingUrl` and `turnConfigUrl` in `js/config/runtime-config.js`, then enable flags in the staged order from `docs/production-activation.md`.
+4. Run physical-device calibration for iOS Safari and Android Chrome across QR, microphone, motion, denied-permission, noisy-room, and fallback cases.
+5. Prove two-browser direct and TURN transfers over the deployed backend, including cancellation, retry, receiver storage exhaustion, and large-file paths.
+6. Load-test signaling toward the 10,000-client target and add Redis/shared presence before horizontal scaling beyond one Node signaling process.
+7. Regenerate the English and Japanese screenshot inventories and PDF guides whenever visible UI or app versioning changes.
 
 ### Documentation stance
 
-This guide uses "should" for production behavior and "current" for implemented behavior. That distinction is intentional. Architecture documentation should help future implementers know what exists, what is only scaffolded, and what must not be overclaimed.
+This guide uses "should" for production behavior and "current" for implemented behavior. That distinction is intentional. Architecture documentation should help future implementers know what exists, what is only enabled behind deployment gates, and what must not be overclaimed.
 
 <div class="page-break" style="page-break-after: always;"></div>
 
@@ -1300,41 +1305,9 @@ The document has more than 20 explicit print sections. If a renderer ignores pag
 
 ## 24. Implementation Checklist
 
-Use this checklist when turning the current prototype into production transfer behavior.
+Use `docs/implementation-checklist.md` as the source of truth for production-readiness status. The short checklist below is a launch handoff list, not an implementation backlog.
 
-### Client transfer
-
-- Add real offer/answer creation in `WebRtcTransport`.
-- Route SDP and ICE through `WebSocketSignalingAdapter`.
-- Add `ondatachannel` handling on receiver.
-- Split control and file data channels or define a robust envelope format.
-- Implement `bufferedAmount` backpressure.
-- Add transfer manifests and file ids.
-- Add receiver ACKs and cancel messages.
-- Add per-file and total transfer progress.
-- Add completion, failure, and retry states.
-
-### Storage
-
-- Replace worker chunk array with OPFS writes.
-- Add IndexedDB chunk fallback.
-- Enforce memory fallback size cap.
-- Add quota estimate before accepting incoming files.
-- Add byte-count verification.
-- Add hash verification.
-- Add export and cleanup.
-
-### Backend
-
-- Build WebSocket signaling endpoint.
-- Validate all message schemas.
-- Add origin and rate-limit policy.
-- Add ephemeral pairing sessions.
-- Add ephemeral TURN credentials.
-- Add direct/relay path metrics.
-- Add server-side observability without file payload logging.
-
-### Product
+### Launch handoff
 
 - Keep send/receive controls hidden until verified connected.
 - Keep QR as universal fallback.
@@ -1342,5 +1315,8 @@ Use this checklist when turning the current prototype into production transfer b
 - Localize all errors.
 - Respect reduced motion.
 - Keep self avatar centered across viewports.
+- Keep file bytes off WebSocket signaling.
+- Keep long-lived TURN credentials out of frontend files.
+- Keep production enforcement disabled until real-device evidence is calibrated.
 
 WebDrop's architecture is strongest when it preserves its boundaries: trust before controls, signaling before WebRTC, metadata before payload, worker storage before export, and explicit user recovery when a browser or network path cannot satisfy the ideal flow.

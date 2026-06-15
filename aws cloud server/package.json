@@ -1,0 +1,20 @@
+{
+  "name": "webdrop-aws-cloud-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AWS EC2-ready WebDrop WebSocket signaling server with Cloudflare TURN credential proxy.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "start:local": "node --env-file=.env src/server.js",
+    "check": "node --check src/*.js test/*.test.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {}
+}

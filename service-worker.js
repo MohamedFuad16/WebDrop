@@ -1,30 +1,41 @@
-const CACHE_NAME = "webdrop-v2-static-21";
-const RUNTIME_CACHE_NAME = "webdrop-v2-runtime-21";
+const APP_VERSION = "1.0.7";
+const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
+const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [
   "./",
   "./index.html",
   "./css/base.css",
   "./css/orbit.css",
   "./css/connected.css",
+  "./css/dynamic-island.css",
   "./css/sheets.css",
   "./css/responsive.css",
   "./js/app.js",
   "./js/config/avatar-options.js",
   "./js/config/i18n.js",
+  "./js/config/runtime-flags.js",
   "./js/core/controller.js",
   "./js/core/state.js",
   "./js/services/capabilities.js",
   "./js/services/mock-signaling.js",
+  "./js/services/acoustic-proximity.js",
+  "./js/services/data-channel-transfer-protocol.js",
+  "./js/services/motion-proximity.js",
   "./js/services/proximity-engine.js",
+  "./js/services/proximity-token.js",
   "./js/services/transfer-engine.js",
   "./js/services/turn-config.js",
   "./js/services/webrtc-transport.js",
   "./js/services/websocket-signaling.js",
   "./js/storage/storage-client.js",
   "./js/ui/app-view.js",
+  "./js/ui/dynamic-island.js",
+  "./js/vendor/qrcode-generator.mjs",
   "./js/utils/emitter.js",
   "./js/utils/format.js",
   "./workers/storage-worker.js",
+  "./workers/incremental-sha256.js",
+  "./assets/fonts/SourceHanSansJP-Normal-static.ttf",
   "./assets/icons/webdrop-mark.svg"
 ];
 
@@ -51,6 +62,10 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  if (new URL(event.request.url).pathname.endsWith("/js/config/runtime-config.js")) {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;

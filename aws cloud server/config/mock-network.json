@@ -1,0 +1,32 @@
+{
+  "description": "Documentation-safe mock network data for local WebDrop signaling tests. These addresses are reserved for examples and are not routable production targets.",
+  "domain": "signal.webdrop.example.com",
+  "publicIp": "203.0.113.42",
+  "privateIp": "10.0.1.42",
+  "node": {
+    "host": "127.0.0.1",
+    "port": 8080
+  },
+  "nginx": {
+    "http": 80,
+    "https": 443
+  },
+  "allowedOrigins": [
+    "https://web-drop-lyart.vercel.app",
+    "https://webdrop.example.com",
+    "http://localhost:4180",
+    "http://127.0.0.1:4180"
+  ],
+  "samplePeers": [
+    {
+      "id": "peer-demo-phone",
+      "deviceName": "Aki iPhone",
+      "ipHint": "198.51.100.10"
+    },
+    {
+      "id": "peer-demo-tablet",
+      "deviceName": "Noa Tab",
+      "ipHint": "198.51.100.11"
+    }
+  ]
+}
