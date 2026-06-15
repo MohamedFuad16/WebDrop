@@ -1,5 +1,5 @@
-const CACHE_NAME = "webdrop-v2-static-20";
-const RUNTIME_CACHE_NAME = "webdrop-v2-runtime-20";
+const CACHE_NAME = "webdrop-v2-static-21";
+const RUNTIME_CACHE_NAME = "webdrop-v2-runtime-21";
 const ASSETS = [
   "./",
   "./index.html",

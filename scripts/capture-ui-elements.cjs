@@ -133,7 +133,7 @@ async function main() {
   await add("settings-device-name", ".field", "Device name field", "The device name can be edited, including clearing the final character without an unwanted reset.", { margin: 8 });
   await add("settings-language", ".language-setting", "Language selector", "Switches every app label between English and Japanese.", { margin: 8 });
   await add("settings-app-info-link", ".settings-link", "App information link", "Moves design, stack, and orbit motion details into a separate sheet.", { margin: 8 });
-  await add("settings-app-version", ".app-version", "App version", "Shows the current prototype version, 1.0.3, at the bottom of Settings.", { margin: 8 });
+  await add("settings-app-version", ".app-version", "App version", "Shows the current prototype version, 1.0.4, at the bottom of Settings.", { margin: 8 });
   await page.click("[data-action='open-information']", { force: true });
   await page.waitForSelector("[data-information-sheet].is-open");
   await page.waitForTimeout(650);

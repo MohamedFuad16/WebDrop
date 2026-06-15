@@ -141,6 +141,7 @@ export class AppView extends Emitter {
     let maxDistance = 0;
     let currentDistance = 0;
     let allowHapticToggle = false;
+    let dragStartedOnHapticSwitch = false;
     const setX = (value) => {
       currentDistance = Math.max(0, Math.min(maxDistance, value));
       control.style.setProperty("--swipe-x", `${axis === "x" ? currentDistance : 0}px`);
@@ -154,8 +155,8 @@ export class AppView extends Emitter {
     const getPosition = (event) => axis === "x" ? event.clientX : event.clientY;
     const start = (event) => {
       if (!event) return;
-      const startedOnHapticSwitch = event.target === hapticSwitch;
-      if (!startedOnHapticSwitch) event.preventDefault();
+      dragStartedOnHapticSwitch = event.target === hapticSwitch;
+      if (!dragStartedOnHapticSwitch) event.preventDefault();
       dragging = true;
       control.classList.add("is-dragging");
       const controlBox = control.getBoundingClientRect();
@@ -164,7 +165,7 @@ export class AppView extends Emitter {
         ? Math.max(0, controlBox.width - thumbBox.width - 12)
         : Math.max(0, controlBox.height - thumbBox.height - 12);
       const position = getPosition(event);
-      if (event.target !== thumb && !startedOnHapticSwitch) {
+      if (event.target !== thumb && !dragStartedOnHapticSwitch) {
         const trackDistance = axis === "x"
           ? position - controlBox.left - thumbBox.width / 2
           : controlBox.bottom - position - thumbBox.height / 2;
@@ -172,7 +173,7 @@ export class AppView extends Emitter {
       }
       startPosition = position - (axis === "x" ? currentDistance : -currentDistance);
       try {
-        (startedOnHapticSwitch ? hapticSwitch : control).setPointerCapture?.(event.pointerId);
+        (dragStartedOnHapticSwitch ? hapticSwitch : control).setPointerCapture?.(event.pointerId);
       } catch {
         // Some synthetic QA gestures do not create an active pointer capture target.
       }
@@ -185,19 +186,22 @@ export class AppView extends Emitter {
     };
     const end = (event) => {
       if (!dragging) return;
-      event?.preventDefault?.();
+      const completed = currentDistance >= maxDistance * .78;
+      if (!(completed && dragStartedOnHapticSwitch)) event?.preventDefault?.();
       dragging = false;
       control.classList.remove("is-dragging");
-      if (currentDistance >= maxDistance * .78) {
+      if (completed) {
         allowHapticToggle = true;
         control.classList.add("is-complete");
         text.textContent = this.translate(completeText);
         setX(maxDistance);
+        if (eventName === "swipe-connect") this.pulseConnectGestureHaptic();
         this.emit(eventName);
         window.setTimeout(reset, 900);
         return;
       }
       allowHapticToggle = false;
+      dragStartedOnHapticSwitch = false;
       reset();
     };
     hapticSwitch?.addEventListener("click", (event) => {
@@ -218,11 +222,17 @@ export class AppView extends Emitter {
   }
 
   pulseConnectionHaptic() {
-    return this.pulseHaptic(28);
+    if (performance.now() - (this.lastConnectHapticAt || 0) < 2400) return false;
+    return this.pulseConnectGestureHaptic();
   }
 
   pulseDisconnectHaptic() {
-    return this.pulseHaptic(34);
+    return this.pulseHaptic(120);
+  }
+
+  pulseConnectGestureHaptic() {
+    this.lastConnectHapticAt = performance.now();
+    return this.pulseHaptic(120);
   }
 
   pulseHaptic(duration) {

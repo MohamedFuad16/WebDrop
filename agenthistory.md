@@ -407,3 +407,21 @@ Verification:
   - Connected cluster keeps visible inner-ring clearance.
   - Disconnect produces a 34 ms haptic fallback pulse, enters `disconnecting`, returns to `lobby`, and leaves the hidden switch unchecked.
 - A persistent Pixel 8 pass reached connected mode with no console warnings or errors.
+
+## 2026-06-15 Version 1.0.4 stronger connection haptics
+
+Scope:
+- Fixed the connect confirmation vibration after QA showed vibration was only noticeable on disconnect.
+- Kept graph-first routing first; the MCP graph was stale, so the repo-local `graphify-out/graph.json` was used for haptic/controller navigation.
+
+Implementation:
+- Bumped the app/package/PDF source version to `1.0.4`.
+- Increased connect and disconnect Vibration API feedback to a stronger 120 ms pulse.
+- Fired the connect pulse immediately when the swipe-to-connect gesture completes, instead of relying only on the later async connection callback.
+- Kept the async connected callback as a fallback, but suppressed duplicate buzzes immediately after a completed swipe.
+- Stopped canceling the hidden native connect switch's completed pointerup, preserving the best-effort iOS native-switch haptic path.
+- Regenerated English/Japanese screenshot inventories and both demo PDFs for version `1.0.4`.
+- Bumped the service-worker cache to `webdrop-v2-static-21` / `webdrop-v2-runtime-21`.
+
+Verification:
+- Browser haptic probe at 393x852 confirmed connect pulses `[120]`, disconnect pulses `[120, 120]`, both hidden switches reset unchecked, connected mode is reached, disconnect returns to lobby, and console logs are clean.
