@@ -524,3 +524,16 @@ Verification:
 Production boundary:
 - The implementation is deployment-ready but production paths remain gated until EC2, DNS/TLS, WSS/API URLs, and server-side TURN credentials are configured.
 - Physical-device proximity calibration, two-device direct/TURN transfer proof, staged 10,000-client load testing, monitoring, and shared state for horizontal scaling remain deployment work.
+
+## 2026-06-15 Version 1.0.8 service-worker deployment refresh
+
+Diagnosis:
+- GitHub received commit `3917638` at 21:32:39 JST and Vercel reported a successful deployment at 21:33:08 JST.
+- The live Vercel `index.html` and `service-worker.js` matched the pushed files byte-for-byte, so the deployment itself was healthy.
+- Existing tabs could still display the previous release because the service worker used cache-first navigation and waited for all old tabs to close before activating an update.
+
+Fix:
+- Changed page navigations to network-first with the cached shell retained only as an offline fallback.
+- Added `skipWaiting()` and `clients.claim()` so a newly installed worker activates and controls open pages promptly.
+- Added an app-side `controllerchange` reload and an explicit registration update check.
+- Added regression coverage for the complete update lifecycle and bumped the app to `1.0.8`.

@@ -19,7 +19,7 @@ import { getRuntimeFlags } from "../js/config/runtime-flags.js";
 test("package metadata, lockfile, and verification scripts stay in sync", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const lockJson = JSON.parse(await readFile(new URL("../package-lock.json", import.meta.url), "utf8"));
-  assert.equal(packageJson.version, "1.0.7");
+  assert.equal(packageJson.version, "1.0.8");
   assert.equal(lockJson.version, packageJson.version);
   assert.equal(lockJson.packages[""].version, packageJson.version);
   assert.deepEqual(lockJson.packages[""].dependencies, packageJson.dependencies);
@@ -27,6 +27,17 @@ test("package metadata, lockfile, and verification scripts stay in sync", async 
   assert.equal(packageJson.scripts.test, "node --test test/*.test.js");
   assert.equal(packageJson.scripts["audit:secrets"], "node scripts/check-js.mjs --secrets-only");
   assert.equal(packageJson.scripts.verify, "npm run check && npm test");
+});
+
+test("service worker updates activate promptly and navigation bypasses stale shell cache", async () => {
+  const source = await readFile(new URL("../service-worker.js", import.meta.url), "utf8");
+  const appSource = await readFile(new URL("../js/app.js", import.meta.url), "utf8");
+  assert.match(source, /self\.skipWaiting\(\)/);
+  assert.match(source, /self\.clients\.claim\(\)/);
+  assert.match(source, /event\.request\.mode === "navigate"/);
+  assert.match(source, /fetch\(event\.request, \{ cache: "no-store" \}\)/);
+  assert.match(appSource, /controllerchange/);
+  assert.match(appSource, /registration\.update\(\)/);
 });
 
 test("generated outputs, dependency folders, and local secrets are ignored", async () => {

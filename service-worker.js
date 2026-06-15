@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.7";
+const APP_VERSION = "1.0.8";
 const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [
@@ -45,23 +45,39 @@ const RUNTIME_ASSET_PREFIXES = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
+  event.waitUntil(
+    Promise.all([
+      caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)),
+      self.skipWaiting()
+    ])
+  );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => ![CACHE_NAME, RUNTIME_CACHE_NAME].includes(key))
-          .map((key) => caches.delete(key))
-      )
-    )
+    Promise.all([
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => ![CACHE_NAME, RUNTIME_CACHE_NAME].includes(key))
+            .map((key) => caches.delete(key))
+        )
+      ),
+      self.clients.claim()
+    ])
   );
 });
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" }).catch(() =>
+        caches.match("./index.html").then((cached) => cached || caches.match("./"))
+      )
+    );
+    return;
+  }
   if (new URL(event.request.url).pathname.endsWith("/js/config/runtime-config.js")) {
     event.respondWith(fetch(event.request, { cache: "no-store" }));
     return;

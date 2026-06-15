@@ -2,7 +2,7 @@
 
 ## Outcome
 
-Completed for version `1.0.7`. The static app, production-gated WebRTC path, storage workers, signaling server folder, documentation, screenshots, and English/Japanese PDFs were audited and verified. Production-only features remain disabled until real deployment configuration is supplied.
+Completed for version `1.0.8`. The static app, production-gated WebRTC path, storage workers, signaling server folder, documentation, screenshots, and English/Japanese PDFs were audited and verified. Production-only features remain disabled until real deployment configuration is supplied.
 
 ## Agent Results
 
@@ -22,7 +22,7 @@ Completed for version `1.0.7`. The static app, production-gated WebRTC path, sto
 - Browser: 7 peers, four visible rings, no horizontal overflow, and clean console at 360, 393, 412, 430, and 1280 px.
 - Interaction: Dynamic Island displayed during verification and retracted before connected avatars merged.
 - Accessibility: sheet focus entered the dialog, Tab remained trapped, Escape closed it, and focus returned to the opener.
-- Deliverables: English and Japanese PDFs are 23 pages each and both report version `1.0.7`; each screenshot inventory contains 29 PNGs.
+- Deliverables: English and Japanese PDFs are 23 pages each and both report version `1.0.8`; each screenshot inventory contains 29 PNGs.
 
 ## Remaining Implementation
 
