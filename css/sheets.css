@@ -639,6 +639,73 @@
   margin-top: 20px;
 }
 
+.info-toggle-row {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel-subtle);
+}
+
+.info-toggle-row > span {
+  min-width: 0;
+}
+
+.info-toggle-row strong,
+.info-toggle-row small {
+  display: block;
+}
+
+.info-toggle-row strong {
+  font-size: 13px;
+}
+
+.info-toggle-row small {
+  margin-top: 3px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.info-toggle {
+  position: relative;
+  flex: 0 0 50px;
+  width: 50px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 10%, var(--panel-solid));
+  cursor: pointer;
+}
+
+.info-toggle::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--panel-solid);
+  box-shadow: 0 3px 9px color-mix(in srgb, var(--ink) 18%, transparent);
+  transition: transform 220ms var(--ease-out);
+}
+
+.info-toggle[aria-checked="true"] {
+  border-color: color-mix(in srgb, var(--blue) 54%, transparent);
+  background: var(--blue);
+}
+
+.info-toggle[aria-checked="true"]::after {
+  transform: translateX(20px);
+}
+
 .sheet-primary {
   min-height: 54px;
   width: 100%;

@@ -204,6 +204,7 @@ export function createController({
   view.on("open-information", () => view.openInformation());
   view.on("back-to-settings", () => view.backToSettings());
   view.on("close-information", () => view.closeInformation());
+  view.on("toggle-qr-preview", () => view.toggleQrScannerPreview());
   view.on("close-sheet", () => view.closePeerSheet());
   view.on("close-action-sheet", () => view.closeActionSheets());
   view.on("close-all-sheets", () => view.closeAllSheets());

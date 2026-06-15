@@ -232,7 +232,7 @@
         </button>
         <div class="app-version">
           <span data-i18n="appVersion">App version</span>
-          <strong>1.0.8</strong>
+          <strong>1.0.9</strong>
         </div>
       </section>
 
@@ -256,6 +256,22 @@
             <button type="button" data-action="set-motion-on" data-motion-value="on" data-i18n="motionOn">On</button>
             <button type="button" data-action="set-motion-paused" data-motion-value="paused" data-i18n="motionPaused">Paused</button>
           </div>
+        </div>
+        <div class="info-toggle-row">
+          <span>
+            <strong data-i18n="qrPreviewTitle">QR scanner preview</strong>
+            <small data-i18n="qrPreviewCopy">Open the scanner UI for testing without starting a connection.</small>
+          </span>
+          <button
+            class="info-toggle"
+            type="button"
+            role="switch"
+            aria-checked="false"
+            aria-label="Show QR scanner preview"
+            data-i18n-aria="qrPreviewToggle"
+            data-action="toggle-qr-preview"
+            data-qr-preview-toggle
+          ></button>
         </div>
         <div class="info-row">
           <strong data-i18n="appInfoNearbyTitle">Nearby-first transfer</strong>

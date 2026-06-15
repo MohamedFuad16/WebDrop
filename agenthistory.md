@@ -537,3 +537,23 @@ Fix:
 - Added `skipWaiting()` and `clients.claim()` so a newly installed worker activates and controls open pages promptly.
 - Added an app-side `controllerchange` reload and an explicit registration update check.
 - Added regression coverage for the complete update lifecycle and bumped the app to `1.0.8`.
+
+## 2026-06-15 Version 1.0.9 orbit and Dynamic Island polish
+
+Scope:
+- Removed both CSS-added white rings from orbit peer avatars while retaining the avatar artwork and accessible 44px hit targets.
+- Changed the Dynamic Island close transition to shrink back into its compact pill before fading, avoiding the previous abrupt disappearance.
+- Added a localized App Information switch that opens the real QR scanner UI as a permission-safe testing preview.
+
+Implementation:
+- Orbit peers now use transparent buttons and a subtle image drop shadow without pseudo-element rings.
+- Dynamic Island close timing now uses a coordinated 580ms geometry transition followed by a short delayed fade.
+- QR preview mode uses the existing scanner component, never starts the camera automatically, and returns to App Information when canceled.
+- Added English and Japanese strings, controller wiring, responsive switch styling, and regression coverage.
+- Incremented the app/package/service-worker/docs version to `1.0.9`.
+
+Rendered evidence:
+- Mobile QA at 393x852 confirmed orbit peers render without duplicate rings.
+- App Information shows the QR scanner preview switch and the preview opens without requesting camera permission.
+- Closing geometry reduced continuously from the expanded island to its compact pill before opacity reached zero.
+- Browser console remained clear.

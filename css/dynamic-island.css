@@ -26,6 +26,7 @@
     border-radius 520ms var(--ease-out),
     opacity 260ms ease,
     transform 520ms var(--ease-out);
+  will-change: width, height, border-radius, opacity, transform;
   pointer-events: auto;
 }
 
@@ -40,8 +41,19 @@
 }
 
 .webdrop-island[data-state="closing"] {
+  width: 126px;
+  height: 36px;
+  border-color: rgba(255, 255, 255, .08);
+  border-radius: 999px;
   opacity: 0;
   transform: translateX(-50%) translateY(-18px) scale(.94);
+  transition:
+    width 580ms var(--ease-out),
+    height 580ms var(--ease-out),
+    border-radius 580ms var(--ease-out),
+    border-color 260ms ease 120ms,
+    opacity 180ms ease 360ms,
+    transform 580ms var(--ease-out);
   pointer-events: none;
 }
 

@@ -132,7 +132,7 @@ export class DynamicIsland extends Emitter {
     };
     this.root?.addEventListener("transitionend", onTransitionEnd);
     this.closeTransitionCleanup = () => this.root?.removeEventListener("transitionend", onTransitionEnd);
-    this.closeTimer = window.setTimeout(finish, reduced ? 110 : 620);
+    this.closeTimer = window.setTimeout(finish, reduced ? 110 : 720);
     return this.closePromise;
   }
 

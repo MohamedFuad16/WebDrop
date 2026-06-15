@@ -129,25 +129,15 @@
   height: var(--peer-hit-target);
   display: grid;
   place-items: center;
-  padding: 2px;
+  padding: 0;
   border: 0;
   border-radius: 50%;
   color: var(--ink);
-  background: #ffffff;
-  box-shadow: 0 12px 26px color-mix(in srgb, var(--ink) 15%, transparent);
+  background: transparent;
   cursor: pointer;
   transition:
     transform var(--motion-control) var(--ease-out),
-    box-shadow var(--motion-control) ease;
-}
-
-.peer-node button::before {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border: 3px solid var(--avatar-ring, #ffffff);
-  border-radius: inherit;
-  pointer-events: none;
+    filter var(--motion-control) ease;
 }
 
 .peer-node img,
@@ -159,6 +149,7 @@
 
 .peer-node img {
   object-fit: cover;
+  filter: drop-shadow(0 8px 12px color-mix(in srgb, var(--ink) 16%, transparent));
 }
 
 .peer-node > span {
@@ -182,18 +173,6 @@
 .peer-node:focus-within > span {
   opacity: 1;
   transform: translate(-50%, 0);
-}
-
-.peer-node[data-stage="intent"] {
-  --avatar-ring: #ffffff;
-}
-
-.peer-node[data-stage="verify"] {
-  --avatar-ring: #ffffff;
-}
-
-.peer-node[data-stage="near"] {
-  --avatar-ring: #ffffff;
 }
 
 .identity-core {

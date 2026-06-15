@@ -65,6 +65,7 @@ export class AppView extends Emitter {
       selectedFiles: document.querySelector("[data-selected-files]"),
       receivedList: document.querySelector("[data-received-list]"),
       receiveBadge: document.querySelector("[data-receive-badge]"),
+      qrPreviewToggle: document.querySelector("[data-qr-preview-toggle]"),
       toast: document.querySelector("[data-toast]")
     };
     this.sheetHideTimers = new WeakMap();
@@ -74,7 +75,13 @@ export class AppView extends Emitter {
     this.peerRenderSignature = "";
     this.dynamicIsland = new DynamicIsland(document, (key, params) => this.translate(key, params));
     this.dynamicIsland.on("detected", (token) => this.emit("island-qr-detected", token));
-    this.dynamicIsland.on("cancel", () => this.emit("island-cancel"));
+    this.dynamicIsland.on("cancel", () => {
+      if (this.qrPreviewActive) {
+        this.closeQrScannerPreview();
+        return;
+      }
+      this.emit("island-cancel");
+    });
     this.dynamicIsland.on("fallback", () => this.emit("island-fallback"));
     this.bindEvents();
     this.bindSwipeControls();
@@ -331,6 +338,33 @@ export class AppView extends Emitter {
 
   closeDynamicIsland() {
     this.dynamicIsland.close();
+  }
+
+  toggleQrScannerPreview() {
+    if (this.qrPreviewActive) {
+      this.closeQrScannerPreview();
+      return;
+    }
+    const state = this.currentState;
+    if (!state) return;
+    const peer = state.peers[0] || {
+      name: this.translate("qrPreviewPeer"),
+      avatar: state.self.avatar
+    };
+    this.qrPreviewActive = true;
+    this.nodes.qrPreviewToggle?.setAttribute("aria-checked", "true");
+    this.hideSheet(
+      this.nodes.informationSheet,
+      () => this.dynamicIsland.showQrScanner({ self: state.self, peer })
+    );
+  }
+
+  async closeQrScannerPreview() {
+    if (!this.qrPreviewActive) return;
+    await this.dynamicIsland.close();
+    this.qrPreviewActive = false;
+    this.nodes.qrPreviewToggle?.setAttribute("aria-checked", "false");
+    this.showSheet(this.nodes.informationSheet);
   }
 
   renderLocale(state) {

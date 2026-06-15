@@ -19,7 +19,7 @@ import { getRuntimeFlags } from "../js/config/runtime-flags.js";
 test("package metadata, lockfile, and verification scripts stay in sync", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const lockJson = JSON.parse(await readFile(new URL("../package-lock.json", import.meta.url), "utf8"));
-  assert.equal(packageJson.version, "1.0.8");
+  assert.equal(packageJson.version, "1.0.9");
   assert.equal(lockJson.version, packageJson.version);
   assert.equal(lockJson.packages[""].version, packageJson.version);
   assert.deepEqual(lockJson.packages[""].dependencies, packageJson.dependencies);
@@ -38,6 +38,22 @@ test("service worker updates activate promptly and navigation bypasses stale she
   assert.match(source, /fetch\(event\.request, \{ cache: "no-store" \}\)/);
   assert.match(appSource, /controllerchange/);
   assert.match(appSource, /registration\.update\(\)/);
+});
+
+test("orbit peers avoid duplicate rings and App Information exposes QR preview", async () => {
+  const orbitCss = await readFile(new URL("../css/orbit.css", import.meta.url), "utf8");
+  const islandCss = await readFile(new URL("../css/dynamic-island.css", import.meta.url), "utf8");
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const viewSource = await readFile(new URL("../js/ui/app-view.js", import.meta.url), "utf8");
+
+  assert.match(orbitCss, /\.peer-node button[\s\S]*?background: transparent;/);
+  assert.doesNotMatch(orbitCss, /\.peer-node button::before/);
+  assert.match(islandCss, /\.webdrop-island\[data-state="closing"\][\s\S]*?width: 126px;[\s\S]*?height: 36px;/);
+  assert.match(islandCss, /opacity 180ms ease 360ms/);
+  assert.match(html, /data-action="toggle-qr-preview"/);
+  assert.match(html, /role="switch"[\s\S]*?data-qr-preview-toggle/);
+  assert.match(viewSource, /toggleQrScannerPreview\(\)/);
+  assert.match(viewSource, /closeQrScannerPreview\(\)/);
 });
 
 test("generated outputs, dependency folders, and local secrets are ignored", async () => {
