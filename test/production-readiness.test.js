@@ -19,7 +19,7 @@ import { getRuntimeFlags } from "../js/config/runtime-flags.js";
 test("package metadata, lockfile, and verification scripts stay in sync", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const lockJson = JSON.parse(await readFile(new URL("../package-lock.json", import.meta.url), "utf8"));
-  assert.equal(packageJson.version, "1.0.14");
+  assert.equal(packageJson.version, "1.0.15");
   assert.equal(lockJson.version, packageJson.version);
   assert.equal(lockJson.packages[""].version, packageJson.version);
   assert.deepEqual(lockJson.packages[""].dependencies, packageJson.dependencies);
@@ -72,7 +72,8 @@ test("nearby directory caps orbit peers and exposes searchable overflow", async 
   const connectedCss = await readFile(new URL("../css/connected.css", import.meta.url), "utf8");
 
   assert.match(viewSource, /const ORBIT_PEER_LIMIT = 12/);
-  assert.match(viewSource, /const ORBIT_RADII = \["\.46", "\.37", "\.28", "\.19"\]/);
+  assert.match(viewSource, /const ORBIT_RADII = \["\.432", "\.348", "\.263", "\.179"\]/);
+  assert.match(viewSource, /const CONNECTED_ORBIT_RADII = \[[\s\S]*?\.348[\s\S]*?\.263[\s\S]*?\.216/);
   assert.match(viewSource, /const ORBIT_LAYOUT_SLOTS = \[/);
   assert.doesNotMatch(viewSource, /Number\(peer\.angle/);
   assert.doesNotMatch(viewSource, /58 \+ layout\.ringIndex \* 6/);
@@ -81,6 +82,8 @@ test("nearby directory caps orbit peers and exposes searchable overflow", async 
   assert.match(viewSource, /rankPeersForDisplay\(peers, state\)/);
   assert.match(viewSource, /matchesNearbyFilter\(peer, state, this\.nearbyFilter\)/);
   assert.match(viewSource, /deviceBrandMarkup\(peer\)/);
+  assert.match(viewSource, /const DEVICE_ICON_MARKUP = Object\.freeze/);
+  assert.match(viewSource, /nearby-history-chip/);
   assert.match(viewSource, /renderCurrentDevice\(state\)/);
   assert.match(html, /data-action="open-nearby-sheet"/);
   assert.match(html, /data-nearby-overflow-count/);
@@ -93,6 +96,10 @@ test("nearby directory caps orbit peers and exposes searchable overflow", async 
   assert.match(sheetsCss, /scrollbar-width: none;/);
   assert.match(sheetsCss, /\.bottom-sheet::-webkit-scrollbar/);
   assert.match(sheetsCss, /\.nearby-sheet\s*\{[\s\S]*?max-height: min\(76dvh, 660px\);/);
+  assert.match(sheetsCss, /\.device-brand svg[\s\S]*?stroke: currentColor;/);
+  assert.match(sheetsCss, /\.device-brand--watchos/);
+  assert.match(sheetsCss, /\.nearby-device-name \.device-brand[\s\S]*?color: var\(--device-chip-ink\);/);
+  assert.match(sheetsCss, /\.nearby-device-meta[\s\S]*?flex-wrap: nowrap;/);
   assert.match(sheetsCss, /\.nearby-device-row/);
   assert.match(sheetsCss, /\.device-brand/);
   assert.match(sheetsCss, /\.nearby-device-avatar\s*\{[\s\S]*?overflow: hidden;/);

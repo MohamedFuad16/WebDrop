@@ -4,13 +4,13 @@ import { AVATAR_OPTIONS, animatedFramesForAvatar } from "../config/avatar-option
 import { translate } from "../config/i18n.js";
 import { DynamicIsland } from "./dynamic-island.js";
 
-const ORBIT_RADII = [".46", ".37", ".28", ".19"];
+const ORBIT_RADII = [".432", ".348", ".263", ".179"];
 const ORBIT_PEER_LIMIT = 12;
 const CONNECTED_ORBIT_PEER_LIMIT = 6;
 const CONNECTED_ORBIT_RADII = [
-  "calc(var(--orbit-size) * .46)",
-  "calc(var(--orbit-size) * .37)",
-  "calc(var(--orbit-size) * .28)"
+  "calc(var(--orbit-size) * .348)",
+  "calc(var(--orbit-size) * .263)",
+  "calc(var(--orbit-size) * .216)"
 ];
 const ORBIT_LAYOUT_SLOTS = [
   { ringIndex: 0, angle: 352 },
@@ -531,16 +531,18 @@ export class AppView extends Emitter {
       const brand = deviceBrandMarkup(peer);
       const distance = escapeHtml(this.translate(peerDistanceKey(peer)));
       const score = Math.max(0, Math.min(100, Math.round(peer.__rankScore || 0)));
+      const history = peerPreviouslyConnected(peer)
+        ? `<span class="nearby-history-chip">${this.translate("connectedBeforeShort")}</span>`
+        : "";
       return `
         <article class="nearby-device-row" data-nearby-device-id="${peerId}">
           <span class="nearby-device-avatar" aria-hidden="true">${staticAvatarMarkup(peer.avatar)}</span>
           <div class="nearby-device-copy">
-            <strong class="nearby-device-name">${brand}<span>${name}</span></strong>
+            <strong class="nearby-device-name">${brand}<span>${name}</span>${history}</strong>
             <span>${device}</span>
             <span class="nearby-device-meta">
               <span class="nearby-pill">${distance}</span>
               <span class="nearby-pill">${this.translate("rankScore", { score })}</span>
-              ${peerPreviouslyConnected(peer) ? `<span class="nearby-pill">${this.translate("connectedBefore")}</span>` : ""}
             </span>
           </div>
           <button class="nearby-connect" type="button" data-peer-id="${peerId}">${this.translate("connect")}</button>
@@ -1163,13 +1165,16 @@ function staticAvatarMarkup(avatar) {
   return `<img class="avatar-static" src="${escapeHtml(frame)}" alt="">`;
 }
 
-const DEVICE_ICON_PATHS = Object.freeze({
-  apple: "M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701",
-  samsung: "M19.8166 10.2808l.0459 2.6934h-.023l-.7793-2.6934h-1.2837v3.3925h.8481l-.0458-2.785h.023l.8366 2.785h1.2264v-3.3925zm-16.149 0l-.6418 3.427h.9284l.4699-3.1175h.0229l.4585 3.1174h.9169l-.6304-3.4269zm5.1805 0l-.424 2.6132h-.023l-.424-2.6132H6.5788l-.0688 3.427h.8596l.023-3.0832h.0114l.573 3.0831h.8711l.5731-3.083h.023l.0228 3.083h.8596l-.0802-3.4269zm-7.2664 2.4527c.0343.0802.0229.1949.0114.2522-.0229.1146-.1031.2292-.3324.2292-.2177 0-.3438-.126-.3438-.3095v-.3323H0v.2636c0 .7679.6074.9971 1.2493.9971.6189 0 1.1346-.2178 1.2149-.7794.0458-.298.0114-.4928 0-.5616-.1605-.722-1.467-.9283-1.5588-1.3295-.0114-.0688-.0114-.1375 0-.1834.023-.1146.1032-.2292.3095-.2292.2063 0 .321.126.321.3095v.2063h.8595v-.2407c0-.745-.6762-.8596-1.1576-.8596-.6074 0-1.1117.2063-1.2034.7564-.023.149-.0344.2866.0114.4585.1376.7106 1.364.9169 1.5358 1.3524m11.152 0c.0343.0803.0228.1834.0114.2522-.023.1146-.1032.2292-.3324.2292-.2178 0-.3438-.126-.3438-.3095v-.3323h-.917v.2636c0 .7564.596.9857 1.2379.9857.6189 0 1.1232-.2063 1.2034-.7794.0459-.298.0115-.4814 0-.5616-.1375-.7106-1.4327-.9284-1.5243-1.318-.0115-.0688-.0115-.1376 0-.1835.0229-.1146.1031-.2292.3094-.2292.1948 0 .321.126.321.3095v.2063h.848v-.2407c0-.745-.6647-.8596-1.146-.8596-.6075 0-1.1004.1948-1.192.7564-.023.149-.023.2866.0114.4585.1376.7106 1.341.9054 1.513 1.3524m2.8882.4585c.2407 0 .3094-.1605.3323-.2522.0115-.0343.0115-.0917.0115-.126v-2.533h.871v2.4642c0 .0688 0 .1948-.0114.2292-.0573.6419-.5616.8482-1.192.8482-.6303 0-1.1346-.2063-1.192-.8482 0-.0344-.0114-.1604-.0114-.2292v-2.4642h.871v2.533c0 .0458 0 .0916.0115.126 0 .0917.0688.2522.3095.2522m7.1518-.0344c.2522 0 .3324-.1605.3553-.2522.0115-.0343.0115-.0917.0115-.126v-.4929h-.3553v-.5043H24v.917c0 .0687 0 .1145-.0115.2292-.0573.6303-.596.8481-1.2034.8481-.6075 0-1.1461-.2178-1.2034-.8481-.0115-.1147-.0115-.1605-.0115-.2293v-1.444c0-.0574.0115-.172.0115-.2293.0802-.6419.596-.8482 1.2034-.8482s1.1347.2063 1.2034.8482c.0115.1031.0115.2292.0115.2292v.1146h-.8596v-.1948s0-.0803-.0115-.1261c-.0114-.0802-.0802-.2521-.3438-.2521-.2521 0-.321.1604-.3438.2521-.0115.0458-.0115.1032-.0115.1605v1.5702c0 .0458 0 .0916.0115.126 0 .0917.0917.2522.3323.2522",
-  android: "M18.4395 5.5586c-.675 1.1664-1.352 2.3318-2.0274 3.498-.0366-.0155-.0742-.0286-.1113-.043-1.8249-.6957-3.484-.8-4.42-.787-1.8551.0185-3.3544.4643-4.2597.8203-.084-.1494-1.7526-3.021-2.0215-3.4864a1.1451 1.1451 0 0 0-.1406-.1914c-.3312-.364-.9054-.4859-1.379-.203-.475.282-.7136.9361-.3886 1.5019 1.9466 3.3696-.0966-.2158 1.9473 3.3593.0172.031-.4946.2642-1.3926 1.0177C2.8987 12.176.452 14.772 0 18.9902h24c-.119-1.1108-.3686-2.099-.7461-3.0683-.7438-1.9118-1.8435-3.2928-2.7402-4.1836a12.1048 12.1048 0 0 0-2.1309-1.6875c.6594-1.122 1.312-2.2559 1.9649-3.3848.2077-.3615.1886-.7956-.0079-1.1191a1.1001 1.1001 0 0 0-.8515-.5332c-.5225-.0536-.9392.3128-1.0488.5449zm-.0391 8.461c.3944.5926.324 1.3306-.1563 1.6503-.4799.3197-1.188.0985-1.582-.4941-.3944-.5927-.324-1.3307.1563-1.6504.4727-.315 1.1812-.1086 1.582.4941zM7.207 13.5273c.4803.3197.5506 1.0577.1563 1.6504-.394.5926-1.1038.8138-1.584.4941-.48-.3197-.5503-1.0577-.1563-1.6504.4008-.6021 1.1087-.8106 1.584-.4941z",
-  google: "M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z",
-  windows: "M3 4.5 10.5 3.4v8.1H3V4.5Zm8.5-1.25L21 2v9.5h-9.5V3.25ZM3 12.5h7.5v8.1L3 19.5v-7Zm8.5 0H21V22l-9.5-1.25v-8.25Z",
-  device: "M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm0 3v14h10V5H7Zm3 15h4v1h-4v-1Z"
+const DEVICE_ICON_MARKUP = Object.freeze({
+  apple: '<rect x="7" y="3" width="10" height="18" rx="3"></rect><path d="M11 18h2"></path>',
+  samsung: '<rect x="7" y="3" width="10" height="18" rx="3"></rect><path d="M10 7h4M10 17h4"></path>',
+  android: '<path d="M7 11h10v7a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-7Z"></path><path d="M9 11V8.5M15 11V8.5M9 8l-1.5-2M15 8l1.5-2"></path><path d="M10 14h.01M14 14h.01"></path>',
+  google: '<rect x="7" y="3" width="10" height="18" rx="3"></rect><path d="M10 12h4M13 9l3 3-3 3"></path>',
+  ipad: '<rect x="5" y="3" width="14" height="18" rx="2.5"></rect><path d="M11 18h2"></path>',
+  macos: '<path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5V15H4V6.5Z"></path><path d="M2.5 17h19l-1.2 2.2H3.7L2.5 17Z"></path>',
+  watchos: '<rect x="7" y="7" width="10" height="10" rx="3"></rect><path d="M9 3h6l1 4H8l1-4ZM8 17h8l-1 4H9l-1-4Z"></path>',
+  windows: '<path d="M4 5.5 10.5 4v7H4V5.5ZM12 3.7 20 2v9h-8V3.7ZM4 13h6.5v7L4 18.5V13ZM12 13h8v9l-8-1.7V13Z"></path>',
+  device: '<rect x="7" y="3" width="10" height="18" rx="3"></rect><path d="M11 18h2"></path>'
 });
 
 function deviceBrandMarkup(peer) {
@@ -1177,7 +1182,7 @@ function deviceBrandMarkup(peer) {
   return `
     <span class="device-brand device-brand--${brand}" aria-hidden="true">
       <svg viewBox="0 0 24 24" focusable="false">
-        <path d="${DEVICE_ICON_PATHS[brand] || DEVICE_ICON_PATHS.device}"></path>
+        ${DEVICE_ICON_MARKUP[brand] || DEVICE_ICON_MARKUP.device}
       </svg>
     </span>
   `;
@@ -1188,7 +1193,10 @@ function deviceBrand(peer) {
   const label = peerDeviceLabel(peer).toLowerCase();
   if (label.includes("samsung") || label.includes("galaxy")) return "samsung";
   if (label.includes("pixel")) return "google";
-  if (["ios", "ipad", "macos", "watchos"].includes(family) || /(iphone|ipad|mac|apple)/.test(label)) return "apple";
+  if (family === "watchos" || label.includes("watch")) return "watchos";
+  if (family === "macos" || /(mac|laptop|surface)/.test(label)) return "macos";
+  if (family === "ipad" || /(ipad|tablet|tab|pad|fold)/.test(label)) return "ipad";
+  if (family === "ios" || /(iphone|apple)/.test(label)) return "apple";
   if (family === "android") return "android";
   if (family === "windows") return "windows";
   return "device";

@@ -291,43 +291,73 @@
 .device-summary-line {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   min-width: 0;
+  max-width: 100%;
 }
 
 .device-brand {
-  width: 17px;
-  height: 17px;
+  --device-chip-bg: color-mix(in srgb, var(--blue) 12%, #ffffff);
+  --device-chip-ink: var(--blue);
+  width: 24px;
+  height: 24px;
   display: inline-grid;
-  flex: 0 0 17px;
+  flex: 0 0 24px;
   place-items: center;
+  border: 1px solid color-mix(in srgb, var(--device-chip-ink) 18%, transparent);
   border-radius: 999px;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--device-chip-ink);
+  background: var(--device-chip-bg);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--device-chip-ink) 13%, transparent);
 }
 
 .device-brand svg {
-  width: 11px;
-  height: 11px;
+  width: 15px;
+  height: 15px;
   display: block;
-  fill: currentColor;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .device-brand--apple {
-  color: #16181d;
-  background: color-mix(in srgb, #ffffff 86%, var(--ink) 6%);
+  --device-chip-bg: #edf3ff;
+  --device-chip-ink: #2f6fed;
 }
 
-.device-brand--samsung,
+.device-brand--samsung {
+  --device-chip-bg: #e4f7ff;
+  --device-chip-ink: #1874c8;
+}
+
 .device-brand--android,
 .device-brand--google {
-  color: #166f50;
-  background: color-mix(in srgb, var(--mint) 22%, #ffffff);
+  --device-chip-bg: #e9f8e8;
+  --device-chip-ink: #2b8b4b;
 }
 
+.device-brand--ipad {
+  --device-chip-bg: #f2edff;
+  --device-chip-ink: #7b5ce6;
+}
+
+.device-brand--macos,
 .device-brand--windows {
-  color: #2b6eea;
-  background: color-mix(in srgb, var(--blue) 12%, #ffffff);
+  --device-chip-bg: #eef3ff;
+  --device-chip-ink: #4867c8;
+}
+
+.device-brand--watchos {
+  --device-chip-bg: #fff0dd;
+  --device-chip-ink: #d37916;
+}
+
+.app-shell[data-theme="dark"] .device-brand {
+  background: color-mix(in srgb, var(--device-chip-bg) 72%, #111418);
+  border-color: color-mix(in srgb, var(--device-chip-ink) 36%, #ffffff 10%);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--device-chip-ink) 22%, transparent);
 }
 
 .nearby-device-copy strong {
@@ -342,17 +372,43 @@
   font-weight: 560;
 }
 
+.nearby-device-name .device-brand {
+  color: var(--device-chip-ink);
+}
+
+.nearby-device-name > span:not(.device-brand):not(.nearby-history-chip) {
+  min-width: 0;
+}
+
+.nearby-history-chip {
+  flex: 0 0 auto;
+  min-height: 18px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: 999px;
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 10%, var(--panel-solid));
+  font-size: 9px;
+  font-weight: 760;
+}
+
+.nearby-device-name .nearby-history-chip {
+  color: var(--blue);
+}
+
 .nearby-device-meta {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 5px;
   min-width: 0;
 }
 
 .nearby-pill {
-  max-width: 100%;
+  max-width: 50%;
   display: inline-flex;
   align-items: center;
+  flex: 0 1 auto;
   min-height: 20px;
   padding: 0 7px;
   border-radius: 999px;
@@ -360,6 +416,7 @@
   background: color-mix(in srgb, var(--ink) 7%, transparent);
   font-size: 10px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .nearby-connect {
