@@ -6,16 +6,16 @@ const MOCK_PEERS = [
   { id: "peer-ren", name: "Ren Pixel", avatar: AVATAR_OPTIONS[2], ringIndex: 1, angle: 18, deviceFamily: "android", deviceLabel: "Pixel 8", distanceBucket: "immediate", proximityScore: 51, capabilities: { platform: { family: "android", isIOS: false, isIPhone: false } } },
   { id: "peer-mio", name: "Mio Galaxy", avatar: AVATAR_OPTIONS[3], ringIndex: 2, angle: 92, deviceFamily: "android", deviceLabel: "Galaxy S25", distanceBucket: "near", proximityScore: 50, connectedBefore: true },
   { id: "peer-noa", name: "Noa Tab", avatar: AVATAR_OPTIONS[4], ringIndex: 0, angle: 68, deviceFamily: "ipad", deviceLabel: "iPad Air", distanceBucket: "near", proximityScore: 48 },
-  { id: "peer-sora", name: "Sora Mac", avatar: AVATAR_OPTIONS[5], ringIndex: 1, angle: 198, deviceFamily: "macos", deviceLabel: "MacBook Air", distanceBucket: "room", proximityScore: 49, previousConnections: 3 },
+  { id: "peer-sora", name: "Sora Mac", avatar: AVATAR_OPTIONS[5], ringIndex: 1, angle: 198, deviceFamily: "macos", deviceLabel: "MacBook Air", distanceBucket: "room", proximityScore: 49, previousConnections: 3, online: false },
   { id: "peer-kai", name: "Kai Watch", avatar: AVATAR_OPTIONS[6], ringIndex: 2, angle: 272, deviceFamily: "watchos", deviceLabel: "Apple Watch", distanceBucket: "room", proximityScore: 45 },
   { id: "peer-yui", name: "Yui Pad", avatar: AVATAR_OPTIONS[7], ringIndex: 0, angle: 188, deviceFamily: "ipad", deviceLabel: "iPad Pro", distanceBucket: "near", proximityScore: 47 },
   { id: "peer-emi", name: "Emi iPhone", avatar: AVATAR_OPTIONS[0], ringIndex: 3, angle: 4, deviceFamily: "ios", deviceLabel: "iPhone 16", distanceBucket: "near", proximityScore: 43, connectedBefore: true },
   { id: "peer-haru", name: "Haru Android", avatar: AVATAR_OPTIONS[1], ringIndex: 1, angle: 306, deviceFamily: "android", deviceLabel: "Android Tablet", distanceBucket: "room", proximityScore: 46 },
   { id: "peer-lina", name: "Lina iPhone", avatar: AVATAR_OPTIONS[2], ringIndex: 2, angle: 212, deviceFamily: "ios", deviceLabel: "iPhone 15", distanceBucket: "room", proximityScore: 44 },
-  { id: "peer-omar", name: "Omar Surface", avatar: AVATAR_OPTIONS[3], ringIndex: 0, angle: 302, deviceFamily: "windows", deviceLabel: "Surface Laptop", distanceBucket: "building", proximityScore: 42 },
+  { id: "peer-omar", name: "Omar Surface", avatar: AVATAR_OPTIONS[3], ringIndex: 0, angle: 302, deviceFamily: "windows", deviceLabel: "Surface Laptop", distanceBucket: "building", proximityScore: 42, online: false },
   { id: "peer-maya", name: "Maya Pixel", avatar: AVATAR_OPTIONS[4], ringIndex: 3, angle: 126, deviceFamily: "android", deviceLabel: "Pixel Fold", distanceBucket: "room", proximityScore: 40 },
   { id: "peer-jun", name: "Jun iPhone", avatar: AVATAR_OPTIONS[5], ringIndex: 3, angle: 246, deviceFamily: "ios", deviceLabel: "iPhone 14", distanceBucket: "building", proximityScore: 34 },
-  { id: "peer-tala", name: "Tala Mac", avatar: AVATAR_OPTIONS[6], ringIndex: 1, angle: 108, deviceFamily: "macos", deviceLabel: "Mac mini", distanceBucket: "far", proximityScore: 30 },
+  { id: "peer-tala", name: "Tala Mac", avatar: AVATAR_OPTIONS[6], ringIndex: 1, angle: 108, deviceFamily: "macos", deviceLabel: "Mac mini", distanceBucket: "far", proximityScore: 30, online: false },
   { id: "peer-zed", name: "Zed Droid", avatar: AVATAR_OPTIONS[7], ringIndex: 2, angle: 332, deviceFamily: "android", deviceLabel: "Android Phone", distanceBucket: "far", proximityScore: 27 }
 ];
 

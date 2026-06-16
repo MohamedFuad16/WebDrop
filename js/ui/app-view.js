@@ -540,12 +540,13 @@ export class AppView extends Emitter {
       const brand = deviceBrandMarkup(peer);
       const distance = escapeHtml(this.translate(peerDistanceKey(peer)));
       const score = Math.max(0, Math.min(100, Math.round(peer.__rankScore || 0)));
+      const onlineClass = peer.online === false ? " is-offline" : " is-online";
       const history = peerPreviouslyConnected(peer)
         ? `<span class="nearby-device-history"><span class="nearby-history-chip">${this.translate("connectedBeforeShort")}</span></span>`
         : "";
       return `
         <article class="nearby-device-row" data-nearby-device-id="${peerId}">
-          <span class="nearby-device-avatar" aria-hidden="true">${staticAvatarMarkup(peer.avatar)}</span>
+          <span class="nearby-device-avatar${onlineClass}" aria-hidden="true">${staticAvatarMarkup(peer.avatar)}</span>
           <div class="nearby-device-copy">
             <strong class="nearby-device-name">${brand}<span>${name}</span></strong>
             <span>${device}</span>
@@ -1177,18 +1178,19 @@ function staticAvatarMarkup(avatar) {
 
 const DEVICE_ICON_MARKUP = Object.freeze({
   apple: '<path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zm3.378-3.066c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"></path>',
-  samsung: '<text x="12" y="14" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="4.7" font-weight="800" letter-spacing=".45">SAMSUNG</text>',
+  samsung: '<text x="44" y="14" text-anchor="middle" dominant-baseline="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="800" letter-spacing="1.25">SAMSUNG</text>',
   android: '<path d="M18.4395 5.5586c-.675 1.1664-1.352 2.3318-2.0274 3.498-.0366-.0155-.0742-.0286-.1113-.043-1.8249-.6957-3.484-.8-4.42-.787-1.8551.0185-3.3544.4643-4.2597.8203-.084-.1494-1.7526-3.021-2.0215-3.4864a1.1451 1.1451 0 0 0-.1406-.1914c-.3312-.364-.9054-.4859-1.379-.203-.475.282-.7136.9361-.3886 1.5019 1.9466 3.3696-.0966-.2158 1.9473 3.3593.0172.031-.4946.2642-1.3926 1.0177C2.8987 12.176.452 14.772 0 18.9902h24c-.119-1.1108-.3686-2.099-.7461-3.0683-.7438-1.9118-1.8435-3.2928-2.7402-4.1836a12.1048 12.1048 0 0 0-2.1309-1.6875c.6594-1.122 1.312-2.2559 1.9649-3.3848.2077-.3615.1886-.7956-.0079-1.1191a1.1001 1.1001 0 0 0-.8515-.5332c-.5225-.0536-.9392.3128-1.0488.5449zm-.0391 8.461c.3944.5926.324 1.3306-.1563 1.6503-.4799.3197-1.188.0985-1.582-.4941-.3944-.5927-.324-1.3307.1563-1.6504.4727-.315 1.1812-.1086 1.582.4941zM7.207 13.5273c.4803.3197.5506 1.0577.1563 1.6504-.394.5926-1.1038.8138-1.584.4941-.48-.3197-.5503-1.0577-.1563-1.6504.4008-.6021 1.1087-.8106 1.584-.4941z"></path>',
   google: '<path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"></path>',
-  windows: '<path d="M6.555 1.375 0 2.237v5.45h6.555zm0 13.353L0 13.795V8.313h6.555zm.723-6.333.026 6.378L16 16V8.395zm8.722-8.395v7.658H7.33V1.244z"></path>',
+  windows: '<path d="M4 5.12 10.75 4.2v6.42H4zm7.55-1.03L20 3v7.62h-8.45zM4 11.38h6.75v6.42L4 16.88zm7.55 0H20V21l-8.45-1.18z"></path>',
   device: '<rect x="7" y="3" width="10" height="18" rx="3"></rect><path d="M11 18h2"></path>'
 });
 
 function deviceBrandMarkup(peer) {
   const brand = deviceBrand(peer);
+  const viewBox = brand === "samsung" ? "0 0 88 24" : "0 0 24 24";
   return `
     <span class="device-brand device-brand--${brand}${OFFICIAL_DEVICE_BRANDS.has(brand) ? " device-brand--official" : ""}" aria-hidden="true">
-      <svg viewBox="0 0 24 24" focusable="false">
+      <svg viewBox="${viewBox}" focusable="false">
         ${DEVICE_ICON_MARKUP[brand] || DEVICE_ICON_MARKUP.device}
       </svg>
     </span>
