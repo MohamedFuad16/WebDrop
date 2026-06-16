@@ -150,8 +150,7 @@
 
 .app-shell[data-mode="connected"] .nearby-fab,
 .app-shell[data-mode="disconnecting"] .nearby-fab {
-  right: max(18px, calc(50vw - 176px));
-  bottom: calc(100px + var(--safe-bottom));
+  display: none;
 }
 
 .receive-badge {

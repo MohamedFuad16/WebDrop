@@ -98,7 +98,7 @@ export class DynamicIsland extends Emitter {
     this.drawQr(token);
   }
 
-  showQrScanner({ self, peer }) {
+  showQrScanner({ self, peer, autoStartCamera = true }) {
     this.prepareToOpen(true);
     this.stopCamera();
     this.renderPeople(self, peer);
@@ -106,6 +106,7 @@ export class DynamicIsland extends Emitter {
     this.setCopy("qrScanTitle", "qrScanStatus");
     this.nodes.scanner?.classList.remove("is-success", "is-live");
     this.nodes.cancel?.focus({ preventScroll: true });
+    if (autoStartCamera) this.scheduleTimeout(() => this.startCamera(), 280);
   }
 
   markSuccess() {
@@ -140,7 +141,7 @@ export class DynamicIsland extends Emitter {
   }
 
   async finishConnectionTransition() {
-    const minimumVisibleMs = this.prefersReducedMotion() ? 80 : 900;
+    const minimumVisibleMs = this.prefersReducedMotion() ? 80 : 1600;
     const elapsedMs = Math.max(0, this.now() - this.connectionOpenedAt);
     const canClose = await this.waitForConnectionMinimum(Math.max(0, minimumVisibleMs - elapsedMs));
     if (!canClose || !["connecting", "qr-display", "qr-scan"].includes(this.state)) return false;

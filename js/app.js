@@ -9,7 +9,7 @@ import { WebRtcTransport } from "./services/webrtc-transport.js";
 import { TransferEngine } from "./services/transfer-engine.js";
 import { StorageClient } from "./storage/storage-client.js";
 import { AppView } from "./ui/app-view.js";
-import { AVATAR_OPTIONS } from "./config/avatar-options.js";
+import { AVATAR_OPTIONS, normalizeAvatarChoice } from "./config/avatar-options.js";
 import { getRuntimeFlags } from "./config/runtime-flags.js";
 
 function browserLocale() {
@@ -27,7 +27,7 @@ const initialState = {
   self: {
     id: persistentDeviceId(),
     name: localStorage.getItem("webdrop.deviceName") || defaultDeviceName(),
-    avatar: localStorage.getItem("webdrop.avatarChoice") || AVATAR_OPTIONS[0],
+    avatar: normalizeAvatarChoice(localStorage.getItem("webdrop.avatarChoice")) || AVATAR_OPTIONS[0],
     ringColor: localStorage.getItem("webdrop.ringColor") || "#ffffff",
     deviceFamily: selfDeviceFamily()
   },

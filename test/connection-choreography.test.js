@@ -30,7 +30,7 @@ test("connecting island stays visible for a subtle minimum interval", async () =
   });
 
   const finishing = island.finishConnectionTransition();
-  assert.equal(scheduledDelay, 750);
+  assert.equal(scheduledDelay, 1450);
   assert.equal(closeCalls, 0);
   releaseDelay();
   assert.equal(await finishing, true);

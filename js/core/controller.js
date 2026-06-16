@@ -310,7 +310,11 @@ export function createController({
     store.patch({ mode: "verifying", pendingInviteId: peerId });
     await view.closePeerSheet();
     if (!isCurrentVerification(peerId)) return;
-    view.showIslandConnectionProgress({ self: initialState.self, peer });
+    if (useQrPairing) {
+      view.showIslandQrScanner({ self: initialState.self, peer, autoStartCamera: false });
+    } else {
+      view.showIslandConnectionProgress({ self: initialState.self, peer });
+    }
     if (runtime.productionSignaling) {
       const pairing = await establishProductionPairing(peerId);
       if (!pairing || !isCurrentVerification(peerId)) {

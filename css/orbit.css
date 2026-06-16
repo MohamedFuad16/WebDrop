@@ -14,9 +14,9 @@
 .app-shell[data-mode="connected"] .orbit-scene,
 .app-shell[data-mode="disconnecting"] .orbit-scene {
   --connected-avatar: clamp(60px, 17vw, 74px);
-  --connected-ring-two-size: calc((var(--orbit-size) * .6) + (var(--connected-avatar) * .7334));
-  --connected-ring-three-size: calc((var(--orbit-size) * .3) + (var(--connected-avatar) * 1.4667));
-  --connected-ring-four-size: calc(var(--connected-avatar) * 2.72);
+  --connected-ring-two-size: calc(var(--orbit-size) * .74);
+  --connected-ring-three-size: calc(var(--orbit-size) * .56);
+  --connected-ring-four-size: calc(var(--orbit-size) * .46);
 }
 
 .orbit-ring {
@@ -40,8 +40,8 @@
 .orbit-ring--one {
   --ring-color: color-mix(in srgb, var(--purple) 56%, var(--ink) 8%);
   --ring-duration: 132s;
-  width: 90%;
-  height: 90%;
+  width: 92%;
+  height: 92%;
 }
 
 .orbit-ring--one circle {
@@ -51,8 +51,8 @@
 .orbit-ring--two {
   --ring-color: color-mix(in srgb, var(--orange) 58%, var(--ink) 7%);
   --ring-duration: 124s;
-  width: 68%;
-  height: 68%;
+  width: 74%;
+  height: 74%;
   animation-direction: reverse;
 }
 
@@ -63,8 +63,8 @@
 .orbit-ring--three {
   --ring-color: color-mix(in srgb, var(--mint) 66%, var(--ink) 8%);
   --ring-duration: 116s;
-  width: 46%;
-  height: 46%;
+  width: 56%;
+  height: 56%;
 }
 
 .orbit-ring--three circle {
@@ -74,8 +74,8 @@
 .orbit-ring--four {
   --ring-color: color-mix(in srgb, var(--blue) 70%, var(--ink) 7%);
   --ring-duration: 108s;
-  width: 30%;
-  height: 30%;
+  width: 38%;
+  height: 38%;
   animation-direction: reverse;
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--blue) 12%, transparent));
 }

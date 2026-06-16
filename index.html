@@ -222,6 +222,10 @@
           <span data-i18n="deviceName">Device name</span>
           <input data-name-input type="text" value="WebDrop Device" maxlength="22" autocomplete="off" spellcheck="false">
         </label>
+        <div class="device-summary-setting">
+          <span data-i18n="currentDevice">Current device</span>
+          <strong data-current-device></strong>
+        </div>
         <div class="avatar-setting">
           <div class="setting-heading">
             <strong data-i18n="profileIcon">Profile icon</strong>
@@ -260,7 +264,7 @@
         </button>
         <div class="app-version">
           <span data-i18n="appVersion">App version</span>
-          <strong>1.0.12</strong>
+          <strong>1.0.14</strong>
         </div>
       </section>
 
@@ -341,13 +345,6 @@
             </svg>
           </button>
         </div>
-        <button class="sheet-primary send-confirm" type="button" data-action="send" hidden>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 4 9.6 14.4"></path>
-            <path d="M20 4 14 21l-4.4-6.6L3 10l17-6Z"></path>
-          </svg>
-          <span data-i18n="send">Send</span>
-        </button>
       </section>
 
       <section class="bottom-sheet action-sheet" data-receive-sheet hidden role="dialog" aria-modal="true" aria-labelledby="receive-title" aria-label="Received files" data-i18n-aria="receiveDialog" tabindex="-1">

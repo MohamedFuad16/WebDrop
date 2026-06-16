@@ -19,7 +19,7 @@ import { getRuntimeFlags } from "../js/config/runtime-flags.js";
 test("package metadata, lockfile, and verification scripts stay in sync", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const lockJson = JSON.parse(await readFile(new URL("../package-lock.json", import.meta.url), "utf8"));
-  assert.equal(packageJson.version, "1.0.12");
+  assert.equal(packageJson.version, "1.0.14");
   assert.equal(lockJson.version, packageJson.version);
   assert.equal(lockJson.packages[""].version, packageJson.version);
   assert.deepEqual(lockJson.packages[""].dependencies, packageJson.dependencies);
@@ -49,7 +49,7 @@ test("orbit peers avoid duplicate rings and App Information exposes QR preview",
   const viewSource = await readFile(new URL("../js/ui/app-view.js", import.meta.url), "utf8");
 
   assert.match(orbitCss, /\.peer-node button[\s\S]*?background: transparent;/);
-  assert.match(orbitCss, /--connected-ring-four-size: calc\(var\(--connected-avatar\) \* 2\.72\);/);
+  assert.match(orbitCss, /--connected-ring-four-size: calc\(var\(--orbit-size\) \* \.46\);/);
   assert.match(orbitCss, /\.peer-node img,[\s\S]*?\.peer-node \.avatar-animation[\s\S]*?border: 3px solid #ffffff;[\s\S]*?background: #ffffff;/);
   assert.doesNotMatch(orbitCss, /\.peer-node button::before/);
   assert.match(islandCss, /\.webdrop-island\[data-state="closing"\][\s\S]*?width: 126px;[\s\S]*?height: 36px;/);
@@ -67,22 +67,38 @@ test("nearby directory caps orbit peers and exposes searchable overflow", async 
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const viewSource = await readFile(new URL("../js/ui/app-view.js", import.meta.url), "utf8");
   const mockSource = await readFile(new URL("../js/services/mock-signaling.js", import.meta.url), "utf8");
+  const orbitCss = await readFile(new URL("../css/orbit.css", import.meta.url), "utf8");
   const sheetsCss = await readFile(new URL("../css/sheets.css", import.meta.url), "utf8");
   const connectedCss = await readFile(new URL("../css/connected.css", import.meta.url), "utf8");
 
   assert.match(viewSource, /const ORBIT_PEER_LIMIT = 12/);
+  assert.match(viewSource, /const ORBIT_RADII = \["\.46", "\.37", "\.28", "\.19"\]/);
+  assert.match(viewSource, /const ORBIT_LAYOUT_SLOTS = \[/);
+  assert.doesNotMatch(viewSource, /Number\(peer\.angle/);
+  assert.doesNotMatch(viewSource, /58 \+ layout\.ringIndex \* 6/);
+  assert.match(viewSource, /const duration = state\.connectedPeerId \? 76 : 72/);
   assert.match(viewSource, /rankPeersForDisplay\(state\.peers, state\)/);
   assert.match(viewSource, /rankPeersForDisplay\(peers, state\)/);
   assert.match(viewSource, /matchesNearbyFilter\(peer, state, this\.nearbyFilter\)/);
+  assert.match(viewSource, /deviceBrandMarkup\(peer\)/);
+  assert.match(viewSource, /renderCurrentDevice\(state\)/);
   assert.match(html, /data-action="open-nearby-sheet"/);
   assert.match(html, /data-nearby-overflow-count/);
   assert.match(html, /data-nearby-search/);
   assert.match(html, /data-nearby-filter="recent"/);
   assert.match(html, /data-nearby-filter="same-device"/);
+  assert.match(html, /data-current-device/);
+  assert.match(orbitCss, /\.orbit-ring--one[\s\S]*?width: 92%;/);
+  assert.match(orbitCss, /\.orbit-ring--four[\s\S]*?width: 38%;/);
+  assert.match(sheetsCss, /scrollbar-width: none;/);
+  assert.match(sheetsCss, /\.bottom-sheet::-webkit-scrollbar/);
+  assert.match(sheetsCss, /\.nearby-sheet\s*\{[\s\S]*?max-height: min\(76dvh, 660px\);/);
   assert.match(sheetsCss, /\.nearby-device-row/);
+  assert.match(sheetsCss, /\.device-brand/);
   assert.match(sheetsCss, /\.nearby-device-avatar\s*\{[\s\S]*?overflow: hidden;/);
   assert.match(sheetsCss, /\.nearby-device-avatar img,\s*[\s\S]*?\.nearby-device-avatar \.avatar-static\s*\{[\s\S]*?width: 100%;[\s\S]*?height: 100%;/);
   assert.match(connectedCss, /\.nearby-fab/);
+  assert.match(connectedCss, /\.app-shell\[data-mode="connected"\] \.nearby-fab,[\s\S]*?display: none;/);
   assert.match(viewSource, /sheet\.classList\.add\("is-open"\);\s*sheet\.style\.opacity = "1";/);
   assert.ok((mockSource.match(/id: "peer-/g) || []).length >= 13);
 });
@@ -94,9 +110,11 @@ test("modal controls are keyboard-safe while sheets and Dynamic Island animate",
   const islandSource = await readFile(new URL("../js/ui/dynamic-island.js", import.meta.url), "utf8");
 
   assert.match(html, /data-send-swipe-thumb/);
+  assert.doesNotMatch(html, /send-confirm/);
   assert.match(viewSource, /setSendSwipeReady\(ready\)/);
   assert.match(viewSource, /sendSwipeThumb\.disabled = !ready/);
   assert.match(viewSource, /sendSwipeThumb\.tabIndex = ready \? 0 : -1/);
+  assert.match(sheetsCss, /\.swipe-control--vertical \.swipe-thumb\s*\{[\s\S]*?left: 12px;[\s\S]*?right: 12px;[\s\S]*?width: auto;/);
   assert.match(viewSource, /setSheetBackgroundInert\(true\)/);
   assert.match(viewSource, /if \(shouldRestoreBackground\) this\.setSheetBackgroundInert\(false\)/);
   assert.match(viewSource, /sheet\.contains\(active\)/);
@@ -110,11 +128,15 @@ test("modal controls are keyboard-safe while sheets and Dynamic Island animate",
 test("avatar picker uses button-group semantics instead of incomplete listbox behavior", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const viewSource = await readFile(new URL("../js/ui/app-view.js", import.meta.url), "utf8");
+  const avatarSource = await readFile(new URL("../js/config/avatar-options.js", import.meta.url), "utf8");
 
   assert.match(html, /data-avatar-carousel role="group"/);
   assert.doesNotMatch(viewSource, /role="option"/);
   assert.match(viewSource, /aria-pressed/);
   assert.doesNotMatch(viewSource, /aria-selected/);
+  assert.match(avatarSource, /length: 9/);
+  assert.match(avatarSource, /if \(index <= 0\) return \[\]/);
+  assert.match(avatarSource, /assets\/icons\/avatars\/user-09\.png/);
 });
 
 test("generated outputs, dependency folders, and local secrets are ignored", async () => {
