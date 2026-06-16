@@ -56,6 +56,20 @@ test("clamps invalid TURN TTL values and falls back to STUN when unconfigured", 
   assert.match(iceServers[0].urls[0], /^stun:/);
 });
 
+test("fails closed when TURN credentials are missing and STUN fallback is disabled", async () => {
+  const provider = new TurnConfigProvider({
+    env: {
+      ALLOW_STUN_FALLBACK: "false"
+    },
+    logger: silentLogger()
+  });
+
+  await assert.rejects(
+    () => provider.getIceServers(),
+    /STUN fallback is disabled/
+  );
+});
+
 function silentLogger() {
   return {
     info() {},

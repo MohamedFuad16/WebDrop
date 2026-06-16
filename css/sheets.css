@@ -389,6 +389,10 @@
   pointer-events: none;
 }
 
+.swipe-control[aria-disabled="true"] .swipe-thumb {
+  cursor: default;
+}
+
 .swipe-thumb svg {
   width: 22px;
   height: 22px;
@@ -431,6 +435,11 @@
   color: var(--ink);
   background: var(--panel-subtle);
   outline: none;
+}
+
+.field input:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .avatar-setting,

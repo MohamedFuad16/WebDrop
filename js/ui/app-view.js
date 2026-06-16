@@ -71,6 +71,12 @@ export class AppView extends Emitter {
     this.sheetHideTimers = new WeakMap();
     this.backdropTimer = null;
     this.lastFocusedBeforeSheet = null;
+    this.sheetBackgroundNodes = [
+      document.querySelector(".topbar"),
+      document.querySelector(".main-stage"),
+      document.querySelector("[data-connection-tray]"),
+      document.querySelector("[data-dynamic-island]")
+    ].filter(Boolean);
     this.avatarOptionsRendered = false;
     this.peerRenderSignature = "";
     this.dynamicIsland = new DynamicIsland(document, (key, params) => this.translate(key, params));
@@ -172,6 +178,7 @@ export class AppView extends Emitter {
     let currentDistance = 0;
     let allowHapticToggle = false;
     let dragStartedOnHapticSwitch = false;
+    const isControlDisabled = () => thumb.disabled || control.getAttribute("aria-disabled") === "true";
     const setX = (value) => {
       currentDistance = Math.max(0, Math.min(maxDistance, value));
       control.style.setProperty("--swipe-x", `${axis === "x" ? currentDistance : 0}px`);
@@ -185,6 +192,7 @@ export class AppView extends Emitter {
     const getPosition = (event) => axis === "x" ? event.clientX : event.clientY;
     const start = (event) => {
       if (!event) return;
+      if (isControlDisabled()) return;
       dragStartedOnHapticSwitch = event.target === hapticSwitch;
       if (!dragStartedOnHapticSwitch) event.preventDefault();
       dragging = true;
@@ -209,12 +217,13 @@ export class AppView extends Emitter {
       }
     };
     const move = (event) => {
-      if (!dragging) return;
+      if (!dragging || isControlDisabled()) return;
       event.preventDefault();
       const delta = getPosition(event) - startPosition;
       setX(axis === "x" ? delta : -delta);
     };
     const complete = () => {
+      if (isControlDisabled()) return;
       allowHapticToggle = true;
       control.classList.add("is-complete");
       text.textContent = this.translate(completeText);
@@ -253,6 +262,7 @@ export class AppView extends Emitter {
     control.addEventListener("lostpointercapture", end);
     thumb.addEventListener("keydown", (event) => {
       if (!["Enter", " "].includes(event.key)) return;
+      if (isControlDisabled()) return;
       event.preventDefault();
       const controlBox = control.getBoundingClientRect();
       const thumbBox = thumb.getBoundingClientRect();
@@ -337,7 +347,7 @@ export class AppView extends Emitter {
   }
 
   closeDynamicIsland() {
-    this.dynamicIsland.close();
+    return this.dynamicIsland.close();
   }
 
   toggleQrScannerPreview() {
@@ -456,7 +466,6 @@ export class AppView extends Emitter {
     this.nodes.avatarCarousel.innerHTML = AVATAR_OPTIONS.map((avatar, index) => `
       <button
         type="button"
-        role="option"
         data-action="select-avatar"
         data-avatar="${avatar}"
         aria-label="Choose profile icon ${index + 1}"
@@ -479,7 +488,7 @@ export class AppView extends Emitter {
       button.setAttribute("aria-label", this.translate("chooseProfileIcon", { number: optionNumber }));
       const selected = button.dataset.avatar === state.self.avatar;
       button.classList.toggle("is-selected", selected);
-      button.setAttribute("aria-selected", String(selected));
+      button.setAttribute("aria-pressed", String(selected));
     });
     this.nodes.ringChoice.querySelectorAll("[data-ring]").forEach((button) => {
       const selected = button.dataset.ring.toLowerCase() === state.self.ringColor.toLowerCase();
@@ -509,9 +518,7 @@ export class AppView extends Emitter {
   renderFiles(state) {
     this.nodes.selectedFiles.hidden = state.files.length === 0;
     if (this.nodes.sendSwipeControl) {
-      this.nodes.sendSwipeControl.classList.toggle("is-ready", state.files.length > 0);
-      if (!state.files.length) this.resetSendSwipe?.();
-      this.nodes.sendSwipeText.textContent = this.translate(state.files.length > 0 ? "swipeSend" : "chooseFirst");
+      this.setSendSwipeReady(state.files.length > 0);
     }
     if (this.nodes.sendConfirm) {
       this.nodes.sendConfirm.hidden = state.files.length === 0;
@@ -642,10 +649,7 @@ export class AppView extends Emitter {
   openSendSheet() {
     this.resetSendSwipe?.();
     const hasFiles = (this.currentState?.files.length || 0) > 0;
-    this.nodes.sendSwipeControl?.classList.toggle("is-ready", hasFiles);
-    if (this.nodes.sendSwipeText) {
-      this.nodes.sendSwipeText.textContent = this.translate(hasFiles ? "swipeSend" : "chooseFirst");
-    }
+    this.setSendSwipeReady(hasFiles);
     this.showSheet(this.nodes.sendSheet);
   }
 
@@ -683,7 +687,9 @@ export class AppView extends Emitter {
     sheet.hidden = false;
     sheet.classList.remove("is-closing");
     this.nodes.app.dataset.sheetOpen = "true";
+    this.setSheetBackgroundInert(true);
     this.showBackdrop();
+    this.focusSheet(sheet);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         sheet.classList.add("is-open");
@@ -720,11 +726,16 @@ export class AppView extends Emitter {
           this.nodes.chatSheet
         ].some((node) => !node.hidden);
         this.nodes.app.dataset.sheetOpen = String(anyVisible);
+        const restoreTarget = this.lastFocusedBeforeSheet;
+        const shouldRestoreBackground = !keepBackdrop && !this.visibleSheet();
+        if (shouldRestoreBackground) this.setSheetBackgroundInert(false);
         onHidden?.();
-        if (!keepBackdrop && !this.visibleSheet()) {
-          const restoreTarget = this.lastFocusedBeforeSheet;
+        if (shouldRestoreBackground) {
           this.lastFocusedBeforeSheet = null;
-          restoreTarget?.focus?.({ preventScroll: true });
+          const active = this.document.activeElement;
+          if (active === this.document.body || sheet.contains(active)) {
+            restoreTarget?.focus?.({ preventScroll: true });
+          }
         }
         resolve();
       };
@@ -807,12 +818,35 @@ export class AppView extends Emitter {
     const active = this.document.activeElement;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
-    if (event.shiftKey && (active === first || !sheet.contains(active))) {
+    if (!sheet.contains(active)) {
+      event.preventDefault();
+      first.focus({ preventScroll: true });
+    } else if (event.shiftKey && active === first) {
       event.preventDefault();
       last.focus({ preventScroll: true });
     } else if (!event.shiftKey && active === last) {
       event.preventDefault();
       first.focus({ preventScroll: true });
+    }
+  }
+
+  setSheetBackgroundInert(active) {
+    for (const node of this.sheetBackgroundNodes) {
+      node.inert = active;
+      node.setAttribute("aria-hidden", String(active));
+    }
+  }
+
+  setSendSwipeReady(ready) {
+    this.nodes.sendSwipeControl?.classList.toggle("is-ready", ready);
+    this.nodes.sendSwipeControl?.setAttribute("aria-disabled", String(!ready));
+    if (this.nodes.sendSwipeThumb) {
+      this.nodes.sendSwipeThumb.disabled = !ready;
+      this.nodes.sendSwipeThumb.tabIndex = ready ? 0 : -1;
+    }
+    if (!ready) this.resetSendSwipe?.();
+    if (this.nodes.sendSwipeText) {
+      this.nodes.sendSwipeText.textContent = this.translate(ready ? "swipeSend" : "chooseFirst");
     }
   }
 

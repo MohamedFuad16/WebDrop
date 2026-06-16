@@ -182,6 +182,10 @@ async function prepareFile(payload) {
 }
 
 async function fallbackFromOpfs(session) {
+  const hasPersistedBytes = [...session.files.values()].some((file) => file.receivedBytes > 0 || file.chunkCount > 0);
+  if (hasPersistedBytes) {
+    throw storageError("OPFS_FALLBACK_UNSAFE", "OPFS became unavailable after receive data was written; restart the receive session instead of switching storage backends mid-transfer.");
+  }
   for (const file of session.files.values()) {
     try {
       await file.writable?.abort();

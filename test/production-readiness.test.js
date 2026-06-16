@@ -19,7 +19,7 @@ import { getRuntimeFlags } from "../js/config/runtime-flags.js";
 test("package metadata, lockfile, and verification scripts stay in sync", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const lockJson = JSON.parse(await readFile(new URL("../package-lock.json", import.meta.url), "utf8"));
-  assert.equal(packageJson.version, "1.0.10");
+  assert.equal(packageJson.version, "1.0.11");
   assert.equal(lockJson.version, packageJson.version);
   assert.equal(lockJson.packages[""].version, packageJson.version);
   assert.deepEqual(lockJson.packages[""].dependencies, packageJson.dependencies);
@@ -27,6 +27,8 @@ test("package metadata, lockfile, and verification scripts stay in sync", async 
   assert.equal(packageJson.scripts.test, "node --test test/*.test.js");
   assert.equal(packageJson.scripts["audit:secrets"], "node scripts/check-js.mjs --secrets-only");
   assert.equal(packageJson.scripts.verify, "npm run check && npm test");
+  assert.match(packageJson.scripts["verify:full"], /aws cloud server/);
+  assert.match(packageJson.scripts["verify:full"], /npm audit --omit=dev/);
 });
 
 test("service worker updates activate promptly and navigation bypasses stale shell cache", async () => {
@@ -47,6 +49,7 @@ test("orbit peers avoid duplicate rings and App Information exposes QR preview",
   const viewSource = await readFile(new URL("../js/ui/app-view.js", import.meta.url), "utf8");
 
   assert.match(orbitCss, /\.peer-node button[\s\S]*?background: transparent;/);
+  assert.match(orbitCss, /--connected-ring-four-size: calc\(var\(--connected-avatar\) \* 2\.72\);/);
   assert.match(orbitCss, /\.peer-node img,[\s\S]*?\.peer-node \.avatar-animation[\s\S]*?border: 3px solid #ffffff;[\s\S]*?background: #ffffff;/);
   assert.doesNotMatch(orbitCss, /\.peer-node button::before/);
   assert.match(islandCss, /\.webdrop-island\[data-state="closing"\][\s\S]*?width: 126px;[\s\S]*?height: 36px;/);
@@ -55,8 +58,39 @@ test("orbit peers avoid duplicate rings and App Information exposes QR preview",
   assert.match(html, /data-action="toggle-qr-preview"/);
   assert.match(html, /role="switch"[\s\S]*?data-qr-preview-toggle/);
   assert.doesNotMatch(html, /data-island-fallback/);
+  assert.doesNotMatch(html, /\s+switch(\s|>)/);
   assert.match(viewSource, /toggleQrScannerPreview\(\)/);
   assert.match(viewSource, /closeQrScannerPreview\(\)/);
+});
+
+test("modal controls are keyboard-safe while sheets and Dynamic Island animate", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const sheetsCss = await readFile(new URL("../css/sheets.css", import.meta.url), "utf8");
+  const viewSource = await readFile(new URL("../js/ui/app-view.js", import.meta.url), "utf8");
+  const islandSource = await readFile(new URL("../js/ui/dynamic-island.js", import.meta.url), "utf8");
+
+  assert.match(html, /data-send-swipe-thumb/);
+  assert.match(viewSource, /setSendSwipeReady\(ready\)/);
+  assert.match(viewSource, /sendSwipeThumb\.disabled = !ready/);
+  assert.match(viewSource, /sendSwipeThumb\.tabIndex = ready \? 0 : -1/);
+  assert.match(viewSource, /setSheetBackgroundInert\(true\)/);
+  assert.match(viewSource, /if \(shouldRestoreBackground\) this\.setSheetBackgroundInert\(false\)/);
+  assert.match(viewSource, /sheet\.contains\(active\)/);
+  assert.match(viewSource, /if \(!sheet\.contains\(active\)\)/);
+  assert.match(sheetsCss, /\.field input:focus-visible/);
+  assert.match(islandSource, /const concealed = state === "closed" \|\| state === "closing"/);
+  assert.match(islandSource, /document\.activeElement\.blur/);
+  assert.match(islandSource, /event\.key === "Tab" && this\.state\.startsWith\("qr-"\)/);
+});
+
+test("avatar picker uses button-group semantics instead of incomplete listbox behavior", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const viewSource = await readFile(new URL("../js/ui/app-view.js", import.meta.url), "utf8");
+
+  assert.match(html, /data-avatar-carousel role="group"/);
+  assert.doesNotMatch(viewSource, /role="option"/);
+  assert.match(viewSource, /aria-pressed/);
+  assert.doesNotMatch(viewSource, /aria-selected/);
 });
 
 test("generated outputs, dependency folders, and local secrets are ignored", async () => {
@@ -184,6 +218,56 @@ test("data channel sender hashes files and waits for receiver completion verific
   assert.equal((await sending).id, "tx-hash");
 });
 
+test("data channel sender aborts while waiting for receiver readiness", async () => {
+  const control = fakeDataChannel("webdrop-control-v1");
+  const file = fakeDataChannel("webdrop-file-v1");
+  const protocol = new DataChannelTransferProtocol({ controlChannel: control, fileChannel: file });
+  const source = Object.assign(new Blob(["hold"]), {
+    name: "hold.txt",
+    lastModified: 1
+  });
+  const controller = new AbortController();
+  const sending = protocol.sendFiles([source], {
+    transferId: "tx-abort-ready",
+    signal: controller.signal
+  });
+  while (!control.sent.some((message) => String(message).includes("transfer:manifest"))) await tick();
+  controller.abort();
+  await assert.rejects(sending, { name: "AbortError" });
+  assert.ok(control.sent.some((message) =>
+    String(message).includes('"type":"transfer:cancel"')
+      && String(message).includes("tx-abort-ready")
+  ));
+});
+
+test("data channel receiver clears incoming state after completion", async () => {
+  const control = fakeDataChannel("webdrop-control-v1");
+  const file = fakeDataChannel("webdrop-file-v1");
+  const protocol = new DataChannelTransferProtocol({ controlChannel: control, fileChannel: file });
+  await protocol.handleControlMessage(JSON.stringify({
+    type: "transfer:manifest",
+    manifest: {
+      version: 1,
+      id: "rx-clean",
+      totalBytes: 0,
+      files: [{
+        id: "file-empty",
+        name: "empty.txt",
+        size: 0,
+        type: "text/plain",
+        sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }]
+    }
+  }));
+  assert.equal(protocol.incoming.has("rx-clean"), true);
+  await protocol.handleControlMessage(JSON.stringify({
+    type: "transfer:complete",
+    transferId: "rx-clean",
+    totalBytes: 0
+  }));
+  assert.equal(protocol.incoming.has("rx-clean"), false);
+});
+
 test("receiver progress survives transferring a chunk buffer into storage worker ownership", async () => {
   const control = fakeDataChannel("webdrop-control-v1");
   const file = fakeDataChannel("webdrop-file-v1");
@@ -257,6 +341,13 @@ test("storage client stays disabled until production transfer is enabled", async
   const result = await storage.prepareSession({ id: "disabled-session", expectedBytes: 10 });
   assert.equal(result.enabled, false);
   assert.equal(worker.messages.length, 0);
+});
+
+test("storage worker refuses unsafe OPFS fallback after bytes have been written", async () => {
+  const workerSource = await readFile(new URL("../workers/storage-worker.js", import.meta.url), "utf8");
+  assert.match(workerSource, /OPFS_FALLBACK_UNSAFE/);
+  assert.match(workerSource, /receivedBytes > 0 \|\| file\.chunkCount > 0/);
+  assert.match(workerSource, /restart the receive session/);
 });
 
 test("storage client transfers sliced typed arrays without detaching unrelated bytes", async () => {

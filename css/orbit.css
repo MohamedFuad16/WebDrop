@@ -16,7 +16,7 @@
   --connected-avatar: clamp(60px, 17vw, 74px);
   --connected-ring-two-size: calc((var(--orbit-size) * .6) + (var(--connected-avatar) * .7334));
   --connected-ring-three-size: calc((var(--orbit-size) * .3) + (var(--connected-avatar) * 1.4667));
-  --connected-ring-four-size: calc(var(--connected-avatar) * 2.2);
+  --connected-ring-four-size: calc(var(--connected-avatar) * 2.72);
 }
 
 .orbit-ring {

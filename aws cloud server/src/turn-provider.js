@@ -14,6 +14,9 @@ export class TurnConfigProvider {
     const keyId = this.env.CLOUDFLARE_TURN_KEY_ID;
     const apiToken = this.env.CLOUDFLARE_TURN_API_TOKEN;
     if (!keyId || !apiToken) {
+      if (this.env.ALLOW_STUN_FALLBACK === "false") {
+        throw new Error("Cloudflare TURN credentials are not configured and STUN fallback is disabled.");
+      }
       this.logger?.warn("Cloudflare TURN is not configured; returning STUN fallback.");
       return fallbackIceServers();
     }

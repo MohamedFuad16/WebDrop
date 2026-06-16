@@ -4,6 +4,9 @@ export const MAX_FILE_NAME_LENGTH = 240;
 export const MAX_SIGNAL_SIZE_BYTES = 32768;
 export const MAX_SDP_LENGTH = 30000;
 export const MAX_ICE_CANDIDATE_LENGTH = 4096;
+export const MAX_TRANSFER_TOTAL_BYTES = 20 * 1024 * 1024 * 1024;
+export const MAX_TRANSFER_CHUNK_SIZE_BYTES = 256 * 1024;
+export const MAX_TRANSFER_CHUNKS_PER_FILE = 1_000_000;
 
 const ROUTED_TYPES = new Set([
   "invite",
@@ -239,14 +242,26 @@ function validateTransferManifest(payload) {
     lastModified: safeInteger(file.lastModified, 0)
   }));
   const totalBytes = safeInteger(payload.totalBytes, 0);
+  if (totalBytes > MAX_TRANSFER_TOTAL_BYTES) {
+    throw new ProtocolError("manifest_too_large", "transfer:manifest totalBytes exceeds the server control-plane limit.");
+  }
   const calculatedBytes = normalizedFiles.reduce((sum, file) => sum + file.size, 0);
+  for (const file of normalizedFiles) {
+    if (file.size > MAX_TRANSFER_TOTAL_BYTES || file.chunks > MAX_TRANSFER_CHUNKS_PER_FILE) {
+      throw new ProtocolError("manifest_too_large", "transfer:manifest file metadata exceeds the server control-plane limit.");
+    }
+  }
   if (calculatedBytes !== totalBytes) {
     throw new ProtocolError("manifest_size_mismatch", "transfer:manifest totalBytes must equal the sum of file sizes.");
+  }
+  const chunkSize = safeInteger(payload.chunkSize, 65536);
+  if (chunkSize <= 0 || chunkSize > MAX_TRANSFER_CHUNK_SIZE_BYTES) {
+    throw new ProtocolError("invalid_chunk_size", "transfer:manifest chunkSize is outside the accepted control-plane range.");
   }
   return {
     transferId,
     totalBytes,
-    chunkSize: safeInteger(payload.chunkSize, 65536),
+    chunkSize,
     files: normalizedFiles
   };
 }
@@ -254,12 +269,14 @@ function validateTransferManifest(payload) {
 function validateRtcSignal(signal) {
   const type = cleanString(signal.type, 40);
   if (type === "offer" || type === "answer") {
+    assertStringWithinLimit(signal.sdp, MAX_SDP_LENGTH, "sdp_too_large", `${type} sdp is too large.`);
     const sdp = cleanString(signal.sdp, MAX_SDP_LENGTH);
     if (!sdp) throw new ProtocolError("invalid_rtc_signal", `${type} requires sdp.`);
     return { type, sdp };
   }
   if (type === "candidate") {
     const candidate = objectPayload(signal.candidate || signal);
+    assertStringWithinLimit(candidate.candidate, MAX_ICE_CANDIDATE_LENGTH, "candidate_too_large", "ICE candidate is too large.");
     const candidateText = cleanString(candidate.candidate, MAX_ICE_CANDIDATE_LENGTH);
     if (!candidateText) throw new ProtocolError("invalid_rtc_signal", "candidate requires candidate text.");
     return {
@@ -273,6 +290,12 @@ function validateRtcSignal(signal) {
     };
   }
   throw new ProtocolError("invalid_rtc_signal", "RTC signal type must be offer, answer, or candidate.");
+}
+
+function assertStringWithinLimit(value, maxLength, code, message) {
+  if (typeof value === "string" && value.trim().length > maxLength) {
+    throw new ProtocolError(code, message);
+  }
 }
 
 function validateProximityMetrics(metrics) {

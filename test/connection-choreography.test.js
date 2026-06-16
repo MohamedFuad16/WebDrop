@@ -219,6 +219,55 @@ test("failed transport preflight resets verification state", async () => {
   assert.ok(toasts.includes("connectionRejected"));
 });
 
+test("terminal WebRTC failure resets verification without waiting for timeout", async () => {
+  const toasts = [];
+  const store = createStore(initialState());
+  const view = fakeView({
+    closePeerSheet: () => Promise.resolve(),
+    finishIslandConnectionTransition: async () => {
+      throw new Error("should not retract after transport failure");
+    },
+    toast: (message) => toasts.push(message)
+  });
+  const signaling = fakeSignaling();
+  const transport = new Emitter();
+  Object.assign(transport, {
+    peerConnection: { connectionState: "new" },
+    enable() {},
+    connect: async () => {
+      queueMicrotask(() => {
+        transport.peerConnection.connectionState = "failed";
+        transport.emit("connection-state", { state: "failed" });
+      });
+    },
+    getPathStats: async () => ({ path: "unknown" })
+  });
+
+  createController({
+    store,
+    view,
+    signaling,
+    futureSignaling: signaling,
+    proximity: {
+      runCeremony: async () => ({ passed: true, metrics: {}, reason: "verified" }),
+      stopMotionCapture() {},
+      stopAcousticCapture() {}
+    },
+    transport,
+    transfer: new Emitter(),
+    runtime: { realTransfer: true }
+  });
+
+  view.emit("peer-select", "peer-a");
+  view.emit("swipe-connect");
+  await tick();
+  await tick();
+  await tick();
+  assert.equal(store.getState().mode, "lobby");
+  assert.equal(store.getState().pendingInviteId, null);
+  assert.ok(toasts.includes("connectionRejected"));
+});
+
 test("send completion after disconnect does not resurrect transfer state", async () => {
   const sendFinished = deferred();
   let progress;

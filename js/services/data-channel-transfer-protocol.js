@@ -98,6 +98,7 @@ export class DataChannelTransferProtocol extends Emitter {
     retryFrom = {}
   } = {}) {
     await this.ready();
+    if (signal?.aborted) throw abortError();
     const manifest = await createManifest(transferId, files, this.chunkSize);
     const receiverReady = deferredWithTimeout(
       DEFAULT_RECEIVER_READY_TIMEOUT,
@@ -114,6 +115,13 @@ export class DataChannelTransferProtocol extends Emitter {
       completion: null,
       receiverReady
     };
+    const onAbort = () => {
+      state.canceled = true;
+      state.status = "canceled";
+      state.receiverReady?.reject(abortError());
+      state.completion?.reject(abortError());
+    };
+    signal?.addEventListener?.("abort", onAbort, { once: true });
     this.outgoing.set(transferId, state);
     this.sendControl({ type: "transfer:manifest", manifest });
 
@@ -136,7 +144,7 @@ export class DataChannelTransferProtocol extends Emitter {
             size: chunk.byteLength,
             final: nextOffset >= file.size
           };
-          await this.waitForBuffer(this.fileChannel);
+          await this.waitForBuffer(this.fileChannel, signal);
           this.fileChannel.send(JSON.stringify(header));
           this.fileChannel.send(chunk);
           state.sequence += 1;
@@ -167,6 +175,7 @@ export class DataChannelTransferProtocol extends Emitter {
       this.emit(state.status, { transferId, error });
       throw error;
     } finally {
+      signal?.removeEventListener?.("abort", onAbort);
       this.outgoing.delete(transferId);
     }
   }
@@ -212,10 +221,11 @@ export class DataChannelTransferProtocol extends Emitter {
     return true;
   }
 
-  async waitForBuffer(channel = this.fileChannel) {
+  async waitForBuffer(channel = this.fileChannel, signal) {
     if (!channel || channel.readyState !== "open") {
       throw new Error("Data channel is not open.");
     }
+    if (signal?.aborted) throw abortError();
     if (channel.bufferedAmount <= this.highWaterMark) return;
     await new Promise((resolve, reject) => {
       const onLow = () => {
@@ -226,12 +236,18 @@ export class DataChannelTransferProtocol extends Emitter {
         cleanup();
         reject(new Error("Data channel closed while waiting for buffer capacity."));
       };
+      const onAbort = () => {
+        cleanup();
+        reject(abortError());
+      };
       const cleanup = () => {
         channel.removeEventListener("bufferedamountlow", onLow);
         channel.removeEventListener("close", onClose);
+        signal?.removeEventListener?.("abort", onAbort);
       };
       channel.addEventListener("bufferedamountlow", onLow, { once: true });
       channel.addEventListener("close", onClose, { once: true });
+      signal?.addEventListener?.("abort", onAbort, { once: true });
     });
   }
 
@@ -405,6 +421,7 @@ export class DataChannelTransferProtocol extends Emitter {
       state.completionPending = null;
     }
     this.emit("complete", { ...message, transferId, local: false });
+    this.incoming.delete(transferId);
   }
 
   async resendRequestedRange(message) {

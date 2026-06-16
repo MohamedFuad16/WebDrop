@@ -1,6 +1,6 @@
 {
   "name": "webdrop-v2-static",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,6 +8,7 @@
     "check": "node scripts/check-js.mjs",
     "test": "node --test test/*.test.js",
     "verify": "npm run check && npm test",
+    "verify:full": "npm run verify && npm run audit:secrets && npm audit --omit=dev && npm --prefix \"aws cloud server\" run check && npm --prefix \"aws cloud server\" test && npm --prefix \"aws cloud server\" audit --omit=dev && git diff --check",
     "serve": "python3 -m http.server 4178"
   },
   "dependencies": {

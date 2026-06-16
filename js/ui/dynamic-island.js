@@ -45,7 +45,9 @@ export class DynamicIsland extends Emitter {
       if (event.key === "Escape" && this.state.startsWith("qr-")) {
         event.preventDefault();
         this.emit("cancel");
+        return;
       }
+      if (event.key === "Tab" && this.state.startsWith("qr-")) this.trapFocus(event);
     });
     window.addEventListener("pagehide", () => this.stopCamera());
   }
@@ -120,6 +122,9 @@ export class DynamicIsland extends Emitter {
     this.cancelCloseTransition(false);
     this.stopCamera();
     this.setState("closing");
+    if (this.root?.contains(this.document.activeElement)) {
+      this.document.activeElement.blur?.();
+    }
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
     this.closePromise = new Promise((resolve) => {
       this.closeResolver = resolve;
@@ -163,11 +168,40 @@ export class DynamicIsland extends Emitter {
   setState(state) {
     this.state = state;
     if (this.root) {
+      const concealed = state === "closed" || state === "closing";
       this.root.dataset.state = state;
-      this.root.setAttribute("aria-hidden", String(state === "closed"));
+      this.root.setAttribute("aria-hidden", String(concealed));
       this.root.setAttribute("role", state.startsWith("qr-") ? "dialog" : "status");
       this.root.setAttribute("aria-modal", String(state.startsWith("qr-")));
-      this.root.inert = state === "closed";
+      this.root.inert = concealed;
+    }
+  }
+
+  focusableElements() {
+    return [...this.root.querySelectorAll(
+      "button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])"
+    )].filter((node) => !node.hidden && node.getAttribute("aria-hidden") !== "true");
+  }
+
+  trapFocus(event) {
+    const focusable = this.focusableElements();
+    if (!focusable.length) {
+      event.preventDefault();
+      this.root.focus?.({ preventScroll: true });
+      return;
+    }
+    const active = this.document.activeElement;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!this.root.contains(active)) {
+      event.preventDefault();
+      first.focus({ preventScroll: true });
+    } else if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus({ preventScroll: true });
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus({ preventScroll: true });
     }
   }
 

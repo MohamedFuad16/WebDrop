@@ -921,13 +921,25 @@ function wait(ms) {
 
 function waitForTransportConnection(transport, timeoutMs) {
   if (transport.peerConnection?.connectionState === "connected") return Promise.resolve();
+  if (["failed", "closed"].includes(transport.peerConnection?.connectionState)) {
+    return Promise.reject(new Error(`WebRTC connection ${transport.peerConnection.connectionState}.`));
+  }
   return new Promise((resolve, reject) => {
     let cleanup = () => {};
+    const fail = (state) => {
+      clearTimeout(timer);
+      cleanup();
+      reject(new Error(`WebRTC connection ${state}.`));
+    };
     const timer = setTimeout(() => {
       cleanup();
       reject(new Error("Timed out waiting for the remote WebRTC offer."));
     }, timeoutMs);
     cleanup = transport.on?.("connection-state", ({ state }) => {
+      if (state === "failed" || state === "closed") {
+        fail(state);
+        return;
+      }
       if (state !== "connected") return;
       clearTimeout(timer);
       cleanup();

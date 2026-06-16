@@ -54,7 +54,11 @@ export class SignalingHub {
 
     server.on("upgrade", (request, socket, head) => {
       const url = new URL(request.url, "http://localhost");
-      if (url.pathname !== this.path) return;
+      if (url.pathname !== this.path) {
+        socket.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
+        socket.destroy();
+        return;
+      }
       if (!this.isAllowedOrigin(request.headers.origin)) {
         socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
         socket.destroy();
@@ -142,9 +146,15 @@ export class SignalingHub {
 
   registerClient(socket, hello) {
     const existing = this.clients.get(hello.id);
+    if (existing && ![WebSocket.CLOSING, WebSocket.CLOSED].includes(existing.socket.readyState)) {
+      this.send(socket, "protocol:error", {
+        code: "client_id_in_use",
+        message: "A live signaling session already uses this client id."
+      });
+      socket.close(4009, "client_id_in_use");
+      return;
+    }
     if (existing) {
-      this.send(existing.socket, "server:replaced", { reason: "A newer connection joined with this client id." });
-      existing.socket.close(4000, "replaced");
       this.clients.delete(hello.id);
     }
 
@@ -285,7 +295,7 @@ export class SignalingHub {
 
   verifyQrToken(sender, target, message) {
     const pairingId = message.pairingId || sender.pairingId || this.findPendingPairingId(sender.id, target.id);
-    if (!this.canUsePairing(sender, target, pairingId)) {
+    if (!this.arePaired(sender, target, pairingId)) {
       this.send(sender.socket, "route:error", {
         code: "pairing_not_available",
         targetId: target.id,
@@ -358,7 +368,7 @@ export class SignalingHub {
     const pairingId = message.pairingId || this.findPendingPairingId(sender.id, target.id);
     const pending = this.pendingInvites.get(pairingId);
     if (!pending || pending.expiresAt <= Date.now() || pending.fromId !== target.id || pending.toId !== sender.id) {
-      this.pendingInvites.delete(pairingId);
+      if (pending?.expiresAt <= Date.now()) this.pendingInvites.delete(pairingId);
       this.send(sender.socket, "route:error", {
         code: "invite_not_pending",
         targetId: target.id,
@@ -398,6 +408,16 @@ export class SignalingHub {
 
   rejectInvite(sender, target, message) {
     const pairingId = message.pairingId || this.findPendingPairingId(sender.id, target.id);
+    const pending = this.pendingInvites.get(pairingId);
+    if (!pending || pending.expiresAt <= Date.now() || pending.fromId !== target.id || pending.toId !== sender.id) {
+      if (pending?.expiresAt <= Date.now()) this.pendingInvites.delete(pairingId);
+      this.send(sender.socket, "route:error", {
+        code: "invite_not_pending",
+        targetId: target.id,
+        type: message.type
+      });
+      return;
+    }
     this.pendingInvites.delete(pairingId);
     this.send(target.socket, message.type, {
       ...message,

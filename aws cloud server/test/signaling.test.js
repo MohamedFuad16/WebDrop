@@ -71,35 +71,37 @@ test("TURN credentials require a live signaling session when authentication is e
   client.close();
 });
 
-test("replacing a signaling session invalidates the old TURN bearer without removing the new client", async () => {
+test("rejects a live duplicate client id without disconnecting the original session", async () => {
   await restartServer({ REQUIRE_TURN_AUTH: "true" });
   const first = await connectClient("turn-reconnect", "First Session");
   const firstConnected = await first.nextOfType("connected");
-  const second = await connectClient("turn-reconnect", "Second Session");
-  const secondConnected = await second.nextOfType("connected");
-  assert.notEqual(firstConnected.payload.turnAccessToken, secondConnected.payload.turnAccessToken);
+
+  const duplicate = new WebSocket(baseUrl.replace("http:", "ws:") + "/ws", {
+    headers: { Origin: "http://allowed.example" }
+  });
+  const duplicateMessages = [];
+  duplicate.on("message", (data) => duplicateMessages.push(JSON.parse(data.toString())));
+  await new Promise((resolve) => duplicate.once("open", resolve));
+  duplicate.send(JSON.stringify({
+    type: "client:hello",
+    payload: { self: { id: "turn-reconnect", deviceName: "Takeover Attempt" } }
+  }));
+  await waitFor(() => duplicateMessages.some((message) => message.type === "protocol:error"));
+  assert.equal(duplicateMessages.find((message) => message.type === "protocol:error").payload.code, "client_id_in_use");
 
   await new Promise((resolve) => setTimeout(resolve, 30));
-  assert.equal(hub.clients.get("turn-reconnect")?.deviceName, "Second Session");
+  assert.equal(hub.clients.get("turn-reconnect")?.deviceName, "First Session");
   assert.equal(hub.clients.size, 1);
 
-  const stale = await fetch(`${baseUrl}/api/ice-servers?clientId=turn-reconnect`, {
+  const current = await fetch(`${baseUrl}/api/ice-servers?clientId=turn-reconnect`, {
     headers: {
       Origin: "http://allowed.example",
       Authorization: `Bearer ${firstConnected.payload.turnAccessToken}`
     }
   });
-  assert.equal(stale.status, 401);
-
-  const current = await fetch(`${baseUrl}/api/ice-servers?clientId=turn-reconnect`, {
-    headers: {
-      Origin: "http://allowed.example",
-      Authorization: `Bearer ${secondConnected.payload.turnAccessToken}`
-    }
-  });
   assert.equal(current.status, 200);
   first.close();
-  second.close();
+  duplicate.close();
 });
 
 test("routes invite, rtc signals, chat, transfer manifest, and disconnect between two clients", async () => {
@@ -364,6 +366,56 @@ test("invite rejection does not mark either peer connected", async () => {
   bob.close();
 });
 
+test("rejects spoofed invite rejection from a third client", async () => {
+  const alice = await connectClient("alice-spoof-reject", "Alice Phone");
+  const bob = await connectClient("bob-spoof-reject", "Bob Tablet");
+  const charlie = await connectClient("charlie-spoof-reject", "Charlie Laptop");
+
+  alice.sendJson({ type: "invite", targetId: "bob-spoof-reject" });
+  const invite = await bob.nextOfType("invite");
+  charlie.sendJson({
+    type: "invite:reject",
+    targetId: "alice-spoof-reject",
+    pairingId: invite.payload.pairingId
+  });
+
+  const error = await charlie.nextOfType("route:error");
+  assert.equal(error.payload.code, "invite_not_pending");
+  assert.equal(hub.pendingInvites.has(invite.payload.pairingId), true);
+
+  alice.close();
+  bob.close();
+  charlie.close();
+});
+
+test("QR verification cannot unlock proximity before an invite is accepted", async () => {
+  await restartServer({ ENABLE_PROXIMITY_ANALYSIS: "true" });
+  const alice = await connectClient("alice-pending-qr", "Alice Phone");
+  const bob = await connectClient("bob-pending-qr", "Bob Tablet");
+
+  alice.sendJson({ type: "invite", targetId: "bob-pending-qr" });
+  const invite = await bob.nextOfType("invite");
+  alice.sendJson({
+    type: "proximity:qr:issue",
+    targetId: "bob-pending-qr",
+    pairingId: invite.payload.pairingId
+  });
+  const issued = await alice.nextOfType("proximity:qr:issued");
+  bob.sendJson({
+    type: "proximity:qr:verify",
+    targetId: "alice-pending-qr",
+    pairingId: invite.payload.pairingId,
+    payload: { token: issued.payload.token }
+  });
+
+  const error = await bob.nextOfType("route:error");
+  assert.equal(error.payload.code, "pairing_not_available");
+  assert.equal(hub.isProximityVerified(invite.payload.pairingId), false);
+
+  alice.close();
+  bob.close();
+});
+
 test("keeps accepted pairings alive while websocket pong remains healthy", async () => {
   await restartServer({ SESSION_TTL_MS: "40", HEARTBEAT_INTERVAL_MS: "10" });
   const alice = await connectClient("alice-expire", "Alice Phone");
@@ -419,6 +471,24 @@ test("rejects websocket connections from disallowed origins", async () => {
       socket.once("error", reject);
     }),
     /Unexpected server response: 403/
+  );
+});
+
+test("rejects websocket upgrades to unknown paths", async () => {
+  await assert.rejects(
+    () => new Promise((resolve, reject) => {
+      const socket = new WebSocket(baseUrl.replace("http:", "ws:") + "/bad", {
+        headers: {
+          Origin: "http://allowed.example"
+        }
+      });
+      socket.once("open", () => {
+        socket.close();
+        resolve();
+      });
+      socket.once("error", reject);
+    }),
+    /Unexpected server response: 404/
   );
 });
 
@@ -503,4 +573,22 @@ function silentLogger() {
     warn() {},
     error() {}
   };
+}
+
+function waitFor(predicate, timeoutMs = 2500) {
+  return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    const check = () => {
+      if (predicate()) {
+        resolve();
+        return;
+      }
+      if (Date.now() - startedAt > timeoutMs) {
+        reject(new Error("Timed out waiting for condition."));
+        return;
+      }
+      setTimeout(check, 10);
+    };
+    check();
+  });
 }
