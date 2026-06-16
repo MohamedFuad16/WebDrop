@@ -340,6 +340,11 @@
   stroke: none;
 }
 
+.device-brand--official text {
+  fill: currentColor;
+  stroke: none;
+}
+
 .device-brand--apple svg,
 .device-brand--google svg,
 .device-brand--windows svg {
@@ -348,7 +353,7 @@
 }
 
 .device-brand--samsung svg {
-  width: 18px;
+  width: 42px;
   height: 18px;
 }
 
@@ -358,31 +363,38 @@
 }
 
 .device-brand--apple {
-  --device-chip-bg: #edf3ff;
-  --device-chip-ink: #2f6fed;
+  --device-chip-bg: #f7f8fa;
+  --device-chip-ink: #111111;
 }
 
 .device-brand--samsung {
-  --device-chip-bg: #e4f7ff;
-  --device-chip-ink: #1874c8;
+  --device-chip-bg: #edf5ff;
+  --device-chip-ink: #1428a0;
+  width: 54px;
+  flex-basis: 54px;
+  border-radius: 999px;
 }
 
-.device-brand--android,
 .device-brand--google {
+  --device-chip-bg: #eaf3ff;
+  --device-chip-ink: #4285f4;
+}
+
+.device-brand--android {
   --device-chip-bg: #e9f8e8;
-  --device-chip-ink: #2b8b4b;
+  --device-chip-ink: #3ddc84;
 }
 
 .device-brand--windows {
   --device-chip-bg: #eef3ff;
-  --device-chip-ink: #4867c8;
+  --device-chip-ink: #0078d4;
 }
 
 .app-shell[data-theme="dark"] .device-brand {
-  color: color-mix(in srgb, var(--device-chip-ink) 84%, #ffffff 16%);
+  color: color-mix(in srgb, var(--device-chip-ink) 78%, #ffffff 22%);
   background:
-    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, .14), transparent 58%),
-    color-mix(in srgb, var(--device-chip-bg) 30%, #f7f8fb 70%);
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, .72), transparent 58%),
+    color-mix(in srgb, var(--device-chip-bg) 70%, #ffffff 30%);
   border-color: color-mix(in srgb, var(--device-chip-ink) 52%, #ffffff 22%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, .18),
@@ -424,14 +436,14 @@
 
 .nearby-device-meta {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 5px;
   min-width: 0;
   align-items: center;
 }
 
 .nearby-pill {
-  max-width: 50%;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   flex: 0 1 auto;
@@ -443,6 +455,11 @@
   font-size: 10px;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.nearby-device-history {
+  display: flex;
+  min-width: 0;
 }
 
 .nearby-connect {

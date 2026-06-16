@@ -583,3 +583,26 @@ Rendered evidence:
 - Dark-mode nearby candidate sheet confirmed candidate, friend, and plus circles all render with white backgrounds and borders.
 - QR scanner preview confirmed the title is one line, the fallback element/text is absent, and only Start camera is shown.
 - Dynamic Island close samples confirmed pill and cancel opacity are zero during the closing shrink.
+
+## 2026-06-16 Version 1.0.16 official device icon and cache polish
+
+Scope:
+- Fixed nearby-device brand badges that could look generic, faint, or non-official in the nearby sheet.
+- Restored the connected-before badge to its own row below the distance and match badges.
+- Checked whether stale service-worker caches could preserve old icon rendering.
+- Ran three subagent lanes for UI/logo, cache/version, and cleanup/performance/animation review.
+
+Implementation:
+- Tightened device brand classification for Apple/iPhone/iPad/Mac/Watch, Samsung/Galaxy, Google/Pixel, Android/tablet/fold, and Windows/Surface.
+- Made Samsung render as a readable official wordmark-style pill while keeping Apple, Google, Android, and Windows as official brand glyph badges.
+- Improved dark-mode badge contrast so brand marks remain visible.
+- Incremented package, lockfile, visible Settings version, service-worker cache version, docs, and screenshot/PDF scripts to `1.0.16`.
+- Added a verification guard so `index.html` visible version must match `package.json`.
+- Paused Dynamic Island flow and scan animations when the in-app motion setting is paused.
+- Removed stale workflow/test-result artifacts and rebuilt `graphify-out`.
+
+Verification:
+- `npm run verify:full` passed.
+- Workflow verification passed for `.workflow/webdrop-official-device-icon-cache-polish`.
+- In-app Browser confirmed app identity, meaningful content, visible `1.0.16`, and no console warnings/errors.
+- Temporary mobile Playwright smoke at 390x844 confirmed light/dark nearby sheets, zero horizontal overflow, readable Samsung wordmark badge, Apple/Google official badge classes, and history below the match row.

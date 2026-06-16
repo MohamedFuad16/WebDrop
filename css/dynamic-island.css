@@ -424,3 +424,8 @@
     animation: none;
   }
 }
+
+.app-shell[data-motion="paused"] .webdrop-island__flow i,
+.app-shell[data-motion="paused"] .webdrop-island__beam {
+  animation: none;
+}

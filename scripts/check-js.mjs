@@ -10,6 +10,7 @@ const args = new Set(process.argv.slice(2));
 if (!args.has("--secrets-only")) {
   checkSyntax();
   checkPackageLock();
+  checkVisibleVersion();
   checkServiceWorkerManifest();
 }
 
@@ -49,6 +50,15 @@ function checkPackageLock() {
   assert(
     JSON.stringify(rootPackage.dependencies ?? {}) === JSON.stringify(packageJson.dependencies ?? {}),
     "package-lock root dependencies do not match package.json"
+  );
+}
+
+function checkVisibleVersion() {
+  const packageJson = readJson("package.json");
+  const html = readFileSync("index.html", "utf8");
+  assert(
+    html.includes(`<strong>${packageJson.version}</strong>`),
+    "index.html visible app version does not match package.json"
   );
 }
 

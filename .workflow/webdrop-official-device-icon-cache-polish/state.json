@@ -1,0 +1,45 @@
+{
+  "title": "WebDrop official device icon cache polish",
+  "slug": "webdrop-official-device-icon-cache-polish",
+  "created_at": "2026-06-16T13:24:44+00:00",
+  "status": "verified",
+  "approval": {
+    "required": false,
+    "granted": true,
+    "notes": "User requested direct cleanup, version bump, verification, and push to main."
+  },
+  "packets": [
+    {
+      "id": "ui-logo",
+      "status": "completed",
+      "owner": "subagent",
+      "result": "Inline brand markup was present, but circular monochrome chip styling and device classification made several devices appear generic or unofficial."
+    },
+    {
+      "id": "cache-version",
+      "status": "completed",
+      "owner": "subagent",
+      "result": "Service worker cache is versioned and cache-first for app assets, so a release version bump is required to avoid stale icon rendering."
+    },
+    {
+      "id": "cleanup-performance-animation",
+      "status": "completed",
+      "owner": "subagent",
+      "result": "Recommended pausing Dynamic Island animations when app motion is paused and updating stale version references."
+    },
+    {
+      "id": "integration",
+      "status": "completed",
+      "owner": "main",
+      "result": "Applied UI, version, cache, and verification-script fixes; QA passed."
+    }
+  ],
+  "verification": {
+    "status": "passed",
+    "checks": [
+      "npm run verify:full: passed",
+      "rendered nearby sheet light/dark smoke: passed",
+      "stale version reference search: passed for runtime/docs/scripts; historical agenthistory entry retained"
+    ]
+  }
+}
