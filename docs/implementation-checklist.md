@@ -1,9 +1,9 @@
 # WebDrop Production Implementation Checklist
 
 Updated: June 16, 2026
-App version: 1.0.24
+App version: 1.0.25
 
-This is the source of truth for the production-readiness package. `Ready, disabled` means the implementation is wired to the frontend but cannot become effective unless `productionSignaling` is enabled with valid runtime URLs. `Ready, unconfigured` means the code exists but requires deployment secrets or infrastructure. `External verification` means the code is ready but requires AWS, Cloudflare, or physical devices.
+This is the source of truth for the production-readiness package. `Ready, live` means the implementation is active in the current runtime. `Ready, disabled` means the implementation is wired to the frontend but cannot become effective unless its runtime flag and infrastructure are enabled. `Ready, unconfigured` means the code exists but requires deployment secrets or infrastructure. `External verification` means the code is ready but requires AWS, Cloudflare, or physical devices.
 
 ## Proximity and permissions
 
@@ -26,38 +26,35 @@ This is the source of truth for the production-readiness package. `Ready, disabl
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Real offer/answer creation | Ready, disabled | `js/services/webrtc-transport.js` |
-| Route SDP and ICE through WebSocket | Ready, disabled | `js/services/webrtc-transport.js`, `js/services/websocket-signaling.js` |
-| Exactly one offerer per accepted invite | Ready, disabled | `js/core/controller.js` |
-| Receiver `ondatachannel` handling | Ready, disabled | `js/services/webrtc-transport.js` |
-| Separate control and file channels | Ready, disabled | `js/services/data-channel-transfer-protocol.js` |
-| 64 KiB chunks and `bufferedAmount` backpressure | Ready, disabled | `js/services/data-channel-transfer-protocol.js` |
-| Transfer manifests and file IDs | Ready, disabled | `js/services/data-channel-transfer-protocol.js` |
-| Sender-side incremental SHA-256 manifest hashes | Ready, disabled | `js/services/data-channel-transfer-protocol.js`, `workers/incremental-sha256.js` |
-| Receiver ACKs and cancel messages | Ready, disabled | `js/services/data-channel-transfer-protocol.js` |
-| Receiver storage backpressure before chunk ACK | Ready, disabled | `js/services/data-channel-transfer-protocol.js`, `js/services/transfer-engine.js` |
-| Per-file and total progress | Ready, disabled | `js/services/data-channel-transfer-protocol.js`, `js/core/controller.js` |
-| Completion waits for receiver storage and hash verification | Ready, disabled | `js/services/transfer-engine.js`, `js/services/data-channel-transfer-protocol.js` |
-| Failure and retry-range controls | Ready, disabled | `js/services/data-channel-transfer-protocol.js` |
-| Direct/relay path classification | Ready, disabled | `js/services/webrtc-transport.js` |
+| Real offer/answer creation | Ready, live | `js/services/webrtc-transport.js` |
+| Route SDP and ICE through WebSocket | Ready, live | `js/services/webrtc-transport.js`, `js/services/websocket-signaling.js` |
+| Exactly one offerer per accepted invite | Ready, live | `js/core/controller.js` |
+| Receiver `ondatachannel` handling | Ready, live | `js/services/webrtc-transport.js` |
+| Separate control and file channels | Ready, live | `js/services/data-channel-transfer-protocol.js` |
+| 64 KiB chunks and `bufferedAmount` backpressure | Ready, live | `js/services/data-channel-transfer-protocol.js` |
+| Transfer manifests and file IDs | Ready, live | `js/services/data-channel-transfer-protocol.js` |
+| Sender-side incremental SHA-256 manifest hashes | Ready, live | `js/services/data-channel-transfer-protocol.js`, `workers/incremental-sha256.js` |
+| Receiver ACKs and cancel messages | Ready, live | `js/services/data-channel-transfer-protocol.js` |
+| Receiver Blob assembly before chunk ACK | Ready, live | `js/services/transfer-engine.js`, `js/storage/storage-client.js` |
+| Per-file and total progress | Ready, live | `js/services/data-channel-transfer-protocol.js`, `js/core/controller.js` |
+| Completion waits for receiver byte-count verification | Ready, live | `js/services/transfer-engine.js`, `js/services/data-channel-transfer-protocol.js`, `js/storage/storage-client.js` |
+| Failure and retry-range controls | Ready, live | `js/services/data-channel-transfer-protocol.js` |
+| Direct/relay path classification | Ready, live | `js/services/webrtc-transport.js` |
 | Two-browser direct and TURN transfer | External verification | Requires deployed WSS/TURN and two browsers |
 
 ## Receive storage
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| OPFS-first incremental writes | Ready, disabled | `workers/storage-worker.js` |
-| Fall through from OPFS failure to IndexedDB/memory | Ready, disabled | `workers/storage-worker.js` |
-| IndexedDB chunk fallback | Ready, disabled | `workers/storage-worker.js` |
-| Memory fallback capped at 64 MiB | Ready, disabled | `workers/storage-worker.js` |
-| Quota estimate before receive | Ready, disabled | `workers/storage-worker.js`, `js/services/transfer-engine.js` |
-| Byte-count verification | Ready, disabled | `workers/storage-worker.js` |
-| Incremental SHA-256 verification | Ready, disabled | `workers/incremental-sha256.js`, `workers/storage-worker.js` |
-| Worker transfer lists for chunks | Ready, disabled | `js/storage/storage-client.js` |
-| Export, abort, and cleanup commands | Ready, disabled | `workers/storage-worker.js`, `js/storage/storage-client.js` |
-| Worker-restart transfer resume | Future hardening | Not required for first production transfer; partial sessions are not resumed |
-| Large IndexedDB export UX above 64 MiB | Future hardening | Worker exposes chunked export; integrated UI currently opens whole-Blob exports |
-| Real-browser OPFS/IndexedDB failure-path tests | External verification | Requires browser/device storage environments |
+| Blob-backed receive assembly | Ready, live | `js/storage/storage-client.js` |
+| Automatic browser download on receive complete | Ready, live | `js/core/controller.js` |
+| Open action for received files | Ready, live | `js/ui/app-view.js`, `js/core/controller.js` |
+| 500 MB receive session cap | Ready, live | `js/storage/storage-client.js`, `js/services/data-channel-transfer-protocol.js` |
+| 500 MB send session cap | Ready, live | `js/core/controller.js`, `js/services/data-channel-transfer-protocol.js` |
+| Byte-count verification | Ready, live | `js/storage/storage-client.js` |
+| Simultaneous send and receive over one peer connection | Ready, live | `js/services/data-channel-transfer-protocol.js`, local bidirectional protocol test |
+| Worker/OPFS receive writer | Removed from active runtime | App no longer creates `workers/storage-worker.js`; received files are browser `Blob`s |
+| Worker-restart transfer resume | Future hardening | Not applicable to Blob receive sessions; interrupted sessions must restart |
 
 ## AWS signaling backend
 
@@ -77,7 +74,7 @@ This is the source of truth for the production-readiness package. `Ready, disabl
 
 ## Disabled-default proof
 
-- `js/config/runtime-config.js` ships with `productionSignaling=false` and blank production URLs.
+- `js/config/runtime-config.js` currently points at the live Japan East WSS/TURN endpoints.
 - `js/config/runtime-flags.js` refuses to enable proximity, transfer, or QR unless production signaling is enabled with a valid production signaling URL.
 - `aws cloud server/.env.example` ships with `ENABLE_PROXIMITY_ANALYSIS=false`.
 - Default app startup uses `MockSignalingAdapter` and does not request microphone or motion permissions.
@@ -98,7 +95,7 @@ This is the source of truth for the production-readiness package. `Ready, disabl
 3. Configure production allowed origins and protected metrics token.
 4. Set real WSS and TURN endpoint URLs in `js/config/runtime-config.js`.
 5. Enable flags in the staged order documented in `docs/production-activation.md`.
-6. Run two-physical-device proximity calibration and direct/TURN file-transfer tests.
+6. Run two-physical-device proximity calibration and direct/TURN file-transfer tests with representative files below and near the 500 MB cap.
 7. Load-test signaling toward the documented 10,000-client target.
 8. Add stronger client identity authentication and shared state before horizontally scaling beyond one signaling instance.
 9. Keep the regenerated English and Japanese screenshot inventories and PDF guides aligned with the current app version.

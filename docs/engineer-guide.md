@@ -17,11 +17,11 @@ The deployed site at `https://web-drop-lyart.vercel.app/` may be used as a produ
 As of this pass:
 
 - The active local runnable artifact is `index.html`.
-- The visible app/package/service-worker version is `1.0.24`.
+- The visible app/package/service-worker version is `1.0.25`.
 - The old architecture HTML page was deleted during the corrected rebuild.
 - `js/app.js` boots the modular static app.
 - `js/core/controller.js` owns the state transitions that gate file controls.
-- `workers/storage-worker.js` owns disabled-gated OPFS-first receive storage, IndexedDB fallback, capped memory fallback, quota checks, hash verification, export, abort, and cleanup.
+- `js/storage/storage-client.js` owns active Blob receive storage, byte-count checks, automatic browser download handoff, and the 500 MB receive-session cap.
 - `aws cloud server/` owns the deployable signaling backend package; it coordinates metadata only and must not carry file bytes.
 - The repository is a Git working tree from this directory; preserve unrelated local changes.
 
@@ -81,8 +81,8 @@ Keep these boundaries stable:
 - WebRTC `RTCDataChannel` carries file chunks.
 - TURN is fallback transport, not the default happy path.
 - Relay mode should be capped and disclosed.
-- Receiver storage writes chunks incrementally.
-- Large received files should not be assembled as one giant in-memory `Blob`.
+- Receiver storage keeps DataChannel chunks as Blob parts and downloads through the browser.
+- Large received files are capped at 500 MB per receive session.
 - QR remains the universal fallback when audio or motion permissions are unavailable.
 
 ## Verification checklist
@@ -93,7 +93,7 @@ For future runtime edits, verify:
 - Send/receive controls are absent before connected state.
 - Send/receive controls appear for a selected connected peer.
 - No file bytes are sent through signaling code.
-- Large receive paths stream to OPFS or IndexedDB rather than memory.
+- Received files auto-download and remain available from the receive sheet Open action.
 - Relay mode applies a clear cap and user-facing explanation.
 
 ## Production handoff reminders

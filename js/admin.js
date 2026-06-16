@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.24";
+const APP_VERSION = "1.0.25";
 const CHUNK_SIZE = 64 * 1024;
 
 const readinessItems = [
@@ -44,8 +44,8 @@ const readinessItems = [
   },
   {
     title: "WebRTC transfer engine",
-    status: "Ready, disabled",
-    score: 66,
+    status: "Ready, live",
+    score: 82,
     checks: [
       "DataChannel control and file channels",
       "64 KiB chunks and backpressure model",
@@ -53,13 +53,13 @@ const readinessItems = [
     ]
   },
   {
-    title: "Storage workers",
-    status: "Ready, disabled",
-    score: 68,
+    title: "Blob receive storage",
+    status: "Ready, live",
+    score: 78,
     checks: [
-      "OPFS-first writes with IndexedDB fallback",
-      "Memory fallback capped for small files",
-      "Incremental hash and byte-count verification"
+      "500 MB send and receive session caps",
+      "Received chunks become browser Blobs",
+      "Open action and automatic download handoff"
     ]
   },
   {

@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.24";
+const APP_VERSION = "1.0.25";
 const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [
@@ -37,7 +37,6 @@ const ASSETS = [
   "./js/vendor/qrcode-generator.mjs",
   "./js/utils/emitter.js",
   "./js/utils/format.js",
-  "./workers/storage-worker.js",
   "./workers/incremental-sha256.js",
   "./assets/fonts/SourceHanSansJP-Normal-static.ttf",
   "./assets/icons/webdrop-mark.svg"

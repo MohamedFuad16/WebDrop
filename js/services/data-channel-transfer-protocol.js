@@ -11,6 +11,7 @@ const DEFAULT_HIGH_WATER_MARK = 8 * 1024 * 1024;
 const DEFAULT_LOW_WATER_MARK = 2 * 1024 * 1024;
 const DEFAULT_RECEIVER_READY_TIMEOUT = 45_000;
 const DEFAULT_COMPLETION_TIMEOUT = 30 * 60_000;
+const DEFAULT_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 
 export class DataChannelTransferProtocol extends Emitter {
   constructor({
@@ -18,12 +19,14 @@ export class DataChannelTransferProtocol extends Emitter {
     fileChannel = null,
     chunkSize = DEFAULT_CHUNK_SIZE,
     highWaterMark = DEFAULT_HIGH_WATER_MARK,
-    lowWaterMark = DEFAULT_LOW_WATER_MARK
+    lowWaterMark = DEFAULT_LOW_WATER_MARK,
+    sessionCapBytes = DEFAULT_SESSION_CAP_BYTES
   } = {}) {
     super();
     this.chunkSize = chunkSize;
     this.highWaterMark = highWaterMark;
     this.lowWaterMark = lowWaterMark;
+    this.sessionCapBytes = sessionCapBytes;
     this.controlChannel = null;
     this.fileChannel = null;
     this.outgoing = new Map();
@@ -99,7 +102,14 @@ export class DataChannelTransferProtocol extends Emitter {
   } = {}) {
     await this.ready();
     if (signal?.aborted) throw abortError();
+    const totalBytes = [...files].reduce((sum, file) => sum + (Number.isFinite(file.size) ? file.size : 0), 0);
+    if (totalBytes > this.sessionCapBytes) {
+      throw new Error(`Transfer exceeds the ${formatCap(this.sessionCapBytes)} session cap.`);
+    }
     const manifest = await createManifest(transferId, files, this.chunkSize);
+    if (manifest.totalBytes > this.sessionCapBytes) {
+      throw new Error(`Transfer exceeds the ${formatCap(this.sessionCapBytes)} session cap.`);
+    }
     const receiverReady = deferredWithTimeout(
       DEFAULT_RECEIVER_READY_TIMEOUT,
       "Timed out waiting for receiver storage readiness."
@@ -260,6 +270,22 @@ export class DataChannelTransferProtocol extends Emitter {
       if (!isValidManifest(manifest)) {
         const error = new Error("Received an invalid transfer manifest.");
         this.emit("protocol-error", { error, message });
+        return;
+      }
+      if (manifest.totalBytes > this.sessionCapBytes) {
+        this.sendControl({
+          type: "transfer:failed",
+          transferId: manifest.id,
+          reason: `Transfer exceeds the ${formatCap(this.sessionCapBytes)} receive session cap.`,
+          retryable: false
+        });
+        this.emit("failed", {
+          transferId: manifest.id,
+          error: new Error("Incoming transfer exceeds the receive session cap."),
+          retryable: false,
+          local: true,
+          stage: "manifest-cap"
+        });
         return;
       }
       this.incoming.set(manifest.id, {
@@ -467,6 +493,10 @@ export class DataChannelTransferProtocol extends Emitter {
     this.incoming.clear();
     this.pendingChunkHeader = null;
   }
+}
+
+function formatCap(bytes) {
+  return `${Math.round(bytes / 1024 / 1024)} MB`;
 }
 
 async function createManifest(transferId, files, chunkSize) {

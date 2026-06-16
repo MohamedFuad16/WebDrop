@@ -5,11 +5,11 @@
 This checkout now contains a first-run static, modular WebDrop v2 app plus architecture notes.
 
 - `index.html` is the active static app shell.
-- The current app/package/service-worker version is `1.0.24`.
+- The current app/package/service-worker version is `1.0.25`.
 - The earlier `proximity_architecture_monkeytype_v2.html` page was removed during the corrected rebuild.
 - `docs/implementation-checklist.md` is the current production-readiness source of truth.
 - `js/` contains the app state machine, controller, adapters, proximity, transport, transfer, storage client, and UI renderer.
-- `workers/storage-worker.js` contains the disabled-by-default receive-side OPFS/IndexedDB/memory storage implementation.
+- `js/storage/storage-client.js` contains the active receive-side Blob storage implementation and 500 MB receive-session cap.
 - `aws cloud server/` contains the deployable signaling backend package for WSS metadata, QR token issuance, TURN credential proxying, and enforcement policy.
 - `graphify-out/` exists, but the current index may be stale or unrelated. Follow `AGENTS.md`: try graph traversal first, record stale results when encountered, then keep any direct reads scoped to the task.
 
@@ -21,7 +21,7 @@ WebDrop is a browser-native nearby file-transfer system. It should feel like a z
 
 The product separates three concerns:
 
-1. Static delivery: HTML, CSS, JavaScript, assets, and worker files served over HTTPS.
+1. Static delivery: HTML, CSS, JavaScript, assets, and the incremental hash helper served over HTTPS.
 2. Signaling and coordination: WebSocket metadata for presence, invites, session state, proximity evidence, offers, answers, and ICE candidates.
 3. Payload transport: encrypted browser-to-browser file chunks over WebRTC `RTCDataChannel`.
 
@@ -38,7 +38,7 @@ The browser client owns:
 - QR, audio, motion, and manual pairing ceremonies.
 - WebRTC peer setup.
 - Chunked file read and send.
-- Streaming receive, hash, and export flow.
+- Chunked receive, Blob assembly, automatic browser download, and Open actions.
 - User-facing state transitions.
 
 ### Signaling lane
@@ -114,15 +114,9 @@ TURN credential requests are separately protected by an ephemeral access token r
 
 ## Storage model
 
-The receiver should avoid holding the entire file in memory.
+The active receive path stores chunks as browser `Blob` parts and triggers a normal browser download after transfer completion. Each send session is capped at 500 MB and each receive session is capped at 500 MB, so a connected pair can send up to 500 MB in each direction at the same time.
 
-Preferred storage ladder:
-
-1. OPFS worker writer for large files.
-2. IndexedDB chunk store when OPFS is unavailable.
-3. In-memory buffer only for small files.
-
-Hashing should be incremental. Export should stream from the selected storage backend where possible.
+The earlier OPFS/IndexedDB worker writer is no longer used by the app runtime. A future native-feeling large-file mode can revisit worker-backed persistence, but the current product direction favors the user's default browser download location.
 
 ## Failure policy
 

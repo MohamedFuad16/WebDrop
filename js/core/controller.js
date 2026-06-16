@@ -1,5 +1,7 @@
 import { formatBytes } from "../utils/format.js";
 
+const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
+
 export function createController({
   store,
   view,
@@ -206,8 +208,13 @@ export function createController({
       icon: file.type?.includes("pdf") ? "P" : file.type?.startsWith("image/") ? "◎" : "⌁",
       storageBackend: file.backend,
       sha256: file.sha256,
-      ready: true
+      ready: true,
+      url: file.blob ? URL.createObjectURL(file.blob) : "",
+      downloadName: file.name
     }));
+    for (const item of receivedItems) {
+      if (item.url) triggerBrowserDownload(item.url, item.downloadName);
+    }
     store.update((state) => ({
       ...state,
       receivedCount: state.receivedCount + receivedItems.length,
@@ -263,6 +270,13 @@ export function createController({
   view.on("open-receive-sheet", () => view.openReceiveSheet());
   view.on("open-chat-sheet", () => view.openChatSheet());
   view.on("open-received", async ({ transferId, fileId }) => {
+    const existing = store.getState().receivedItems.find((item) =>
+      item.transferId === transferId && item.id === fileId
+    );
+    if (existing?.url) {
+      window.open(existing.url, "_blank", "noopener");
+      return;
+    }
     if (!runtime.realTransfer || !transferId || !fileId) return;
     try {
       const exported = await transfer.storage.exportFile(fileId, { sessionId: transferId });
@@ -436,8 +450,8 @@ export function createController({
       pendingInviteId: null,
       incomingInvite: null,
       path,
-      receivedCount: 1,
-      receivedItems: demoPdfItems(),
+      receivedCount: runtime.realTransfer ? 0 : 1,
+      receivedItems: runtime.realTransfer ? [] : demoPdfItems(),
       peers: store.getState().peers.map((candidate) =>
         candidate.id === peerId ? { ...candidate, stage: "near" } : candidate
       )
@@ -450,9 +464,8 @@ export function createController({
   view.on("files-selected", (files) => {
     const limited = [...files];
     const totalBytes = limited.reduce((sum, file) => sum + file.size, 0);
-    const relayLimit = 500 * 1024 * 1024;
-    if (store.getState().path === "relay" && totalBytes > relayLimit) {
-      view.toast(view.translate("relayLimit"));
+    if (totalBytes > TRANSFER_SESSION_CAP_BYTES) {
+      view.toast(view.translate("transferSessionLimit", { size: formatBytes(TRANSFER_SESSION_CAP_BYTES) }));
       return;
     }
     store.patch({ files: limited });
@@ -465,14 +478,18 @@ export function createController({
 
   async function sendSelectedFiles() {
     const state = store.getState();
-    const { files, connectedPeerId, pairingId, transfer: activeTransfer } = state;
+    const { files, connectedPeerId, pairingId } = state;
     if (!connectedPeerId || state.mode !== "connected") {
       view.toast(view.translate("connectFirst"));
       return;
     }
-    if (activeTransfer) return;
     if (!files.length) {
       view.openFilePicker();
+      return;
+    }
+    const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+    if (totalBytes > TRANSFER_SESSION_CAP_BYTES) {
+      view.toast(view.translate("transferSessionLimit", { size: formatBytes(TRANSFER_SESSION_CAP_BYTES) }));
       return;
     }
     try {
@@ -482,7 +499,7 @@ export function createController({
           stage: "preparing",
           ratio: 0,
           transferredBytes: 0,
-          totalBytes: files.reduce((sum, file) => sum + file.size, 0)
+          totalBytes
         }
       });
       await transfer.send(files, {
@@ -584,6 +601,7 @@ export function createController({
     } finally {
       clearVerificationWaiters();
       resolveQrCancellation();
+      revokeReceivedItemUrls(store.getState().receivedItems);
       store.patch({
         mode: "lobby",
         connectedPeerId: null,
@@ -1035,4 +1053,22 @@ function waitForTransportConnection(transport, timeoutMs) {
       resolve();
     }) || cleanup;
   });
+}
+
+function triggerBrowserDownload(url, name) {
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = name || "webdrop-file";
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
+function revokeReceivedItemUrls(items = []) {
+  for (const item of items) {
+    if (!item?.url || !item.url.startsWith("blob:")) continue;
+    URL.revokeObjectURL(item.url);
+  }
 }
