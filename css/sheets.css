@@ -142,7 +142,16 @@
 }
 
 .peer-candidate-heading h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   text-align: left;
+}
+
+.peer-candidate-heading h2 .device-brand {
+  width: 28px;
+  height: 28px;
+  flex-basis: 28px;
 }
 
 .peer-candidate-avatar {
@@ -299,27 +308,53 @@
 .device-brand {
   --device-chip-bg: color-mix(in srgb, var(--blue) 12%, #ffffff);
   --device-chip-ink: var(--blue);
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   display: inline-grid;
-  flex: 0 0 24px;
+  flex: 0 0 26px;
   place-items: center;
-  border: 1px solid color-mix(in srgb, var(--device-chip-ink) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--device-chip-ink) 24%, transparent);
   border-radius: 999px;
   color: var(--device-chip-ink);
-  background: var(--device-chip-bg);
-  box-shadow: 0 5px 14px color-mix(in srgb, var(--device-chip-ink) 13%, transparent);
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, .82), transparent 58%),
+    var(--device-chip-bg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .58),
+    0 6px 16px color-mix(in srgb, var(--device-chip-ink) 15%, transparent);
 }
 
 .device-brand svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   display: block;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 2.15;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.device-brand--official svg {
+  fill: currentColor;
+  stroke: none;
+}
+
+.device-brand--apple svg,
+.device-brand--google svg,
+.device-brand--windows svg {
+  width: 14px;
+  height: 14px;
+}
+
+.device-brand--samsung svg {
+  width: 18px;
+  height: 18px;
+}
+
+.device-brand--android svg {
+  width: 15px;
+  height: 15px;
 }
 
 .device-brand--apple {
@@ -338,26 +373,20 @@
   --device-chip-ink: #2b8b4b;
 }
 
-.device-brand--ipad {
-  --device-chip-bg: #f2edff;
-  --device-chip-ink: #7b5ce6;
-}
-
-.device-brand--macos,
 .device-brand--windows {
   --device-chip-bg: #eef3ff;
   --device-chip-ink: #4867c8;
 }
 
-.device-brand--watchos {
-  --device-chip-bg: #fff0dd;
-  --device-chip-ink: #d37916;
-}
-
 .app-shell[data-theme="dark"] .device-brand {
-  background: color-mix(in srgb, var(--device-chip-bg) 72%, #111418);
-  border-color: color-mix(in srgb, var(--device-chip-ink) 36%, #ffffff 10%);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--device-chip-ink) 22%, transparent);
+  color: color-mix(in srgb, var(--device-chip-ink) 84%, #ffffff 16%);
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, .14), transparent 58%),
+    color-mix(in srgb, var(--device-chip-bg) 30%, #f7f8fb 70%);
+  border-color: color-mix(in srgb, var(--device-chip-ink) 52%, #ffffff 22%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .18),
+    0 7px 18px color-mix(in srgb, var(--device-chip-ink) 26%, transparent);
 }
 
 .nearby-device-copy strong {
@@ -393,15 +422,12 @@
   font-weight: 760;
 }
 
-.nearby-device-name .nearby-history-chip {
-  color: var(--blue);
-}
-
 .nearby-device-meta {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 5px;
   min-width: 0;
+  align-items: center;
 }
 
 .nearby-pill {

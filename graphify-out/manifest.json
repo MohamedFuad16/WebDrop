@@ -1,31 +1,23 @@
 {
   "/Users/mfuad16/Documents/web_drop_v2/service-worker.js": {
-    "mtime": 1781532361.1091304,
-    "hash": "c7888a70ed994daafb7cc7c5dc151c2f"
-  },
-  "/Users/mfuad16/Documents/web_drop_v2/test/connection-choreography.test.js": {
-    "mtime": 1781524155.4562726,
-    "hash": "d0c9d3aad32d4ffd89348c59e0549ec2"
-  },
-  "/Users/mfuad16/Documents/web_drop_v2/test/production-readiness.test.js": {
-    "mtime": 1781532376.5324066,
-    "hash": "157a17ef3c6d4a871869dc6503bf4c07"
+    "mtime": 1781604109.870345,
+    "hash": "e1ab1165524d68b821d16d17196f47ec"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/app.js": {
-    "mtime": 1781529353.3453565,
-    "hash": "54d1c707f71a9cd86ddc88d8611ee601"
+    "mtime": 1781594369.4624774,
+    "hash": "232cfa4a316561fe17623628080e6784"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/ui/dynamic-island.js": {
-    "mtime": 1781532455.5278363,
-    "hash": "fe16f40de05c3b401def717f45938f37"
+    "mtime": 1781608790.116098,
+    "hash": "a9e57cf76779c0e9d50400a605b38437"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/ui/app-view.js": {
-    "mtime": 1781530227.6013072,
-    "hash": "32bbbb57188400cd0ec36e8b189915da"
+    "mtime": 1781610254.691892,
+    "hash": "c7c4229cc7d8b3dbd3af9a2b8761d446"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/core/controller.js": {
-    "mtime": 1781530227.6017392,
-    "hash": "7d9bb56ca1f9ce6719068bb47e7f8d4f"
+    "mtime": 1781594369.461874,
+    "hash": "fee91649bb74f458e3585c7b0b2464cd"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/core/state.js": {
     "mtime": 1781441018.4200222,
@@ -36,16 +28,16 @@
     "hash": "0950f3fd49c844381ee3931106bb8b9f"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/config/avatar-options.js": {
-    "mtime": 1781453144.3208354,
-    "hash": "965c48b18295eab50073a52bc7f88995"
+    "mtime": 1781594369.4621634,
+    "hash": "6285749af5d1f428b3f4acb551b20e49"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/config/runtime-config.js": {
     "mtime": 1781511785.28432,
     "hash": "e417e700810cb1698a3d91daa07b9eed"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/config/i18n.js": {
-    "mtime": 1781532470.2794194,
-    "hash": "c7df44e3646dad0d76124882866b4fac"
+    "mtime": 1781605173.8666856,
+    "hash": "56ef1d5fbf7588665c01984a3f702f4b"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/utils/format.js": {
     "mtime": 1781441018.4219906,
@@ -64,8 +56,8 @@
     "hash": "b196fe191dc72c9060b28114bae8542d"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/services/mock-signaling.js": {
-    "mtime": 1781511430.6854613,
-    "hash": "b7ed91ed6dce95cfe888d6a7e02364fc"
+    "mtime": 1781588963.541606,
+    "hash": "986fed5a6bb1cf21c6e12c0495ca710e"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/services/transfer-engine.js": {
     "mtime": 1781510785.526682,
@@ -76,8 +68,8 @@
     "hash": "6b1c083e34b95fe94c91679cbf5b063f"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/services/data-channel-transfer-protocol.js": {
-    "mtime": 1781524021.0167496,
-    "hash": "fc5853616ba1fea970221f8f59995436"
+    "mtime": 1781567296.0782092,
+    "hash": "e0ba6f1e4985e08aadc50b80b66d6910"
   },
   "/Users/mfuad16/Documents/web_drop_v2/js/services/proximity-engine.js": {
     "mtime": 1781507470.2063398,
@@ -103,25 +95,9 @@
     "mtime": 1781509792.7640612,
     "hash": "379f846d6b09ebd264352e19c91d5762"
   },
-  "/Users/mfuad16/Documents/web_drop_v2/aws cloud server/test/turn-provider.test.js": {
-    "mtime": 1781502122.9877298,
-    "hash": "2692a3b751481d87c5ef06aac00d062b"
-  },
-  "/Users/mfuad16/Documents/web_drop_v2/aws cloud server/test/proximity.test.js": {
-    "mtime": 1781505010.785822,
-    "hash": "8a70612a11210fb24d36d8d0663f1cfe"
-  },
-  "/Users/mfuad16/Documents/web_drop_v2/aws cloud server/test/signaling.test.js": {
-    "mtime": 1781524091.8239539,
-    "hash": "39786792d8cb7a75219aff09f8ce92f2"
-  },
-  "/Users/mfuad16/Documents/web_drop_v2/aws cloud server/test/metrics.test.js": {
-    "mtime": 1781524091.8232875,
-    "hash": "5224317be18e70399beb073cf1ef1273"
-  },
   "/Users/mfuad16/Documents/web_drop_v2/aws cloud server/src/turn-provider.js": {
-    "mtime": 1781501957.3461668,
-    "hash": "7fba21f2998589714fdfc6af2271df28"
+    "mtime": 1781566849.989957,
+    "hash": "39b6d79eeae9b6cb5a0fa44917540fe4"
   },
   "/Users/mfuad16/Documents/web_drop_v2/aws cloud server/src/proximity-score.js": {
     "mtime": 1781504588.1921358,
@@ -144,12 +120,12 @@
     "hash": "54edfe2bc8c38f990fed5f71e74981ec"
   },
   "/Users/mfuad16/Documents/web_drop_v2/aws cloud server/src/message-schema.js": {
-    "mtime": 1781511430.6835794,
-    "hash": "2ece55663c6f522b998ee3c08cdba7c0"
+    "mtime": 1781566849.99027,
+    "hash": "8ecc72a2e5a4ce4509c0ca651a658bb8"
   },
   "/Users/mfuad16/Documents/web_drop_v2/aws cloud server/src/signaling-hub.js": {
-    "mtime": 1781518168.6218812,
-    "hash": "80fef3794771ab3e2697ed9e8d109397"
+    "mtime": 1781567120.3820572,
+    "hash": "7ceb7c4fca73ca503761ff8ba7ccb7a6"
   },
   "/Users/mfuad16/Documents/web_drop_v2/aws cloud server/src/rate-limits.js": {
     "mtime": 1781501829.6961446,
@@ -168,16 +144,16 @@
     "hash": "c70d05b36f2f2954bef1d61feb0166cd"
   },
   "/Users/mfuad16/Documents/web_drop_v2/workers/storage-worker.js": {
-    "mtime": 1781524021.0170903,
-    "hash": "ad7d13f5b17928f3d747b61dbc4de22a"
+    "mtime": 1781566849.990535,
+    "hash": "91c6ad94cf8b0f69a6449d06a03aa1a8"
   },
   "/Users/mfuad16/Documents/web_drop_v2/workers/incremental-sha256.js": {
     "mtime": 1781506258.4394796,
     "hash": "4869816aa70342a373164ef9c75b9a1f"
   },
   "/Users/mfuad16/Documents/web_drop_v2/index.html": {
-    "mtime": 1781532361.1086714,
-    "hash": "d08b88ae427ad3eb85f37b4e554e1f33"
+    "mtime": 1781604109.8700283,
+    "hash": "b2cc28ff353799ec6f26227eae04492c"
   },
   "/Users/mfuad16/Documents/web_drop_v2/agenthistory.md": {
     "mtime": 1781532873.7168193,
@@ -212,8 +188,8 @@
     "hash": "5768d38658e12efd2e0b2d94810a5dae"
   },
   "/Users/mfuad16/Documents/web_drop_v2/docs/implementation-checklist.md": {
-    "mtime": 1781532361.111559,
-    "hash": "b7de1215a50e5aa8b81a52247df513ac"
+    "mtime": 1781610882.6198113,
+    "hash": "e6b3db100273bec9d2046fdd6a390954"
   },
   "/Users/mfuad16/Documents/web_drop_v2/assets/diagrams/orbital-ui-state-gating.md": {
     "mtime": 1781441486.9060533,
@@ -459,6 +435,10 @@
     "mtime": 1781532773.5714142,
     "hash": "a6ca5b82b11e3ce06212d84e4310cd77"
   },
+  "/Users/mfuad16/Documents/web_drop_v2/test-results/nearby-device-icons-1.0.15.png": {
+    "mtime": 1781605312.487829,
+    "hash": "f03ead013a80771e7006297e7f598bb4"
+  },
   "/Users/mfuad16/Documents/web_drop_v2/assets/screenshots/reference-web-drop-lyart-home.png": {
     "mtime": 1781440754.8572464,
     "hash": "7994463bb10911edb754c5248e2d3f68"
@@ -600,36 +580,40 @@
     "hash": "9a6170ab750b5866f8f92e2fa7ac0ec8"
   },
   "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-06.png": {
-    "mtime": 1781445997.7134945,
-    "hash": "b81fbd192cf6552cc5e1b9542e917500"
-  },
-  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-07.png": {
-    "mtime": 1781445997.7116125,
-    "hash": "40ce7cc2e86cfc2aa63fa7a466cd1460"
-  },
-  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-05.png": {
     "mtime": 1781445997.7428687,
     "hash": "dc77eda66031711e4d58614b257d97da"
   },
-  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-04.png": {
+  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-07.png": {
+    "mtime": 1781445997.7134945,
+    "hash": "b81fbd192cf6552cc5e1b9542e917500"
+  },
+  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-05.png": {
     "mtime": 1781445997.7558248,
     "hash": "09ba8f509f47c6d4c66d40ed2002191f"
   },
-  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-01.png": {
-    "mtime": 1781445997.6839468,
-    "hash": "8793e749da9c0b6285c5ebfc629ee78a"
-  },
-  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-03.png": {
+  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-04.png": {
     "mtime": 1781445997.735745,
     "hash": "9c23a6370cd21440402c63033e43c0d5"
   },
-  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-02.png": {
+  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-01.png": {
+    "mtime": 1781592358.05509,
+    "hash": "a01219ed9ea494ca351655104f6bfeee"
+  },
+  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-03.png": {
     "mtime": 1781445997.7154102,
     "hash": "6c7196b5d4ead10ad77058924703295d"
   },
-  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-08.png": {
+  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-02.png": {
+    "mtime": 1781445997.6839468,
+    "hash": "8793e749da9c0b6285c5ebfc629ee78a"
+  },
+  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-09.png": {
     "mtime": 1781445997.8085146,
     "hash": "2edd84c6f6e00a606ff425a6423ed43b"
+  },
+  "/Users/mfuad16/Documents/web_drop_v2/assets/icons/avatars/user-08.png": {
+    "mtime": 1781445997.7116125,
+    "hash": "40ce7cc2e86cfc2aa63fa7a466cd1460"
   },
   "/Users/mfuad16/Documents/web_drop_v2/assets/icons/animated/user-3/frame-4.png": {
     "mtime": 1781453118.6786044,

@@ -79,8 +79,6 @@ aws cloud server/
 |   `-- mock-network.json
 |-- load/
 |   `-- artillery-websocket.yml
-|-- test/
-|   `-- signaling.test.js
 |-- .env.example
 |-- .gitignore
 |-- package.json
@@ -322,7 +320,7 @@ Important variables:
 cd "aws cloud server"
 npm install
 npm run check
-npm test
+npm test # reports that no AWS server test files are shipped in this build
 npm start
 ```
 

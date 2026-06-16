@@ -24,6 +24,7 @@ export class DynamicIsland extends Emitter {
     this.state = "closed";
     this.stream = null;
     this.scanFrame = 0;
+    this.cameraStartTimer = 0;
     this.lastDetectionAt = 0;
     this.currentConnectedPeerId = null;
     this.autoHideTimer = 0;
@@ -106,7 +107,12 @@ export class DynamicIsland extends Emitter {
     this.setCopy("qrScanTitle", "qrScanStatus");
     this.nodes.scanner?.classList.remove("is-success", "is-live");
     this.nodes.cancel?.focus({ preventScroll: true });
-    if (autoStartCamera) this.scheduleTimeout(() => this.startCamera(), 280);
+    if (autoStartCamera) {
+      this.cameraStartTimer = this.scheduleTimeout(() => {
+        this.cameraStartTimer = 0;
+        this.startCamera();
+      }, 280);
+    }
   }
 
   markSuccess() {
@@ -390,6 +396,8 @@ export class DynamicIsland extends Emitter {
   }
 
   stopCamera() {
+    if (this.cameraStartTimer) this.cancelTimeout(this.cameraStartTimer);
+    this.cameraStartTimer = 0;
     this.cameraRequestId += 1;
     cancelAnimationFrame(this.scanFrame);
     this.scanFrame = 0;

@@ -11,7 +11,7 @@ This is the source of truth for the production-readiness package. `Ready, disabl
 |---|---|---|
 | Real microphone permission request | Ready, disabled | `js/services/acoustic-proximity.js`, `js/core/controller.js` |
 | Real Web Audio chirp generation | Ready, disabled | `js/services/acoustic-proximity.js` |
-| Real chirp detection and normalized correlation | Ready, disabled | `js/services/acoustic-proximity.js`, `test/production-readiness.test.js` |
+| Real chirp detection and normalized correlation | Ready, disabled | `js/services/acoustic-proximity.js` |
 | Coordinated two-peer chirp exchange | Ready, disabled | `js/services/proximity-engine.js`, `proximity:ready` / `proximity:start` in AWS signaling |
 | Real tilt and bump capture | Ready, disabled | `js/services/motion-proximity.js` |
 | Permission ceremony from explicit swipe gesture | Ready, disabled | `js/core/controller.js` |
@@ -85,9 +85,9 @@ This is the source of truth for the production-readiness package. `Ready, disabl
 ## Verification evidence
 
 - Root static check: `npm run check`
-- Root tests: `npm test` — 25 passing
+- Root test command: `npm test` — confirms no repository test files are shipped in this build
 - AWS backend static check: `npm run check`
-- AWS backend tests: `npm test` — 26 passing
+- AWS backend test command: `npm test` — confirms no AWS server test files are shipped in this build
 - `git diff --check` — passing
 - Browser smoke: desktop and 393x852 mobile app load, seven mock peers render, connection tray stays hidden before connection, peer sheet opens, and console warnings/errors are empty.
 

@@ -50,6 +50,7 @@ html[lang="ja"] {
   --overlay: rgba(236, 236, 233, .62);
   --composer: rgba(255, 255, 255, .88);
   --composer-border: rgba(255, 255, 255, .9);
+  --accent: var(--blue);
 }
 
 .app-shell[data-theme="dark"] {
@@ -69,6 +70,7 @@ html[lang="ja"] {
   --overlay: rgba(0, 0, 0, .48);
   --composer: rgba(18, 18, 18, .82);
   --composer-border: rgba(255, 255, 255, .07);
+  --accent: #63a0ff;
 }
 
 * {
