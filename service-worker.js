@@ -1,9 +1,11 @@
-const APP_VERSION = "1.0.19";
+const APP_VERSION = "1.0.22";
 const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [
   "./",
   "./index.html",
+  "./admin/index.html",
+  "./css/admin.css",
   "./css/base.css",
   "./css/orbit.css",
   "./css/connected.css",
@@ -11,6 +13,7 @@ const ASSETS = [
   "./css/sheets.css",
   "./css/responsive.css",
   "./js/app.js",
+  "./js/admin.js",
   "./js/config/avatar-options.js",
   "./js/config/i18n.js",
   "./js/config/runtime-flags.js",
@@ -30,6 +33,7 @@ const ASSETS = [
   "./js/storage/storage-client.js",
   "./js/ui/app-view.js",
   "./js/ui/dynamic-island.js",
+  "./js/ui/siri-wave.js",
   "./js/vendor/qrcode-generator.mjs",
   "./js/utils/emitter.js",
   "./js/utils/format.js",
@@ -73,7 +77,8 @@ self.addEventListener("fetch", (event) => {
   if (event.request.mode === "navigate") {
     event.respondWith(
       fetch(event.request, { cache: "no-store" }).catch(() =>
-        caches.match("./index.html").then((cached) => cached || caches.match("./"))
+        caches.match(isAdminRoute(event.request) ? "./admin/index.html" : "./index.html")
+          .then((cached) => cached || caches.match("./"))
       )
     );
     return;
@@ -104,4 +109,11 @@ function shouldRuntimeCache(request) {
   const basePath = scopePath.endsWith("/") ? scopePath : `${scopePath}/`;
   return url.origin === self.location.origin
     && RUNTIME_ASSET_PREFIXES.some((prefix) => url.pathname.startsWith(`${basePath}${prefix}`));
+}
+
+function isAdminRoute(request) {
+  const url = new URL(request.url);
+  const scopePath = new URL(self.registration.scope).pathname;
+  const basePath = scopePath.endsWith("/") ? scopePath : `${scopePath}/`;
+  return url.pathname === `${basePath}admin` || url.pathname === `${basePath}admin/`;
 }

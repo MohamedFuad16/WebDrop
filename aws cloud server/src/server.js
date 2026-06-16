@@ -55,7 +55,7 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
         }
         const ip = request.headers["x-real-ip"] || request.socket.remoteAddress || "unknown";
         if (!httpRateLimits.take(`${ip}:${url.pathname}`)) {
-          sendJson(response, 429, { error: "rate_limited" });
+          sendJson(response, 429, { error: "rate_limited" }, corsHeaders || {});
           return;
         }
       }
@@ -65,7 +65,7 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
           service: "webdrop-signaling",
           uptimeSeconds: Math.round(process.uptime()),
           time: new Date().toISOString()
-        });
+        }, corsHeaders || {});
         return;
       }
 
@@ -111,7 +111,7 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
 
       if (request.method === "GET" && url.pathname === "/api/metrics-summary" && env.ENABLE_METRICS_ENDPOINT === "true") {
         if (!hasMetricsAuthorization(request, env.METRICS_API_TOKEN)) {
-          sendJson(response, 401, { error: "unauthorized" });
+          sendJson(response, 401, { error: "unauthorized" }, corsHeaders || {});
           return;
         }
         sendJson(response, 200, metrics.summary({
@@ -126,12 +126,12 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
 
       sendJson(response, 404, {
         error: "not_found"
-      });
+      }, url.pathname.startsWith("/api/") ? corsHeaders || {} : {});
     } catch (error) {
       providedLogger.error("HTTP request failed.", { message: error.message });
       sendJson(response, 500, {
         error: "internal_error"
-      });
+      }, allowedOriginHeaders(request.headers.origin, allowedOrigins) || {});
     }
   });
 

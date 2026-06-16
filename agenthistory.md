@@ -606,3 +606,51 @@ Verification:
 - Workflow verification passed for `.workflow/webdrop-official-device-icon-cache-polish`.
 - In-app Browser confirmed app identity, meaningful content, visible `1.0.16`, and no console warnings/errors.
 - Temporary mobile Playwright smoke at 390x844 confirmed light/dark nearby sheets, zero horizontal overflow, readable Samsung wordmark badge, Apple/Google official badge classes, and history below the match row.
+
+## 2026-06-17 Version 1.0.20 admin route and live testing dashboard
+
+Scope:
+- Added a standalone `/admin/` route for production readiness review and live testing.
+- Kept the main app UI untouched while adding a separate admin surface for status, blockers, signaling, ICE, server probes, and transfer manifest simulation.
+- Made the AWS signaling health route browser-testable from the static app domain.
+
+Implementation:
+- Created `admin/index.html`, `css/admin.css`, and `js/admin.js`.
+- Added readiness cards for completed frontend, signaling, TURN, WebRTC, storage, proximity, and production-proof work.
+- Added blocker cards for AWS deployment, TURN configuration, production URLs, proximity calibration, real transfer proof, load testing, real tests, and horizontal scale.
+- Added WebSocket live monitor for the real `client:hello` schema, peer list tracking, ping/disconnect controls, and session facts.
+- Added API probes for `/healthz`, `/api/ice-servers`, and `/api/metrics-summary`.
+- Added ICE candidate gathering and DataChannel file-manifest simulation with 64 KiB chunk accounting.
+- Redacted temporary TURN credentials from event logs while keeping the active session token visible in its dedicated test field.
+- Added CORS headers to `/healthz` and related operational API errors so the admin route can test the backend from another origin.
+- Incremented package, lockfile, visible Settings version, service-worker cache version, docs, and screenshot/PDF scripts to `1.0.20`.
+
+Verification:
+- `npm run verify:full` passed.
+- In-app Browser confirmed `/admin/` renders eight readiness cards, eight blockers, and no horizontal overflow.
+- In-app Browser confirmed the Live testing tab exposes WebSocket, API, ICE, and transfer tools.
+- Local AWS signaling server smoke confirmed admin WebSocket connection, session id display, token redaction in logs, `/healthz` 200, and `/api/ice-servers` 200 with fallback STUN payload.
+- Mobile-width Browser smoke at 390px confirmed no horizontal overflow and visible admin tabs.
+
+## 2026-06-17 Version 1.0.22 Siri wave and admin visual alignment
+
+Scope:
+- Replaced the Dynamic Island connection bars with the `siriWaveCore` WebGL wave from `/Users/mfuad16/Documents/animations/siri-wave.html`.
+- Restyled the `/admin/` page so it matches the WebDrop app theme more closely.
+- Removed the opaque black WebGL canvas background from the Siri wave animation.
+
+Implementation:
+- Added `js/ui/siri-wave.js` with the copied Siri wave vertex/fragment shader and a small render wrapper.
+- Mounted the wave in the existing Dynamic Island flow canvas without changing the connection or QR state machine.
+- Switched the WebGL context to an alpha-enabled transparent surface and made the shader output alpha only where the wave emits light.
+- Runs the wave only while the island is connecting or connected, and stops it for closed, QR, reduced-motion, and paused-motion states.
+- Reworked `css/admin.css` around the WebDrop palette, grid background, glass panels, orbit hint, pill tabs, rounded sheets, and softer status rows.
+- Added the new wave module to the service-worker asset list.
+- Incremented package, lockfile, visible Settings version, service-worker cache version, docs, and screenshot/PDF scripts to `1.0.22`.
+
+Verification:
+- `npm run verify:full` passed.
+- In-app Browser confirmed the main app loads with the new `[data-island-wave]` canvas, the real swipe-to-connect flow opens the Dynamic Island in `connecting`, and the app settles into connected mode with no horizontal overflow.
+- In-app Browser confirmed `/admin/` renders with WebDrop-style background, glass hero, blue active tab, version `1.0.22`, eight readiness cards, eight blockers, and no console warnings/errors.
+- Mobile-width Browser smoke at 390px confirmed the redesigned admin route has no horizontal overflow and keeps the tab controls visible.
+- Browser screenshot capture timed out in the current Codex browser session, so visual evidence is from rendered DOM/computed-style checks rather than an attached screenshot.

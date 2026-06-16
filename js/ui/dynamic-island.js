@@ -1,6 +1,7 @@
 import qrcode from "../vendor/qrcode-generator.mjs";
 import { Emitter } from "../utils/emitter.js";
 import { animatedFramesForAvatar } from "../config/avatar-options.js";
+import { SiriWaveCore } from "./siri-wave.js";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -19,8 +20,15 @@ export class DynamicIsland extends Emitter {
       cancel: this.root?.querySelector("[data-island-cancel]"),
       scanner: this.root?.querySelector("[data-island-scanner]"),
       canvas: this.root?.querySelector("[data-island-qr-canvas]"),
-      video: this.root?.querySelector("[data-island-video]")
+      video: this.root?.querySelector("[data-island-video]"),
+      wave: this.root?.querySelector("[data-island-wave]")
     };
+    try {
+      this.wave = this.nodes.wave ? new SiriWaveCore(this.nodes.wave) : null;
+    } catch {
+      this.wave = null;
+      this.nodes.wave?.setAttribute("hidden", "");
+    }
     this.state = "closed";
     this.stream = null;
     this.scanFrame = 0;
@@ -181,7 +189,15 @@ export class DynamicIsland extends Emitter {
       this.root.setAttribute("role", state.startsWith("qr-") ? "dialog" : "status");
       this.root.setAttribute("aria-modal", String(state.startsWith("qr-")));
       this.root.inert = concealed;
+      this.syncWave(state);
     }
+  }
+
+  syncWave(state = this.state) {
+    const appShell = this.root?.closest(".app-shell");
+    const motionPaused = appShell?.dataset.motion === "paused";
+    const waveState = ["connecting", "connected"].includes(state);
+    this.wave?.setRunning(waveState && !motionPaused && !this.prefersReducedMotion());
   }
 
   focusableElements() {

@@ -175,39 +175,35 @@
 
 .webdrop-island__flow {
   position: relative;
-  height: 84px;
-  display: flex;
+  width: clamp(126px, 18vw, 190px);
+  height: 116px;
+  display: grid;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  isolation: isolate;
 }
 
 .webdrop-island__flow::before {
   content: "";
   position: absolute;
-  left: 3px;
-  right: 3px;
-  height: 24px;
+  inset: 8px -8px;
   border-radius: 50%;
-  background: linear-gradient(90deg, #347df5, #65e9dc, #9b76ff);
-  opacity: .58;
-  filter: blur(12px);
+  background:
+    radial-gradient(circle at 50% 48%, rgba(55, 128, 255, .32), transparent 56%),
+    radial-gradient(circle at 45% 52%, rgba(98, 227, 213, .24), transparent 48%);
+  filter: blur(18px);
+  opacity: .88;
 }
 
-.webdrop-island__flow i {
+.webdrop-island__wave {
   position: relative;
-  width: 4px;
-  height: 22px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #fff, #62e3d5 55%, #5f82ff);
-  box-shadow: 0 0 12px rgba(52, 125, 245, .34);
-  animation: islandFlow 1400ms ease-in-out infinite alternate;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  opacity: .98;
+  mix-blend-mode: screen;
+  filter: saturate(1.18) contrast(1.08) drop-shadow(0 16px 28px rgba(56, 126, 246, .18));
 }
-
-.webdrop-island__flow i:nth-child(2) { height: 42px; animation-delay: -900ms; }
-.webdrop-island__flow i:nth-child(3) { height: 62px; animation-delay: -420ms; }
-.webdrop-island__flow i:nth-child(4) { height: 38px; animation-delay: -1080ms; }
-.webdrop-island__flow i:nth-child(5) { height: 20px; animation-delay: -620ms; }
 
 .webdrop-island__qr {
   height: 100%;
@@ -360,20 +356,16 @@
 }
 
 .app-shell[data-theme="light"] .webdrop-island__flow::before {
-  background: linear-gradient(90deg, #1768ef, #13a99c, #6e43e8);
-  opacity: .34;
-  filter: blur(10px);
+  background:
+    radial-gradient(circle at 50% 48%, rgba(38, 121, 242, .34), transparent 58%),
+    radial-gradient(circle at 45% 52%, rgba(24, 196, 176, .22), transparent 48%);
+  opacity: .96;
+  filter: blur(20px);
 }
 
-.app-shell[data-theme="light"] .webdrop-island__flow i {
-  background: linear-gradient(180deg, #1579e8, #13b6a7 48%, #603ef0);
-  box-shadow:
-    0 0 0 1px rgba(25, 91, 201, .12),
-    0 4px 14px rgba(42, 99, 224, .28);
-}
-
-@keyframes islandFlow {
-  to { transform: scaleY(.55); opacity: .58; }
+.app-shell[data-theme="light"] .webdrop-island__wave {
+  opacity: 1;
+  filter: saturate(1.32) contrast(1.28) brightness(1.18) drop-shadow(0 14px 30px rgba(38, 121, 242, .22));
 }
 
 @keyframes islandScan {
@@ -419,13 +411,13 @@
     transition-duration: 80ms;
   }
 
-  .webdrop-island__flow i,
+  .webdrop-island__wave,
   .webdrop-island__beam {
     animation: none;
   }
 }
 
-.app-shell[data-motion="paused"] .webdrop-island__flow i,
+.app-shell[data-motion="paused"] .webdrop-island__wave,
 .app-shell[data-motion="paused"] .webdrop-island__beam {
-  animation: none;
+  opacity: .72;
 }

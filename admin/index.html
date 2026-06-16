@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f8fb">
+  <title>WebDrop Admin</title>
+  <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+  <main class="admin-shell">
+    <header class="admin-hero">
+      <a class="admin-back" href="../">Back to app</a>
+      <p class="eyebrow">WebDrop Admin</p>
+      <h1>Production readiness and live testing</h1>
+      <p class="hero-copy">A focused control room for launch status, device sessions, ICE paths, transfer manifests, and server checks.</p>
+      <div class="hero-status" aria-label="Admin status summary">
+        <span><strong data-admin-version>1.0.22</strong> app version</span>
+        <span><strong data-admin-mode>Mock</strong> runtime mode</span>
+        <span><strong data-admin-score>0%</strong> launch readiness</span>
+      </div>
+    </header>
+
+    <nav class="admin-tabs" aria-label="Admin sections">
+      <button class="is-active" type="button" data-admin-tab="readiness">Readiness</button>
+      <button type="button" data-admin-tab="live">Live testing</button>
+    </nav>
+
+    <section class="admin-panel is-active" data-admin-panel="readiness" aria-labelledby="readiness-title">
+      <div class="section-heading">
+        <p class="eyebrow">What is done</p>
+        <h2 id="readiness-title">Launch map</h2>
+      </div>
+      <div class="readiness-grid" data-readiness-grid></div>
+      <div class="section-heading">
+        <p class="eyebrow">What is left</p>
+        <h2>Production blockers</h2>
+      </div>
+      <div class="blocker-list" data-blocker-list></div>
+    </section>
+
+    <section class="admin-panel" data-admin-panel="live" aria-labelledby="live-title">
+      <div class="section-heading">
+        <p class="eyebrow">Live tracking</p>
+        <h2 id="live-title">Devices, transfer, ICE, and server probes</h2>
+      </div>
+
+      <div class="live-grid">
+        <article class="admin-card span-2">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">Signaling</p>
+              <h3>WebSocket session monitor</h3>
+            </div>
+            <span class="status-pill" data-ws-status>Disconnected</span>
+          </div>
+          <label class="admin-field">
+            <span>WSS endpoint</span>
+            <input data-ws-url type="url" placeholder="wss://signal.example.com/ws">
+          </label>
+          <label class="admin-field">
+            <span>Client name</span>
+            <input data-client-name type="text" maxlength="60" value="Admin Test Device">
+          </label>
+          <div class="button-row">
+            <button type="button" data-action="ws-connect">Connect</button>
+            <button type="button" data-action="ws-ping">Ping</button>
+            <button type="button" data-action="ws-disconnect">Disconnect</button>
+          </div>
+          <dl class="session-facts" data-session-facts>
+            <div>
+              <dt>Client id</dt>
+              <dd data-session-client>Not connected</dd>
+            </div>
+            <div>
+              <dt>Session id</dt>
+              <dd data-session-id>Not connected</dd>
+            </div>
+            <div>
+              <dt>TURN access token</dt>
+              <dd data-session-turn-token>Not issued</dd>
+            </div>
+          </dl>
+          <div class="device-table" data-device-table>
+            <p class="empty-note">No live signaling peers yet.</p>
+          </div>
+          <pre class="event-log" data-ws-log aria-live="polite"></pre>
+        </article>
+
+        <article class="admin-card">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">Server</p>
+              <h3>API probes</h3>
+            </div>
+          </div>
+          <label class="admin-field">
+            <span>HTTP base</span>
+            <input data-http-base type="url" placeholder="https://signal.example.com">
+          </label>
+          <label class="admin-field">
+            <span>Bearer token</span>
+            <input data-bearer-token type="password" placeholder="optional">
+          </label>
+          <div class="button-row">
+            <button type="button" data-action="probe-health">Health</button>
+            <button type="button" data-action="probe-ice">ICE servers</button>
+            <button type="button" data-action="probe-metrics">Metrics</button>
+          </div>
+          <pre class="event-log compact" data-api-output></pre>
+        </article>
+
+        <article class="admin-card">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">ICE</p>
+              <h3>Candidate lab</h3>
+            </div>
+            <span class="status-pill" data-ice-status>Idle</span>
+          </div>
+          <label class="admin-field">
+            <span>ICE server URL</span>
+            <input data-ice-url type="text" value="stun:stun.l.google.com:19302">
+          </label>
+          <button type="button" data-action="ice-gather">Gather candidates</button>
+          <div class="candidate-list" data-candidate-list>
+            <p class="empty-note">Candidate type, protocol, IP family, and relay/direct hints appear here.</p>
+          </div>
+        </article>
+
+        <article class="admin-card span-2">
+          <div class="card-head">
+            <div>
+              <p class="eyebrow">Transfer</p>
+              <h3>File manifest and speed simulator</h3>
+            </div>
+            <span class="status-pill" data-transfer-status>Idle</span>
+          </div>
+          <label class="file-drop">
+            <input data-file-input type="file" multiple>
+            <span>Select test files</span>
+            <small>Builds the same kind of manifest WebDrop sends before DataChannel chunks.</small>
+          </label>
+          <div class="button-row">
+            <button type="button" data-action="simulate-transfer">Simulate transfer</button>
+            <button type="button" data-action="reset-transfer">Reset</button>
+          </div>
+          <div class="transfer-meter">
+            <span data-transfer-bar></span>
+          </div>
+          <div class="transfer-summary" data-transfer-summary></div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/config/runtime-config.js"></script>
+  <script src="../js/admin.js" type="module"></script>
+</body>
+</html>
