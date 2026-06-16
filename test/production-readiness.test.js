@@ -19,7 +19,7 @@ import { getRuntimeFlags } from "../js/config/runtime-flags.js";
 test("package metadata, lockfile, and verification scripts stay in sync", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const lockJson = JSON.parse(await readFile(new URL("../package-lock.json", import.meta.url), "utf8"));
-  assert.equal(packageJson.version, "1.0.11");
+  assert.equal(packageJson.version, "1.0.12");
   assert.equal(lockJson.version, packageJson.version);
   assert.equal(lockJson.packages[""].version, packageJson.version);
   assert.deepEqual(lockJson.packages[""].dependencies, packageJson.dependencies);
@@ -61,6 +61,30 @@ test("orbit peers avoid duplicate rings and App Information exposes QR preview",
   assert.doesNotMatch(html, /\s+switch(\s|>)/);
   assert.match(viewSource, /toggleQrScannerPreview\(\)/);
   assert.match(viewSource, /closeQrScannerPreview\(\)/);
+});
+
+test("nearby directory caps orbit peers and exposes searchable overflow", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const viewSource = await readFile(new URL("../js/ui/app-view.js", import.meta.url), "utf8");
+  const mockSource = await readFile(new URL("../js/services/mock-signaling.js", import.meta.url), "utf8");
+  const sheetsCss = await readFile(new URL("../css/sheets.css", import.meta.url), "utf8");
+  const connectedCss = await readFile(new URL("../css/connected.css", import.meta.url), "utf8");
+
+  assert.match(viewSource, /const ORBIT_PEER_LIMIT = 12/);
+  assert.match(viewSource, /rankPeersForDisplay\(state\.peers, state\)/);
+  assert.match(viewSource, /rankPeersForDisplay\(peers, state\)/);
+  assert.match(viewSource, /matchesNearbyFilter\(peer, state, this\.nearbyFilter\)/);
+  assert.match(html, /data-action="open-nearby-sheet"/);
+  assert.match(html, /data-nearby-overflow-count/);
+  assert.match(html, /data-nearby-search/);
+  assert.match(html, /data-nearby-filter="recent"/);
+  assert.match(html, /data-nearby-filter="same-device"/);
+  assert.match(sheetsCss, /\.nearby-device-row/);
+  assert.match(sheetsCss, /\.nearby-device-avatar\s*\{[\s\S]*?overflow: hidden;/);
+  assert.match(sheetsCss, /\.nearby-device-avatar img,\s*[\s\S]*?\.nearby-device-avatar \.avatar-static\s*\{[\s\S]*?width: 100%;[\s\S]*?height: 100%;/);
+  assert.match(connectedCss, /\.nearby-fab/);
+  assert.match(viewSource, /sheet\.classList\.add\("is-open"\);\s*sheet\.style\.opacity = "1";/);
+  assert.ok((mockSource.match(/id: "peer-/g) || []).length >= 13);
 });
 
 test("modal controls are keyboard-safe while sheets and Dynamic Island animate", async () => {

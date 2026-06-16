@@ -4,7 +4,9 @@ import { AVATAR_OPTIONS, animatedFramesForAvatar } from "../config/avatar-option
 import { translate } from "../config/i18n.js";
 import { DynamicIsland } from "./dynamic-island.js";
 
-const ORBIT_RADII = [".423", ".32", ".216"];
+const ORBIT_RADII = [".423", ".334", ".245", ".158"];
+const ORBIT_PEER_LIMIT = 12;
+const CONNECTED_ORBIT_PEER_LIMIT = 6;
 const CONNECTED_ORBIT_RADII = [
   "calc((var(--orbit-size) * .423))",
   "calc((var(--orbit-size) * .282) + (var(--connected-avatar) * .3447))",
@@ -37,6 +39,11 @@ export class AppView extends Emitter {
       connectedPeer: document.querySelector("[data-connected-peer]"),
       disconnectHaptic: document.querySelector("[data-disconnect-haptic]"),
       peerSheet: document.querySelector("[data-peer-sheet]"),
+      nearbySheet: document.querySelector("[data-nearby-sheet]"),
+      nearbySearch: document.querySelector("[data-nearby-search]"),
+      nearbyList: document.querySelector("[data-nearby-list]"),
+      nearbyOverflowCount: document.querySelector("[data-nearby-overflow-count]"),
+      nearbyFilterChoice: document.querySelector(".nearby-filter-choice"),
       settingsSheet: document.querySelector("[data-settings-sheet]"),
       informationSheet: document.querySelector("[data-information-sheet]"),
       sendSheet: document.querySelector("[data-send-sheet]"),
@@ -74,9 +81,12 @@ export class AppView extends Emitter {
     this.sheetBackgroundNodes = [
       document.querySelector(".topbar"),
       document.querySelector(".main-stage"),
+      document.querySelector(".nearby-fab"),
       document.querySelector("[data-connection-tray]"),
       document.querySelector("[data-dynamic-island]")
     ].filter(Boolean);
+    this.nearbyFilter = "all";
+    this.nearbyQuery = "";
     this.avatarOptionsRendered = false;
     this.peerRenderSignature = "";
     this.dynamicIsland = new DynamicIsland(document, (key, params) => this.translate(key, params));
@@ -112,6 +122,11 @@ export class AppView extends Emitter {
         this.emit(action, actionTarget.dataset.ring);
         return;
       }
+      if (action === "set-nearby-filter") {
+        this.nearbyFilter = actionTarget.dataset.nearbyFilter || "all";
+        this.renderNearbyDirectory(this.currentState);
+        return;
+      }
       if (action === "open-received") {
         this.emit(action, {
           transferId: actionTarget.dataset.transferId,
@@ -129,6 +144,11 @@ export class AppView extends Emitter {
     this.nodes.fileInput.addEventListener("change", (event) => {
       this.emit("files-selected", event.target.files);
       event.target.value = "";
+    });
+
+    this.nodes.nearbySearch?.addEventListener("input", (event) => {
+      this.nearbyQuery = event.target.value;
+      this.renderNearbyDirectory(this.currentState);
     });
 
     this.nodes.disconnectHaptic?.addEventListener("change", () => {
@@ -316,6 +336,7 @@ export class AppView extends Emitter {
     this.renderAvatarSettings(state);
     this.renderCapabilities(state.capabilities);
     this.renderPeers(state);
+    this.renderNearbyDirectory(state);
     this.renderTray(state);
     this.renderFiles(state);
     this.renderReceiveBadge(state);
@@ -416,14 +437,16 @@ export class AppView extends Emitter {
   }
 
   renderPeers(state) {
-    const orbitPeers = state.connectedPeerId
-      ? state.peers.filter((peer) => peer.id !== state.connectedPeerId)
-      : state.peers;
+    const rankedPeers = rankPeersForDisplay(state.peers, state);
+    const orbitPeers = (state.connectedPeerId
+      ? rankedPeers.filter((peer) => peer.id !== state.connectedPeerId).slice(0, CONNECTED_ORBIT_PEER_LIMIT)
+      : rankedPeers.slice(0, ORBIT_PEER_LIMIT));
     const signature = [
       state.connectedPeerId || "",
       state.mode,
       state.locale || "en",
       state.motionPaused ? "paused" : "on",
+      rankedPeers.length,
       ...orbitPeers.map((peer, index) => {
         const stage = normalizedPeerStage(peer, state);
         const layout = state.connectedPeerId
@@ -458,6 +481,54 @@ export class AppView extends Emitter {
           </button>
           <span>${peerName}</span>
         </div>
+      `;
+    }).join("");
+  }
+
+  renderNearbyDirectory(state) {
+    if (!state || !this.nodes.nearbyList) return;
+    const rankedPeers = rankPeersForDisplay(state.peers, state);
+    const visibleLimit = state.connectedPeerId ? CONNECTED_ORBIT_PEER_LIMIT : ORBIT_PEER_LIMIT;
+    const hiddenCount = Math.max(0, rankedPeers.length - visibleLimit);
+    if (this.nodes.nearbyOverflowCount) {
+      this.nodes.nearbyOverflowCount.hidden = hiddenCount <= 0;
+      this.nodes.nearbyOverflowCount.textContent = hiddenCount > 99 ? "99+" : String(hiddenCount);
+    }
+    this.nodes.nearbyFilterChoice?.querySelectorAll("[data-nearby-filter]").forEach((button) => {
+      const selected = button.dataset.nearbyFilter === this.nearbyFilter;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+    });
+    const query = normalizeSearch(this.nearbyQuery);
+    const filtered = rankedPeers.filter((peer) => {
+      if (!matchesNearbyFilter(peer, state, this.nearbyFilter)) return false;
+      if (!query) return true;
+      return normalizeSearch(`${peer.name} ${peerDeviceLabel(peer)} ${peerDeviceFamily(peer)}`).includes(query);
+    });
+    if (!filtered.length) {
+      this.nodes.nearbyList.innerHTML = `<div class="nearby-empty">${this.translate("nearbyEmpty")}</div>`;
+      return;
+    }
+    this.nodes.nearbyList.innerHTML = filtered.map((peer) => {
+      const peerId = escapeHtml(String(peer.id || ""));
+      const name = escapeHtml(String(peer.name || ""));
+      const device = escapeHtml(peerDeviceLabel(peer));
+      const distance = escapeHtml(this.translate(peerDistanceKey(peer)));
+      const score = Math.max(0, Math.min(100, Math.round(peer.__rankScore || 0)));
+      return `
+        <article class="nearby-device-row" data-nearby-device-id="${peerId}">
+          <span class="nearby-device-avatar" aria-hidden="true">${staticAvatarMarkup(peer.avatar)}</span>
+          <div class="nearby-device-copy">
+            <strong>${name}</strong>
+            <span>${device}</span>
+            <span class="nearby-device-meta">
+              <span class="nearby-pill">${distance}</span>
+              <span class="nearby-pill">${this.translate("rankScore", { score })}</span>
+              ${peerPreviouslyConnected(peer) ? `<span class="nearby-pill">${this.translate("connectedBefore")}</span>` : ""}
+            </span>
+          </div>
+          <button class="nearby-connect" type="button" data-peer-id="${peerId}">${this.translate("connect")}</button>
+        </article>
       `;
     }).join("");
   }
@@ -602,6 +673,9 @@ export class AppView extends Emitter {
   }
 
   openPeerSheet(peer, { peers }) {
+    if (this.nodes.nearbySheet && !this.nodes.nearbySheet.hidden) {
+      this.hideSheet(this.nodes.nearbySheet, undefined, { keepBackdrop: true });
+    }
     this.nodes.sheetPeerName.textContent = peer.name;
     renderAnimatedAvatar(this.nodes.sheetPeerAvatar, peer.avatar, 1);
     this.nodes.sheetCopy.textContent = this.translate("peerSheetReadyCopy");
@@ -610,6 +684,16 @@ export class AppView extends Emitter {
     ).join("") + "<span>+</span>";
     this.resetSwipe?.();
     this.showSheet(this.nodes.peerSheet);
+  }
+
+  openNearbySheet() {
+    if (this.nodes.nearbySearch) this.nodes.nearbySearch.value = this.nearbyQuery;
+    this.renderNearbyDirectory(this.currentState);
+    this.showSheet(this.nodes.nearbySheet, () => this.nodes.nearbySearch?.focus({ preventScroll: true }));
+  }
+
+  closeNearbySheet() {
+    return this.hideSheet(this.nodes.nearbySheet);
   }
 
   closePeerSheet() {
@@ -670,6 +754,7 @@ export class AppView extends Emitter {
   closeAllSheets() {
     [
       this.nodes.peerSheet,
+      this.nodes.nearbySheet,
       this.nodes.settingsSheet,
       this.nodes.informationSheet,
       this.nodes.sendSheet,
@@ -686,18 +771,21 @@ export class AppView extends Emitter {
     }
     sheet.hidden = false;
     sheet.classList.remove("is-closing");
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    sheet.style.opacity = "0";
+    sheet.style.transform = reduced ? "none" : "translateY(calc(100% + 24px)) scale(.985)";
+    void sheet.offsetHeight;
     this.nodes.app.dataset.sheetOpen = "true";
     this.setSheetBackgroundInert(true);
     this.showBackdrop();
     this.focusSheet(sheet);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        sheet.classList.add("is-open");
-        this.afterTransition(sheet, () => {
-          this.focusSheet(sheet);
-          onShown?.();
-        });
-      });
+    sheet.classList.add("is-open");
+    sheet.style.opacity = "1";
+    sheet.style.transform = reduced ? "none" : "translateY(0) scale(1)";
+    this.afterTransition(sheet, () => {
+      this.settleSheetState(sheet, true);
+      this.focusSheet(sheet);
+      onShown?.();
     });
   }
 
@@ -712,13 +800,18 @@ export class AppView extends Emitter {
       if (existingTimer) clearTimeout(existingTimer);
       sheet.classList.remove("is-open");
       sheet.classList.add("is-closing");
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      sheet.style.opacity = "0";
+      sheet.style.transform = reduced ? "none" : "translateY(calc(100% + 24px)) scale(.985)";
       if (!keepBackdrop) this.hideBackdropIfIdle();
       const finish = () => {
+        this.settleSheetState(sheet, false);
         sheet.hidden = true;
         sheet.classList.remove("is-closing");
         this.sheetHideTimers.delete(sheet);
         const anyVisible = [
           this.nodes.peerSheet,
+          this.nodes.nearbySheet,
           this.nodes.settingsSheet,
           this.nodes.informationSheet,
           this.nodes.sendSheet,
@@ -754,6 +847,7 @@ export class AppView extends Emitter {
   hideBackdropIfIdle() {
     const hasOpenSheet = [
       this.nodes.peerSheet,
+      this.nodes.nearbySheet,
       this.nodes.settingsSheet,
       this.nodes.informationSheet,
       this.nodes.sendSheet,
@@ -786,9 +880,20 @@ export class AppView extends Emitter {
     const timer = window.setTimeout(finish, closing ? 420 : 480);
   }
 
+  settleSheetState(sheet, open) {
+    const previousTransition = sheet.style.transition;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    sheet.style.transition = "none";
+    sheet.style.opacity = open ? "1" : "0";
+    sheet.style.transform = open || reduced ? "translateY(0) scale(1)" : "translateY(calc(100% + 24px)) scale(.985)";
+    void sheet.offsetHeight;
+    sheet.style.transition = previousTransition;
+  }
+
   visibleSheet() {
     return [
       this.nodes.peerSheet,
+      this.nodes.nearbySheet,
       this.nodes.settingsSheet,
       this.nodes.informationSheet,
       this.nodes.sendSheet,
@@ -924,6 +1029,87 @@ function peerOrbitLayout(peer, index) {
       : index % ORBIT_RADII.length,
     angle: Number.isFinite(angle) ? angle : index * 72
   };
+}
+
+function rankPeersForDisplay(peers, state) {
+  return [...peers]
+    .map((peer) => ({
+      ...peer,
+      __rankScore: peerRankScore(peer, state)
+    }))
+    .sort((a, b) =>
+      b.__rankScore - a.__rankScore
+        || String(a.name || "").localeCompare(String(b.name || ""))
+        || String(a.id || "").localeCompare(String(b.id || ""))
+    );
+}
+
+function peerRankScore(peer, state) {
+  const explicit = Number(peer.proximityScore ?? peer.proximity?.score);
+  const base = Number.isFinite(explicit) ? explicit : 48;
+  const stageBonus = {
+    verify: 24,
+    near: 20,
+    intent: 12,
+    lobby: 0
+  }[normalizedPeerStage(peer, state)] || 0;
+  const distanceBonus = {
+    immediate: 28,
+    near: 20,
+    room: 12,
+    building: 4,
+    far: 0
+  }[peer.distanceBucket || peer.proximity?.bucket] || 0;
+  const recentBonus = peerPreviouslyConnected(peer) ? 9 : 0;
+  const sameDeviceBonus = selfDeviceFamily(state) === peerDeviceFamily(peer) ? 4 : 0;
+  return Math.max(0, Math.min(100, base + stageBonus + distanceBonus + recentBonus + sameDeviceBonus));
+}
+
+function matchesNearbyFilter(peer, state, filter) {
+  if (filter === "recent") return peerPreviouslyConnected(peer);
+  if (filter === "same-device") return selfDeviceFamily(state) === peerDeviceFamily(peer);
+  return true;
+}
+
+function peerPreviouslyConnected(peer) {
+  return Boolean(peer.connectedBefore || peer.lastConnectedAt || Number(peer.previousConnections || 0) > 0);
+}
+
+function peerDeviceFamily(peer) {
+  return peer.deviceFamily || peer.capabilities?.platform?.family || peer.platform || "unknown";
+}
+
+function selfDeviceFamily(state) {
+  return state.self.deviceFamily || state.capabilities?.platform?.family || "unknown";
+}
+
+function peerDeviceLabel(peer) {
+  return peer.deviceLabel || peer.deviceType || peer.capabilities?.platform?.label || familyLabel(peerDeviceFamily(peer));
+}
+
+function familyLabel(family) {
+  return {
+    ios: "iPhone",
+    android: "Android",
+    macos: "Mac",
+    windows: "Windows",
+    watchos: "Watch",
+    ipad: "iPad"
+  }[family] || "Device";
+}
+
+function peerDistanceKey(peer) {
+  return {
+    immediate: "distanceImmediate",
+    near: "distanceNear",
+    room: "distanceRoom",
+    building: "distanceBuilding",
+    far: "distanceFar"
+  }[peer.distanceBucket || peer.proximity?.bucket] || "distanceNear";
+}
+
+function normalizeSearch(value) {
+  return String(value || "").trim().toLocaleLowerCase();
 }
 
 function visibleReceivedItems(state) {

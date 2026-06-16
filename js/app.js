@@ -28,7 +28,8 @@ const initialState = {
     id: persistentDeviceId(),
     name: localStorage.getItem("webdrop.deviceName") || defaultDeviceName(),
     avatar: localStorage.getItem("webdrop.avatarChoice") || AVATAR_OPTIONS[0],
-    ringColor: localStorage.getItem("webdrop.ringColor") || "#ffffff"
+    ringColor: localStorage.getItem("webdrop.ringColor") || "#ffffff",
+    deviceFamily: selfDeviceFamily()
   },
   peers: [],
   selectedPeerId: null,
@@ -114,4 +115,13 @@ function defaultDeviceName() {
   if (/iPad/i.test(navigator.userAgent)) return "WebDrop iPad";
   if (/Android/i.test(navigator.userAgent)) return "WebDrop Android";
   return "WebDrop Device";
+}
+
+function selfDeviceFamily() {
+  if (/iPhone/i.test(navigator.userAgent)) return "ios";
+  if (/iPad/i.test(navigator.userAgent)) return "ipad";
+  if (/Android/i.test(navigator.userAgent)) return "android";
+  if (/Macintosh|Mac OS X/i.test(navigator.userAgent)) return "macos";
+  if (/Windows/i.test(navigator.userAgent)) return "windows";
+  return "unknown";
 }

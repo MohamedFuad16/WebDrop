@@ -10,6 +10,55 @@
   animation: dockIn var(--motion-sheet-in) var(--ease-out);
 }
 
+.nearby-fab {
+  position: fixed;
+  z-index: 18;
+  right: 18px;
+  bottom: calc(18px + var(--safe-bottom));
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--composer-border);
+  border-radius: 20px;
+  color: var(--mint);
+  background: var(--composer);
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(28px);
+  cursor: pointer;
+}
+
+.nearby-fab svg {
+  width: 28px;
+  height: 28px;
+}
+
+.nearby-fab path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+
+.nearby-fab-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  padding: 0 5px;
+  border: 2px solid var(--panel-solid);
+  border-radius: 999px;
+  color: #fff;
+  background: #ff3b55;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .app-shell[data-mode="disconnecting"] .connection-tray {
   animation: dockOut 500ms var(--ease-in) forwards;
 }
@@ -97,6 +146,12 @@
 
 .dock-button--disconnect {
   --icon-color: #ff5b6b;
+}
+
+.app-shell[data-mode="connected"] .nearby-fab,
+.app-shell[data-mode="disconnecting"] .nearby-fab {
+  right: max(18px, calc(50vw - 176px));
+  bottom: calc(100px + var(--safe-bottom));
 }
 
 .receive-badge {
