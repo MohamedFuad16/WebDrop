@@ -33,6 +33,7 @@ export function createController({
       connectedPeerId: null,
       selectedPeerId: null,
       pendingInviteId: null,
+      incomingInvite: null,
       pairingId: null,
       files: [],
       transfer: null,
@@ -78,6 +79,7 @@ export function createController({
       mode: wasVerifying ? "verifying" : "intent",
       selectedPeerId: peerId,
       pendingInviteId: peerId,
+      incomingInvite: null,
       pairingId: pairingId || null
     });
     pairingWaiters.get(peerId)?.({ peerId, pairingId });
@@ -93,10 +95,36 @@ export function createController({
     const peerId = payload?.fromId;
     const peer = store.getState().peers.find((candidate) => candidate.id === peerId) || payload?.from;
     if (!peerId || !peer) return;
-    incomingInvite = { peerId, pairingId: payload.pairingId };
+    const state = store.getState();
+    if (state.connectedPeerId || state.mode === "verifying" || state.mode === "disconnecting") {
+      signaling.rejectInvite?.(peerId, payload.pairingId);
+      view.toast(view.translate("inviteDeclinedBusy", { name: peer.name }));
+      return;
+    }
+    incomingInvite = {
+      peerId,
+      pairingId: payload.pairingId || null,
+      receivedAt: payload.receivedAt || new Date().toISOString(),
+      from: peer
+    };
     activePeerId = peerId;
-    store.patch({ selectedPeerId: peerId, pendingInviteId: peerId, pairingId: payload.pairingId || null });
-    view.openPeerSheet(peer, { peers: store.getState().peers });
+    store.patch({
+      mode: "lobby",
+      selectedPeerId: peerId,
+      pendingInviteId: peerId,
+      incomingInvite,
+      pairingId: payload.pairingId || null
+    });
+    view.openPeerSheet(peer, { peers: store.getState().peers, direction: "incoming" });
+    view.toast(view.translate("incomingInviteToast", { name: peer.name }));
+  });
+
+  signaling.on("invite:reject", (payload = {}) => {
+    handleInviteRejected(payload);
+  });
+
+  signaling.on("inviteRejected", (payload = {}) => {
+    handleInviteRejected(payload);
   });
 
   signaling.on("chat:message", (payload) => {
@@ -155,6 +183,7 @@ export function createController({
       connectedPeerId: null,
       selectedPeerId: null,
       pendingInviteId: null,
+      incomingInvite: null,
       pairingId: null,
       files: [],
       transfer: null,
@@ -207,9 +236,29 @@ export function createController({
   view.on("open-nearby-sheet", () => view.openNearbySheet());
   view.on("close-nearby-sheet", () => view.closeNearbySheet());
   view.on("toggle-qr-preview", () => view.toggleQrScannerPreview());
-  view.on("close-sheet", () => view.closePeerSheet());
+  view.on("close-sheet", async () => {
+    if (incomingInvite?.peerId) {
+      const invite = incomingInvite;
+      clearIncomingInvite();
+      await signaling.rejectInvite?.(invite.peerId, invite.pairingId);
+      await view.closePeerSheet();
+      view.toast(view.translate("inviteDeclined"));
+      return;
+    }
+    view.closePeerSheet();
+  });
   view.on("close-action-sheet", () => view.closeActionSheets());
-  view.on("close-all-sheets", () => view.closeAllSheets());
+  view.on("close-all-sheets", async () => {
+    if (incomingInvite?.peerId) {
+      const invite = incomingInvite;
+      clearIncomingInvite();
+      await signaling.rejectInvite?.(invite.peerId, invite.pairingId);
+      await view.closeAllSheets();
+      view.toast(view.translate("inviteDeclined"));
+      return;
+    }
+    view.closeAllSheets();
+  });
   view.on("open-send-sheet", () => view.openSendSheet());
   view.on("open-receive-sheet", () => view.openReceiveSheet());
   view.on("open-chat-sheet", () => view.openChatSheet());
@@ -296,10 +345,11 @@ export function createController({
     const peer = findPeer(peerId);
     if (!peer) {
       activePeerId = null;
-      store.patch({ selectedPeerId: null, pendingInviteId: null });
+      store.patch({ selectedPeerId: null, pendingInviteId: null, incomingInvite: null });
       return;
     }
-    let productionInitiator = true;
+    const acceptingIncoming = incomingInvite?.peerId === peerId;
+    let productionInitiator = !acceptingIncoming;
     const useQrPairing = shouldUseQrPairing(peer);
     const permissionPromises = runtime.realProximityCeremony && !useQrPairing
       ? {
@@ -307,7 +357,12 @@ export function createController({
         motion: proximity.requestMotionPermission()
       }
       : null;
-    store.patch({ mode: "verifying", pendingInviteId: peerId });
+    if (acceptingIncoming && !runtime.productionSignaling) {
+      const invite = incomingInvite;
+      incomingInvite = null;
+      await signaling.acceptInvite?.(peerId, invite.pairingId);
+    }
+    store.patch({ mode: "verifying", pendingInviteId: peerId, incomingInvite: null });
     await view.closePeerSheet();
     if (!isCurrentVerification(peerId)) return;
     if (useQrPairing) {
@@ -319,7 +374,7 @@ export function createController({
       const pairing = await establishProductionPairing(peerId);
       if (!pairing || !isCurrentVerification(peerId)) {
         stopProximitySensors();
-        store.patch({ mode: "lobby", pendingInviteId: null, pairingId: null });
+        store.patch({ mode: "lobby", pendingInviteId: null, incomingInvite: null, pairingId: null });
         return;
       }
       store.patch({ pairingId: pairing.pairingId });
@@ -359,7 +414,7 @@ export function createController({
       if (runtime.productionSignaling && pairingId) {
         await signaling.disconnectPeer?.(peerId, pairingId);
       }
-      store.patch({ mode: "lobby", pendingInviteId: null, pairingId: null });
+      store.patch({ mode: "lobby", pendingInviteId: null, incomingInvite: null, pairingId: null });
       view.toast(view.translate("qrFallback"));
       return;
     }
@@ -379,6 +434,7 @@ export function createController({
       mode: "connected",
       connectedPeerId: peerId,
       pendingInviteId: null,
+      incomingInvite: null,
       path,
       receivedCount: 1,
       receivedItems: demoPdfItems(),
@@ -533,6 +589,7 @@ export function createController({
         connectedPeerId: null,
         selectedPeerId: null,
         pendingInviteId: null,
+        incomingInvite: null,
         pairingId: null,
         files: [],
         transfer: null,
@@ -567,6 +624,7 @@ export function createController({
       mode: "lobby",
       selectedPeerId: null,
       pendingInviteId: null,
+      incomingInvite: null,
       pairingId: null
     });
     activePeerId = null;
@@ -877,6 +935,7 @@ export function createController({
       mode: "lobby",
       selectedPeerId: null,
       pendingInviteId: null,
+      incomingInvite: null,
       pairingId: null,
       transfer: null,
       path: "unknown"
@@ -884,6 +943,30 @@ export function createController({
     activePeerId = null;
     incomingInvite = null;
     view.toast(view.translate("connectionRejected"));
+  }
+
+  function handleInviteRejected(payload = {}) {
+    const peerId = payload.fromId || payload.peerId || payload.targetId;
+    if (peerId && activePeerId && peerId !== activePeerId) return;
+    if (peerId) {
+      pairingWaiters.get(peerId)?.(null);
+      pairingWaiters.delete(peerId);
+    }
+    clearIncomingInvite();
+    view.closePeerSheet();
+    view.toast(view.translate("inviteDeclined"));
+  }
+
+  function clearIncomingInvite() {
+    incomingInvite = null;
+    store.patch({
+      mode: store.getState().mode === "verifying" ? "verifying" : "lobby",
+      selectedPeerId: null,
+      pendingInviteId: null,
+      incomingInvite: null,
+      pairingId: null
+    });
+    activePeerId = null;
   }
 
   function setTheme(theme) {

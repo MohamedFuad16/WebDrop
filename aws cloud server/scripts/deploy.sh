@@ -2,7 +2,7 @@
 set -euo pipefail
 
 DOMAIN="${DOMAIN:-signal.webdrop.example.com}"
-APP_DIR="${APP_DIR:-/opt/webdrop/aws cloud server}"
+APP_DIR="${APP_DIR:-/opt/webdrop/aws-cloud-server}"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ "${EUID}" -ne 0 ]]; then

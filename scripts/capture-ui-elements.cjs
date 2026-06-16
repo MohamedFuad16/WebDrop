@@ -131,7 +131,7 @@ async function main() {
   await add("settings-profile-ring", ".ring-setting", "Profile ring selector", "The default ring is white, with optional blue, green, purple, and rose choices.", { margin: 8 });
   await add("settings-language", ".language-setting", "Language selector", "Switches every app label between English and Japanese.", { margin: 8 });
   await add("settings-app-info-link", ".settings-link", "App information link", "Moves design, stack, and orbit motion details into a separate sheet.", { margin: 8 });
-  await add("settings-app-version", ".app-version", "App version", "Shows the current prototype version, 1.0.22, at the bottom of Settings.", { margin: 8 });
+  await add("settings-app-version", ".app-version", "App version", "Shows the current prototype version, 1.0.24, at the bottom of Settings.", { margin: 8 });
   await page.click("[data-action='open-information']", { force: true });
   await page.waitForSelector("[data-information-sheet].is-open");
   await page.waitForTimeout(650);

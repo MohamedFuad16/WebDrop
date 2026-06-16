@@ -1,14 +1,14 @@
 import { createStore } from "./core/state.js";
-import { createController } from "./core/controller.js";
+import { createController } from "./core/controller.js?v=1.0.24";
 import { detectCapabilities } from "./services/capabilities.js";
-import { MockSignalingAdapter } from "./services/mock-signaling.js";
+import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.24";
 import { WebSocketSignalingAdapter } from "./services/websocket-signaling.js";
 import { TurnConfigProvider } from "./services/turn-config.js";
 import { ProximityEngine } from "./services/proximity-engine.js";
 import { WebRtcTransport } from "./services/webrtc-transport.js";
 import { TransferEngine } from "./services/transfer-engine.js";
 import { StorageClient } from "./storage/storage-client.js";
-import { AppView } from "./ui/app-view.js";
+import { AppView } from "./ui/app-view.js?v=1.0.24";
 import { AVATAR_OPTIONS, normalizeAvatarChoice } from "./config/avatar-options.js";
 import { getRuntimeFlags } from "./config/runtime-flags.js";
 
@@ -39,6 +39,7 @@ const initialState = {
   capabilities: {},
   path: "unknown",
   pendingInviteId: null,
+  incomingInvite: null,
   pairingId: null,
   receivedCount: 0,
   receivedItems: [],
@@ -86,6 +87,9 @@ createController({
 detectCapabilities().then((capabilities) => {
   store.patch({ capabilities: { ...capabilities, runtime } });
   signaling.connect({ self: store.getState().self, capabilities });
+  if (isLocalhost && new URLSearchParams(location.search).get("qa") === "incoming-invite") {
+    window.setTimeout(() => mockSignaling.simulateIncomingInvite?.(), 900);
+  }
 });
 
 const isLocalhost = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);

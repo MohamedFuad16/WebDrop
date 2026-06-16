@@ -44,6 +44,20 @@ export class MockSignalingAdapter extends Emitter {
     this.emit("inviteAccepted", { peerId, pairingId: `pair-${peerId}` });
   }
 
+  async rejectInvite(peerId, pairingId) {
+    this.emit("inviteRejected", { peerId, pairingId });
+  }
+
+  simulateIncomingInvite(peerId = "peer-aki") {
+    const peer = MOCK_PEERS.find((candidate) => candidate.id === peerId) || MOCK_PEERS[0];
+    this.emit("invite", {
+      fromId: peer.id,
+      from: peer,
+      pairingId: `pair-${peer.id}`,
+      receivedAt: new Date().toISOString()
+    });
+  }
+
   async sendProximityTelemetry(peerId, metrics) {
     this.emit("telemetry", { peerId, metrics });
   }

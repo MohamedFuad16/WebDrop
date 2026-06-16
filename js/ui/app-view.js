@@ -67,6 +67,7 @@ export class AppView extends Emitter {
       sheetPeerName: document.querySelector("[data-sheet-peer-name]"),
       sheetPeerAvatar: document.querySelector("[data-sheet-peer-avatar]"),
       sheetCopy: document.querySelector("[data-sheet-copy]"),
+      peerSheetCancel: document.querySelector("[data-peer-sheet-cancel]"),
       sendTitle: document.querySelector("[data-send-title]"),
       sendCopy: document.querySelector("[data-send-copy]"),
       chatTitle: document.querySelector("[data-chat-title]"),
@@ -212,15 +213,19 @@ export class AppView extends Emitter {
     let currentDistance = 0;
     let allowHapticToggle = false;
     let dragStartedOnHapticSwitch = false;
+    let defaultTextKey = defaultText;
+    let completeTextKey = completeText;
     const isControlDisabled = () => thumb.disabled || control.getAttribute("aria-disabled") === "true";
     const setX = (value) => {
       currentDistance = Math.max(0, Math.min(maxDistance, value));
       control.style.setProperty("--swipe-x", `${axis === "x" ? currentDistance : 0}px`);
       control.style.setProperty("--swipe-y", `${axis === "y" ? currentDistance * -1 : 0}px`);
     };
-    const reset = () => {
+    const reset = (copy = {}) => {
+      defaultTextKey = copy.defaultText || defaultTextKey;
+      completeTextKey = copy.completeText || completeTextKey;
       control.classList.remove("is-complete", "is-dragging");
-      text.textContent = this.translate(defaultText);
+      text.textContent = this.translate(defaultTextKey);
       setX(0);
     };
     const getPosition = (event) => axis === "x" ? event.clientX : event.clientY;
@@ -260,7 +265,7 @@ export class AppView extends Emitter {
       if (isControlDisabled()) return;
       allowHapticToggle = true;
       control.classList.add("is-complete");
-      text.textContent = this.translate(completeText);
+      text.textContent = this.translate(completeTextKey);
       setX(maxDistance);
       if (eventName === "swipe-connect") this.pulseConnectGestureHaptic();
       this.emit(eventName);
@@ -710,17 +715,36 @@ export class AppView extends Emitter {
     );
   }
 
-  openPeerSheet(peer, { peers }) {
+  openPeerSheet(peer, { peers, direction = "outgoing" } = {}) {
     if (this.nodes.nearbySheet && !this.nodes.nearbySheet.hidden) {
       this.hideSheet(this.nodes.nearbySheet, undefined, { keepBackdrop: true });
     }
+    const incoming = direction === "incoming";
+    this.nodes.peerSheet.dataset.inviteDirection = incoming ? "incoming" : "outgoing";
+    this.nodes.peerSheet.setAttribute(
+      "aria-label",
+      this.translate(incoming ? "incomingPeerActions" : "peerActions")
+    );
+    this.nodes.peerSheet.querySelector(".sheet-kicker").textContent = this.translate(
+      incoming ? "incomingInviteKicker" : "nearbyCandidate"
+    );
     this.nodes.sheetPeerName.innerHTML = `${deviceBrandMarkup(peer)}<span>${escapeHtml(peer.name)}</span>`;
     renderAnimatedAvatar(this.nodes.sheetPeerAvatar, peer.avatar, 1);
-    this.nodes.sheetCopy.textContent = this.translate("peerSheetReadyCopy");
+    this.nodes.sheetCopy.textContent = this.translate(
+      incoming ? "incomingInviteCopy" : "peerSheetReadyCopy",
+      { name: peer.name }
+    );
     this.nodes.friendStrip.innerHTML = peers.slice(0, 5).map((item, index) =>
       animatedAvatarMarkup(item.avatar, index)
     ).join("") + "<span>+</span>";
-    this.resetSwipe?.();
+    this.resetSwipe?.({
+      defaultText: incoming ? "swipeAccept" : "swipeConnect",
+      completeText: incoming ? "accepting" : "connecting"
+    });
+    this.nodes.swipeThumb?.setAttribute("aria-label", this.translate(incoming ? "swipeAccept" : "swipeConnect"));
+    if (this.nodes.peerSheetCancel) {
+      this.nodes.peerSheetCancel.textContent = this.translate(incoming ? "decline" : "cancel");
+    }
     this.showSheet(this.nodes.peerSheet);
   }
 
@@ -735,7 +759,13 @@ export class AppView extends Emitter {
   }
 
   closePeerSheet() {
-    return this.hideSheet(this.nodes.peerSheet);
+    return this.hideSheet(this.nodes.peerSheet, () => {
+      this.nodes.peerSheet.dataset.inviteDirection = "outgoing";
+      this.nodes.peerSheet.setAttribute("aria-label", this.translate("peerActions"));
+      this.nodes.peerSheet.querySelector(".sheet-kicker").textContent = this.translate("nearbyCandidate");
+      if (this.nodes.peerSheetCancel) this.nodes.peerSheetCancel.textContent = this.translate("cancel");
+      this.resetSwipe?.({ defaultText: "swipeConnect", completeText: "connecting" });
+    });
   }
 
   openSettings() {

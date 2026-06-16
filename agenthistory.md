@@ -632,7 +632,7 @@ Verification:
 - Local AWS signaling server smoke confirmed admin WebSocket connection, session id display, token redaction in logs, `/healthz` 200, and `/api/ice-servers` 200 with fallback STUN payload.
 - Mobile-width Browser smoke at 390px confirmed no horizontal overflow and visible admin tabs.
 
-## 2026-06-17 Version 1.0.22 Siri wave and admin visual alignment
+## 2026-06-17 Version 1.0.23 Siri wave and admin visual alignment
 
 Scope:
 - Replaced the Dynamic Island connection bars with the `siriWaveCore` WebGL wave from `/Users/mfuad16/Documents/animations/siri-wave.html`.
@@ -646,11 +646,11 @@ Implementation:
 - Runs the wave only while the island is connecting or connected, and stops it for closed, QR, reduced-motion, and paused-motion states.
 - Reworked `css/admin.css` around the WebDrop palette, grid background, glass panels, orbit hint, pill tabs, rounded sheets, and softer status rows.
 - Added the new wave module to the service-worker asset list.
-- Incremented package, lockfile, visible Settings version, service-worker cache version, docs, and screenshot/PDF scripts to `1.0.22`.
+- Incremented package, lockfile, visible Settings version, service-worker cache version, docs, and screenshot/PDF scripts to `1.0.23`.
 
 Verification:
 - `npm run verify:full` passed.
 - In-app Browser confirmed the main app loads with the new `[data-island-wave]` canvas, the real swipe-to-connect flow opens the Dynamic Island in `connecting`, and the app settles into connected mode with no horizontal overflow.
-- In-app Browser confirmed `/admin/` renders with WebDrop-style background, glass hero, blue active tab, version `1.0.22`, eight readiness cards, eight blockers, and no console warnings/errors.
+- In-app Browser confirmed `/admin/` renders with WebDrop-style background, glass hero, blue active tab, version `1.0.23`, eight readiness cards, eight blockers, and no console warnings/errors.
 - Mobile-width Browser smoke at 390px confirmed the redesigned admin route has no horizontal overflow and keeps the tab controls visible.
 - Browser screenshot capture timed out in the current Codex browser session, so visual evidence is from rendered DOM/computed-style checks rather than an attached screenshot.

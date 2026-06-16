@@ -164,6 +164,26 @@
   box-shadow: 0 9px 22px color-mix(in srgb, var(--ink) 11%, transparent);
 }
 
+.peer-sheet[data-invite-direction="incoming"] .peer-candidate-avatar {
+  border-color: #ffffff;
+  box-shadow:
+    0 0 0 6px color-mix(in srgb, var(--blue) 10%, transparent),
+    0 14px 34px color-mix(in srgb, var(--blue) 20%, transparent);
+}
+
+.peer-sheet[data-invite-direction="incoming"] .sheet-kicker {
+  color: var(--blue);
+}
+
+.peer-sheet[data-invite-direction="incoming"] .swipe-control::before {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--mint) 24%, transparent),
+    color-mix(in srgb, var(--blue) 18%, transparent) 62%,
+    transparent
+  );
+}
+
 .bottom-sheet p:not(.sheet-kicker) {
   margin: 10px auto 16px;
   max-width: 320px;

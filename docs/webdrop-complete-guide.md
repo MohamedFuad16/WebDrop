@@ -1,6 +1,6 @@
 # WebDrop Complete Technical Guide
 
-Version: WebDrop v2 production-readiness handoff for app version 1.0.22
+Version: WebDrop v2 production-readiness handoff for app version 1.0.24
 Scope: `/Users/mfuad16/Documents/web_drop_v2`
 Primary app entrypoint: `index.html` and `js/app.js`
 
@@ -14,7 +14,7 @@ The current repository ships a static browser application plus an AWS signaling-
 
 ### Production readiness status
 
-- App/package/service-worker version: `1.0.22`.
+- App/package/service-worker version: `1.0.24`.
 - Default frontend runtime: safe demo mode because `productionSignaling` is `false` and both production URLs are blank in `js/config/runtime-config.js`.
 - Effective feature gating: `js/config/runtime-flags.js` refuses to enable real proximity, real transfer, or QR pairing unless production signaling is enabled with a valid WSS URL.
 - Backend package: `aws cloud server/` contains the Node WebSocket signaling service, QR token provider, TURN credential proxy, nginx/systemd/deploy assets, and load-test assets.
