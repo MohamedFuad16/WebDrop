@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.29";
+const APP_VERSION = "1.0.30";
 const CHUNK_SIZE = 256 * 1024;
 
 const readinessItems = [
@@ -27,7 +27,7 @@ const readinessItems = [
     status: "Ready, unconfigured",
     score: 72,
     checks: [
-      "AWS WebSocket server package exists",
+      "Azure WebSocket server package exists",
       "Presence, invites, RTC, chat and transfer metadata schemas",
       "nginx, Certbot, systemd and load-test assets"
     ]
@@ -59,7 +59,7 @@ const readinessItems = [
     checks: [
       "500 MB send and receive session caps",
       "StreamSaver browser download writer",
-      "Blob fallback with Open action"
+      "Blob fallback waits for explicit Save"
     ]
   },
   {
@@ -85,8 +85,8 @@ const readinessItems = [
 ];
 
 const blockers = [
-  ["Deploy AWS signaling", "Configure EC2, DNS, TLS, nginx, systemd, firewall and health checks.", "High"],
-  ["Rotate and configure TURN", "Use valid Cloudflare TURN Server credentials only in the EC2 environment file.", "High"],
+  ["Deploy Azure signaling", "Configure Azure VM, DNS, TLS, nginx, systemd, firewall and health checks.", "High"],
+  ["Rotate and configure TURN", "Use valid Cloudflare TURN Server credentials only in the Azure VM environment file.", "High"],
   ["Set production URLs", "Configure WSS and TURN endpoint URLs in js/config/runtime-config.js.", "High"],
   ["Calibrate proximity", "Test QR, microphone chirps, tilt and bump on physical iOS and Android devices.", "High"],
   ["Prove real transfer", "Run direct and TURN file transfers with cancellation, retry and storage exhaustion cases.", "High"],

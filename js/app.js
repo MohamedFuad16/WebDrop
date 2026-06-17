@@ -1,15 +1,15 @@
 import { createStore } from "./core/state.js";
-import { createController } from "./core/controller.js?v=1.0.29";
+import { createController } from "./core/controller.js?v=1.0.30";
 import { detectCapabilities } from "./services/capabilities.js";
-import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.29";
+import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.30";
 import { WebSocketSignalingAdapter } from "./services/websocket-signaling.js";
 import { TurnConfigProvider } from "./services/turn-config.js";
 import { ProximityEngine } from "./services/proximity-engine.js";
 import { WebRtcTransport } from "./services/webrtc-transport.js";
 import { TransferEngine } from "./services/transfer-engine.js";
 import { StorageClient } from "./storage/storage-client.js";
-import { AppView } from "./ui/app-view.js?v=1.0.29";
-import { AVATAR_OPTIONS, normalizeAvatarChoice } from "./config/avatar-options.js";
+import { AppView } from "./ui/app-view.js?v=1.0.30";
+import { randomAvatarChoice, normalizeAvatarChoice } from "./config/avatar-options.js";
 import { getRuntimeFlags } from "./config/runtime-flags.js";
 
 function browserLocale() {
@@ -28,8 +28,8 @@ const initialState = {
     id: persistentClientId(),
     deviceId: persistentDeviceId(),
     name: localStorage.getItem("webdrop.deviceName") || defaultDeviceName(),
-    avatar: normalizeAvatarChoice(localStorage.getItem("webdrop.avatarChoice")) || AVATAR_OPTIONS[0],
-    avatarId: normalizeAvatarChoice(localStorage.getItem("webdrop.avatarChoice")) || AVATAR_OPTIONS[0],
+    avatar: cachedAvatarChoice(),
+    avatarId: cachedAvatarChoice(),
     ringColor: localStorage.getItem("webdrop.ringColor") || "#ffffff",
     deviceFamily: selfDeviceFamily()
   },
@@ -46,6 +46,7 @@ const initialState = {
   receivedCount: 0,
   receivedItems: [],
   chatMessages: [],
+  unreadChatCount: 0,
   theme: localStorage.getItem("webdrop.theme") || "light",
   locale: browserLocale(),
   motionPaused: localStorage.getItem("webdrop.motionPaused") === "true"
@@ -120,6 +121,14 @@ function persistentClientId() {
   const id = `${stableDeviceId}-${suffix}`;
   sessionStorage.setItem("webdrop.clientId", id);
   return id;
+}
+
+function cachedAvatarChoice() {
+  const stored = localStorage.getItem("webdrop.avatarChoice");
+  if (stored) return normalizeAvatarChoice(stored);
+  const avatar = randomAvatarChoice();
+  localStorage.setItem("webdrop.avatarChoice", avatar);
+  return avatar;
 }
 
 function persistentDeviceId() {

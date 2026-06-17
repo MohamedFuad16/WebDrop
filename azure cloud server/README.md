@@ -1,8 +1,8 @@
-# WebDrop AWS Cloud Server
+# WebDrop Azure Cloud Server
 
-This folder is a self-contained first production-signaling package for WebDrop. It is designed to be copied to an AWS EC2 Ubuntu instance and served behind nginx with Certbot-managed TLS.
+This folder is a self-contained first production-signaling package for WebDrop. It is designed to run on an Ubuntu Azure VM and sit behind nginx with Certbot-managed TLS.
 
-No files outside `aws cloud server/` are required for this server package.
+No files outside `azure cloud server/` are required for this server package.
 
 ## What This Server Does
 
@@ -40,7 +40,7 @@ Browser static app over HTTPS
         |
         | small metadata only
         v
-nginx TLS/WSS proxy on EC2
+nginx TLS/WSS proxy on Azure VM
         |
         | /ws, /healthz, /api/ice-servers
         v
@@ -57,7 +57,7 @@ Peer B browser        direct path first, Cloudflare TURN relay if needed
 ## Folder Layout
 
 ```text
-aws cloud server/
+azure cloud server/
 |-- src/
 |   |-- server.js
 |   |-- signaling-hub.js
@@ -71,7 +71,7 @@ aws cloud server/
 |-- systemd/
 |   `-- webdrop-signaling.service
 |-- scripts/
-|   |-- install-ec2-ubuntu.sh
+|   |-- install-azure-ubuntu.sh
 |   |-- deploy.sh
 |   |-- certbot-init.sh
 |   `-- smoke-test.sh
@@ -284,16 +284,16 @@ Response shape returned to the browser:
 }
 ```
 
-Do not expose the long-term Cloudflare TURN API token in frontend code. Store it only on EC2 in `/etc/webdrop/signaling.env`.
+Do not expose the long-term Cloudflare TURN API token in frontend code. Store it only on Azure VM in `/etc/webdrop/signaling.env`.
 The browser receives a separate ephemeral TURN access token only after `client:hello` succeeds. nginx and Node allow the configured frontend origin, while `/api/ice-servers` rejects requests that are not tied to that live signaling session. Keep `REQUIRE_TURN_AUTH=true` outside isolated local tests.
 
-The token pasted into the planning chat should be rotated before real deployment. Put the rotated token in the EC2 env file, not in Git.
+The token pasted into the planning chat should be rotated before real deployment. Put the rotated token in the Azure VM env file, not in Git.
 
 Cloudflare notes that TURN is usually enough for one-to-one WebRTC communication. STUN is free and unlimited. TURN has a 1,000 GB monthly free tier, then usage is charged on egress from Cloudflare to TURN clients.
 
 ## Environment
 
-Copy `.env.example` to `/etc/webdrop/signaling.env` on EC2 and edit values:
+Copy `.env.example` to `/etc/webdrop/signaling.env` on Azure VM and edit values:
 
 ```bash
 sudo install -d -m 0750 /etc/webdrop
@@ -317,10 +317,10 @@ Important variables:
 ## Local Development
 
 ```bash
-cd "aws cloud server"
+cd "azure cloud server"
 npm install
 npm run check
-npm test # reports that no AWS server test files are shipped in this build
+npm test # reports that no Azure server test files are shipped in this build
 npm start
 ```
 
@@ -330,24 +330,24 @@ Smoke test:
 BASE_URL=http://127.0.0.1:8080 bash scripts/smoke-test.sh
 ```
 
-## EC2 Deployment
+## Azure VM Deployment
 
-Recommended first instance:
+Recommended first VM:
 
 - Ubuntu 24.04 LTS
-- `t3.micro` only for a private smoke test
-- `t3.medium` for a small hosted beta
-- `t3.large` (2 vCPU / 8 GiB) as the minimum serious single-node 10,000-client load-test candidate
-- Prefer a non-burstable `m7g.large` or `m7i.large` when signaling traffic becomes sustained
-- Security group inbound: `80/tcp`, `443/tcp`, SSH from your IP only
-- DNS `A` record pointing `signal.webdrop.example.com` to the EC2 public IP
+- Small burstable VM only for a private smoke test
+- 2 vCPU / 4 GiB VM for a small hosted beta
+- 2 vCPU / 8 GiB VM or larger as the minimum serious single-node 10,000-client load-test candidate
+- Prefer non-burstable general-purpose compute when signaling traffic becomes sustained
+- Network security group inbound: `80/tcp`, `443/tcp`, SSH from your IP only
+- DNS `A` record pointing `signal.webdrop.example.com` to the Azure VM public IP
 
-These are starting points, not guaranteed capacity. AWS classifies T3 as burstable and publishes much lower baseline network bandwidth for the smaller sizes. See `../docs/deployment-sizing.md` for the current source-backed sizing rationale and load-test requirements.
+These are starting points, not guaranteed capacity. See `../docs/deployment-sizing.md` for the current sizing rationale and load-test requirements.
 
 Install base packages:
 
 ```bash
-sudo bash scripts/install-ec2-ubuntu.sh
+sudo bash scripts/install-azure-ubuntu.sh
 ```
 
 Copy the folder to the server, then deploy. If certificates do not exist yet, this installs an HTTP bootstrap vhost so nginx can start and Certbot can complete:
@@ -388,9 +388,9 @@ This package includes:
 - `/etc/security/limits.d/webdrop.conf` entries for `webdrop` and `www-data`
 - `/etc/sysctl.d/99-webdrop-signaling.conf` TCP/file descriptor headroom
 
-This gives headroom above 10,000 concurrent users on a correctly sized instance. The exact limit still depends on EC2 size, kernel settings, memory, TLS cost, network bandwidth, Node event loop load, and browser heartbeat intervals.
+This gives headroom above 10,000 concurrent users on a correctly sized instance. The exact limit still depends on Azure VM size, kernel settings, memory, TLS cost, network bandwidth, Node event loop load, and browser heartbeat intervals.
 
-nginx's documented default is only `512` connections per worker. The nginx limit includes proxied upstream connections, so a WebSocket proxy consumes more than one nginx connection slot. Never treat `worker_connections 65535` as proof of application capacity; prove the target on the chosen EC2 instance.
+nginx's documented default is only `512` connections per worker. The nginx limit includes proxied upstream connections, so a WebSocket proxy consumes more than one nginx connection slot. Never treat `worker_connections 65535` as proof of application capacity; prove the target on the chosen Azure VM instance.
 
 For real production scale, add:
 
@@ -425,4 +425,4 @@ Start below 10,000 and increase gradually while watching:
 - Do not log `iceServers`, TURN credentials, or bearer tokens.
 - Do not route files through WebSocket.
 - Keep the frontend’s chunk size modest, around 64 KiB, and use `RTCDataChannel.bufferedAmount` to prevent local queue bloat.
-- Treat the first EC2 deployment as a hosted signaling test, not the final production architecture.
+- Treat the first Azure VM deployment as a hosted signaling test, not the final production architecture.

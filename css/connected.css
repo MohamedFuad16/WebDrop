@@ -153,7 +153,8 @@
   display: none;
 }
 
-.receive-badge {
+.receive-badge,
+.chat-badge {
   position: absolute;
   top: -4px;
   right: -4px;
@@ -169,6 +170,10 @@
   font-size: 10px;
   font-weight: 800;
   line-height: 1;
+}
+
+.chat-badge {
+  background: #347cff;
 }
 
 .selected-files,

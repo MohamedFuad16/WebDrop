@@ -10,15 +10,15 @@ Primary app entrypoint: `index.html` and `js/app.js`
 
 This guide is written for product, engineering, QA, and production handoff work. It intentionally separates the default demo runtime from the production paths that are now wired but still disabled until deployment configuration is supplied.
 
-The current repository ships a static browser application plus an AWS signaling-server package. The default app still runs as a safe static demo: production signaling is off, runtime URLs are blank, and the app uses mock peers without requesting microphone, motion, or camera permissions. Behind those gates, the code now includes production WebSocket signaling, one-time QR token routing, real WebRTC offer/answer/ICE handling, separate control/file data channels, transfer manifests, sender hashing, receiver ACK/cancel/retry semantics, StreamSaver-backed browser downloads, Blob fallback for smaller unsupported cases, and Cloudflare TURN credential proxying. The core product boundaries remain: discovery and trust happen before file controls appear; signaling carries metadata; file bytes belong on an `RTCDataChannel`; and large receives should stream into the browser download pipeline rather than one giant in-memory object.
+The current repository ships a static browser application plus an Azure signaling-server package. The default app still runs as a safe static demo: production signaling is off, runtime URLs are blank, and the app uses mock peers without requesting microphone, motion, or camera permissions. Behind those gates, the code now includes production WebSocket signaling, one-time QR token routing, real WebRTC offer/answer/ICE handling, separate control/file data channels, transfer manifests, sender hashing, receiver ACK/cancel/retry semantics, StreamSaver-backed browser downloads, Blob fallback for smaller unsupported cases, and Cloudflare TURN credential proxying. The core product boundaries remain: discovery and trust happen before file controls appear; signaling carries metadata; file bytes belong on an `RTCDataChannel`; and large receives should stream into the browser download pipeline rather than one giant in-memory object.
 
 ### Production readiness status
 
 - App/package/service-worker version: `1.0.28`.
 - Default frontend runtime: safe demo mode because `productionSignaling` is `false` and both production URLs are blank in `js/config/runtime-config.js`.
 - Effective feature gating: `js/config/runtime-flags.js` refuses to enable real proximity, real transfer, or QR pairing unless production signaling is enabled with a valid WSS URL.
-- Backend package: `aws cloud server/` contains the Node WebSocket signaling service, QR token provider, TURN credential proxy, nginx/systemd/deploy assets, and load-test assets.
-- Still external: EC2 deployment, DNS/TLS, valid rotated Cloudflare TURN credentials, real WSS/TURN URLs, physical-device proximity calibration, two-browser direct/TURN transfer proof, load testing, and any horizontal-scaling state store.
+- Backend package: `azure cloud server/` contains the Node WebSocket signaling service, QR token provider, TURN credential proxy, nginx/systemd/deploy assets, and load-test assets.
+- Still external: Azure VM deployment, DNS/TLS, valid rotated Cloudflare TURN credentials, real WSS/TURN URLs, physical-device proximity calibration, two-browser direct/TURN transfer proof, load testing, and any horizontal-scaling state store.
 
 The production roadmap sections describe the backend and browser-work needed to turn those boundaries into a real multi-device transfer system.
 
@@ -444,7 +444,7 @@ QR should remain the universal fallback because it works when microphone permiss
 WebDrop has two signaling adapters:
 
 - `MockSignalingAdapter` for the default static demo.
-- `WebSocketSignalingAdapter` for the production AWS signaling endpoint.
+- `WebSocketSignalingAdapter` for the production Azure signaling endpoint.
 
 The mock adapter emits demo peers and accepts invite-style method calls. It makes the UI useful without a server. The WebSocket adapter is intentionally inactive unless a production URL is configured. Its unconfigured event means no endpoint is baked into the static app:
 
@@ -457,7 +457,7 @@ if (!this.url) {
 }
 ```
 
-That is a healthy boundary. The AWS package supplies the server-side origin validation, session management, rate limits, TURN credential minting, QR token provider, and abuse controls, but it still needs deployment and production environment configuration.
+That is a healthy boundary. The Azure package supplies the server-side origin validation, session management, rate limits, TURN credential minting, QR token provider, and abuse controls, but it still needs deployment and production environment configuration.
 
 ### Metadata that belongs on signaling
 
@@ -842,7 +842,7 @@ The active backend ladder is:
 
 ### Streaming browser download
 
-StreamSaver creates a browser-managed download response from client-side chunks. WebDrop writes each received `RTCDataChannel` chunk into the active `WritableStream`. The browser then saves the file through the user's normal download pipeline. JavaScript does not receive a final local Downloads path, so streamed files show saved status rather than a guaranteed Open action.
+StreamSaver creates a browser-managed download response from client-side chunks. WebDrop writes each received `RTCDataChannel` chunk into the active `WritableStream`. The browser then saves the file through the user's normal download pipeline. JavaScript does not receive a final local Downloads path, so streamed files show saved status rather than a guaranteed Save/Open action.
 
 ### Blob fallback
 
@@ -853,7 +853,7 @@ Blob fallback keeps compatibility for browsers where StreamSaver is unavailable 
 
 ### Blob fallback
 
-Blob fallback is the compatibility path when streaming download support is unavailable. It stores chunks as in-memory `ArrayBuffer` parts and creates an object URL after completion. This is convenient for small files and lets the receive sheet provide an Open action, but it must remain capped because it grows memory with the received payload.
+Blob fallback is the compatibility path when streaming download support is unavailable. It stores chunks as in-memory `ArrayBuffer` parts and creates an object URL after completion. This is convenient for small files and lets the receive sheet provide an explicit Save action, but it must remain capped because it grows memory with the received payload.
 
 <div class="page-break" style="page-break-after: always;"></div>
 
@@ -1146,7 +1146,7 @@ The current app is a polished static demo with disabled-gated production transfe
 
 ### Implemented but disabled or unconfigured
 
-- AWS WebSocket signaling endpoint, schemas, sessions, rate limits, and payload-safe observability.
+- Azure WebSocket signaling endpoint, schemas, sessions, rate limits, and payload-safe observability.
 - Backend-issued QR tokens and frontend Dynamic Island QR display/scan flow.
 - Real microphone chirp and motion evidence ceremony.
 - Real SDP offer/answer and ICE exchange through signaling.
@@ -1158,8 +1158,8 @@ The current app is a polished static demo with disabled-gated production transfe
 
 ### Remaining before production launch
 
-1. Deploy `aws cloud server/` to EC2 with DNS, nginx, Certbot, systemd, firewall rules, exact `ALLOWED_ORIGINS`, and protected metrics token.
-2. Rotate and configure valid Cloudflare TURN Server credentials on EC2 only; the latest audit recorded the provided Cloudflare identifier returning HTTP 404 as a TURN Key ID.
+1. Deploy `azure cloud server/` to Azure VM with DNS, nginx, Certbot, systemd, firewall rules, exact `ALLOWED_ORIGINS`, and protected metrics token.
+2. Rotate and configure valid Cloudflare TURN Server credentials on Azure VM only; the latest audit recorded the provided Cloudflare identifier returning HTTP 404 as a TURN Key ID.
 3. Configure real `signalingUrl` and `turnConfigUrl` in `js/config/runtime-config.js`, then enable flags in the staged order from `docs/production-activation.md`.
 4. Run physical-device calibration for iOS Safari and Android Chrome across QR, microphone, motion, denied-permission, noisy-room, and fallback cases.
 5. Prove two-browser direct and TURN transfers over the deployed backend, including cancellation, retry, receiver storage exhaustion, and large-file paths.

@@ -1,9 +1,9 @@
 {
-  "name": "webdrop-aws-cloud-server",
+  "name": "webdrop-azure-cloud-server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "AWS EC2-ready WebDrop WebSocket signaling server with Cloudflare TURN credential proxy.",
+  "description": "Azure VM-ready WebDrop WebSocket signaling server with Cloudflare TURN credential proxy.",
   "engines": {
     "node": ">=20"
   },

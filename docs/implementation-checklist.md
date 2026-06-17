@@ -3,7 +3,7 @@
 Updated: June 16, 2026
 App version: 1.0.28
 
-This is the source of truth for the production-readiness package. `Ready, live` means the implementation is active in the current runtime. `Ready, disabled` means the implementation is wired to the frontend but cannot become effective unless its runtime flag and infrastructure are enabled. `Ready, unconfigured` means the code exists but requires deployment secrets or infrastructure. `External verification` means the code is ready but requires AWS, Cloudflare, or physical devices.
+This is the source of truth for the production-readiness package. `Ready, live` means the implementation is active in the current runtime. `Ready, disabled` means the implementation is wired to the frontend but cannot become effective unless its runtime flag and infrastructure are enabled. `Ready, unconfigured` means the code exists but requires deployment secrets or infrastructure. `External verification` means the code is ready but requires Azure, Cloudflare, or physical devices.
 
 ## Proximity and permissions
 
@@ -12,13 +12,13 @@ This is the source of truth for the production-readiness package. `Ready, live` 
 | Real microphone permission request | Ready, disabled | `js/services/acoustic-proximity.js`, `js/core/controller.js` |
 | Real Web Audio chirp generation | Ready, disabled | `js/services/acoustic-proximity.js` |
 | Real chirp detection and normalized correlation | Ready, disabled | `js/services/acoustic-proximity.js` |
-| Coordinated two-peer chirp exchange | Ready, disabled | `js/services/proximity-engine.js`, `proximity:ready` / `proximity:start` in AWS signaling |
+| Coordinated two-peer chirp exchange | Ready, disabled | `js/services/proximity-engine.js`, `proximity:ready` / `proximity:start` in Azure signaling |
 | Real tilt and bump capture | Ready, disabled | `js/services/motion-proximity.js` |
 | Permission ceremony from explicit swipe gesture | Ready, disabled | `js/core/controller.js` |
 | Reset old motion evidence and stop microphone/motion after ceremony | Ready, disabled | `js/services/proximity-engine.js`, `js/core/controller.js` |
-| Send real proximity telemetry to AWS signaling | Ready, disabled | `js/services/websocket-signaling.js`, `js/core/controller.js` |
-| Enforce proximity before RTC, chat, path metrics, or transfer metadata | Ready, disabled | `aws cloud server/src/signaling-hub.js` |
-| Backend QR one-time-token logic | Ready, disabled | `aws cloud server/src/qr-token-provider.js`, `aws cloud server/src/signaling-hub.js` |
+| Send real proximity telemetry to Azure signaling | Ready, disabled | `js/services/websocket-signaling.js`, `js/core/controller.js` |
+| Enforce proximity before RTC, chat, path metrics, or transfer metadata | Ready, disabled | `azure cloud server/src/signaling-hub.js` |
+| Backend QR one-time-token logic | Ready, disabled | `azure cloud server/src/qr-token-provider.js`, `azure cloud server/src/signaling-hub.js` |
 | QR frontend UI and scanner | Ready, disabled | `js/ui/dynamic-island.js`, `js/core/controller.js`, `js/services/websocket-signaling.js` |
 | Two-device threshold calibration | External verification | Requires physical iOS/Android devices |
 
@@ -56,42 +56,42 @@ This is the source of truth for the production-readiness package. `Ready, live` 
 | Legacy receive worker writer | Removed from active runtime | App no longer creates `workers/storage-worker.js`; received files use browser download streaming or Blob fallback |
 | Interrupted transfer resume | Future hardening | Interrupted browser download sessions must restart |
 
-## AWS signaling backend
+## Azure signaling backend
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| WebSocket signaling endpoint | Ready | `aws cloud server/src/server.js`, `aws cloud server/src/signaling-hub.js` |
-| Reject WebSocket file bytes and oversized JSON | Ready | `aws cloud server/src/message-schema.js`, backend tests |
-| Strict RTC, chat, transfer, proximity, and path schemas | Ready | `aws cloud server/src/message-schema.js` |
-| Origin and rate-limit policy | Ready | `aws cloud server/src/server.js`, `aws cloud server/src/signaling-hub.js` |
-| Ephemeral invites and pairing sessions | Ready | `aws cloud server/src/signaling-hub.js` |
-| Coordinated proximity start and enforced verified state | Ready, disabled | `aws cloud server/src/signaling-hub.js`, `ENABLE_PROXIMITY_ANALYSIS=false` |
-| Server-issued QR one-time tokens | Ready | `aws cloud server/src/qr-token-provider.js` |
-| Cloudflare temporary TURN credentials | Ready, unconfigured | `aws cloud server/src/turn-provider.js` |
-| Direct/relay path metrics | Ready, disabled | `aws cloud server/src/metrics.js`, `aws cloud server/src/signaling-hub.js` |
-| Payload-safe observability | Ready, disabled | `aws cloud server/src/logger.js`, protected metrics endpoint |
-| nginx, Certbot, systemd, EC2 scripts, and load-test assets | Ready, unconfigured | `aws cloud server/nginx/`, `systemd/`, `scripts/`, `load/` |
+| WebSocket signaling endpoint | Ready | `azure cloud server/src/server.js`, `azure cloud server/src/signaling-hub.js` |
+| Reject WebSocket file bytes and oversized JSON | Ready | `azure cloud server/src/message-schema.js`, backend tests |
+| Strict RTC, chat, transfer, proximity, and path schemas | Ready | `azure cloud server/src/message-schema.js` |
+| Origin and rate-limit policy | Ready | `azure cloud server/src/server.js`, `azure cloud server/src/signaling-hub.js` |
+| Ephemeral invites and pairing sessions | Ready | `azure cloud server/src/signaling-hub.js` |
+| Coordinated proximity start and enforced verified state | Ready, disabled | `azure cloud server/src/signaling-hub.js`, `ENABLE_PROXIMITY_ANALYSIS=false` |
+| Server-issued QR one-time tokens | Ready | `azure cloud server/src/qr-token-provider.js` |
+| Cloudflare temporary TURN credentials | Ready, unconfigured | `azure cloud server/src/turn-provider.js` |
+| Direct/relay path metrics | Ready, disabled | `azure cloud server/src/metrics.js`, `azure cloud server/src/signaling-hub.js` |
+| Payload-safe observability | Ready, disabled | `azure cloud server/src/logger.js`, protected metrics endpoint |
+| nginx, Certbot, systemd, Azure VM scripts, and load-test assets | Ready, unconfigured | `azure cloud server/nginx/`, `systemd/`, `scripts/`, `load/` |
 
 ## Disabled-default proof
 
 - `js/config/runtime-config.js` currently points at the live Japan East WSS/TURN endpoints.
 - `js/config/runtime-flags.js` refuses to enable proximity, transfer, or QR unless production signaling is enabled with a valid production signaling URL.
-- `aws cloud server/.env.example` ships with `ENABLE_PROXIMITY_ANALYSIS=false`.
+- `azure cloud server/.env.example` ships with `ENABLE_PROXIMITY_ANALYSIS=false`.
 - Default app startup uses `MockSignalingAdapter` and does not request microphone or motion permissions.
 
 ## Verification evidence
 
 - Root static check: `npm run check`
 - Root test command: `npm test` — confirms no repository test files are shipped in this build
-- AWS backend static check: `npm run check`
-- AWS backend test command: `npm test` — confirms no AWS server test files are shipped in this build
+- Azure backend static check: `npm run check`
+- Azure backend test command: `npm test` — confirms no Azure server test files are shipped in this build
 - `git diff --check` — passing
 - Browser smoke: desktop and 393x852 mobile app load, seven mock peers render, connection tray stays hidden before connection, peer sheet opens, and console warnings/errors are empty.
 
 ## Remaining before production launch
 
-1. Deploy `aws cloud server/` to EC2 and configure DNS, nginx, Certbot, systemd, and firewall rules.
-2. Rotate and configure valid Cloudflare TURN Server credentials only in the EC2 environment file.
+1. Deploy `azure cloud server/` to Azure VM and configure DNS, nginx, Certbot, systemd, and firewall rules.
+2. Rotate and configure valid Cloudflare TURN Server credentials only in the Azure VM environment file.
 3. Configure production allowed origins and protected metrics token.
 4. Set real WSS and TURN endpoint URLs in `js/config/runtime-config.js`.
 5. Enable flags in the staged order documented in `docs/production-activation.md`.

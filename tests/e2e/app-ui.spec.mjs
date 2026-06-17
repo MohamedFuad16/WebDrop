@@ -96,7 +96,11 @@ test("falls back when production-like peers omit avatar or text fields", async (
 
 test("connects by swipe, selects a file, and shows Dynamic Island transfer progress", async ({ page }) => {
   const consoleProblems = [];
+  let downloadCount = 0;
   page.on("pageerror", (error) => consoleProblems.push(error.message));
+  page.on("download", () => {
+    downloadCount += 1;
+  });
   page.on("console", (message) => {
     if (!["error", "warning"].includes(message.type())) return;
     const text = message.text();
@@ -114,6 +118,12 @@ test("connects by swipe, selects a file, and shows Dynamic Island transfer progr
   await page.locator('[data-nearby-device-id="peer-aki"] .nearby-connect').click();
   await page.locator("[data-swipe-thumb]").press("Enter");
   await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 7000 });
+  await page.waitForTimeout(300);
+  expect(downloadCount).toBe(0);
+  await page.locator('[data-action="open-receive-sheet"]').click();
+  await expect(page.locator("[data-received-list] button").first()).toHaveText(/Save|保存/);
+  expect(downloadCount).toBe(0);
+  await page.locator('[data-receive-sheet] [data-action="close-action-sheet"]').click();
 
   await page.locator('[data-action="open-send-sheet"]').click();
   await page.locator("[data-file-input]").setInputFiles({

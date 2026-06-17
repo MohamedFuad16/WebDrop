@@ -87,6 +87,7 @@ export class AppView extends Emitter {
       selectedFiles: document.querySelector("[data-selected-files]"),
       receivedList: document.querySelector("[data-received-list]"),
       receiveBadge: document.querySelector("[data-receive-badge]"),
+      chatBadge: document.querySelector("[data-chat-badge]"),
       qrPreviewToggle: document.querySelector("[data-qr-preview-toggle]"),
       toast: document.querySelector("[data-toast]")
     };
@@ -643,8 +644,16 @@ export class AppView extends Emitter {
     const visibleCount = visibleReceivedItems(state).length;
     this.nodes.receiveBadge.hidden = visibleCount <= 0;
     this.nodes.receiveBadge.textContent = String(visibleCount);
+    this.renderChatBadge(state);
     this.renderReceivedList(state);
     this.renderChat(state);
+  }
+
+  renderChatBadge(state) {
+    if (!this.nodes.chatBadge) return;
+    const count = Math.max(0, Number(state.unreadChatCount || 0));
+    this.nodes.chatBadge.hidden = count <= 0;
+    this.nodes.chatBadge.textContent = count > 99 ? "99+" : String(count);
   }
 
   renderReceivedList(state) {
@@ -669,8 +678,8 @@ export class AppView extends Emitter {
           <strong>${escapeHtml(item.name)}</strong>
           <span>${escapeHtml(receivedFileStatus(this, item))}</span>
         </div>
-        ${item.url || item.canOpen
-          ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${this.translate("open")}</a>`
+        ${item.url || item.canSave
+          ? `<button type="button" data-action="open-received" data-transfer-id="${escapeHtml(item.transferId || "")}" data-file-id="${escapeHtml(item.id || "")}">${this.translate("save")}</button>`
           : `<button type="button" class="received-file-state" disabled>${this.translate(item.status === "retry" ? "needsRetry" : "saved")}</button>`}
       </div>
     `).join("");
@@ -736,8 +745,9 @@ export class AppView extends Emitter {
       incoming ? "incomingInviteCopy" : "peerSheetReadyCopy",
       { name: peer.name }
     );
-    this.nodes.friendStrip.innerHTML = peers.slice(0, 5).map((item, index) =>
-      animatedAvatarMarkup(peerDisplayAvatar(item, index + 1), index)
+    const stripAvatars = previewAvatarStrip(peer, peers);
+    this.nodes.friendStrip.innerHTML = stripAvatars.map((avatar, index) =>
+      animatedAvatarMarkup(avatar, index)
     ).join("") + "<span>+</span>";
     this.resetSwipe?.({
       defaultText: incoming ? "swipeAccept" : "swipeConnect",
@@ -768,6 +778,10 @@ export class AppView extends Emitter {
       if (this.nodes.peerSheetCancel) this.nodes.peerSheetCancel.textContent = this.translate("cancel");
       this.resetSwipe?.({ defaultText: "swipeConnect", completeText: "connecting" });
     });
+  }
+
+  isChatSheetOpen() {
+    return Boolean(this.nodes.chatSheet && !this.nodes.chatSheet.hidden);
   }
 
   openSettings() {
@@ -1230,9 +1244,25 @@ function animatedAvatarMarkup(avatar, stagger = 0) {
 }
 
 function peerDisplayAvatar(peer, index = 0) {
-  if (AVATAR_OPTIONS.includes(peer?.avatar)) return peer.avatar;
+  const rawAvatar = peer?.avatar || peer?.avatarId;
+  if (rawAvatar) return normalizeAvatarChoice(rawAvatar);
   const hash = stableHash(`${peer?.id || ""}:${peer?.name || ""}:${index}`);
   return AVATAR_OPTIONS[hash % AVATAR_OPTIONS.length];
+}
+
+function previewAvatarStrip(peer, peers = []) {
+  const seen = new Set();
+  const avatars = [];
+  const push = (avatar) => {
+    const normalized = normalizeAvatarChoice(avatar);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    avatars.push(normalized);
+  };
+  push(peerDisplayAvatar(peer, 0));
+  peers.forEach((item, index) => push(peerDisplayAvatar(item, index + 1)));
+  AVATAR_OPTIONS.forEach(push);
+  return avatars.slice(0, 5);
 }
 
 function stableHash(value) {
@@ -1274,7 +1304,7 @@ const OFFICIAL_DEVICE_BRANDS = new Set(["apple", "samsung", "google", "android",
 
 function deviceBrand(peer) {
   const family = peerDeviceFamily(peer).toLowerCase();
-  const label = peerDeviceLabel(peer).toLowerCase();
+  const label = `${peerDeviceLabel(peer)} ${peer?.name || ""}`.toLowerCase();
   if (label.includes("samsung") || label.includes("galaxy")) return "samsung";
   if (label.includes("pixel")) return "google";
   if (/(surface|windows|win32|win64)/.test(label) || family === "windows") return "windows";

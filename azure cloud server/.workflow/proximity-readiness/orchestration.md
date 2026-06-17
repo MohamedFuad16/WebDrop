@@ -1,6 +1,6 @@
 # Orchestration
 
-1. Main agent implements proximity scoring and permission readiness under `aws cloud server/`.
+1. Main agent implements proximity scoring and permission readiness under `azure cloud server/`.
 2. Subagents audit four disjoint slices:
    - protocol and proximity message safety
    - TURN/security/secret handling

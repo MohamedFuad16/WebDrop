@@ -40,7 +40,8 @@ export function createController({
       files: [],
       transfer: null,
       path: "unknown",
-      chatMessages: []
+      chatMessages: [],
+      unreadChatCount: 0
     });
     activePeerId = null;
     incomingInvite = null;
@@ -145,7 +146,8 @@ export function createController({
       chatMessages: [
         ...state.chatMessages,
         { id: message.id || `remote-${Date.now()}`, author: "peer", text: message.text }
-      ]
+      ],
+      unreadChatCount: view.isChatSheetOpen?.() ? state.unreadChatCount : (state.unreadChatCount || 0) + 1
     }));
   });
 
@@ -198,7 +200,8 @@ export function createController({
       files: [],
       transfer: null,
       path: "unknown",
-      chatMessages: []
+      chatMessages: [],
+      unreadChatCount: 0
     });
     activePeerId = null;
     resolveQrCancellation();
@@ -220,11 +223,8 @@ export function createController({
       url: file.blob ? URL.createObjectURL(file.blob) : "",
       downloadName: file.name,
       status: file.openUnavailable ? "saved" : "ready",
-      canOpen: Boolean(file.blob)
+      canSave: Boolean(file.blob)
     }));
-    for (const item of receivedItems) {
-      if (item.url) triggerBrowserDownload(item.url, item.downloadName);
-    }
     store.update((state) => ({
       ...state,
       receivedCount: state.receivedCount + receivedItems.length,
@@ -278,13 +278,17 @@ export function createController({
   });
   view.on("open-send-sheet", () => view.openSendSheet());
   view.on("open-receive-sheet", () => view.openReceiveSheet());
-  view.on("open-chat-sheet", () => view.openChatSheet());
+  view.on("open-chat-sheet", () => {
+    store.patch({ unreadChatCount: 0 });
+    view.openChatSheet();
+  });
   view.on("open-received", async ({ transferId, fileId }) => {
     const existing = store.getState().receivedItems.find((item) =>
       item.transferId === transferId && item.id === fileId
     );
     if (existing?.url) {
-      window.open(existing.url, "_blank", "noopener");
+      triggerBrowserDownload(existing.url, existing.downloadName);
+      view.toast(view.translate("downloadStarted"));
       return;
     }
     if (!runtime.realTransfer || !transferId || !fileId) return;
@@ -296,8 +300,9 @@ export function createController({
       }
       if (!exported?.blob) return;
       const url = URL.createObjectURL(exported.blob);
-      window.open(url, "_blank", "noopener");
+      triggerBrowserDownload(url, exported.name || existing?.downloadName);
       window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      view.toast(view.translate("downloadStarted"));
     } catch {
       view.toast(view.translate("noReceived"));
     }
@@ -599,9 +604,10 @@ export function createController({
           {
             id: crypto.randomUUID?.() || `reply-${Date.now()}`,
             author: "peer",
-            text: view.translate("mockReply")
+          text: view.translate("mockReply")
           }
-        ]
+        ],
+        unreadChatCount: view.isChatSheetOpen?.() ? current.unreadChatCount : (current.unreadChatCount || 0) + 1
       }));
     }, 560);
   });
@@ -634,7 +640,8 @@ export function createController({
         path: "unknown",
         receivedCount: 0,
         receivedItems: [],
-        chatMessages: []
+        chatMessages: [],
+        unreadChatCount: 0
       });
       activePeerId = null;
       incomingInvite = null;

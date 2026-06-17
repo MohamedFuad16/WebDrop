@@ -1,6 +1,6 @@
 # WebDrop AWS Proximity Readiness Workflow
 
-Goal: make the AWS signaling folder ready for future proximity score analysis and permission-policy reporting without activating proximity enforcement.
+Goal: make the Azure signaling folder ready for future proximity score analysis and permission-policy reporting without activating proximity enforcement.
 
 Success criteria:
 - Proximity telemetry can be normalized and scored server-side behind a disabled-by-default flag.
@@ -9,7 +9,7 @@ Success criteria:
 - Multiple subagents audit code, security, deployment/docs, and test coverage before final report.
 
 Constraints:
-- Keep work inside `aws cloud server/`.
+- Keep work inside `azure cloud server/`.
 - Do not store real Cloudflare tokens.
 - Do not turn proximity scoring into an enforcement gate yet.
 - Do not route file bytes through WebSocket.

@@ -1,6 +1,6 @@
 {
   "name": "webdrop-v2-static",
-  "version": "1.0.29",
+  "version": "1.0.30",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "test:e2e": "playwright test",
     "test:relay": "playwright test tests/e2e/live-relay.spec.mjs --project=chromium-desktop",
     "verify": "npm run check && npm test",
-    "verify:full": "npm run verify && npm run audit:secrets && npm audit --omit=dev && npm --prefix \"aws cloud server\" run check && npm --prefix \"aws cloud server\" test && npm --prefix \"aws cloud server\" audit --omit=dev && git diff --check",
+    "verify:full": "npm run verify && npm run audit:secrets && npm audit --omit=dev && npm --prefix \"azure cloud server\" run check && npm --prefix \"azure cloud server\" test && npm --prefix \"azure cloud server\" audit --omit=dev && git diff --check",
     "serve": "python3 -m http.server 4178"
   },
   "dependencies": {

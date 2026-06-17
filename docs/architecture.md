@@ -10,7 +10,7 @@ This checkout now contains a first-run static, modular WebDrop v2 app plus archi
 - `docs/implementation-checklist.md` is the current production-readiness source of truth.
 - `js/` contains the app state machine, controller, adapters, proximity, transport, transfer, storage client, and UI renderer.
 - `js/storage/storage-client.js` contains the active receive-side storage ladder: StreamSaver-backed browser downloads first, Blob fallback second, and a 500 MB receive-session cap.
-- `aws cloud server/` contains the deployable signaling backend package for WSS metadata, QR token issuance, TURN credential proxying, and enforcement policy.
+- `azure cloud server/` contains the deployable signaling backend package for WSS metadata, QR token issuance, TURN credential proxying, and enforcement policy.
 - `graphify-out/` exists, but the current index may be stale or unrelated. Follow `AGENTS.md`: try graph traversal first, record stale results when encountered, then keep any direct reads scoped to the task.
 
 The deployed site at `https://web-drop-lyart.vercel.app/` is a reference surface only. It should inform product behavior, interaction vocabulary, and visual intent, but it is not a source to clone into this repository.
@@ -135,8 +135,8 @@ Failures should move the user to the next viable path:
 
 The architecture is code-ready for deployment experiments, but production is not active from this checkout alone. Remaining work is operational:
 
-1. Deploy and verify the AWS signaling backend with exact allowed origins, TLS, systemd, nginx, firewall rules, and protected metrics.
-2. Rotate and verify Cloudflare TURN credentials on EC2 only; no long-lived TURN secrets belong in frontend files.
+1. Deploy and verify the Azure signaling backend with exact allowed origins, TLS, systemd, nginx, firewall rules, and protected metrics.
+2. Rotate and verify Cloudflare TURN credentials on Azure VM only; no long-lived TURN secrets belong in frontend files.
 3. Configure real WSS and TURN URLs in `js/config/runtime-config.js` and enable flags in the staged order in `docs/production-activation.md`.
 4. Calibrate QR/acoustic/motion evidence on physical iOS and Android devices before enabling server-side proximity enforcement.
 5. Prove direct and TURN WebRTC transfers between two browsers, including large receives, cancellation, retry, and storage exhaustion.

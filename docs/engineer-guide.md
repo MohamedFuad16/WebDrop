@@ -22,7 +22,7 @@ As of this pass:
 - `js/app.js` boots the modular static app.
 - `js/core/controller.js` owns the state transitions that gate file controls.
 - `js/storage/storage-client.js` owns the receive storage ladder, byte-count checks, streaming browser download handoff, Blob fallback, and the 500 MB receive-session cap.
-- `aws cloud server/` owns the deployable signaling backend package; it coordinates metadata only and must not carry file bytes.
+- `azure cloud server/` owns the deployable signaling backend package; it coordinates metadata only and must not carry file bytes.
 - The repository is a Git working tree from this directory; preserve unrelated local changes.
 
 Update these facts when the runtime structure changes.
@@ -93,12 +93,12 @@ For future runtime edits, verify:
 - Send/receive controls are absent before connected state.
 - Send/receive controls appear for a selected connected peer.
 - No file bytes are sent through signaling code.
-- Received files save through the browser download pipeline. Blob fallback files remain available from the receive sheet Open action; streamed downloads show saved status because browsers do not expose the final Downloads path.
+- Received files save through the browser download pipeline. Blob fallback files remain available from the receive sheet Save action; streamed downloads show saved status because browsers do not expose the final Downloads path.
 - Relay mode applies a clear cap and user-facing explanation.
 
 ## Production handoff reminders
 
-- Keep `productionSignaling=false` and production URLs blank until the AWS signaling service is deployed.
-- Configure long-lived Cloudflare TURN credentials only in the EC2 environment file.
+- Keep `productionSignaling=false` and production URLs blank until the Azure signaling service is deployed.
+- Configure long-lived Cloudflare TURN credentials only in the Azure VM environment file.
 - Run physical iOS/Android calibration before enabling proximity enforcement server-side.
 - Keep any WebSocket message additions schema-validated and metadata-only.

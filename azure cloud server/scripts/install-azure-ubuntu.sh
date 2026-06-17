@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ "${EUID}" -ne 0 ]]; then
-  echo "Run as root: sudo bash scripts/install-ec2-ubuntu.sh" >&2
+  echo "Run as root: sudo bash scripts/install-azure-ubuntu.sh" >&2
   exit 1
 fi
 
@@ -38,4 +38,4 @@ net.ipv4.tcp_fin_timeout = 15
 SYSCTL
 sysctl --system
 
-echo "Base packages installed. Copy the aws cloud server folder to /opt/webdrop, configure /etc/webdrop/signaling.env, then run scripts/deploy.sh."
+echo "Base packages installed. Copy the azure cloud server folder to /opt/webdrop, configure /etc/webdrop/signaling.env, then run scripts/deploy.sh."

@@ -17,7 +17,7 @@ function collectConsoleProblems(page, bucket) {
 test("live signaling lets two same-browser pages discover only each other and connect", async ({ browser, baseURL }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium-desktop", "Run the live UI signaling proof once on desktop Chromium.");
 
-  const sharedDeviceId = `pw-shared-device-${Date.now().toString(36)}`;
+  const runId = Date.now().toString(36);
   const context = await browser.newContext();
   const pageA = await context.newPage();
   const pageB = await context.newPage();
@@ -25,18 +25,18 @@ test("live signaling lets two same-browser pages discover only each other and co
   collectConsoleProblems(pageA, consoleProblems);
   collectConsoleProblems(pageB, consoleProblems);
 
-  await pageA.addInitScript(({ sharedDeviceId }) => {
-    localStorage.setItem("webdrop.deviceId", sharedDeviceId);
+  await pageA.addInitScript(({ runId }) => {
+    localStorage.setItem("webdrop.deviceId", `pw-alice-device-${runId}`);
     localStorage.setItem("webdrop.deviceName", "Alice Live");
     localStorage.setItem("webdrop.motionPaused", "true");
     sessionStorage.clear();
-  }, { sharedDeviceId });
-  await pageB.addInitScript(({ sharedDeviceId }) => {
-    localStorage.setItem("webdrop.deviceId", sharedDeviceId);
+  }, { runId });
+  await pageB.addInitScript(({ runId }) => {
+    localStorage.setItem("webdrop.deviceId", `pw-bob-device-${runId}`);
     localStorage.setItem("webdrop.deviceName", "Bob Live");
     localStorage.setItem("webdrop.motionPaused", "true");
     sessionStorage.clear();
-  }, { sharedDeviceId });
+  }, { runId });
 
   await pageA.goto(`${baseURL}/?qa=live-signaling-a`, { waitUntil: "domcontentloaded" });
   await pageB.goto(`${baseURL}/?qa=live-signaling-b`, { waitUntil: "domcontentloaded" });

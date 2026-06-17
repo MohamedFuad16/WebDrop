@@ -4,9 +4,9 @@ WebDrop's production networking, proximity ceremony, QR pairing, and real transf
 
 ## Activation order
 
-Do not enable the frontend flags until the AWS signaling server is deployed and tested.
+Do not enable the frontend flags until the Azure signaling server is deployed and tested.
 
-1. Deploy `aws cloud server/` to EC2.
+1. Deploy `azure cloud server/` to Azure VM.
 2. Configure DNS, nginx, Certbot, systemd, firewall rules, exact allowed origins, protected metrics token, and rotated valid Cloudflare TURN Server credentials.
 3. Verify `https://<signal-domain>/healthz`, `wss://<signal-domain>/ws`, and `https://<signal-domain>/api/ice-servers`.
 4. Keep `ENABLE_PROXIMITY_ANALYSIS=false` for the first signaling-only smoke test.
@@ -14,7 +14,7 @@ Do not enable the frontend flags until the AWS signaling server is deployed and 
 6. Enable production signaling, then real transfer, then the real proximity ceremony.
 7. Enable `ENABLE_PROXIMITY_ANALYSIS=true` only after two-device telemetry is visible and calibrated.
 
-Use [deployment-sizing.md](deployment-sizing.md) before selecting an EC2 size. `t3.micro` is suitable for smoke testing, not the documented 10,000-client goal. Start serious single-node load testing at `t3.large` or an equivalent 2-vCPU/8-GiB instance, and treat the final size as a measured result.
+Use [deployment-sizing.md](deployment-sizing.md) before selecting an Azure VM size. `t3.micro` is suitable for smoke testing, not the documented 10,000-client goal. Start serious single-node load testing at `t3.large` or an equivalent 2-vCPU/8-GiB instance, and treat the final size as a measured result.
 
 ## Frontend configuration
 
@@ -70,7 +70,7 @@ Real-device acoustic thresholds and timing may require tuning after measurements
 
 ## Launch blockers
 
-- Validate the configured Cloudflare TURN key from the deployed server before relay testing. Keep the long-term token only in the EC2 environment file.
+- Validate the configured Cloudflare TURN key from the deployed server before relay testing. Keep the long-term token only in the Azure VM environment file.
 - Direct and relay transfer have code-level coverage but still need a deployed WSS/TURN endpoint and two-browser proof.
 - Signaling load tests should start below 10,000 clients and ramp while watching nginx, Node, file descriptors, memory, CPU, and network throughput.
 - Do not horizontally scale the signaling service until presence/session state is moved to shared storage such as Redis or traffic is routed sticky by session.

@@ -183,7 +183,7 @@ export class DynamicIsland extends Emitter {
   }
 
   async finishConnectionTransition() {
-    const minimumVisibleMs = this.prefersReducedMotion() ? 80 : 1600;
+    const minimumVisibleMs = this.prefersReducedMotion() ? 80 : 2200;
     const elapsedMs = Math.max(0, this.now() - this.connectionOpenedAt);
     const canClose = await this.waitForConnectionMinimum(Math.max(0, minimumVisibleMs - elapsedMs));
     if (!canClose || !["connecting", "qr-display", "qr-scan"].includes(this.state)) return false;

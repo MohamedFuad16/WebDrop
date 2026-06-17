@@ -1,23 +1,22 @@
 # Deployment Sizing
 
-WebDrop's EC2 service carries signaling metadata, chat messages, proximity telemetry, and WebRTC negotiation. File bytes remain peer-to-peer on `RTCDataChannel`, or traverse Cloudflare TURN when a direct path cannot be established. This keeps the signaling server much lighter than a file relay, but long-lived WebSockets still consume memory, file descriptors, TLS work, and nginx upstream connections.
+WebDrop's Azure VM service carries signaling metadata, chat messages, proximity telemetry, and WebRTC negotiation. File bytes remain peer-to-peer on `RTCDataChannel`, or traverse Cloudflare TURN when a direct path cannot be established. This keeps the signaling server much lighter than a file relay, but long-lived WebSockets still consume memory, file descriptors, TLS work, and nginx upstream connections.
 
 ## Recommended starting sizes
 
 | Stage | Suggested instance | Use |
 | --- | --- | --- |
-| Local or private smoke test | `t3.micro` | A few developers and short functional tests only. Its 1 GiB memory and burstable CPU are not a 10,000-client target. |
-| Hosted beta | `t3.medium` | Low-volume real-device and TURN validation with monitoring enabled. |
-| First 10,000-client load-test candidate | `t3.large` | 2 vCPU and 8 GiB RAM provide a practical single-node baseline, but capacity must be proven with staged tests. |
-| Sustained production signaling | `m7g.large` or `m7i.large` | Prefer a non-burstable general-purpose instance when traffic is steady, then scale horizontally with shared presence/session state. |
+| Local or private smoke test | Small burstable Azure VM | A few developers and short functional tests only. Do not treat small burstable CPU and 1-2 GiB memory as a 10,000-client target. |
+| Hosted beta | 2 vCPU / 4 GiB Azure VM | Low-volume real-device and TURN validation with monitoring enabled. |
+| First 10,000-client load-test candidate | 2 vCPU / 8 GiB Azure VM or larger | A practical single-node baseline, but capacity must be proven with staged tests. |
+| Sustained production signaling | Non-burstable general-purpose Azure VM | Prefer non-burstable compute when traffic is steady, then scale horizontally with shared presence/session state. |
 
-AWS documents T instances as burstable general-purpose instances intended for low-to-moderate CPU workloads. Its current instance table lists `t3.micro` with 1 GiB and `t3.large` with 8 GiB. T3 network bandwidth is also credit-based: AWS lists a 0.064 Gbps baseline for `t3.micro` and 0.512 Gbps for `t3.large`, with both able to burst higher on a best-effort basis.
+Treat VM sizing as a measured result, not a fixed promise. Long-lived WebSockets are light compared with file relaying, but they still consume memory, file descriptors, TLS work, and upstream nginx connections. Start with conservative load tests and scale the VM size or architecture from evidence.
 
 Sources:
 
-- [AWS T3 instances](https://aws.amazon.com/ec2/instance-types/t3/)
-- [AWS general-purpose instance specifications](https://docs.aws.amazon.com/ec2/latest/instancetypes/gp.html)
-- [AWS instance network bandwidth](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-network-bandwidth.html)
+- [Azure VM sizes overview](https://learn.microsoft.com/azure/virtual-machines/sizes/overview)
+- [nginx core module](https://nginx.org/en/docs/ngx_core_module.html)
 
 ## Why nginx is tuned above 10,000
 
@@ -30,13 +29,13 @@ The supplied configuration therefore uses:
 - `worker_rlimit_nofile 200000`
 - systemd `LimitNOFILE=200000`
 
-A proxied WebSocket normally occupies a client-facing nginx connection and an upstream nginx-to-Node connection. The Node process also owns its accepted upstream socket. These settings create headroom, but they do not prove that a given EC2 size can sustain 10,000 active users.
+A proxied WebSocket normally occupies a client-facing nginx connection and an upstream nginx-to-Node connection. The Node process also owns its accepted upstream socket. These settings create headroom, but they do not prove that a given Azure VM size can sustain 10,000 active users.
 
 Source: [nginx core module](https://nginx.org/en/docs/ngx_core_module.html)
 
 ## Required proof before launch
 
-1. Start with the conservative Artillery scenario in `aws cloud server/load/`.
+1. Start with the conservative Artillery scenario in `azure cloud server/load/`.
 2. Increase connection count in stages while recording CPU, RSS memory, event-loop delay, nginx active connections, open file descriptors, reconnect rate, and message latency.
 3. Test idle sockets separately from active chat/proximity/RTC signaling traffic.
 4. Test TLS termination and heartbeat behavior for at least the intended session duration.
