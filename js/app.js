@@ -1,14 +1,14 @@
 import { createStore } from "./core/state.js";
-import { createController } from "./core/controller.js?v=1.0.26";
+import { createController } from "./core/controller.js?v=1.0.27";
 import { detectCapabilities } from "./services/capabilities.js";
-import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.26";
+import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.27";
 import { WebSocketSignalingAdapter } from "./services/websocket-signaling.js";
 import { TurnConfigProvider } from "./services/turn-config.js";
 import { ProximityEngine } from "./services/proximity-engine.js";
 import { WebRtcTransport } from "./services/webrtc-transport.js";
 import { TransferEngine } from "./services/transfer-engine.js";
 import { StorageClient } from "./storage/storage-client.js";
-import { AppView } from "./ui/app-view.js?v=1.0.26";
+import { AppView } from "./ui/app-view.js?v=1.0.27";
 import { AVATAR_OPTIONS, normalizeAvatarChoice } from "./config/avatar-options.js";
 import { getRuntimeFlags } from "./config/runtime-flags.js";
 

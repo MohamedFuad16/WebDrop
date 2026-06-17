@@ -1,17 +1,24 @@
 {
   "name": "webdrop-v2-static",
-  "version": "1.0.26",
+  "version": "1.0.27",
   "private": true,
   "type": "module",
   "scripts": {
     "audit:secrets": "node scripts/check-js.mjs --secrets-only",
     "check": "node scripts/check-js.mjs",
     "test": "node --test tests/*.test.mjs",
+    "test:e2e": "playwright test",
+    "test:relay": "playwright test tests/e2e/live-relay.spec.mjs --project=chromium-desktop",
     "verify": "npm run check && npm test",
     "verify:full": "npm run verify && npm run audit:secrets && npm audit --omit=dev && npm --prefix \"aws cloud server\" run check && npm --prefix \"aws cloud server\" test && npm --prefix \"aws cloud server\" audit --omit=dev && git diff --check",
     "serve": "python3 -m http.server 4178"
   },
   "dependencies": {
     "qrcode-generator": "2.0.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.0",
+    "playwright": "^1.61.0",
+    "ws": "^8.21.0"
   }
 }

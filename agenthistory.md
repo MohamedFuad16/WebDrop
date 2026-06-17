@@ -678,3 +678,22 @@ Verification:
 - Live AWS smoke passed against `https://webdrop-wss-0617.japaneast.cloudapp.azure.com`: health, proximity policy, WSS connect, TURN credential proxy, invite pairing, and bidirectional chat.
 - In-app Browser confirmed the local app loads at `http://127.0.0.1:4184/?qa=streaming-receive-module-v1026`, app info shows streamed downloads with Blob fallback, receive sheet exists, and empty receive state renders.
 - The in-app Browser screenshot call timed out, and standalone Playwright is not installed in this repo; physical browser download behavior still needs Chrome/Edge/Safari device testing.
+
+## 2026-06-17 Version 1.0.27 transfer, relay, and production render audit
+
+Scope:
+- Audited the completed static app, streaming receive path, live WebSocket signaling server, Cloudflare TURN proxy, and forced-relay WebRTC/DataChannel transfer path.
+- Fixed the deployed production crash where WebSocket peers without local avatar/text fields caused `escapeHtml(undefined)` to throw during orbit and nearby-sheet rendering.
+
+Implementation:
+- Hardened `escapeHtml`, static avatar rendering, and animated avatar rendering so production presence messages can omit avatar/name fields without breaking the UI.
+- Added Playwright e2e coverage for desktop, iPhone 15 Pro emulation, Pixel emulation, StreamSaver capability, and the nullish avatar/text regression.
+- Added a live relay Playwright test that obtains TURN credentials through the deployed WSS backend and forces relay-only bidirectional DataChannel byte transfer.
+- Serialized Playwright workers for this static server so cross-device checks are repeatable.
+- Incremented package, lockfile, visible app/admin/cache/docs versions to `1.0.27`.
+
+Verification:
+- `npm run verify:full` passed.
+- `npx playwright test tests/e2e/app-ui.spec.mjs --reporter=line` passed: 9 tests across desktop, iPhone 15 Pro emulation, and Pixel emulation.
+- `npm run test:relay -- --reporter=line` passed with live TURN credentials, relay-only ICE, and bidirectional DataChannel payloads.
+- Live AWS smoke passed against `https://webdrop-wss-0617.japaneast.cloudapp.azure.com`: health, proximity policy, WSS connect, TURN credential proxy, invite pairing, and bidirectional chat.

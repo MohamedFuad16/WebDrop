@@ -1,6 +1,6 @@
 import { Emitter } from "../utils/emitter.js";
 import { formatBytes } from "../utils/format.js";
-import { AVATAR_OPTIONS, animatedFramesForAvatar } from "../config/avatar-options.js";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js";
 import { translate } from "../config/i18n.js";
 import { DynamicIsland } from "./dynamic-island.js";
 
@@ -1057,7 +1057,7 @@ export class AppView extends Emitter {
 }
 
 function escapeHtml(text) {
-  return text.replace(/[&<>"']/g, (char) => ({
+  return String(text ?? "").replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
@@ -1191,9 +1191,10 @@ function receivedFileStatus(view, item) {
 }
 
 function animatedAvatarMarkup(avatar, stagger = 0) {
-  const frames = animatedFramesForAvatar(avatar);
+  const normalizedAvatar = normalizeAvatarChoice(avatar);
+  const frames = animatedFramesForAvatar(normalizedAvatar);
   if (!frames.length) {
-    return `<img src="${escapeHtml(avatar)}" alt="">`;
+    return `<img src="${escapeHtml(normalizedAvatar)}" alt="">`;
   }
   return `
     <span class="avatar-animation" style="--avatar-stagger:${stagger * -0.34}s" aria-hidden="true">
@@ -1210,7 +1211,8 @@ function animatedAvatarMarkup(avatar, stagger = 0) {
 }
 
 function staticAvatarMarkup(avatar) {
-  const frame = animatedFramesForAvatar(avatar)[0] || avatar;
+  const normalizedAvatar = normalizeAvatarChoice(avatar);
+  const frame = animatedFramesForAvatar(normalizedAvatar)[0] || normalizedAvatar;
   return `<img class="avatar-static" src="${escapeHtml(frame)}" alt="">`;
 }
 
@@ -1253,11 +1255,12 @@ function deviceBrand(peer) {
 }
 
 function renderAnimatedAvatar(node, avatar, stagger = 0) {
-  const avatarKey = `animated:${avatar}`;
+  const normalizedAvatar = normalizeAvatarChoice(avatar);
+  const avatarKey = `animated:${normalizedAvatar}`;
   if (node.dataset.avatarKey === avatarKey) return;
-  const frames = animatedFramesForAvatar(avatar);
+  const frames = animatedFramesForAvatar(normalizedAvatar);
   if (!frames.length) {
-    node.innerHTML = `<img src="${escapeHtml(avatar)}" alt="">`;
+    node.innerHTML = `<img src="${escapeHtml(normalizedAvatar)}" alt="">`;
     node.dataset.avatarKey = avatarKey;
     return;
   }
@@ -1273,9 +1276,10 @@ function renderAnimatedAvatar(node, avatar, stagger = 0) {
 }
 
 function renderStaticAvatar(node, avatar) {
-  const avatarKey = `static:${avatar}`;
+  const normalizedAvatar = normalizeAvatarChoice(avatar);
+  const avatarKey = `static:${normalizedAvatar}`;
   if (node.dataset.avatarKey === avatarKey) return;
-  node.innerHTML = staticAvatarMarkup(avatar);
+  node.innerHTML = staticAvatarMarkup(normalizedAvatar);
   node.dataset.avatarKey = avatarKey;
 }
 
@@ -1283,3 +1287,8 @@ function avatarFrameDelay(index) {
   if (index === 0) return "0s";
   return `${-(36 - index * 6)}s`;
 }
+
+export const __appViewTest = Object.freeze({
+  escapeHtml,
+  staticAvatarMarkup
+});
