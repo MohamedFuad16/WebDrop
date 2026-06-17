@@ -8,6 +8,7 @@ const DEFAULTS = Object.freeze({
 });
 
 export function getRuntimeFlags() {
+  if (isLocalQaMockRuntime()) return { ...DEFAULTS, defaults: DEFAULTS };
   const injected = globalThis.WEBDROP_RUNTIME_CONFIG || {};
   const signalingUrl = safeUrl(injected.signalingUrl, ["wss:", "ws:"]);
   const turnConfigUrl = safeUrl(injected.turnConfigUrl, ["https:", "http:"]);
@@ -21,6 +22,12 @@ export function getRuntimeFlags() {
     turnConfigUrl,
     defaults: DEFAULTS
   };
+}
+
+function isLocalQaMockRuntime() {
+  const localHost = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+  if (!localHost) return false;
+  return new URLSearchParams(location.search).get("runtime") === "mock";
 }
 
 function safeUrl(value, allowedProtocols) {

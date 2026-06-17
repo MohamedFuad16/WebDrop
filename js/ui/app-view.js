@@ -481,7 +481,7 @@ export class AppView extends Emitter {
         const layout = state.connectedPeerId
           ? CONNECTED_LAYOUT[index % CONNECTED_LAYOUT.length]
           : peerOrbitLayout(index);
-        return `${peer.id}:${peer.name}:${peer.avatar}:${stage}:${layout.ringIndex}:${layout.angle}`;
+        return `${peer.id}:${peer.name}:${peerDisplayAvatar(peer, index)}:${stage}:${layout.ringIndex}:${layout.angle}`;
       })
     ].join("|");
     if (signature === this.peerRenderSignature) return;
@@ -498,6 +498,7 @@ export class AppView extends Emitter {
       const peerId = escapeHtml(String(peer.id || ""));
       const peerName = escapeHtml(String(peer.name || ""));
       const peerLabel = escapeHtml(this.translate("openPeer", { name: peer.name || "" }));
+      const avatar = peerDisplayAvatar(peer, index);
       return `
         <div
           class="peer-node"
@@ -506,7 +507,7 @@ export class AppView extends Emitter {
           style="--angle:${layout.angle}deg;--radius:${radius};--orbit-duration:${duration}s"
         >
           <button type="button" data-peer-id="${peerId}" aria-label="${peerLabel}">
-            ${staticAvatarMarkup(peer.avatar)}
+            ${staticAvatarMarkup(avatar)}
           </button>
           <span>${peerName}</span>
         </div>
@@ -538,11 +539,12 @@ export class AppView extends Emitter {
       this.nodes.nearbyList.innerHTML = `<div class="nearby-empty">${this.translate("nearbyEmpty")}</div>`;
       return;
     }
-    this.nodes.nearbyList.innerHTML = filtered.map((peer) => {
+    this.nodes.nearbyList.innerHTML = filtered.map((peer, index) => {
       const peerId = escapeHtml(String(peer.id || ""));
       const name = escapeHtml(String(peer.name || ""));
       const device = escapeHtml(peerDeviceLabel(peer));
       const brand = deviceBrandMarkup(peer);
+      const avatar = peerDisplayAvatar(peer, index);
       const distance = escapeHtml(this.translate(peerDistanceKey(peer)));
       const score = Math.max(0, Math.min(100, Math.round(peer.__rankScore || 0)));
       const onlineClass = peer.online === false ? " is-offline" : " is-online";
@@ -551,7 +553,7 @@ export class AppView extends Emitter {
         : "";
       return `
         <article class="nearby-device-row" data-nearby-device-id="${peerId}">
-          <span class="nearby-device-avatar${onlineClass}" aria-hidden="true">${staticAvatarMarkup(peer.avatar)}</span>
+          <span class="nearby-device-avatar${onlineClass}" aria-hidden="true">${staticAvatarMarkup(avatar)}</span>
           <div class="nearby-device-copy">
             <strong class="nearby-device-name">${brand}<span>${name}</span></strong>
             <span>${device}</span>
@@ -608,7 +610,7 @@ export class AppView extends Emitter {
     this.nodes.connectedPeer.hidden = !connected;
     if (connected) {
       const peer = state.peers.find((item) => item.id === state.connectedPeerId);
-      this.nodes.connectedPeer.innerHTML = peer?.avatar ? staticAvatarMarkup(peer.avatar) : "";
+      this.nodes.connectedPeer.innerHTML = peer ? staticAvatarMarkup(peerDisplayAvatar(peer, 0)) : "";
       const firstName = peer?.name.split(" ")[0] || "peer";
       this.nodes.sendTitle.textContent = this.translate("sendTo", { name: firstName });
       this.nodes.sendCopy.textContent = this.translate("sendCopy");
@@ -729,13 +731,13 @@ export class AppView extends Emitter {
       incoming ? "incomingInviteKicker" : "nearbyCandidate"
     );
     this.nodes.sheetPeerName.innerHTML = `${deviceBrandMarkup(peer)}<span>${escapeHtml(peer.name)}</span>`;
-    renderAnimatedAvatar(this.nodes.sheetPeerAvatar, peer.avatar, 1);
+    renderAnimatedAvatar(this.nodes.sheetPeerAvatar, peerDisplayAvatar(peer, 0), 1);
     this.nodes.sheetCopy.textContent = this.translate(
       incoming ? "incomingInviteCopy" : "peerSheetReadyCopy",
       { name: peer.name }
     );
     this.nodes.friendStrip.innerHTML = peers.slice(0, 5).map((item, index) =>
-      animatedAvatarMarkup(item.avatar, index)
+      animatedAvatarMarkup(peerDisplayAvatar(item, index + 1), index)
     ).join("") + "<span>+</span>";
     this.resetSwipe?.({
       defaultText: incoming ? "swipeAccept" : "swipeConnect",
@@ -1179,7 +1181,24 @@ function normalizeSearch(value) {
 }
 
 function visibleReceivedItems(state) {
-  return state.receivedItems.filter((item) => !item.locale || item.locale === state.locale);
+  const items = state.receivedItems.filter((item) => !item.locale || item.locale === state.locale);
+  const activeReceive = activeReceiveItem(state);
+  return activeReceive ? [activeReceive, ...items] : items;
+}
+
+function activeReceiveItem(state) {
+  const transfer = state?.transfer;
+  if (!transfer || transfer.direction !== "receive") return null;
+  const size = Number.isFinite(transfer.totalBytes) ? formatBytes(transfer.totalBytes) : "";
+  return {
+    id: transfer.fileId || transfer.transferId || "active-receive",
+    transferId: transfer.transferId || "active-receive",
+    name: transfer.name || "Incoming file",
+    size,
+    icon: "↓",
+    status: "receiving",
+    canOpen: false
+  };
 }
 
 function receivedFileStatus(view, item) {
@@ -1208,6 +1227,20 @@ function animatedAvatarMarkup(avatar, stagger = 0) {
       `).join("")}
     </span>
   `;
+}
+
+function peerDisplayAvatar(peer, index = 0) {
+  if (AVATAR_OPTIONS.includes(peer?.avatar)) return peer.avatar;
+  const hash = stableHash(`${peer?.id || ""}:${peer?.name || ""}:${index}`);
+  return AVATAR_OPTIONS[hash % AVATAR_OPTIONS.length];
+}
+
+function stableHash(value) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
 }
 
 function staticAvatarMarkup(avatar) {

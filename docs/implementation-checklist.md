@@ -1,7 +1,7 @@
 # WebDrop Production Implementation Checklist
 
 Updated: June 16, 2026
-App version: 1.0.27
+App version: 1.0.28
 
 This is the source of truth for the production-readiness package. `Ready, live` means the implementation is active in the current runtime. `Ready, disabled` means the implementation is wired to the frontend but cannot become effective unless its runtime flag and infrastructure are enabled. `Ready, unconfigured` means the code exists but requires deployment secrets or infrastructure. `External verification` means the code is ready but requires AWS, Cloudflare, or physical devices.
 
@@ -53,7 +53,7 @@ This is the source of truth for the production-readiness package. `Ready, live` 
 | 500 MB send session cap | Ready, live | `js/core/controller.js`, `js/services/data-channel-transfer-protocol.js` |
 | Byte-count verification | Ready, live | `js/storage/storage-client.js` |
 | Simultaneous send and receive over one peer connection | Ready, live | `js/services/data-channel-transfer-protocol.js`, local bidirectional protocol test |
-| Worker/OPFS receive writer | Removed from active runtime | App no longer creates `workers/storage-worker.js`; received files use browser download streaming or Blob fallback |
+| Legacy receive worker writer | Removed from active runtime | App no longer creates `workers/storage-worker.js`; received files use browser download streaming or Blob fallback |
 | Interrupted transfer resume | Future hardening | Interrupted browser download sessions must restart |
 
 ## AWS signaling backend

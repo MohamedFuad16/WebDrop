@@ -54,7 +54,7 @@ COPY = {
         "lang": "English edition",
         "cover_kicker": "MOBILE-FIRST NEARBY TRANSFER PROTOTYPE",
         "cover_summary": (
-            "A visual and technical guide to the WebDrop 1.0.27 prototype. "
+            "A visual and technical guide to the WebDrop 1.0.28 prototype. "
             "This document explains the product in plain language, shows every "
             "approved interface state, and records the boundary between the "
             "working local demo and the future production services."
@@ -91,7 +91,7 @@ COPY = {
             ),
             (
                 "What this build proves",
-                "Version 1.0.27 proves the mobile-first interaction, responsive orbit "
+                "Version 1.0.28 proves the mobile-first interaction, responsive orbit "
                 "layout, bilingual interface, local connection simulation, transfer "
                 "states, storage strategy, and replaceable service boundaries. It does "
                 "not yet claim production internet signaling or managed TURN capacity.",
@@ -131,7 +131,7 @@ COPY = {
             (
                 "5",
                 "Store safely",
-                "A worker writes received chunks to OPFS when available, then IndexedDB. "
+                "Incoming chunks stream into the browser download pipeline when supported. "
                 "Memory is only appropriate for small fallback transfers.",
             ),
             (
@@ -183,7 +183,7 @@ COPY = {
                 "Workers and storage",
                 "Large-file safety",
                 "Workers keep hashing, chunk bookkeeping, and local writes away from the "
-                "main UI thread. OPFS leads the capability ladder.",
+                "main UI thread. StreamSaver leads the capability ladder with Blob fallback.",
             ),
         ],
         "limits_title": "Current scope and limitations",
@@ -209,12 +209,12 @@ COPY = {
             ),
             (
                 "Storage is capability-based",
-                "OPFS is preferred, IndexedDB is the fallback, and memory is limited to "
+                "StreamSaver is preferred, Blob download is the fallback, and fallback size is limited to "
                 "small files. Export can still fail independently of private storage.",
             ),
         ],
         "catalog_title": "Interface guide",
-        "catalog_subtitle": "Approved WebDrop 1.0.27 UI inventory",
+        "catalog_subtitle": "Approved WebDrop 1.0.28 UI inventory",
         "roadmap_title": "Roadmap",
         "roadmap_statement": (
             "The remaining requirements are planned to be completed by the end of this "
@@ -244,7 +244,7 @@ COPY = {
         "lang": "日本語版",
         "cover_kicker": "モバイルファーストの近距離ファイル転送プロトタイプ",
         "cover_summary": (
-            "WebDrop 1.0.27の画面と技術をまとめたデモガイドです。"
+            "WebDrop 1.0.28の画面と技術をまとめたデモガイドです。"
             "製品の仕組みを分かりやすく説明し、承認済みの全UI状態を紹介します。"
             "また、現在動作するローカルデモと、今後実装する本番サービスの境界も明確にします。"
         ),
@@ -275,7 +275,7 @@ COPY = {
             ),
             (
                 "このビルドで確認できること",
-                "バージョン1.0.27では、モバイル中心の操作、レスポンシブな軌道UI、日英切替、"
+                "バージョン1.0.28では、モバイル中心の操作、レスポンシブな軌道UI、日英切替、"
                 "ローカル接続シミュレーション、転送状態、保存方針、交換可能なサービス境界を確認できます。"
                 "本番インターネット用シグナリングや管理TURNの完成を示すものではありません。",
             ),
@@ -313,7 +313,7 @@ COPY = {
             (
                 "5",
                 "安全に保存する",
-                "受信したチャンクはワーカーがOPFSへ書き込みます。利用できない場合はIndexedDBを使い、"
+                "受信したチャンクは対応ブラウザではダウンロードストリームへ直接書き込み、"
                 "メモリ保存は小さなファイルだけの最終手段とします。",
             ),
             (
@@ -360,7 +360,7 @@ COPY = {
             (
                 "ワーカーと保存",
                 "大容量ファイルへの配慮",
-                "ハッシュ、チャンク管理、ローカル書き込みをUIスレッドの外で行います。保存方式はOPFSを最優先します。",
+                "ハッシュ、チャンク管理、ダウンロード保存をUIスレッドから分離します。保存方式はStreamSaverを最優先します。",
             ),
         ],
         "limits_title": "現在の範囲と制限",
@@ -384,12 +384,12 @@ COPY = {
             ),
             (
                 "保存方式は機能に応じて選ぶ",
-                "OPFSを優先し、IndexedDBへ切り替えます。メモリは小容量限定です。"
+                "StreamSaverを優先し、未対応時はBlobダウンロードへ切り替えます。Blob fallbackは小容量限定です。"
                 "非公開保存に成功しても書き出しだけ失敗する場合があります。",
             ),
         ],
         "catalog_title": "UIガイド",
-        "catalog_subtitle": "承認済みWebDrop 1.0.27画面一覧",
+        "catalog_subtitle": "承認済みWebDrop 1.0.28画面一覧",
         "roadmap_title": "今後の予定",
         "roadmap_statement": (
             "残りの要件は今週末までに完了する予定です。"
@@ -446,7 +446,7 @@ JP_ITEMS = {
     "settings-device-name": ("端末名入力", "最後の1文字まで消しても勝手に初期値へ戻らず、自由に編集できます。"),
     "settings-language": ("言語選択", "アプリ内の全ラベルを英語と日本語で切り替えます。"),
     "settings-app-info-link": ("アプリ情報リンク", "デザイン、技術構成、軌道アニメーションの詳細を別シートへ移動します。"),
-    "settings-app-version": ("アプリバージョン", "設定画面の下部に現在のプロトタイプバージョン1.0.27を表示します。"),
+    "settings-app-version": ("アプリバージョン", "設定画面の下部に現在のプロトタイプバージョン1.0.28を表示します。"),
     "app-information-sheet": ("アプリ情報シート", "設定画面を整理したまま、プロトタイプの説明と軌道アニメーション設定を表示します。"),
     "app-dark": ("ダークモードのホーム画面", "同じ近隣端末UIを落ち着いたダークテーマで表示します。"),
 }
@@ -752,7 +752,7 @@ def draw_cover(
     c.roundRect(MARGIN, PAGE_H - 360, 91, 28, 14, fill=1, stroke=0)
     c.setFillColor(WHITE)
     c.setFont(bold, 9)
-    c.drawCentredString(MARGIN + 45.5, PAGE_H - 350, "VERSION 1.0.27")
+    c.drawCentredString(MARGIN + 45.5, PAGE_H - 350, "VERSION 1.0.28")
 
     rounded_rect(
         c,
@@ -1313,7 +1313,7 @@ def build_pdf(locale: str, items: Sequence[dict[str, str]], fonts: dict[str, str
     c = canvas.Canvas(str(output), pagesize=A4, pageCompression=1)
     c.setTitle("WebDrop Demo Guide" if locale == "en" else "WebDrop デモガイド")
     c.setAuthor("WebDrop")
-    c.setSubject("WebDrop 1.0.27 interface and architecture guide")
+    c.setSubject("WebDrop 1.0.28 interface and architecture guide")
 
     page_number = 1
     draw_cover(c, locale, page_number, regular, bold)

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="680" viewBox="0 0 1100 680" role="img" aria-labelledby="title desc">
   <title id="title">WebDrop receive storage ladder</title>
-  <desc id="desc">Storage decision ladder showing capability check, OPFS writer, IndexedDB fallback, memory fallback, finalize, hash, and export.</desc>
+  <desc id="desc">Storage decision ladder showing capability check, StreamSaver download writer, Blob fallback, finalize, hash, and browser save.</desc>
   <defs>
     <style>
       .bg{fill:#f9faf6}.box{fill:#fff;stroke:#1e2028;stroke-width:2}.good{fill:#eafff6;stroke:#24805f}.mid{fill:#eaf4ff;stroke:#286ecb}.warn{fill:#fff3e4;stroke:#c87924}.bad{fill:#fff0f0;stroke:#bd3c48}.title{font:700 28px Arial,sans-serif;fill:#15171c}.label{font:700 17px Arial,sans-serif;fill:#15171c}.small{font:13px Arial,sans-serif;fill:#50535a}.arrow{stroke:#2b2e36;stroke-width:2.4;fill:none;marker-end:url(#arrow)}.dash{stroke-dasharray:8 8}
@@ -9,34 +9,34 @@
   </defs>
   <rect class="bg" width="1100" height="680" rx="24"/>
   <text class="title" x="48" y="58">Receive-side storage ladder</text>
-  <text class="small" x="48" y="86">Current worker detects the backend and stores chunks in an array. Production should implement the ladder below.</text>
+  <text class="small" x="48" y="86">The receiver streams chunks into the browser download pipeline where supported, then falls back to Blob for smaller files.</text>
 
   <rect class="box" x="410" y="125" width="280" height="76" rx="16"/>
   <text class="label" x="455" y="158">prepareSession()</text>
   <text class="small" x="454" y="181">session id, quota estimate, policy</text>
 
   <rect class="good" x="100" y="270" width="250" height="88" rx="16"/>
-  <text class="label" x="142" y="304">OPFS available</text>
-  <text class="small" x="125" y="328">worker-owned file handle</text>
-  <text class="small" x="125" y="347">stream chunks to disk</text>
+  <text class="label" x="130" y="304">StreamSaver available</text>
+  <text class="small" x="125" y="328">browser download writer</text>
+  <text class="small" x="125" y="347">stream chunks as they arrive</text>
 
   <rect class="mid" x="425" y="270" width="250" height="88" rx="16"/>
-  <text class="label" x="461" y="304">IndexedDB fallback</text>
-  <text class="small" x="450" y="328">object store by session/file</text>
-  <text class="small" x="450" y="347">append ordered chunk records</text>
+  <text class="label" x="474" y="304">Blob fallback</text>
+  <text class="small" x="450" y="328">small files only</text>
+  <text class="small" x="450" y="347">object URL after finalize</text>
 
   <rect class="warn" x="750" y="270" width="250" height="88" rx="16"/>
-  <text class="label" x="796" y="304">Memory fallback</text>
-  <text class="small" x="775" y="328">small files only</text>
-  <text class="small" x="775" y="347">Blob assembled at the end</text>
+  <text class="label" x="786" y="304">Reject too large</text>
+  <text class="small" x="775" y="328">fallback cap enforced</text>
+  <text class="small" x="775" y="347">retry on supported browser</text>
 
   <rect class="box" x="410" y="455" width="280" height="76" rx="16"/>
   <text class="label" x="480" y="488">finalize()</text>
   <text class="small" x="453" y="511">verify byte count, hash, manifest</text>
 
   <rect class="good" x="410" y="585" width="280" height="58" rx="16"/>
-  <text class="label" x="490" y="619">Export file</text>
-  <text class="small" x="456" y="639">download, File System Access, or share</text>
+  <text class="label" x="488" y="619">Saved file</text>
+  <text class="small" x="456" y="639">download pipeline or Blob URL</text>
 
   <path class="arrow" d="M550 201 V245"/>
   <path class="arrow" d="M550 245 C380 245 225 245 225 270"/>
@@ -47,6 +47,6 @@
   <path class="arrow" d="M875 358 C875 430 550 430 550 455"/>
   <path class="arrow" d="M550 531 V585"/>
   <text class="small" x="118" y="410">Best path for large receives.</text>
-  <text class="small" x="425" y="410">Broad compatibility fallback.</text>
-  <text class="small" x="755" y="410">Use only after size checks.</text>
+  <text class="small" x="425" y="410">Compatibility fallback.</text>
+  <text class="small" x="755" y="410">Avoid memory pressure.</text>
 </svg>

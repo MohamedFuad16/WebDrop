@@ -36,10 +36,10 @@
   <rect class="data" x="790" y="497" width="130" height="72" rx="12"/><text class="label" x="822" y="527">Receive</text><text class="small" x="811" y="550">ArrayBuffers</text>
   <rect class="data" x="990" y="497" width="150" height="72" rx="12"/><text class="label" x="1011" y="527">Backpressure</text><text class="small" x="1013" y="550">ACKs and buffering</text>
 
-  <rect class="store" x="390" y="674" width="150" height="58" rx="12"/><text class="label" x="420" y="700">OPFS writer</text><text class="small" x="413" y="721">large-file target</text>
-  <rect class="store" x="590" y="674" width="150" height="58" rx="12"/><text class="label" x="615" y="700">IndexedDB</text><text class="small" x="615" y="721">fallback chunks</text>
-  <rect class="store" x="790" y="674" width="150" height="58" rx="12"/><text class="label" x="825" y="700">Memory</text><text class="small" x="805" y="721">small-file fallback</text>
-  <rect class="store" x="990" y="674" width="150" height="58" rx="12"/><text class="label" x="1036" y="700">Export</text><text class="small" x="1018" y="721">download/share</text>
+  <rect class="store" x="390" y="674" width="150" height="58" rx="12"/><text class="label" x="405" y="700">StreamSaver</text><text class="small" x="413" y="721">download writer</text>
+  <rect class="store" x="590" y="674" width="150" height="58" rx="12"/><text class="label" x="622" y="700">Blob</text><text class="small" x="612" y="721">small fallback</text>
+  <rect class="store" x="790" y="674" width="150" height="58" rx="12"/><text class="label" x="823" y="700">Receive UI</text><text class="small" x="804" y="721">badge and status</text>
+  <rect class="store" x="990" y="674" width="150" height="58" rx="12"/><text class="label" x="1036" y="700">Open</text><text class="small" x="1018" y="721">when URL exists</text>
 
   <path class="arrow" d="M320 173 H390"/>
   <path class="arrow metaLine dash" d="M455 209 V317"/>

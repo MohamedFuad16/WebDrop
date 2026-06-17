@@ -15,7 +15,7 @@ export default defineConfig({
     video: "off"
   },
   webServer: {
-    command: "python3 -m http.server 4186",
+    command: "python3 -m http.server 4186 --bind 127.0.0.1",
     url: "http://127.0.0.1:4186",
     reuseExistingServer: !process.env.CI,
     stdout: "ignore",

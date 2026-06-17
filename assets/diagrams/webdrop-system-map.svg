@@ -62,7 +62,7 @@
   <text class="small" x="992" y="634">64 KiB chunk loop</text>
 
   <rect class="box muted" x="435" y="705" width="330" height="38" rx="12"/>
-  <text class="small" x="458" y="729">workers/storage-worker.js detects OPFS, IndexedDB, or memory</text>
+  <text class="small" x="458" y="729">StorageClient selects StreamSaver download or Blob fallback</text>
 
   <path class="arrow" d="M280 216 H330"/>
   <path class="arrow" d="M580 216 H630"/>

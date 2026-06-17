@@ -49,11 +49,14 @@ export class WebSocketSignalingAdapter extends Emitter {
       const onError = () => {
         cleanupHandshake();
         this.scheduleReconnect();
-        reject(new Error("Production signaling connection failed."));
+        this.emit("connection-failed", { reason: "socket-error-before-open" });
+        resolve(false);
       };
       const onCloseBeforeOpen = () => {
         cleanupHandshake();
-        reject(new Error("Production signaling closed before it connected."));
+        this.scheduleReconnect();
+        this.emit("connection-failed", { reason: "socket-closed-before-open" });
+        resolve(false);
       };
       socket.addEventListener("open", onOpen, { once: true });
       socket.addEventListener("error", onError, { once: true });

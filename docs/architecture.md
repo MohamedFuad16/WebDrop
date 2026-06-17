@@ -5,7 +5,7 @@
 This checkout now contains a first-run static, modular WebDrop v2 app plus architecture notes.
 
 - `index.html` is the active static app shell.
-- The current app/package/service-worker version is `1.0.27`.
+- The current app/package/service-worker version is `1.0.28`.
 - The earlier `proximity_architecture_monkeytype_v2.html` page was removed during the corrected rebuild.
 - `docs/implementation-checklist.md` is the current production-readiness source of truth.
 - `js/` contains the app state machine, controller, adapters, proximity, transport, transfer, storage client, and UI renderer.
@@ -118,7 +118,7 @@ The active receive path prefers streamed browser downloads through the self-host
 
 Each send session is capped at 500 MB and each receive session is capped at 500 MB, so a connected pair can send up to 500 MB in each direction at the same time. The Blob fallback has a lower memory-safety cap and is intended for compatibility, not as the large-file path.
 
-The earlier OPFS/IndexedDB worker writer is no longer used by the app runtime. The current product direction favors the user's normal browser download pipeline. Browser security still means WebDrop cannot read the final Downloads file path after a streamed save.
+The earlier durable worker writer is no longer used by the app runtime. The current product direction favors the user's normal browser download pipeline. Browser security still means WebDrop cannot read the final Downloads file path after a streamed save.
 
 ## Failure policy
 

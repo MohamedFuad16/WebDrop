@@ -1,14 +1,14 @@
 import { createStore } from "./core/state.js";
-import { createController } from "./core/controller.js?v=1.0.27";
+import { createController } from "./core/controller.js?v=1.0.28";
 import { detectCapabilities } from "./services/capabilities.js";
-import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.27";
+import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.28";
 import { WebSocketSignalingAdapter } from "./services/websocket-signaling.js";
 import { TurnConfigProvider } from "./services/turn-config.js";
 import { ProximityEngine } from "./services/proximity-engine.js";
 import { WebRtcTransport } from "./services/webrtc-transport.js";
 import { TransferEngine } from "./services/transfer-engine.js";
 import { StorageClient } from "./storage/storage-client.js";
-import { AppView } from "./ui/app-view.js?v=1.0.27";
+import { AppView } from "./ui/app-view.js?v=1.0.28";
 import { AVATAR_OPTIONS, normalizeAvatarChoice } from "./config/avatar-options.js";
 import { getRuntimeFlags } from "./config/runtime-flags.js";
 
@@ -52,6 +52,7 @@ const initialState = {
 const store = createStore(initialState);
 const view = new AppView(document, store);
 const runtime = getRuntimeFlags();
+const isLocalhost = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
 
 const mockSignaling = new MockSignalingAdapter();
 const futureSignaling = new WebSocketSignalingAdapter({ url: runtime.signalingUrl });
@@ -92,7 +93,6 @@ detectCapabilities().then((capabilities) => {
   }
 });
 
-const isLocalhost = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
 if ("serviceWorker" in navigator && !isLocalhost) {
   const hadController = Boolean(navigator.serviceWorker.controller);
   let reloadingForUpdate = false;

@@ -1,6 +1,7 @@
 import qrcode from "../vendor/qrcode-generator.mjs";
 import { Emitter } from "../utils/emitter.js";
-import { animatedFramesForAvatar } from "../config/avatar-options.js";
+import { formatBytes } from "../utils/format.js";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js";
 import { SiriWaveCore } from "./siri-wave.js";
 
 export class DynamicIsland extends Emitter {
@@ -21,7 +22,12 @@ export class DynamicIsland extends Emitter {
       scanner: this.root?.querySelector("[data-island-scanner]"),
       canvas: this.root?.querySelector("[data-island-qr-canvas]"),
       video: this.root?.querySelector("[data-island-video]"),
-      wave: this.root?.querySelector("[data-island-wave]")
+      wave: this.root?.querySelector("[data-island-wave]"),
+      transfer: this.root?.querySelector("[data-island-transfer]"),
+      transferLabel: this.root?.querySelector("[data-island-transfer-label]"),
+      transferPercent: this.root?.querySelector("[data-island-transfer-percent]"),
+      transferBar: this.root?.querySelector("[data-island-transfer-bar]"),
+      transferName: this.root?.querySelector("[data-island-transfer-name]")
     };
     try {
       this.wave = this.nodes.wave ? new SiriWaveCore(this.nodes.wave) : null;
@@ -64,7 +70,11 @@ export class DynamicIsland extends Emitter {
   sync(state) {
     this.refreshLocale();
     const peer = state.peers.find((item) => item.id === state.connectedPeerId);
-    if (state.mode === "connected" && peer && this.currentConnectedPeerId !== peer.id) {
+    if (state.mode === "connected" && peer && state.transfer) {
+      this.showTransferProgress(state.self, peer, state.transfer);
+    } else if (this.state === "transfer" && !state.transfer) {
+      this.close();
+    } else if (state.mode === "connected" && peer && this.currentConnectedPeerId !== peer.id) {
       this.showConnection(state.self, peer);
     } else if (state.mode === "disconnecting" && !["closed", "closing"].includes(this.state)) {
       this.close();
@@ -96,6 +106,24 @@ export class DynamicIsland extends Emitter {
     this.setState("connected");
     clearTimeout(this.autoHideTimer);
     this.autoHideTimer = window.setTimeout(() => this.hide(), 4200);
+  }
+
+  showTransferProgress(self, peer, transfer = {}) {
+    const opening = this.state !== "transfer";
+    if (opening) {
+      this.cancelConnectionMinimum(false);
+      this.prepareToOpen(false);
+      this.stopCamera();
+      clearTimeout(this.autoHideTimer);
+      this.copyKeys = { title: null, status: null };
+      this.currentConnectedPeerId = peer.id;
+      this.renderPeople(self, peer);
+      this.setState("transfer");
+    } else if (this.currentConnectedPeerId !== peer.id) {
+      this.currentConnectedPeerId = peer.id;
+      this.renderPeople(self, peer);
+    }
+    this.renderTransfer(transfer);
   }
 
   showQrDisplay({ self, peer, token }) {
@@ -196,7 +224,7 @@ export class DynamicIsland extends Emitter {
   syncWave(state = this.state) {
     const appShell = this.root?.closest(".app-shell");
     const motionPaused = appShell?.dataset.motion === "paused";
-    const waveState = ["connecting", "connected"].includes(state);
+    const waveState = ["connecting", "connected", "transfer"].includes(state);
     this.wave?.setRunning(waveState && !motionPaused && !this.prefersReducedMotion());
   }
 
@@ -325,6 +353,22 @@ export class DynamicIsland extends Emitter {
     renderAvatar(this.nodes.peerAvatar, peer.avatar);
   }
 
+  renderTransfer(transfer = {}) {
+    const ratio = clampRatio(transfer.ratio);
+    const percent = `${Math.round(ratio * 100)}%`;
+    const directionKey = transfer.direction === "receive" ? "receivingStatus" : "sending";
+    const name = transfer.name || "";
+    const bytes = Number.isFinite(transfer.transferredBytes) && Number.isFinite(transfer.totalBytes)
+      ? `${formatBytes(transfer.transferredBytes)} / ${formatBytes(transfer.totalBytes)}`
+      : "";
+    if (this.nodes.transferLabel) this.nodes.transferLabel.textContent = this.translate(directionKey);
+    if (this.nodes.transferPercent) this.nodes.transferPercent.textContent = percent;
+    if (this.nodes.transferBar) this.nodes.transferBar.style.transform = `scaleX(${ratio})`;
+    if (this.nodes.transferName) {
+      this.nodes.transferName.textContent = [name, bytes].filter(Boolean).join(" · ");
+    }
+  }
+
   drawQr(token) {
     if (!token || !this.nodes.canvas) return;
     const qr = qrcode(0, "M");
@@ -435,16 +479,22 @@ export class DynamicIsland extends Emitter {
 }
 
 function renderAvatar(node, avatar) {
-  const src = animatedFramesForAvatar(avatar)[0] || avatar;
+  const normalizedAvatar = normalizeAvatarChoice(avatar);
+  const src = animatedFramesForAvatar(normalizedAvatar)[0] || normalizedAvatar;
   node.innerHTML = `<img src="${escapeHtml(src)}" alt="">`;
 }
 
 function escapeHtml(text) {
-  return String(text).replace(/[&<>"']/g, (character) => ({
+  return String(text ?? "").replace(/[&<>"']/g, (character) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
     '"': "&quot;",
     "'": "&#039;"
   }[character]));
+}
+
+function clampRatio(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
 }
