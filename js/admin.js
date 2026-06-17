@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.25";
+const APP_VERSION = "1.0.26";
 const CHUNK_SIZE = 64 * 1024;
 
 const readinessItems = [
@@ -53,13 +53,13 @@ const readinessItems = [
     ]
   },
   {
-    title: "Blob receive storage",
+    title: "Streaming receive storage",
     status: "Ready, live",
-    score: 78,
+    score: 84,
     checks: [
       "500 MB send and receive session caps",
-      "Received chunks become browser Blobs",
-      "Open action and automatic download handoff"
+      "StreamSaver browser download writer",
+      "Blob fallback with Open action"
     ]
   },
   {

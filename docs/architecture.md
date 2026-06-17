@@ -5,11 +5,11 @@
 This checkout now contains a first-run static, modular WebDrop v2 app plus architecture notes.
 
 - `index.html` is the active static app shell.
-- The current app/package/service-worker version is `1.0.25`.
+- The current app/package/service-worker version is `1.0.26`.
 - The earlier `proximity_architecture_monkeytype_v2.html` page was removed during the corrected rebuild.
 - `docs/implementation-checklist.md` is the current production-readiness source of truth.
 - `js/` contains the app state machine, controller, adapters, proximity, transport, transfer, storage client, and UI renderer.
-- `js/storage/storage-client.js` contains the active receive-side Blob storage implementation and 500 MB receive-session cap.
+- `js/storage/storage-client.js` contains the active receive-side storage ladder: StreamSaver-backed browser downloads first, Blob fallback second, and a 500 MB receive-session cap.
 - `aws cloud server/` contains the deployable signaling backend package for WSS metadata, QR token issuance, TURN credential proxying, and enforcement policy.
 - `graphify-out/` exists, but the current index may be stale or unrelated. Follow `AGENTS.md`: try graph traversal first, record stale results when encountered, then keep any direct reads scoped to the task.
 
@@ -38,7 +38,7 @@ The browser client owns:
 - QR, audio, motion, and manual pairing ceremonies.
 - WebRTC peer setup.
 - Chunked file read and send.
-- Chunked receive, Blob assembly, automatic browser download, and Open actions.
+- Chunked receive, streamed browser download where supported, Blob fallback, and receive-sheet status actions.
 - User-facing state transitions.
 
 ### Signaling lane
@@ -114,9 +114,11 @@ TURN credential requests are separately protected by an ephemeral access token r
 
 ## Storage model
 
-The active receive path stores chunks as browser `Blob` parts and triggers a normal browser download after transfer completion. Each send session is capped at 500 MB and each receive session is capped at 500 MB, so a connected pair can send up to 500 MB in each direction at the same time.
+The active receive path prefers streamed browser downloads through the self-hosted StreamSaver helper. Incoming `RTCDataChannel` chunks are written to a `WritableStream` so large supported downloads do not require one complete in-memory `Blob`. If streaming download support is unavailable, the app falls back to Blob assembly for smaller files and rejects larger unsupported receive sessions before bytes are accepted.
 
-The earlier OPFS/IndexedDB worker writer is no longer used by the app runtime. A future native-feeling large-file mode can revisit worker-backed persistence, but the current product direction favors the user's default browser download location.
+Each send session is capped at 500 MB and each receive session is capped at 500 MB, so a connected pair can send up to 500 MB in each direction at the same time. The Blob fallback has a lower memory-safety cap and is intended for compatibility, not as the large-file path.
+
+The earlier OPFS/IndexedDB worker writer is no longer used by the app runtime. The current product direction favors the user's normal browser download pipeline. Browser security still means WebDrop cannot read the final Downloads file path after a streamed save.
 
 ## Failure policy
 

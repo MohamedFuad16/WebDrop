@@ -1,6 +1,6 @@
 # WebDrop Complete Technical Guide
 
-Version: WebDrop v2 production-readiness handoff for app version 1.0.25
+Version: WebDrop v2 production-readiness handoff for app version 1.0.26
 Scope: `/Users/mfuad16/Documents/web_drop_v2`
 Primary app entrypoint: `index.html` and `js/app.js`
 
@@ -10,11 +10,11 @@ Primary app entrypoint: `index.html` and `js/app.js`
 
 This guide is written for product, engineering, QA, and production handoff work. It intentionally separates the default demo runtime from the production paths that are now wired but still disabled until deployment configuration is supplied.
 
-The current repository ships a static browser application plus an AWS signaling-server package. The default app still runs as a safe static demo: production signaling is off, runtime URLs are blank, and the app uses mock peers without requesting microphone, motion, or camera permissions. Behind those gates, the code now includes production WebSocket signaling, one-time QR token routing, real WebRTC offer/answer/ICE handling, separate control/file data channels, transfer manifests, sender hashing, receiver ACK/cancel/retry semantics, OPFS-first receive storage, IndexedDB fallback, capped memory fallback, and Cloudflare TURN credential proxying. The core product boundaries remain: discovery and trust happen before file controls appear; signaling carries metadata; file bytes belong on an `RTCDataChannel`; and large receives must use worker-backed storage rather than one giant in-memory object.
+The current repository ships a static browser application plus an AWS signaling-server package. The default app still runs as a safe static demo: production signaling is off, runtime URLs are blank, and the app uses mock peers without requesting microphone, motion, or camera permissions. Behind those gates, the code now includes production WebSocket signaling, one-time QR token routing, real WebRTC offer/answer/ICE handling, separate control/file data channels, transfer manifests, sender hashing, receiver ACK/cancel/retry semantics, StreamSaver-backed browser downloads, Blob fallback for smaller unsupported cases, and Cloudflare TURN credential proxying. The core product boundaries remain: discovery and trust happen before file controls appear; signaling carries metadata; file bytes belong on an `RTCDataChannel`; and large receives should stream into the browser download pipeline rather than one giant in-memory object.
 
 ### Production readiness status
 
-- App/package/service-worker version: `1.0.25`.
+- App/package/service-worker version: `1.0.26`.
 - Default frontend runtime: safe demo mode because `productionSignaling` is `false` and both production URLs are blank in `js/config/runtime-config.js`.
 - Effective feature gating: `js/config/runtime-flags.js` refuses to enable real proximity, real transfer, or QR pairing unless production signaling is enabled with a valid WSS URL.
 - Backend package: `aws cloud server/` contains the Node WebSocket signaling service, QR token provider, TURN credential proxy, nginx/systemd/deploy assets, and load-test assets.
@@ -69,11 +69,11 @@ The active implementation is static and module-based. These are the files most d
 | Area | Files | Responsibility |
 | --- | --- | --- |
 | Static shell | `index.html` | DOM structure, topbar, orbit stage, sheets, file input, toast |
-| Bootstrapping | `js/app.js` | creates store, view, services, transport, storage worker, and controller |
+| Bootstrapping | `js/app.js` | creates store, view, services, transport, receive storage, and controller |
 | State | `js/core/state.js` | small observable store with `getState`, `patch`, `update`, and `subscribe` |
 | Controller | `js/core/controller.js` | event handling, UI state transitions, connection gate, file selection, mock send, disconnect |
 | UI renderer | `js/ui/app-view.js` | DOM rendering, sheet animation, peer orbit placement, swipe controls, translations |
-| Capabilities | `js/services/capabilities.js` | detects secure context, mic, motion, WebRTC, OPFS, IndexedDB, worker support |
+| Capabilities | `js/services/capabilities.js` | detects secure context, mic, motion, WebRTC, and browser support |
 | Proximity | `js/services/proximity-engine.js`, `js/services/acoustic-proximity.js`, `js/services/motion-proximity.js` | default mock scoring plus disabled-gated real microphone chirp and motion ceremony |
 | QR/Dynamic Island | `js/ui/dynamic-island.js`, `js/core/controller.js` | disabled-gated iPhone QR display/scan ceremony using backend one-time tokens |
 | Signaling mock | `js/services/mock-signaling.js` | supplies demo peers and emits invite/accept telemetry events |
@@ -81,8 +81,8 @@ The active implementation is static and module-based. These are the files most d
 | TURN/STUN | `js/services/turn-config.js` | uses Cloudflare STUN by default and fetches ephemeral TURN credentials only from the configured backend |
 | WebRTC | `js/services/webrtc-transport.js` | disabled-gated offer/answer/ICE exchange, receiver data channels, path stats, and control/file channels |
 | Transfer | `js/services/transfer-engine.js`, `js/services/data-channel-transfer-protocol.js` | mock progress by default; disabled-gated real manifests, chunks, ACKs, cancel, retry, and completion ACK |
-| Storage client | `js/storage/storage-client.js` | request/response wrapper around the storage worker |
-| Storage worker | `workers/storage-worker.js` | disabled-gated OPFS-first writes, IndexedDB chunks, capped memory fallback, quota, hash, export, abort, and cleanup |
+| Storage client | `js/storage/storage-client.js` | receive storage ladder with StreamSaver download writer, Blob fallback, quota/cap checks, export, abort, and cleanup |
+| StreamSaver helper | `vendor/streamsaver/` | self-hosted MITM page and service worker used only for browser download streaming |
 | Offline cache | `service-worker.js` | caches static files and demo PDFs outside localhost |
 
 The existing `docs/architecture.md` and `docs/engineer-guide.md` are concise architecture notes. This guide is the expanded technical package.
@@ -97,7 +97,7 @@ The local Graphify index was checked first, but it appears stale or unrelated fo
 2. Create the store with `createStore`.
 3. Create `AppView`, which subscribes to store changes.
 4. Create mock signaling and a future WebSocket adapter.
-5. Create proximity, TURN config, WebRTC transport, storage worker, and transfer engine.
+5. Create proximity, TURN config, WebRTC transport, receive storage client, and transfer engine.
 6. Create the controller with all dependencies.
 7. Detect capabilities, patch them into state, and connect mock signaling.
 8. Register the service worker outside localhost.
@@ -797,9 +797,9 @@ This default path is still the safe offline demo. When production signaling and 
 12. Sender sends transfer manifest.
 13. Receiver checks storage quota and accepts or rejects.
 14. Sender streams chunks while respecting backpressure.
-15. Receiver writes chunks to OPFS or IndexedDB.
-16. Receiver verifies byte count and hash.
-17. Receiver finalizes and exposes export/open action.
+15. Receiver writes chunks to a browser download stream or Blob fallback.
+16. Receiver verifies byte count and hash metadata.
+17. Receiver finalizes and exposes saved/open status.
 18. Both sides show complete state.
 
 ### Production receive flow
@@ -807,14 +807,14 @@ This default path is still the safe offline demo. When production signaling and 
 The receiver must not wait until the whole file is available. On manifest:
 
 1. Check file size and policy.
-2. Estimate available storage.
-3. Open OPFS or IndexedDB target.
+2. Check streaming download support and Blob fallback limits.
+3. Open a StreamSaver download writer or Blob fallback target.
 4. Reply `file:ready`.
-5. For each chunk, enqueue worker write.
-6. Periodically ACK durable progress.
+5. For each chunk, enqueue a storage write.
+6. Periodically ACK received progress.
 7. On final chunk, verify total bytes.
 8. Compute or finalize hash.
-9. Create a downloadable/exportable result.
+9. Close the browser download writer or create a Blob object URL.
 
 The user should see a clear difference between "incoming file request," "receiving," "verifying," and "ready to open."
 
@@ -824,73 +824,48 @@ The user should see a clear difference between "incoming file request," "receivi
 
 ![Storage ladder](../assets/diagrams/webdrop-storage-ladder.svg)
 
-The receive side is the highest-risk part for large files. The sender can read from a user-selected file without loading the entire file into memory. The receiver must avoid accidentally assembling a multi-gigabyte file in RAM.
+The receive side is the highest-risk part for large files. The sender can read from a user-selected file without loading the entire file into memory. The receiver must avoid accidentally assembling a large file in RAM.
 
-The current `StorageClient` wraps a worker in a promise-based request/response API. It sends:
+The current `StorageClient` is a promise-based strategy wrapper. It exposes:
 
-- `prepare`
-- `write`
+- `prepareSession`
+- `prepareFile`
+- `writeChunk`
 - `finalize`
+- `abort`
 
-The current worker detects a backend:
+The active backend ladder is:
 
-```js
-if (navigator.storage?.getDirectory) return "opfs";
-if ("indexedDB" in self) return "indexeddb";
-return "memory";
-```
+1. Use the self-hosted StreamSaver helper when `WritableStream`, service workers, secure context, and browser support are available.
+2. Fall back to Blob assembly for smaller files when streaming is unavailable.
+3. Reject larger unsupported receive sessions before accepting file bytes.
 
-The worker now writes OPFS chunks first, falls back to IndexedDB chunks, and uses memory only under a 64 MiB cap. It also estimates quota, verifies byte counts and SHA-256 hashes, supports chunked export, and exposes abort/delete cleanup commands. Remaining storage work is browser-matrix validation and smoother UI for large IndexedDB exports.
+### Streaming browser download
 
-### OPFS
+StreamSaver creates a browser-managed download response from client-side chunks. WebDrop writes each received `RTCDataChannel` chunk into the active `WritableStream`. The browser then saves the file through the user's normal download pipeline. JavaScript does not receive a final local Downloads path, so streamed files show saved status rather than a guaranteed Open action.
 
-OPFS means Origin Private File System. It is browser storage scoped to the origin. It can support file-like writing from a worker. For WebDrop, OPFS is the best target for large received files because it can write incrementally without building one giant `Blob`.
+### Blob fallback
 
-Production OPFS flow:
+Blob fallback keeps compatibility for browsers where StreamSaver is unavailable or unreliable. It stores chunk buffers in memory and creates an object URL after completion. This is why fallback has a lower memory-safety cap and why the receive sheet can only offer Open for fallback files.
+6. The storage client writes chunks by order.
+7. The storage client closes the stream on finalize.
+8. The storage client returns saved/open metadata for the receive sheet.
 
-1. Worker receives `prepare`.
-2. Worker calls `navigator.storage.getDirectory()`.
-3. Worker creates or opens a transfer directory.
-4. Worker creates a file handle for each incoming file.
-5. Worker creates a writable stream.
-6. Worker writes chunks by order.
-7. Worker closes stream on finalize.
-8. Worker returns a manifest and export handle metadata.
+### Blob fallback
 
-### IndexedDB
-
-IndexedDB is the broad fallback. It can store chunks as records keyed by transfer id, file id, and chunk index. It is more awkward than a file writer, but it works across more browsers.
-
-Production IndexedDB flow:
-
-1. Open database `webdrop-transfers`.
-2. Store session metadata.
-3. Store each chunk as a record.
-4. Track durable received byte count.
-5. On finalize, read records in order and create export stream or `Blob`.
-6. Clean up after export or expiry.
-
-### Memory
-
-Memory should be the last fallback. It is acceptable for small files and demos. It is risky for large files because the receiver has to hold many bytes at once. Production WebDrop should set a small memory-only cap.
+Blob fallback is the compatibility path when streaming download support is unavailable. It stores chunks as in-memory `ArrayBuffer` parts and creates an object URL after completion. This is convenient for small files and lets the receive sheet provide an Open action, but it must remain capped because it grows memory with the received payload.
 
 <div class="page-break" style="page-break-after: always;"></div>
 
 ## 16. Workers and Main-Thread Safety
 
-Workers keep expensive transfer and storage work away from the UI thread. The current repository already creates the storage worker from `js/app.js`:
+Workers keep expensive transfer work away from the UI thread where the platform supports it. The current repository no longer creates a receive storage worker. Instead, `StorageClient` writes received chunks to a browser `WritableStream` through the self-hosted StreamSaver helper when available, and uses capped Blob fallback otherwise.
 
-```js
-const storage = new StorageClient(
-  new Worker("workers/storage-worker.js", { type: "module" })
-);
-```
-
-That is the right boundary. The main thread should own UI state and user gestures. The worker should own receive persistence, hashing, and cleanup.
+The main thread owns UI state, user gestures, stream writer lifecycle, and receive metadata. The sender-side incremental hash helper remains worker-friendly and can stay separate from the receive storage decision.
 
 ### Message design
 
-The current worker protocol uses `{ id, type, payload }` messages and replies with `{ id, ok, payload, error }`. This is a good shape because `StorageClient` can map each request to a promise.
+If worker-backed storage is reintroduced later, use `{ id, type, payload }` messages and replies with `{ id, ok, payload, error }` so `StorageClient` can map each request to a promise.
 
 Production worker commands should include:
 
@@ -994,9 +969,8 @@ Chat is useful as a connected-peer affordance, but production chat should not di
 - Device motion API availability.
 - Device motion permission API availability.
 - WebRTC support.
-- OPFS support.
-- IndexedDB support.
-- Worker support.
+- WritableStream and service worker support for streaming downloads.
+- Blob fallback availability.
 - WebSocket support.
 
 The secure-context check is critical. Microphone, motion, service workers, and modern storage features are constrained by browser security policy. Localhost is a special case for development; production must be HTTPS.
@@ -1031,9 +1005,9 @@ Fallbacks should be treated as first-class paths:
 - No microphone: QR.
 - No motion: QR or explicit accept.
 - No WebRTC: explain unsupported browser or offer cloud relay only if product policy allows.
-- No OPFS: IndexedDB.
-- No IndexedDB: memory only under small cap.
-- No Worker: reject large receives or use very small in-memory mode.
+- No streaming download support: Blob fallback under its memory cap.
+- Blob fallback above cap: reject before receiving bytes.
+- No service worker: reject large receives or use Blob fallback only for small files.
 
 <div class="page-break" style="page-break-after: always;"></div>
 
@@ -1056,7 +1030,7 @@ The client should not trust:
 
 ### File name safety
 
-Received file names should be treated as display text. They should be escaped in HTML, sanitized for download, and never used to create arbitrary paths inside OPFS or IndexedDB. The current UI uses `escapeHtml()` before rendering selected and received file names, which is a good pattern.
+Received file names should be treated as display text. They should be escaped in HTML and sanitized for browser download metadata. The current UI uses `escapeHtml()` before rendering selected and received file names, which is a good pattern.
 
 ### Payload privacy
 
@@ -1178,7 +1152,7 @@ The current app is a polished static demo with disabled-gated production transfe
 - Real SDP offer/answer and ICE exchange through signaling.
 - Separate WebRTC control and file data channels.
 - Real file manifests, 64 KiB chunks, backpressure, ACKs, cancel, retry, completion ACK, and sender SHA-256.
-- Receiver-side OPFS writer, IndexedDB chunk store, capped memory fallback, quota checks, byte/hash verification, export, abort, and cleanup.
+- Receiver-side StreamSaver writer, Blob fallback, quota/cap checks, byte/hash metadata verification, saved/open status, abort, and cleanup.
 - Cloudflare TURN credential proxy with bearer access bound to the live signaling session.
 - Transfer failure, retry, and receive-completion protocol events.
 

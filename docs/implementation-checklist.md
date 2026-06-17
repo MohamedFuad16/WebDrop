@@ -1,7 +1,7 @@
 # WebDrop Production Implementation Checklist
 
 Updated: June 16, 2026
-App version: 1.0.25
+App version: 1.0.26
 
 This is the source of truth for the production-readiness package. `Ready, live` means the implementation is active in the current runtime. `Ready, disabled` means the implementation is wired to the frontend but cannot become effective unless its runtime flag and infrastructure are enabled. `Ready, unconfigured` means the code exists but requires deployment secrets or infrastructure. `External verification` means the code is ready but requires AWS, Cloudflare, or physical devices.
 
@@ -46,15 +46,15 @@ This is the source of truth for the production-readiness package. `Ready, live` 
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Blob-backed receive assembly | Ready, live | `js/storage/storage-client.js` |
-| Automatic browser download on receive complete | Ready, live | `js/core/controller.js` |
-| Open action for received files | Ready, live | `js/ui/app-view.js`, `js/core/controller.js` |
+| Streamed browser download receive path | Ready, live | `js/storage/storage-client.js`, `vendor/streamsaver/` |
+| Blob-backed receive fallback | Ready, live | `js/storage/storage-client.js`, `tests/storage-client.test.mjs` |
+| Receive sheet saved/open states | Ready, live | `js/ui/app-view.js`, `js/core/controller.js` |
 | 500 MB receive session cap | Ready, live | `js/storage/storage-client.js`, `js/services/data-channel-transfer-protocol.js` |
 | 500 MB send session cap | Ready, live | `js/core/controller.js`, `js/services/data-channel-transfer-protocol.js` |
 | Byte-count verification | Ready, live | `js/storage/storage-client.js` |
 | Simultaneous send and receive over one peer connection | Ready, live | `js/services/data-channel-transfer-protocol.js`, local bidirectional protocol test |
-| Worker/OPFS receive writer | Removed from active runtime | App no longer creates `workers/storage-worker.js`; received files are browser `Blob`s |
-| Worker-restart transfer resume | Future hardening | Not applicable to Blob receive sessions; interrupted sessions must restart |
+| Worker/OPFS receive writer | Removed from active runtime | App no longer creates `workers/storage-worker.js`; received files use browser download streaming or Blob fallback |
+| Interrupted transfer resume | Future hardening | Interrupted browser download sessions must restart |
 
 ## AWS signaling backend
 

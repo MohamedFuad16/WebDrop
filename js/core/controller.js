@@ -210,7 +210,9 @@ export function createController({
       sha256: file.sha256,
       ready: true,
       url: file.blob ? URL.createObjectURL(file.blob) : "",
-      downloadName: file.name
+      downloadName: file.name,
+      status: file.openUnavailable ? "saved" : "ready",
+      canOpen: Boolean(file.blob)
     }));
     for (const item of receivedItems) {
       if (item.url) triggerBrowserDownload(item.url, item.downloadName);
@@ -280,6 +282,10 @@ export function createController({
     if (!runtime.realTransfer || !transferId || !fileId) return;
     try {
       const exported = await transfer.storage.exportFile(fileId, { sessionId: transferId });
+      if (exported?.openUnavailable) {
+        view.toast(view.translate("downloadSaved"));
+        return;
+      }
       if (!exported?.blob) return;
       const url = URL.createObjectURL(exported.blob);
       window.open(url, "_blank", "noopener");

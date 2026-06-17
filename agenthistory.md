@@ -654,3 +654,27 @@ Verification:
 - In-app Browser confirmed `/admin/` renders with WebDrop-style background, glass hero, blue active tab, version `1.0.23`, eight readiness cards, eight blockers, and no console warnings/errors.
 - Mobile-width Browser smoke at 390px confirmed the redesigned admin route has no horizontal overflow and keeps the tab controls visible.
 - Browser screenshot capture timed out in the current Codex browser session, so visual evidence is from rendered DOM/computed-style checks rather than an attached screenshot.
+
+## 2026-06-17 Version 1.0.26 streaming receive storage
+
+Scope:
+- Replaced the active receive storage path from Blob-only assembly to a streaming-download-first ladder.
+- Kept WebRTC/DataChannel transfer framing unchanged.
+- Preserved the 500 MB send and receive session caps while adding a lower memory-safety cap for Blob fallback when streaming is unavailable.
+
+Implementation:
+- Added `js/vendor/streamsaver-adapter.js`, a small ES module wrapper around the self-hosted StreamSaver MITM/service-worker protocol.
+- Added `vendor/streamsaver/mitm.html`, `vendor/streamsaver/sw.js`, and `vendor/streamsaver/LICENSE`.
+- Reworked `js/storage/storage-client.js` into a pluggable ladder: StreamSaver `WritableStream` first, Blob fallback second, and early rejection for oversized fallback-only receives.
+- Updated receive-sheet behavior so streamed files show saved status while Blob fallback files keep the Open/object URL behavior.
+- Updated English/Japanese app copy, admin readiness text, architecture docs, engineer guide, implementation checklist, and the expanded complete guide.
+- Added `tests/storage-client.test.mjs` and made `npm test` run real storage regression tests.
+- Enhanced `aws cloud server/scripts/smoke-test.sh` to run from its own server folder and verify invite pairing plus bidirectional chat routing.
+- Incremented package, lockfile, visible app/cache/docs versions to `1.0.26`.
+
+Verification:
+- `npm test` passed with 3 storage-client tests: stream writer close, Blob fallback, and large fallback rejection.
+- `npm run verify:full` passed.
+- Live AWS smoke passed against `https://webdrop-wss-0617.japaneast.cloudapp.azure.com`: health, proximity policy, WSS connect, TURN credential proxy, invite pairing, and bidirectional chat.
+- In-app Browser confirmed the local app loads at `http://127.0.0.1:4184/?qa=streaming-receive-module-v1026`, app info shows streamed downloads with Blob fallback, receive sheet exists, and empty receive state renders.
+- The in-app Browser screenshot call timed out, and standalone Playwright is not installed in this repo; physical browser download behavior still needs Chrome/Edge/Safari device testing.

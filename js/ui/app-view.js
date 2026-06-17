@@ -665,11 +665,11 @@ export class AppView extends Emitter {
         <span class="received-file-icon">${escapeHtml(item.icon || "↓")}</span>
         <div>
           <strong>${escapeHtml(item.name)}</strong>
-          <span>${escapeHtml(item.size)}</span>
+          <span>${escapeHtml(receivedFileStatus(this, item))}</span>
         </div>
-        ${item.url
+        ${item.url || item.canOpen
           ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${this.translate("open")}</a>`
-          : `<button type="button" data-action="open-received" data-transfer-id="${escapeHtml(item.transferId || "")}" data-file-id="${escapeHtml(item.id || "")}">${this.translate("open")}</button>`}
+          : `<button type="button" class="received-file-state" disabled>${this.translate(item.status === "retry" ? "needsRetry" : "saved")}</button>`}
       </div>
     `).join("");
   }
@@ -1180,6 +1180,14 @@ function normalizeSearch(value) {
 
 function visibleReceivedItems(state) {
   return state.receivedItems.filter((item) => !item.locale || item.locale === state.locale);
+}
+
+function receivedFileStatus(view, item) {
+  const size = item.size || "";
+  if (item.status === "saved") return `${size} · ${view.translate("savedToDownloads")}`;
+  if (item.status === "retry") return `${size} · ${view.translate("needsRetry")}`;
+  if (item.status === "receiving") return `${size} · ${view.translate("receivingStatus")}`;
+  return size;
 }
 
 function animatedAvatarMarkup(avatar, stagger = 0) {

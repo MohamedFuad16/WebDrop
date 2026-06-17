@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SERVER_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${SERVER_DIR}"
+
 BASE_URL="${BASE_URL:-http://127.0.0.1:8080}"
 WS_URL="${WS_URL:-${BASE_URL/http:/ws:}/ws}"
 ORIGIN="${ORIGIN:-}"
@@ -60,4 +64,92 @@ socket.on("error", (error) => {
   console.error(error.message);
   process.exit(1);
 });
+NODE
+
+echo "Checking invite pairing and bidirectional chat routing at ${WS_URL}"
+node --input-type=module <<'NODE'
+import WebSocket from "ws";
+
+const wsUrl = process.env.WS_URL || "ws://127.0.0.1:8080/ws";
+const origin = process.env.ORIGIN || "";
+const websocketOptions = origin ? { headers: { Origin: origin } } : {};
+const suffix = Date.now().toString(36);
+
+function connect(id, deviceName) {
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket(wsUrl, websocketOptions);
+    const messages = [];
+    const timeout = setTimeout(() => reject(new Error(`${id} timed out connecting.`)), 5000);
+    socket.on("open", () => {
+      socket.send(JSON.stringify({
+        type: "client:hello",
+        payload: {
+          self: { id, deviceName },
+          capabilities: { chat: true, dataChannel: true }
+        }
+      }));
+    });
+    socket.on("message", (data) => {
+      const message = JSON.parse(data.toString());
+      messages.push(message);
+      if (message.type === "connected") {
+        clearTimeout(timeout);
+        resolve({ id, socket, messages });
+      }
+    });
+    socket.on("error", reject);
+  });
+}
+
+function waitFor(client, predicate, label, timeoutMs = 7000) {
+  const startedAt = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      const found = client.messages.find(predicate);
+      if (found) {
+        resolve(found);
+        return;
+      }
+      if (Date.now() - startedAt > timeoutMs) {
+        reject(new Error(`Timed out waiting for ${label}. Saw: ${client.messages.map((message) => message.type).join(", ")}`));
+        return;
+      }
+      setTimeout(tick, 40);
+    };
+    tick();
+  });
+}
+
+const sender = await connect(`smoke-chat-a-${suffix}`, "Smoke Chat A");
+const receiver = await connect(`smoke-chat-b-${suffix}`, "Smoke Chat B");
+
+sender.socket.send(JSON.stringify({ type: "invite", targetId: receiver.id }));
+const invite = await waitFor(receiver, (message) => message.type === "invite" && message.payload?.fromId === sender.id, "invite");
+receiver.socket.send(JSON.stringify({
+  type: "invite:accept",
+  targetId: sender.id,
+  pairingId: invite.payload.pairingId
+}));
+const accepted = await waitFor(sender, (message) => message.type === "invite:accept" && message.payload?.pairingId === invite.payload.pairingId, "invite accept");
+await waitFor(receiver, (message) => message.type === "invite:accept" && message.payload?.pairingId === invite.payload.pairingId, "invite accept echo");
+
+sender.socket.send(JSON.stringify({
+  type: "chat:message",
+  targetId: receiver.id,
+  pairingId: accepted.payload.pairingId,
+  payload: { id: "smoke-chat-a", text: "hello from smoke A", createdAt: new Date().toISOString() }
+}));
+receiver.socket.send(JSON.stringify({
+  type: "chat:message",
+  targetId: sender.id,
+  pairingId: accepted.payload.pairingId,
+  payload: { id: "smoke-chat-b", text: "hello from smoke B", createdAt: new Date().toISOString() }
+}));
+
+await waitFor(receiver, (message) => message.type === "chat:message" && message.payload?.payload?.text === "hello from smoke A", "chat A to B");
+await waitFor(sender, (message) => message.type === "chat:message" && message.payload?.payload?.text === "hello from smoke B", "chat B to A");
+
+sender.socket.close();
+receiver.socket.close();
+console.log({ paired: true, chat: "bidirectional", pairingId: accepted.payload.pairingId });
 NODE

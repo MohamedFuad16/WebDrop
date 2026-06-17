@@ -248,6 +248,14 @@
   cursor: pointer;
 }
 
+.received-file button:disabled,
+.received-file-state {
+  color: var(--ink-muted);
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  box-shadow: none;
+  cursor: default;
+}
+
 .chat-panel {
   height: clamp(176px, 30dvh, 250px);
   overflow-y: auto;
