@@ -1,8 +1,8 @@
 export const MAX_CHAT_TEXT_LENGTH = 2000;
 export const MAX_FILES_PER_MANIFEST = 50;
 export const MAX_FILE_NAME_LENGTH = 240;
-export const MAX_SIGNAL_SIZE_BYTES = 32768;
-export const MAX_SDP_LENGTH = 30000;
+export const MAX_SIGNAL_SIZE_BYTES = 90000;
+export const MAX_SDP_LENGTH = 65535;
 export const MAX_ICE_CANDIDATE_LENGTH = 4096;
 export const MAX_TRANSFER_TOTAL_BYTES = 500 * 1024 * 1024;
 export const MAX_TRANSFER_CHUNK_SIZE_BYTES = 256 * 1024;
@@ -67,10 +67,18 @@ export function validateClientHello(message) {
   const self = objectPayload(payload.self || payload);
   const deviceName = cleanString(self.deviceName || self.name, 80) || "WebDrop device";
   const id = cleanString(self.id, 120) || cryptoRandomId("client");
+  const deviceId = cleanString(self.deviceId, 120) || id;
+  const deviceFamily = cleanString(self.deviceFamily || self.platform || payload.capabilities?.platform?.family, 30) || null;
+  const deviceLabel = cleanString(self.deviceLabel || self.deviceType, 80) || null;
+  const avatarId = cleanString(self.avatarId || self.avatar, 160) || null;
   return {
     id,
+    deviceId,
     deviceName,
-    avatarId: cleanString(self.avatarId, 80) || null,
+    avatarId,
+    avatar: avatarId,
+    deviceFamily,
+    deviceLabel,
     ringColor: cleanString(self.ringColor, 40) || null,
     capabilities: objectPayload(payload.capabilities || {})
   };
@@ -192,10 +200,14 @@ export function validateRoutedMessage(message) {
 export function publicPeer(client) {
   return {
     id: client.id,
+    deviceId: client.deviceId,
     name: client.deviceName,
     deviceName: client.deviceName,
     avatarId: client.avatarId,
+    avatar: client.avatar,
     ringColor: client.ringColor,
+    deviceFamily: client.deviceFamily || client.capabilities?.platform?.family || "unknown",
+    deviceLabel: client.deviceLabel || client.capabilities?.platform?.label || null,
     connected: Boolean(client.pairingId),
     joinedAt: client.joinedAt,
     capabilities: publicCapabilities(client.capabilities)
@@ -211,6 +223,7 @@ function publicCapabilities(capabilities) {
     webRtc: source.webRtc === true,
     platform: {
       family: cleanString(platform.family, 20) || "unknown",
+      label: cleanString(platform.label, 80) || null,
       isIOS: platform.isIOS === true,
       isIPhone: platform.isIPhone === true,
       dynamicIslandCapable: platform.dynamicIslandCapable === true
@@ -254,7 +267,7 @@ function validateTransferManifest(payload) {
   if (calculatedBytes !== totalBytes) {
     throw new ProtocolError("manifest_size_mismatch", "transfer:manifest totalBytes must equal the sum of file sizes.");
   }
-  const chunkSize = safeInteger(payload.chunkSize, 65536);
+  const chunkSize = safeInteger(payload.chunkSize, MAX_TRANSFER_CHUNK_SIZE_BYTES);
   if (chunkSize <= 0 || chunkSize > MAX_TRANSFER_CHUNK_SIZE_BYTES) {
     throw new ProtocolError("invalid_chunk_size", "transfer:manifest chunkSize is outside the accepted control-plane range.");
   }
@@ -270,7 +283,7 @@ function validateRtcSignal(signal) {
   const type = cleanString(signal.type, 40);
   if (type === "offer" || type === "answer") {
     assertStringWithinLimit(signal.sdp, MAX_SDP_LENGTH, "sdp_too_large", `${type} sdp is too large.`);
-    const sdp = cleanString(signal.sdp, MAX_SDP_LENGTH);
+    const sdp = normalizeSdpString(signal.sdp);
     if (!sdp) throw new ProtocolError("invalid_rtc_signal", `${type} requires sdp.`);
     return { type, sdp };
   }
@@ -296,6 +309,18 @@ function assertStringWithinLimit(value, maxLength, code, message) {
   if (typeof value === "string" && value.trim().length > maxLength) {
     throw new ProtocolError(code, message);
   }
+}
+
+function normalizeSdpString(value) {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .join("\r\n")
+    .concat("\r\n");
 }
 
 function validateProximityMetrics(metrics) {

@@ -63,8 +63,16 @@ export function createController({
     view.toast(view.translate("connectionRejected"));
   });
 
+  signaling.on("protocol:error", (payload = {}) => {
+    if (payload.code === "client_id_in_use") {
+      view.toast(view.translate("signalingLost"));
+      return;
+    }
+    view.toast(view.translate("connectionRejected"));
+  });
+
   signaling.on("peers", (peers) => {
-    store.patch({ peers });
+    store.patch({ peers: sanitizePeers(peers) });
   });
 
   signaling.on("inviteAccepted", ({ peerId, pairingId }) => {
@@ -307,7 +315,7 @@ export function createController({
   view.on("select-avatar", (avatar) => {
     if (!avatar?.startsWith("assets/icons/avatars/")) return;
     localStorage.setItem("webdrop.avatarChoice", avatar);
-    store.update((state) => ({ ...state, self: { ...state.self, avatar } }));
+    store.update((state) => ({ ...state, self: { ...state.self, avatar, avatarId: avatar } }));
   });
   view.on("select-ring", (ringColor) => {
     if (!/^#[0-9a-f]{6}$/i.test(ringColor || "")) return;
@@ -443,7 +451,12 @@ export function createController({
       path = runtime.realTransfer
         ? await connectProductionTransport(peerId, { initiator: productionInitiator })
         : await transport.preflight(peerId);
-    } catch {
+    } catch (error) {
+      console.warn("WebDrop connection transport failed.", {
+        message: error?.message || String(error),
+        peerId,
+        pairingId: store.getState().pairingId
+      });
       await resetFailedVerification(peerId);
       return;
     }
@@ -950,6 +963,64 @@ export function createController({
 
   function findPeer(peerId) {
     return store.getState().peers.find((peer) => peer.id === peerId);
+  }
+
+  function sanitizePeers(peers = []) {
+    const state = store.getState();
+    const seen = new Set();
+    const byDevice = new Map();
+    for (const peer of (Array.isArray(peers) ? peers : [])) {
+      if (!peer || typeof peer !== "object") continue;
+      const normalized = normalizePeer(peer);
+      if (!normalized.id || normalized.id === state.self.id) continue;
+      const deviceKey = stablePeerDeviceKey(normalized);
+      const existing = byDevice.get(deviceKey);
+      if (!existing || peerFreshness(normalized) >= peerFreshness(existing)) byDevice.set(deviceKey, normalized);
+    }
+    return [...byDevice.values()]
+      .filter((peer) => peer && typeof peer === "object")
+      .filter((peer) => {
+        if (seen.has(peer.id)) return false;
+        seen.add(peer.id);
+        return true;
+      });
+  }
+
+  function normalizePeer(peer) {
+    const platform = peer.capabilities?.platform || {};
+    const family = peer.deviceFamily || platform.family || "unknown";
+    return {
+      ...peer,
+      name: peer.name || peer.deviceName || "WebDrop device",
+      avatar: peer.avatar || peer.avatarId,
+      avatarId: peer.avatarId || peer.avatar,
+      deviceFamily: family,
+      deviceLabel: peer.deviceLabel || platform.label || familyLabel(family),
+      online: peer.online !== false
+    };
+  }
+
+  function familyLabel(family) {
+    return {
+      ios: "iPhone",
+      android: "Android",
+      macos: "Mac",
+      windows: "Windows",
+      watchos: "Watch",
+      ipad: "iPad"
+    }[family] || "Device";
+  }
+
+  function stablePeerDeviceKey(peer) {
+    if (peer.deviceId) return String(peer.deviceId);
+    const id = String(peer.id || "");
+    return id.replace(/-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, "");
+  }
+
+  function peerFreshness(peer) {
+    const joinedAt = Date.parse(peer.joinedAt || "");
+    if (Number.isFinite(joinedAt)) return joinedAt;
+    return 0;
   }
 
   function isCurrentVerification(peerId) {

@@ -108,6 +108,7 @@ test("connects by swipe, selects a file, and shows Dynamic Island transfer progr
   });
   await page.goto("/?qa=e2e-transfer-island&runtime=mock", { waitUntil: "domcontentloaded" });
   await expect(page.locator('[data-action="open-nearby-sheet"]')).toBeVisible({ timeout: 7000 });
+  await expect(page.locator(".peer-node").first()).toBeVisible({ timeout: 7000 });
   await page.locator('[data-action="open-nearby-sheet"]').click();
   await expect(page.locator('[data-nearby-device-id="peer-aki"]')).toBeVisible();
   await page.locator('[data-nearby-device-id="peer-aki"] .nearby-connect').click();

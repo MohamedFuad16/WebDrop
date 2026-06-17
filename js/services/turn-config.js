@@ -1,5 +1,5 @@
 export class TurnConfigProvider {
-  constructor({ url = "", enabled = false, fetchImpl = fetch, authorizationProvider = null } = {}) {
+  constructor({ url = "", enabled = false, fetchImpl = (...args) => fetch(...args), authorizationProvider = null } = {}) {
     this.url = url;
     this.enabled = Boolean(enabled && url);
     this.fetchImpl = fetchImpl;
@@ -36,7 +36,7 @@ export class TurnConfigProvider {
     }
     const requestUrl = new URL(this.url, globalThis.location?.href || "https://webdrop.invalid/");
     if (authorization.clientId) requestUrl.searchParams.set("clientId", authorization.clientId);
-    const response = await this.fetchImpl(requestUrl, {
+    const response = await this.fetchImpl(requestUrl.toString(), {
       method: "GET",
       credentials: "omit",
       headers: {

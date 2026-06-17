@@ -1,14 +1,14 @@
 import { createStore } from "./core/state.js";
-import { createController } from "./core/controller.js?v=1.0.28";
+import { createController } from "./core/controller.js?v=1.0.29";
 import { detectCapabilities } from "./services/capabilities.js";
-import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.28";
+import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.29";
 import { WebSocketSignalingAdapter } from "./services/websocket-signaling.js";
 import { TurnConfigProvider } from "./services/turn-config.js";
 import { ProximityEngine } from "./services/proximity-engine.js";
 import { WebRtcTransport } from "./services/webrtc-transport.js";
 import { TransferEngine } from "./services/transfer-engine.js";
 import { StorageClient } from "./storage/storage-client.js";
-import { AppView } from "./ui/app-view.js?v=1.0.28";
+import { AppView } from "./ui/app-view.js?v=1.0.29";
 import { AVATAR_OPTIONS, normalizeAvatarChoice } from "./config/avatar-options.js";
 import { getRuntimeFlags } from "./config/runtime-flags.js";
 
@@ -25,9 +25,11 @@ function browserLocale() {
 const initialState = {
   mode: "lobby",
   self: {
-    id: persistentDeviceId(),
+    id: persistentClientId(),
+    deviceId: persistentDeviceId(),
     name: localStorage.getItem("webdrop.deviceName") || defaultDeviceName(),
     avatar: normalizeAvatarChoice(localStorage.getItem("webdrop.avatarChoice")) || AVATAR_OPTIONS[0],
+    avatarId: normalizeAvatarChoice(localStorage.getItem("webdrop.avatarChoice")) || AVATAR_OPTIONS[0],
     ringColor: localStorage.getItem("webdrop.ringColor") || "#ffffff",
     deviceFamily: selfDeviceFamily()
   },
@@ -104,6 +106,20 @@ if ("serviceWorker" in navigator && !isLocalhost) {
   navigator.serviceWorker.register("./service-worker.js")
     .then((registration) => registration.update())
     .catch(() => {});
+}
+
+window.addEventListener("pagehide", () => {
+  signaling.disconnect?.();
+});
+
+function persistentClientId() {
+  const stored = sessionStorage.getItem("webdrop.clientId");
+  if (stored) return stored;
+  const stableDeviceId = persistentDeviceId();
+  const suffix = crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const id = `${stableDeviceId}-${suffix}`;
+  sessionStorage.setItem("webdrop.clientId", id);
+  return id;
 }
 
 function persistentDeviceId() {

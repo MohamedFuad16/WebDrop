@@ -9,14 +9,14 @@ export default defineConfig({
   },
   reporter: [["list"]],
   use: {
-    baseURL: "http://127.0.0.1:4186",
+    baseURL: "http://127.0.0.1:4180",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "off"
   },
   webServer: {
-    command: "python3 -m http.server 4186 --bind 127.0.0.1",
-    url: "http://127.0.0.1:4186",
+    command: "python3 -m http.server 4180 --bind 127.0.0.1",
+    url: "http://127.0.0.1:4180",
     reuseExistingServer: !process.env.CI,
     stdout: "ignore",
     stderr: "pipe"

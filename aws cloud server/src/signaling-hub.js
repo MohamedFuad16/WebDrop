@@ -29,7 +29,7 @@ const PROXIMITY_GATED_TYPES = new Set([
 ]);
 
 export class SignalingHub {
-  constructor({ server, path = "/ws", logger, maxJsonBytes = 65536, heartbeatIntervalMs = 25000, sessionTtlMs = 900000, pairingTtlMs = 120000, proximityAnalyzer, qrTokenProvider, metrics } = {}) {
+  constructor({ server, path = "/ws", logger, maxJsonBytes = 131072, heartbeatIntervalMs = 25000, sessionTtlMs = 900000, pairingTtlMs = 120000, proximityAnalyzer, qrTokenProvider, metrics } = {}) {
     this.wss = new WebSocketServer({
       noServer: true,
       maxPayload: maxJsonBytes * 4
@@ -147,12 +147,9 @@ export class SignalingHub {
   registerClient(socket, hello) {
     const existing = this.clients.get(hello.id);
     if (existing && ![WebSocket.CLOSING, WebSocket.CLOSED].includes(existing.socket.readyState)) {
-      this.send(socket, "protocol:error", {
-        code: "client_id_in_use",
-        message: "A live signaling session already uses this client id."
-      });
-      socket.close(4009, "client_id_in_use");
-      return;
+      this.logger?.warn("Replacing stale signaling session with the same client id.", { id: hello.id });
+      this.removeClient(existing.socket, "replaced_by_new_connection");
+      existing.socket.close(4001, "replaced_by_new_connection");
     }
     if (existing) {
       this.clients.delete(hello.id);

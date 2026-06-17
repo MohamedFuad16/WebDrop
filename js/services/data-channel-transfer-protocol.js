@@ -6,7 +6,7 @@ export const DATA_CHANNEL_LABELS = Object.freeze({
   file: "webdrop-file-v1"
 });
 
-const DEFAULT_CHUNK_SIZE = 64 * 1024;
+const DEFAULT_CHUNK_SIZE = 256 * 1024;
 const DEFAULT_HIGH_WATER_MARK = 8 * 1024 * 1024;
 const DEFAULT_LOW_WATER_MARK = 2 * 1024 * 1024;
 const DEFAULT_RECEIVER_READY_TIMEOUT = 45_000;

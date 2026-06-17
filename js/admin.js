@@ -1,5 +1,5 @@
-const APP_VERSION = "1.0.28";
-const CHUNK_SIZE = 64 * 1024;
+const APP_VERSION = "1.0.29";
+const CHUNK_SIZE = 256 * 1024;
 
 const readinessItems = [
   {
@@ -48,7 +48,7 @@ const readinessItems = [
     score: 82,
     checks: [
       "DataChannel control and file channels",
-      "64 KiB chunks and backpressure model",
+      "256 KiB chunks and backpressure model",
       "Path stats classify direct, relay or failed"
     ]
   },

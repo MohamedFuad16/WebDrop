@@ -11,7 +11,7 @@
     "start": "node src/server.js",
     "start:local": "node --env-file=.env src/server.js",
     "check": "node --check src/*.js",
-    "test": "node -e \"console.log('No AWS server test files are shipped in this build.')\""
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "ws": "^8.18.0"

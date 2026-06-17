@@ -25,7 +25,7 @@ export class TransferEngine extends Emitter {
     const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
     let sentBytes = 0;
     for (const file of files) {
-      const chunkSize = 64 * 1024;
+      const chunkSize = 256 * 1024;
       for (let offset = 0; offset < file.size; offset += chunkSize) {
         const chunk = file.slice(offset, offset + chunkSize);
         await chunk.arrayBuffer();

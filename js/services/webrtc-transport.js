@@ -49,6 +49,7 @@ export class WebRtcTransport extends Emitter {
     this.peerId = peerId;
     this.pairingId = pairingId;
     this._bindSignaling();
+    this.emit("connect-start", { peerId, pairingId, initiator });
     await this._createPeerConnection({ initiator });
     if (initiator) {
       const offer = await this.peerConnection.createOffer();
@@ -166,7 +167,7 @@ export class WebRtcTransport extends Emitter {
     if (!this.peerConnection) await this._createPeerConnection({ initiator: false });
     switch (signal.type) {
       case "offer": {
-        await this.peerConnection.setRemoteDescription(signal.description || { type: "offer", sdp: signal.sdp });
+        await this.peerConnection.setRemoteDescription(normalizeSessionDescription(signal, "offer"));
         await this._flushPendingCandidates();
         const answer = await this.peerConnection.createAnswer();
         await this.peerConnection.setLocalDescription(answer);
@@ -174,7 +175,7 @@ export class WebRtcTransport extends Emitter {
         break;
       }
       case "answer":
-        await this.peerConnection.setRemoteDescription(signal.description || { type: "answer", sdp: signal.sdp });
+        await this.peerConnection.setRemoteDescription(normalizeSessionDescription(signal, "answer"));
         await this._flushPendingCandidates();
         break;
       case "candidate":
@@ -221,6 +222,7 @@ export class WebRtcTransport extends Emitter {
   async _createPeerConnection({ initiator }) {
     if (this.peerConnection) return;
     const iceServers = await this.turnConfig.getIceServers();
+    this.emit("peer-connection-create", { initiator, iceServerCount: iceServers.length });
     const connection = new RTCPeerConnection({ ...this.rtcConfig, iceServers });
     this.peerConnection = connection;
     connection.addEventListener("icecandidate", ({ candidate }) => {
@@ -286,6 +288,7 @@ export class WebRtcTransport extends Emitter {
   }
 
   async _sendSignal(signal) {
+    this.emit("signal-send", { type: signal.type, peerId: this.peerId, pairingId: this.pairingId });
     const sent = await this.signaling.sendRtcSignal(this.peerId, normalizeOutboundSignal(signal), {
       pairingId: this.pairingId
     });
@@ -330,6 +333,26 @@ function normalizeSignal(payload) {
     pairingId: payload?.pairingId,
     signal: payload?.signal || payload
   };
+}
+
+function normalizeSessionDescription(signal, fallbackType) {
+  const description = signal.description || signal;
+  const type = description.type || signal.type || fallbackType;
+  return {
+    type,
+    sdp: normalizeSdp(description.sdp || signal.sdp || "")
+  };
+}
+
+function normalizeSdp(sdp) {
+  return String(sdp || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .join("\r\n")
+    .concat("\r\n");
 }
 
 function wait(ms) {
