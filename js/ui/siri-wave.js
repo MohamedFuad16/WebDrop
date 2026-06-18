@@ -105,14 +105,10 @@ export class SiriWaveCore {
   constructor(canvas, { renderScale = 0.75 } = {}) {
     this.canvas = canvas;
     this.renderScale = renderScale;
-    this.gl = canvas?.getContext("webgl", {
-      alpha: true,
-      antialias: true,
-      depth: false,
-      premultipliedAlpha: false,
-      preserveDrawingBuffer: false,
-      stencil: false
-    });
+    this.touchOptimized = prefersCanvas2dWave();
+    this.gl = null;
+    this.context2d = null;
+    this.renderer = "none";
     this.program = null;
     this.uniforms = {};
     this.buffer = null;
@@ -123,8 +119,36 @@ export class SiriWaveCore {
     this.resizeObserver = null;
     this.resizeDirty = true;
     this.frameCount = 0;
-    if (!this.gl) return;
-    this.build();
+    this.lastDrawAt = 0;
+    this.frameIntervalMs = this.touchOptimized ? 32 : 0;
+    if (this.touchOptimized) {
+      this.switchToCanvas2d();
+    } else {
+      try {
+        this.gl = canvas?.getContext("webgl", {
+          alpha: true,
+          antialias: true,
+          depth: false,
+          premultipliedAlpha: false,
+          preserveDrawingBuffer: false,
+          stencil: false
+        });
+        if (!this.gl) throw new Error("WebGL is unavailable.");
+        this.build();
+        this.renderer = "webgl";
+        this.canvas.dataset.waveRenderer = this.renderer;
+        this.canvas.addEventListener("webglcontextlost", (event) => {
+          event.preventDefault();
+          const wasRunning = this.running;
+          this.setRunning(false);
+          this.switchToCanvas2d(true);
+          this.resize();
+          if (wasRunning) this.setRunning(true);
+        }, { once: true });
+      } catch {
+        this.switchToCanvas2d(Boolean(this.gl));
+      }
+    }
     this.resize();
     if ("ResizeObserver" in globalThis) {
       this.resizeObserver = new ResizeObserver(() => {
@@ -135,13 +159,13 @@ export class SiriWaveCore {
   }
 
   setRunning(running) {
-    if (!this.gl) return;
+    if (!this.gl && !this.context2d) return;
     if (running === this.running) return;
     this.running = running;
     if (running) {
       this.startedAt = performance.now();
       this.resizeDirty = true;
-      this.frameId = requestAnimationFrame(() => this.frame());
+      this.frameId = requestAnimationFrame((now) => this.frame(now));
     } else {
       cancelAnimationFrame(this.frameId);
       this.frameId = 0;
@@ -161,6 +185,28 @@ export class SiriWaveCore {
     if (this.buffer) this.gl?.deleteBuffer(this.buffer);
     this.program = null;
     this.buffer = null;
+    this.context2d = null;
+  }
+
+  renderOnce(time = 0.8) {
+    if (!this.gl && !this.context2d) return;
+    this.resize();
+    if (this.renderer === "canvas2d") this.drawCanvas2d(time);
+    else this.drawWebGl(time);
+  }
+
+  switchToCanvas2d(replaceCanvas = false) {
+    if (replaceCanvas && this.canvas?.parentNode) {
+      const replacement = this.canvas.cloneNode(false);
+      this.canvas.replaceWith(replacement);
+      this.canvas = replacement;
+    }
+    this.gl = null;
+    this.program = null;
+    this.buffer = null;
+    this.context2d = this.canvas?.getContext("2d", { alpha: true }) || null;
+    this.renderer = this.context2d ? "canvas2d" : "none";
+    if (this.canvas) this.canvas.dataset.waveRenderer = this.renderer;
   }
 
   compile(type, source) {
@@ -195,32 +241,92 @@ export class SiriWaveCore {
   }
 
   resize() {
-    if (!this.canvas || !this.gl) return;
+    if (!this.canvas || (!this.gl && !this.context2d)) return;
     const rect = this.canvas.getBoundingClientRect();
-    const width = Math.max(1, Math.round(rect.width * this.renderScale));
-    const height = Math.max(1, Math.round(rect.height * this.renderScale));
+    const scale = this.renderer === "canvas2d"
+      ? Math.min(this.touchOptimized ? 1.5 : 2, globalThis.devicePixelRatio || 1)
+      : this.renderScale;
+    const width = Math.max(1, Math.round(rect.width * scale));
+    const height = Math.max(1, Math.round(rect.height * scale));
     if (this.canvas.width === width && this.canvas.height === height) {
       this.resizeDirty = false;
       return;
     }
     this.canvas.width = width;
     this.canvas.height = height;
-    this.gl.viewport(0, 0, width, height);
+    this.gl?.viewport(0, 0, width, height);
     this.resizeDirty = false;
   }
 
-  frame() {
-    if (!this.running || !this.gl || !this.program) return;
+  frame(now = performance.now()) {
+    if (!this.running || (!this.gl && !this.context2d)) return;
+    if (this.frameIntervalMs && now - this.lastDrawAt < this.frameIntervalMs) {
+      this.frameId = requestAnimationFrame((next) => this.frame(next));
+      return;
+    }
+    this.lastDrawAt = now;
     this.frameCount += 1;
     if (this.resizeDirty || (!this.resizeObserver && this.frameCount % 30 === 0)) {
       this.resize();
     }
-    const time = (performance.now() - this.startedAt) / 1000;
+    const time = (now - this.startedAt) / 1000;
+    if (this.renderer === "canvas2d") this.drawCanvas2d(time);
+    else this.drawWebGl(time);
+    this.frameId = requestAnimationFrame((next) => this.frame(next));
+  }
+
+  drawWebGl(time) {
+    if (!this.gl || !this.program) return;
     this.gl.useProgram(this.program);
     this.gl.uniform2f(this.uniforms.iResolution, this.canvas.width, this.canvas.height);
     this.gl.uniform1f(this.uniforms.iTime, time);
     this.gl.uniform1f(this.uniforms.iDirection, this.direction || 1);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
-    this.frameId = requestAnimationFrame(() => this.frame());
   }
+
+  drawCanvas2d(time) {
+    const context = this.context2d;
+    if (!context) return;
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+    const centerY = height / 2;
+    const amplitude = height * 0.22;
+    const step = this.touchOptimized || width > 420 ? 3 : 2;
+    const shadow = (this.touchOptimized ? 6 : 10) * Math.max(1, width / 360);
+    context.clearRect(0, 0, width, height);
+    context.save();
+    context.globalCompositeOperation = "lighter";
+    context.lineCap = "round";
+    const waves = [
+      { color: "rgba(72, 132, 255, .88)", phase: 0, width: 3.2 },
+      { color: "rgba(82, 222, 207, .78)", phase: 1.35, width: 2.7 },
+      { color: "rgba(195, 91, 255, .68)", phase: 2.7, width: 2.4 },
+      { color: "rgba(255, 157, 89, .58)", phase: 4.05, width: 2.1 }
+    ];
+    for (const wave of waves) {
+      context.beginPath();
+      context.strokeStyle = wave.color;
+      context.lineWidth = wave.width * Math.max(1, width / 360);
+      context.shadowColor = wave.color;
+      context.shadowBlur = shadow;
+      for (let x = 0; x <= width; x += step) {
+        const normalized = x / Math.max(1, width);
+        const envelope = Math.sin(Math.PI * normalized) ** 1.7;
+        const carrier = Math.sin(normalized * Math.PI * 4.2 + time * 3.1 * this.direction + wave.phase);
+        const detail = Math.sin(normalized * Math.PI * 9.4 - time * 1.8 * this.direction + wave.phase * 0.6) * 0.22;
+        const y = centerY + (carrier + detail) * amplitude * envelope;
+        if (x === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.stroke();
+    }
+    context.restore();
+  }
+}
+
+function prefersCanvas2dWave() {
+  const navigator = globalThis.navigator;
+  const userAgent = navigator?.userAgent || "";
+  return /iPhone|iPad|iPod/i.test(userAgent)
+    || (navigator?.platform === "MacIntel" && Number(navigator?.maxTouchPoints) > 1);
 }

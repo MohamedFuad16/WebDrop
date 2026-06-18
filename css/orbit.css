@@ -9,6 +9,7 @@
   display: grid;
   place-items: center;
   isolation: isolate;
+  contain: layout paint style;
 }
 
 .app-shell[data-mode="connected"] .orbit-scene,
@@ -27,6 +28,10 @@
   opacity: .78;
   animation: ringDrift var(--ring-duration, 120s) linear infinite;
   transform-origin: center;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  contain: paint;
+  will-change: transform;
 }
 
 .orbit-ring circle {
@@ -116,11 +121,14 @@
   top: 50%;
   width: var(--peer-hit-target);
   height: var(--peer-hit-target);
-  transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(var(--radius) * -1)) rotate(calc(var(--angle) * -1));
+  transform: translate3d(-50%, -50%, 0) rotate(var(--angle)) translate3d(0, calc(var(--radius) * -1), 0) rotate(calc(var(--angle) * -1));
   animation: orbitSpin var(--orbit-duration, 46s) linear infinite;
   animation-delay: var(--orbit-delay, 0s);
   transition: opacity var(--motion-control) ease;
   pointer-events: auto;
+  backface-visibility: hidden;
+  contain: layout paint style;
+  will-change: transform, opacity;
 }
 
 .peer-node .peer-avatar {
@@ -146,6 +154,8 @@
   border-radius: inherit;
   background: #ffffff;
   box-shadow: 0 8px 18px color-mix(in srgb, var(--ink) 15%, transparent);
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .peer-node img {
@@ -336,6 +346,8 @@
   opacity: 0;
   animation: avatarFrameFade 36s ease-in-out infinite;
   animation-delay: calc(var(--avatar-frame-delay, 0s) + var(--avatar-stagger, 0s));
+  backface-visibility: hidden;
+  transform: translateZ(0);
   will-change: opacity;
 }
 
@@ -353,16 +365,16 @@
 
 @keyframes orbitSpin {
   from {
-    transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(var(--radius) * -1)) rotate(calc(var(--angle) * -1));
+    transform: translate3d(-50%, -50%, 0) rotate(var(--angle)) translate3d(0, calc(var(--radius) * -1), 0) rotate(calc(var(--angle) * -1));
   }
   to {
-    transform: translate(-50%, -50%) rotate(calc(var(--angle) + 360deg)) translateY(calc(var(--radius) * -1)) rotate(calc((var(--angle) + 360deg) * -1));
+    transform: translate3d(-50%, -50%, 0) rotate(calc(var(--angle) + 360deg)) translate3d(0, calc(var(--radius) * -1), 0) rotate(calc((var(--angle) + 360deg) * -1));
   }
 }
 
 @keyframes ringDrift {
   to {
-    transform: rotate(360deg);
+    transform: translateZ(0) rotate(360deg);
   }
 }
 

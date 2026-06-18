@@ -27,6 +27,12 @@ const PROXIMITY_GATED_TYPES = new Set([
   "transfer:manifest",
   "transfer:control"
 ]);
+const SESSION_JOIN_WINDOW_MS = 1800;
+const SESSION_START_DELAY_MS = 1200;
+const SESSION_DURATION_MS = 3600;
+const SESSION_TTL_MS = 15000;
+const SESSION_MATCH_SLOP_MS = 900;
+const SESSION_SCORE_MINIMUM = 0.55;
 
 export class SignalingHub {
   constructor({ server, path = "/ws", logger, maxJsonBytes = 131072, heartbeatIntervalMs = 25000, sessionTtlMs = 900000, pairingTtlMs = 120000, proximityAnalyzer, qrTokenProvider, metrics } = {}) {
@@ -48,6 +54,8 @@ export class SignalingHub {
     this.activePairs = new Map();
     this.proximityDecisions = new Map();
     this.proximityReady = new Map();
+    this.proximitySessions = new Map();
+    this.openProximitySessionId = null;
     this.socketToClient = new WeakMap();
     this.rateLimits = new TokenBucket({ capacity: 90, refillPerSecond: 30 });
     this.ipRateLimits = new TokenBucket({ capacity: 120, refillPerSecond: 20 });
@@ -178,6 +186,26 @@ export class SignalingHub {
   }
 
   route(sender, message) {
+    if (message.type === "proximity:session:join") {
+      this.joinProximitySession(sender, message);
+      return;
+    }
+    if (message.type === "proximity:session:telemetry") {
+      this.recordProximitySessionTelemetry(sender, message);
+      return;
+    }
+    if (message.type === "proximity:session:cancel") {
+      this.cancelProximitySession(sender, message);
+      return;
+    }
+    if (message.type === "proximity:qr:issue" && !message.targetId) {
+      this.issuePeerlessQrToken(sender);
+      return;
+    }
+    if (message.type === "proximity:qr:verify" && !message.targetId) {
+      this.verifyPeerlessQrToken(sender, message);
+      return;
+    }
     const target = this.clients.get(message.targetId);
     if (!target) {
       this.send(sender.socket, "route:error", {
@@ -317,6 +345,236 @@ export class SignalingHub {
     }
   }
 
+  issuePeerlessQrToken(sender) {
+    const pairingId = `qr-${randomUUID()}`;
+    const issued = this.qrTokenProvider?.issue({
+      pairingId,
+      issuerId: sender.id,
+      targetId: null
+    });
+    this.send(sender.socket, "proximity:qr:issued", issued);
+  }
+
+  verifyPeerlessQrToken(sender, message) {
+    const result = this.qrTokenProvider?.verify({
+      token: message.payload.token,
+      pairingId: message.pairingId,
+      verifierId: sender.id,
+      targetId: null
+    }) || { valid: false, pairingId: null, verifiedAt: null };
+    if (!result.valid || !result.issuerId) {
+      this.send(sender.socket, "proximity:qr:verified", result);
+      return;
+    }
+    const issuer = this.clients.get(result.issuerId);
+    if (!issuer || issuer.id === sender.id || issuer.pairingId || sender.pairingId) {
+      this.send(sender.socket, "proximity:qr:verified", { ...result, valid: false, reason: "peer_unavailable" });
+      return;
+    }
+    const pairingId = result.pairingId || makePairingId(sender.id, issuer.id);
+    this.activatePair(sender, issuer, pairingId);
+    this.proximityDecisions.set(pairingId, new Map([
+      [sender.id, "verified"],
+      [issuer.id, "verified"]
+    ]));
+    const payloadForSender = {
+      ...result,
+      pairingId,
+      peerId: issuer.id,
+      peer: publicPeer(issuer)
+    };
+    const payloadForIssuer = {
+      ...result,
+      pairingId,
+      peerId: sender.id,
+      peer: publicPeer(sender)
+    };
+    this.send(sender.socket, "proximity:qr:verified", payloadForSender);
+    this.send(issuer.socket, "proximity:qr:verified", payloadForIssuer);
+    this.broadcast("peers", this.peerList());
+  }
+
+  joinProximitySession(sender, message) {
+    if (sender.pairingId) {
+      this.send(sender.socket, "proximity:session:failed", { reason: "already_connected" });
+      return;
+    }
+    const now = Date.now();
+    let session = this.openProximitySessionId ? this.proximitySessions.get(this.openProximitySessionId) : null;
+    if (!session || session.started || session.expiresAt <= now) {
+      session = {
+        id: `prox-${randomUUID()}`,
+        clients: new Set(),
+        nonces: new Map(),
+        telemetry: new Map(),
+        createdAt: now,
+        expiresAt: now + SESSION_TTL_MS,
+        joinUntil: now + SESSION_JOIN_WINDOW_MS,
+        started: false,
+        matched: new Set(),
+        timer: null,
+        failTimer: null
+      };
+      this.proximitySessions.set(session.id, session);
+      this.openProximitySessionId = session.id;
+      session.timer = setTimeout(() => this.startProximitySession(session.id), SESSION_JOIN_WINDOW_MS);
+      session.timer.unref?.();
+    }
+    session.clients.add(sender.id);
+    session.nonces.set(sender.id, message.payload.clientNonce);
+    this.send(sender.socket, "proximity:session:joined", {
+      sessionId: session.id,
+      clientNonce: message.payload.clientNonce,
+      joinUntil: session.joinUntil,
+      participantCount: session.clients.size
+    });
+    if (session.clients.size >= 2 && !session.started && Date.now() >= session.createdAt + 250) {
+      clearTimeout(session.timer);
+      session.timer = setTimeout(() => this.startProximitySession(session.id), 250);
+      session.timer.unref?.();
+    }
+  }
+
+  startProximitySession(sessionId) {
+    const session = this.proximitySessions.get(sessionId);
+    if (!session || session.started) return;
+    session.started = true;
+    if (this.openProximitySessionId === sessionId) this.openProximitySessionId = null;
+    if (session.clients.size < 2) {
+      for (const clientId of session.clients) {
+        const client = this.clients.get(clientId);
+        if (client) this.send(client.socket, "proximity:session:failed", { sessionId, reason: "no_nearby_partner" });
+      }
+      this.proximitySessions.delete(sessionId);
+      return;
+    }
+    const startAt = Date.now() + SESSION_START_DELAY_MS;
+    let slot = 0;
+    for (const clientId of session.clients) {
+      const client = this.clients.get(clientId);
+      if (!client) continue;
+      this.send(client.socket, "proximity:session:start", {
+        sessionId,
+        startAt,
+        durationMs: SESSION_DURATION_MS,
+        acousticSlot: slot++,
+        participantCount: session.clients.size
+      });
+    }
+    session.failTimer = setTimeout(
+      () => this.failUnmatchedProximitySession(sessionId),
+      SESSION_START_DELAY_MS + SESSION_DURATION_MS + SESSION_MATCH_SLOP_MS
+    );
+    session.failTimer.unref?.();
+  }
+
+  recordProximitySessionTelemetry(sender, message) {
+    const sessionId = message.payload.sessionId;
+    const session = this.proximitySessions.get(sessionId);
+    if (!session || !session.clients.has(sender.id) || session.expiresAt <= Date.now()) {
+      this.send(sender.socket, "proximity:session:failed", { sessionId, reason: "session_not_available" });
+      return;
+    }
+    const analysis = sessionAnalysis(this.proximityAnalyzer, message.payload.metrics || {});
+    session.telemetry.set(sender.id, {
+      clientId: sender.id,
+      analysis,
+      timing: message.payload.timing || {},
+      receivedAt: Date.now()
+    });
+    this.tryMatchProximitySession(session);
+  }
+
+  tryMatchProximitySession(session) {
+    const candidates = [...session.telemetry.values()]
+      .filter((entry) => entry.analysis?.decision === "verified" && !session.matched.has(entry.clientId))
+      .sort((a, b) => Number(a.timing?.bumpAt || a.receivedAt) - Number(b.timing?.bumpAt || b.receivedAt));
+    let best = null;
+    for (let i = 0; i < candidates.length; i += 1) {
+      for (let j = i + 1; j < candidates.length; j += 1) {
+        const a = candidates[i];
+        const b = candidates[j];
+        const delta = Math.abs(Number(a.timing?.bumpAt || a.receivedAt) - Number(b.timing?.bumpAt || b.receivedAt));
+        if (delta > SESSION_MATCH_SLOP_MS) continue;
+        if (!best || delta < best.delta) best = { a, b, delta };
+      }
+    }
+    if (!best) return;
+    const first = this.clients.get(best.a.clientId);
+    const second = this.clients.get(best.b.clientId);
+    if (!first || !second || first.pairingId || second.pairingId) return;
+    const pairingId = makePairingId(first.id, second.id);
+    this.activatePair(first, second, pairingId);
+    session.matched.add(first.id);
+    session.matched.add(second.id);
+    this.proximityDecisions.set(pairingId, new Map([
+      [first.id, "verified"],
+      [second.id, "verified"]
+    ]));
+    this.send(first.socket, "proximity:match", {
+      sessionId: session.id,
+      pairingId,
+      peerId: second.id,
+      peer: publicPeer(second),
+      score: best.a.analysis.score
+    });
+    this.send(second.socket, "proximity:match", {
+      sessionId: session.id,
+      pairingId,
+      peerId: first.id,
+      peer: publicPeer(first),
+      score: best.b.analysis.score
+    });
+    this.broadcast("peers", this.peerList());
+    if ([...session.clients].every((clientId) => session.matched.has(clientId))) {
+      clearTimeout(session.timer);
+      clearTimeout(session.failTimer);
+      this.proximitySessions.delete(session.id);
+    }
+  }
+
+  failUnmatchedProximitySession(sessionId) {
+    const session = this.proximitySessions.get(sessionId);
+    if (!session) return;
+    for (const clientId of session.clients) {
+      if (session.matched.has(clientId)) continue;
+      const client = this.clients.get(clientId);
+      const entry = session.telemetry.get(clientId);
+      if (!client || client.pairingId) continue;
+      this.send(client.socket, "proximity:session:failed", {
+        sessionId,
+        reason: "score_too_low",
+        score: entry?.analysis?.score ?? null,
+        analysis: entry?.analysis || null
+      });
+    }
+    clearTimeout(session.timer);
+    clearTimeout(session.failTimer);
+    this.proximitySessions.delete(sessionId);
+  }
+
+  cancelProximitySession(sender, message) {
+    const sessionId = message.payload.sessionId;
+    const session = this.proximitySessions.get(sessionId);
+    if (!session) return;
+    session.clients.delete(sender.id);
+    session.telemetry.delete(sender.id);
+    if (!session.clients.size) {
+      clearTimeout(session.timer);
+      clearTimeout(session.failTimer);
+      this.proximitySessions.delete(sessionId);
+      if (this.openProximitySessionId === sessionId) this.openProximitySessionId = null;
+    }
+  }
+
+  activatePair(sender, target, pairingId) {
+    const activePair = new Set([sender.id, target.id]);
+    activePair.expiresAt = Date.now() + this.sessionTtlMs;
+    this.activePairs.set(pairingId, activePair);
+    sender.pairingId = pairingId;
+    target.pairingId = pairingId;
+  }
+
   canUsePairing(sender, target, pairingId) {
     if (this.arePaired(sender, target, pairingId)) return true;
     const pending = this.pendingInvites.get(pairingId);
@@ -383,11 +641,7 @@ export class SignalingHub {
       return;
     }
     this.pendingInvites.delete(pairingId);
-    const activePair = new Set([sender.id, target.id]);
-    activePair.expiresAt = Date.now() + this.sessionTtlMs;
-    this.activePairs.set(pairingId, activePair);
-    sender.pairingId = pairingId;
-    target.pairingId = pairingId;
+    this.activatePair(sender, target, pairingId);
     this.send(target.socket, message.type, {
       ...message,
       pairingId,
@@ -531,6 +785,17 @@ export class SignalingHub {
     this.clients.delete(client.id);
     this.socketToClient.delete(socket);
     this.logger?.info("Client left signaling.", { id: client.id, reason });
+    for (const [sessionId, session] of this.proximitySessions) {
+      if (!session.clients.delete(client.id)) continue;
+      session.telemetry.delete(client.id);
+      session.matched.delete(client.id);
+      if (!session.clients.size) {
+        clearTimeout(session.timer);
+        clearTimeout(session.failTimer);
+        this.proximitySessions.delete(sessionId);
+        if (this.openProximitySessionId === sessionId) this.openProximitySessionId = null;
+      }
+    }
     if (client.pairingId) {
       const pairingId = client.pairingId;
       const pair = this.activePairs.get(pairingId);
@@ -615,4 +880,31 @@ function makePairingId(a, b) {
 
 function makeSessionId(id) {
   return `session-${randomUUID()}-${id.slice(0, 40)}`;
+}
+
+function sessionAnalysis(analyzer, metrics = {}) {
+  const analyzed = analyzer?.analyze
+    ? analyzer.analyze(metrics)
+    : fallbackSessionAnalysis(metrics);
+  const score = Number(analyzed?.score || 0);
+  return {
+    ...analyzed,
+    decision: score >= SESSION_SCORE_MINIMUM ? "verified" : (analyzed?.decision || "insufficient")
+  };
+}
+
+function fallbackSessionAnalysis(metrics = {}) {
+  const sound = metricValue(metrics.soundCorrelation ?? metrics.acoustic ?? metrics.audio);
+  const motion = metricValue(metrics.motionCorrelation ?? metrics.motion);
+  const bump = metricValue(metrics.bumpCorrelation ?? metrics.bump);
+  const tilt = metricValue(metrics.tiltMatch ?? metrics.tilt);
+  const qr = metricValue(metrics.qrMatch ?? metrics.qrFallback);
+  const score = sound * 0.34 + motion * 0.26 + bump * 0.2 + tilt * 0.12 + qr * 0.08;
+  return { enabled: false, mode: "fallback", score, decision: score >= SESSION_SCORE_MINIMUM ? "verified" : "insufficient" };
+}
+
+function metricValue(value) {
+  if (typeof value === "boolean") return value ? 1 : 0;
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : 0;
 }

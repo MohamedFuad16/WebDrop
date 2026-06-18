@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.41";
-import { Emitter } from "../utils/emitter.js?v=1.0.41";
-import { formatBytes } from "../utils/format.js?v=1.0.41";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.41";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.41";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.42";
+import { Emitter } from "../utils/emitter.js?v=1.0.42";
+import { formatBytes } from "../utils/format.js?v=1.0.42";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.42";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.42";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -27,6 +27,7 @@ export class DynamicIsland extends Emitter {
       ceremonyStage: this.root?.querySelector("[data-island-ceremony-stage]"),
       ceremonyScore: this.root?.querySelector("[data-island-ceremony-score]"),
       ceremonyError: this.root?.querySelector("[data-island-ceremony-error]"),
+      fallback: this.root?.querySelector("[data-island-fallback]"),
       audioMetric: this.root?.querySelector("[data-island-metric='audio']"),
       audioValue: this.root?.querySelector("[data-island-audio-value]"),
       bumpMetric: this.root?.querySelector("[data-island-metric='bump']"),
@@ -41,6 +42,7 @@ export class DynamicIsland extends Emitter {
     };
     try {
       this.wave = this.nodes.wave ? new SiriWaveCore(this.nodes.wave) : null;
+      if (this.wave?.canvas) this.nodes.wave = this.wave.canvas;
     } catch {
       this.wave = null;
       this.nodes.wave?.setAttribute("hidden", "");
@@ -59,8 +61,12 @@ export class DynamicIsland extends Emitter {
     this.connectionOpenedAt = 0;
     this.connectionDelayTimer = 0;
     this.connectionDelayResolver = null;
+    this.waveStabilizeFrame = 0;
+    this.waveStabilizeTimer = 0;
     this.cameraRequestId = 0;
     this.detectionPaused = false;
+    this.preparedCameraPromise = null;
+    this.preparedCameraStream = null;
     this.scanCanvas = document.createElement("canvas");
     this.scanContext = this.scanCanvas.getContext("2d", { willReadFrequently: true });
     this.previousFocus = null;
@@ -68,6 +74,7 @@ export class DynamicIsland extends Emitter {
     this.backgroundNodes = [...document.querySelectorAll(".topbar, .main-stage, .connection-tray, [data-backdrop], [data-sheet]")];
     this.nodes.camera?.addEventListener("click", () => this.startCamera());
     this.nodes.cancel?.addEventListener("click", () => this.emit("cancel"));
+    this.nodes.fallback?.addEventListener("click", () => this.emit("fallback"));
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && this.state.startsWith("qr-")) {
         event.preventDefault();
@@ -90,13 +97,13 @@ export class DynamicIsland extends Emitter {
       this.showConnection(state.self, peer);
     } else if (state.mode === "disconnecting" && !["closed", "closing"].includes(this.state)) {
       this.close();
-    } else if (state.mode === "lobby" && !this.state.startsWith("qr-")) {
+    } else if (state.mode === "lobby" && !this.state.startsWith("qr-") && this.state !== "verification-failed") {
       this.currentConnectedPeerId = null;
       if (!["closed", "closing"].includes(this.state)) this.close();
     }
   }
 
-  showConnectionProgress(self, peer) {
+  showConnectionProgress(self, peer, ceremony = null) {
     this.cancelConnectionMinimum(false);
     this.prepareToOpen(false);
     this.stopCamera();
@@ -106,11 +113,27 @@ export class DynamicIsland extends Emitter {
     this.renderPeople(self, peer);
     this.resetCeremony();
     this.setState("connecting");
+    if (ceremony) this.renderVerifiedCeremony(ceremony);
+  }
+
+  showAnonymousConnectionProgress(self) {
+    this.cancelConnectionMinimum(false);
+    this.prepareToOpen(false);
+    this.stopCamera();
+    this.copyKeys = { title: null, status: null };
+    this.currentConnectedPeerId = null;
+    this.connectionOpenedAt = this.now();
+    this.renderPeople(self, {
+      name: this.translate("anonymousNearbyPeer"),
+      avatar: self.avatar
+    });
+    this.resetCeremony();
+    this.setState("connecting");
   }
 
   showQrPreparing({ self, peer, role = "show" }) {
     this.prepareToOpen(true);
-    this.stopCamera();
+    this.stopCamera({ preservePrepared: role === "scan" });
     this.renderPeople(self, peer);
     this.setState("qr-preparing");
     this.setCopy(
@@ -162,7 +185,7 @@ export class DynamicIsland extends Emitter {
 
   showQrScanner({ self, peer, autoStartCamera = true }) {
     this.prepareToOpen(true);
-    this.stopCamera();
+    this.stopCamera({ preservePrepared: true });
     this.renderPeople(self, peer);
     this.setState("qr-scan");
     this.setCopy("qrScanTitle", "qrScanStatus");
@@ -172,7 +195,7 @@ export class DynamicIsland extends Emitter {
       this.cameraStartTimer = this.scheduleTimeout(() => {
         this.cameraStartTimer = 0;
         this.startCamera();
-      }, 280);
+      }, 40);
     }
   }
 
@@ -229,7 +252,7 @@ export class DynamicIsland extends Emitter {
       this.nodes.ceremonyError.hidden = false;
       this.nodes.ceremonyError.textContent = errors.filter(Boolean).join(" · ");
     }
-    await new Promise((resolve) => this.scheduleTimeout(resolve, this.prefersReducedMotion() ? 700 : 3000));
+    if (this.nodes.fallback) this.nodes.fallback.hidden = false;
     return true;
   }
 
@@ -311,7 +334,43 @@ export class DynamicIsland extends Emitter {
     const appShell = this.root?.closest(".app-shell");
     const motionPaused = appShell?.dataset.motion === "paused";
     const waveState = ["connecting", "connected", "transfer"].includes(state);
-    this.wave?.setRunning(waveState && !motionPaused && !this.prefersReducedMotion());
+    const shouldShowWave = waveState && !motionPaused;
+    if (!shouldShowWave) {
+      this.cancelWaveStabilize();
+      this.wave?.setRunning(false);
+    } else if (this.prefersReducedMotion()) {
+      this.wave?.setRunning(false);
+      this.wave?.renderOnce();
+    } else {
+      this.wave?.setRunning(true);
+      this.stabilizeWaveFrame();
+    }
+  }
+
+  stabilizeWaveFrame() {
+    if (!this.wave) return;
+    this.cancelWaveStabilize();
+    const render = () => {
+      if (!["connecting", "connected", "transfer"].includes(this.state)) return;
+      this.wave.resize?.();
+      this.wave.renderOnce?.(0.35);
+      if (!this.prefersReducedMotion()) this.wave.setRunning(true);
+    };
+    this.waveStabilizeFrame = requestAnimationFrame(() => {
+      this.waveStabilizeFrame = 0;
+      render();
+    });
+    this.waveStabilizeTimer = this.scheduleTimeout(() => {
+      this.waveStabilizeTimer = 0;
+      render();
+    }, 180);
+  }
+
+  cancelWaveStabilize() {
+    if (this.waveStabilizeFrame) cancelAnimationFrame(this.waveStabilizeFrame);
+    if (this.waveStabilizeTimer) this.cancelTimeout(this.waveStabilizeTimer);
+    this.waveStabilizeFrame = 0;
+    this.waveStabilizeTimer = 0;
   }
 
   focusableElements() {
@@ -430,6 +489,7 @@ export class DynamicIsland extends Emitter {
       this.nodes.status.textContent = this.translate(this.copyKeys.status);
     }
     if (this.nodes.camera) this.nodes.camera.textContent = this.translate("startCamera");
+    if (this.nodes.fallback) this.nodes.fallback.textContent = this.translate("useQrInstead");
   }
 
   renderPeople(self, peer) {
@@ -449,10 +509,29 @@ export class DynamicIsland extends Emitter {
       this.nodes.ceremonyError.hidden = true;
       this.nodes.ceremonyError.textContent = "";
     }
+    if (this.nodes.fallback) this.nodes.fallback.hidden = true;
     [this.nodes.audioMetric, this.nodes.bumpMetric, this.nodes.tiltMetric].forEach((node) => this.setMetricState(node, "waiting"));
     if (this.nodes.audioValue) this.nodes.audioValue.textContent = this.translate("ceremonyWaiting");
     if (this.nodes.bumpValue) this.nodes.bumpValue.textContent = "0.0";
     if (this.nodes.tiltValue) this.nodes.tiltValue.textContent = "0°";
+  }
+
+  renderVerifiedCeremony({ score = 100, acoustic = {}, motion = {} } = {}) {
+    this.updateCeremony({
+      phase: "audio",
+      state: "complete",
+      acoustic: { detected: true, ...acoustic }
+    });
+    this.updateCeremony({
+      phase: "motion",
+      state: "complete",
+      motion
+    });
+    this.updateCeremony({
+      phase: "score",
+      state: "complete",
+      score
+    });
   }
 
   renderMotionMetrics(motion = {}) {
@@ -500,12 +579,13 @@ export class DynamicIsland extends Emitter {
     const canvas = this.nodes.canvas;
     const context = canvas.getContext("2d");
     const count = qr.getModuleCount();
-    const pad = 12;
+    context.imageSmoothingEnabled = false;
+    const pad = 24;
     const size = canvas.width - pad * 2;
     const cell = size / count;
-    context.fillStyle = "#f4f5f7";
+    context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = "#15171b";
+    context.fillStyle = "#050505";
     for (let row = 0; row < count; row += 1) {
       for (let column = 0; column < count; column += 1) {
         if (!qr.isDark(row, column)) continue;
@@ -529,32 +609,41 @@ export class DynamicIsland extends Emitter {
       this.setStatus("qrDetectorUnavailable");
       return;
     }
-    this.stopCamera();
-    const requestId = ++this.cameraRequestId;
+    const preparedPromise = this.preparedCameraPromise;
+    const preparedStream = this.preparedCameraStream;
+    if (!preparedPromise && !preparedStream) this.stopCamera();
+    const requestId = preparedPromise || preparedStream ? this.cameraRequestId : ++this.cameraRequestId;
     this.nodes.camera.disabled = true;
     this.setStatus("cameraRequest");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: { ideal: "environment" } }
-      });
+      const stream = preparedStream || await preparedPromise || await requestCameraStream();
+      if (!stream) throw new Error("Camera permission was not granted.");
+      if (preparedPromise === this.preparedCameraPromise || preparedStream === this.preparedCameraStream) {
+        this.preparedCameraPromise = null;
+        this.preparedCameraStream = null;
+      }
       if (requestId !== this.cameraRequestId || this.state !== "qr-scan") {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
       this.stream = stream;
       this.nodes.video.srcObject = this.stream;
+      await waitForVideoReady(this.nodes.video);
       await this.nodes.video.play();
       this.nodes.scanner.classList.add("is-live");
       this.setStatus("qrLooking");
-      this.detector = "BarcodeDetector" in window
-        ? new BarcodeDetector({ formats: ["qr_code"] })
-        : null;
+      try {
+        this.detector = "BarcodeDetector" in window
+          ? new BarcodeDetector({ formats: ["qr_code"] })
+          : null;
+      } catch {
+        this.detector = null;
+      }
       this.detectionPaused = false;
       this.scanFrame = requestAnimationFrame((now) => this.detect(now));
-    } catch {
+    } catch (error) {
       this.stopCamera();
-      this.setStatus("cameraUnavailable");
+      this.setStatus(["NotAllowedError", "SecurityError"].includes(error?.name) ? "cameraDenied" : "cameraUnavailable");
     } finally {
       this.nodes.camera.disabled = false;
     }
@@ -566,9 +655,15 @@ export class DynamicIsland extends Emitter {
     if (now - this.lastDetectionAt > 180 && this.nodes.video.readyState >= 2) {
       this.lastDetectionAt = now;
       try {
-        const value = this.detector
-          ? (await this.detector.detect(this.nodes.video)).find((code) => code.rawValue)?.rawValue
-          : this.detectQrWithFallback();
+        let value = null;
+        if (this.detector) {
+          try {
+            value = (await this.detector.detect(this.nodes.video)).find((code) => code.rawValue)?.rawValue || null;
+          } catch {
+            this.detector = null;
+          }
+        }
+        if (!value && typeof globalThis.jsQR === "function") value = this.detectQrWithFallback();
         if (value) {
           this.detectionPaused = true;
           this.emit("detected", value);
@@ -581,16 +676,51 @@ export class DynamicIsland extends Emitter {
     this.scanFrame = requestAnimationFrame((next) => this.detect(next));
   }
 
-  stopCamera() {
+  prepareCameraFromGesture() {
+    if (!navigator.mediaDevices?.getUserMedia) return Promise.resolve(null);
+    if (this.preparedCameraPromise || this.preparedCameraStream) {
+      return this.preparedCameraPromise || Promise.resolve(this.preparedCameraStream);
+    }
+    this.stopCamera();
+    const requestId = ++this.cameraRequestId;
+    this.setStatus("cameraRequest");
+    const pending = requestCameraStream().then((stream) => {
+      if (requestId !== this.cameraRequestId) {
+        stream.getTracks().forEach((track) => track.stop());
+        return null;
+      }
+      this.preparedCameraStream = stream;
+      return stream;
+    }).catch((error) => {
+      if (requestId === this.cameraRequestId) {
+        this.setStatus(["NotAllowedError", "SecurityError"].includes(error?.name) ? "cameraDenied" : "cameraUnavailable");
+      }
+      return null;
+    });
+    this.preparedCameraPromise = pending;
+    return pending;
+  }
+
+  stopCamera({ preservePrepared = false } = {}) {
     if (this.cameraStartTimer) this.cancelTimeout(this.cameraStartTimer);
     this.cameraStartTimer = 0;
-    this.cameraRequestId += 1;
+    if (!preservePrepared) this.cameraRequestId += 1;
     cancelAnimationFrame(this.scanFrame);
     this.scanFrame = 0;
     this.detector = null;
     this.detectionPaused = false;
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = null;
+    if (!preservePrepared) {
+      const pending = this.preparedCameraPromise;
+      const prepared = this.preparedCameraStream;
+      this.preparedCameraPromise = null;
+      this.preparedCameraStream = null;
+      prepared?.getTracks().forEach((track) => track.stop());
+      pending?.then((stream) => {
+        if (stream && stream !== prepared) stream.getTracks().forEach((track) => track.stop());
+      });
+    }
     if (this.nodes.video) this.nodes.video.srcObject = null;
     this.nodes.scanner?.classList.remove("is-live");
   }
@@ -600,11 +730,34 @@ export class DynamicIsland extends Emitter {
     const width = video.videoWidth;
     const height = video.videoHeight;
     if (!width || !height || !this.scanContext) return null;
-    this.scanCanvas.width = width;
-    this.scanCanvas.height = height;
-    this.scanContext.drawImage(video, 0, 0, width, height);
-    const frame = this.scanContext.getImageData(0, 0, width, height);
-    return globalThis.jsQR(frame.data, width, height, { inversionAttempts: "attemptBoth" })?.data || null;
+    const scale = Math.min(1, 720 / Math.max(width, height));
+    const targetWidth = Math.max(1, Math.round(width * scale));
+    const targetHeight = Math.max(1, Math.round(height * scale));
+    this.scanCanvas.width = targetWidth;
+    this.scanCanvas.height = targetHeight;
+    this.scanContext.drawImage(video, 0, 0, targetWidth, targetHeight);
+    let frame = this.scanContext.getImageData(0, 0, targetWidth, targetHeight);
+    let value = globalThis.jsQR(frame.data, targetWidth, targetHeight, { inversionAttempts: "attemptBoth" })?.data || null;
+    if (value || Math.abs(width - height) < Math.min(width, height) * 0.15) return value;
+
+    const sourceSize = Math.min(width, height);
+    const cropSize = Math.min(640, sourceSize);
+    this.scanCanvas.width = cropSize;
+    this.scanCanvas.height = cropSize;
+    this.scanContext.drawImage(
+      video,
+      Math.max(0, (width - sourceSize) / 2),
+      Math.max(0, (height - sourceSize) / 2),
+      sourceSize,
+      sourceSize,
+      0,
+      0,
+      cropSize,
+      cropSize
+    );
+    frame = this.scanContext.getImageData(0, 0, cropSize, cropSize);
+    value = globalThis.jsQR(frame.data, cropSize, cropSize, { inversionAttempts: "attemptBoth" })?.data || null;
+    return value;
   }
 
   retryScanner() {
@@ -616,10 +769,58 @@ export class DynamicIsland extends Emitter {
   }
 }
 
+async function requestCameraStream() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    });
+    await configureCameraTrack(stream);
+    return stream;
+  } catch (error) {
+    if (["NotAllowedError", "SecurityError"].includes(error?.name)) throw error;
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+    await configureCameraTrack(stream);
+    return stream;
+  }
+}
+
+async function configureCameraTrack(stream) {
+  const track = stream.getVideoTracks?.()[0];
+  const capabilities = track?.getCapabilities?.();
+  if (capabilities?.focusMode?.includes?.("continuous")) {
+    const applying = track.applyConstraints?.({ advanced: [{ focusMode: "continuous" }] });
+    await applying?.catch?.(() => {});
+  }
+}
+
+function waitForVideoReady(video) {
+  if (video.readyState >= 1 && video.videoWidth) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(resolve, 1500);
+    video.addEventListener("loadedmetadata", () => {
+      window.clearTimeout(timer);
+      resolve();
+    }, { once: true });
+  });
+}
+
 function renderAvatar(node, avatar) {
   const normalizedAvatar = normalizeAvatarChoice(avatar);
   const src = animatedFramesForAvatar(normalizedAvatar)[0] || normalizedAvatar;
-  node.innerHTML = `<img src="${escapeHtml(src)}" alt="">`;
+  const image = new Image();
+  image.decoding = "async";
+  image.alt = "";
+  image.src = src;
+  image.onerror = () => {
+    node.textContent = "◎";
+  };
+  node.replaceChildren(image);
+  image.decode?.().catch(() => {});
 }
 
 function escapeHtml(text) {

@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.41";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.41";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.41";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.42";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.42";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.42";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 
@@ -24,6 +24,10 @@ export class ProximityEngine {
     return this.acoustic.requestMicrophonePermission(constraints);
   }
 
+  async prepareAudioOutput() {
+    return this.acoustic.prepareAudioOutput();
+  }
+
   async requestMotionPermission() {
     return this.motion.requestPermission();
   }
@@ -44,8 +48,8 @@ export class ProximityEngine {
     this.motion.stopCapture();
   }
 
-  stopAcousticCapture() {
-    this.acoustic.stop();
+  stopAcousticCapture(options) {
+    this.acoustic.stopCapture?.(options) || this.acoustic.stop();
   }
 
   async emitAcousticChirp(options) {

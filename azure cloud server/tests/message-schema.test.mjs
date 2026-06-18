@@ -32,3 +32,25 @@ test("rtc:signal SDP preserves line boundaries and avoids truncation", () => {
   assert.match(routed.signal.sdp, /\r\na=x-webdrop-test-699:0123456789\r\n/);
   assert.ok(routed.signal.sdp.length >= sdp.length);
 });
+
+test("proximity sessions and peerless QR do not require a preselected target", () => {
+  const joined = validateRoutedMessage({
+    type: "proximity:session:join",
+    payload: { clientNonce: "nonce-a" }
+  });
+  assert.equal(joined.targetId, null);
+  assert.equal(joined.payload.clientNonce, "nonce-a");
+
+  const qrIssue = validateRoutedMessage({
+    type: "proximity:qr:issue",
+    payload: {}
+  });
+  assert.equal(qrIssue.targetId, null);
+
+  const qrVerify = validateRoutedMessage({
+    type: "proximity:qr:verify",
+    payload: { token: "abc123" }
+  });
+  assert.equal(qrVerify.targetId, null);
+  assert.equal(qrVerify.payload.token, "abc123");
+});

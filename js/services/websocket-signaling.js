@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.41";
+import { Emitter } from "../utils/emitter.js?v=1.0.42";
 
 export class WebSocketSignalingAdapter extends Emitter {
   constructor({
@@ -156,6 +156,18 @@ export class WebSocketSignalingAdapter extends Emitter {
     return this.send({ type: "proximity:ready", targetId, pairingId });
   }
 
+  async joinProximitySession(payload = {}) {
+    return this.send({ type: "proximity:session:join", payload });
+  }
+
+  async sendProximitySessionTelemetry(payload = {}) {
+    return this.send({ type: "proximity:session:telemetry", payload });
+  }
+
+  async cancelProximitySession(sessionId) {
+    return this.send({ type: "proximity:session:cancel", payload: { sessionId } });
+  }
+
   async sendRtcSignal(targetId, signal, { pairingId } = {}) {
     return this.send({ type: "rtc:signal", targetId, pairingId, signal });
   }
@@ -178,6 +190,14 @@ export class WebSocketSignalingAdapter extends Emitter {
 
   async verifyQrToken(targetId, pairingId, token) {
     return this.send({ type: "proximity:qr:verify", targetId, pairingId, payload: { token } });
+  }
+
+  async issuePeerlessQrToken() {
+    return this.send({ type: "proximity:qr:issue", payload: {} });
+  }
+
+  async verifyPeerlessQrToken(token) {
+    return this.send({ type: "proximity:qr:verify", payload: { token } });
   }
 
   async sendProximityFallback(targetId, pairingId) {

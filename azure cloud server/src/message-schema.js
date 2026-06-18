@@ -14,6 +14,9 @@ const ROUTED_TYPES = new Set([
   "invite:reject",
   "proximity:ready",
   "proximity:telemetry",
+  "proximity:session:join",
+  "proximity:session:telemetry",
+  "proximity:session:cancel",
   "proximity:qr:issue",
   "proximity:qr:verify",
   "proximity:fallback",
@@ -89,11 +92,14 @@ export function validateRoutedMessage(message) {
     throw new ProtocolError("unsupported_type", `Unsupported message type: ${message.type}`);
   }
   const targetId = cleanString(message.targetId || message.peerId, 120);
-  if (!targetId) throw new ProtocolError("missing_target", "targetId is required.");
+  const targetless = message.type.startsWith("proximity:session:")
+    || (message.type === "proximity:qr:issue" && !targetId)
+    || (message.type === "proximity:qr:verify" && !targetId);
+  if (!targetId && !targetless) throw new ProtocolError("missing_target", "targetId is required.");
   const pairingId = cleanString(message.pairingId, 160);
   const base = {
     type: message.type,
-    targetId,
+    targetId: targetId || null,
     pairingId: pairingId || null
   };
 
@@ -188,6 +194,43 @@ export function validateRoutedMessage(message) {
     return {
       ...base,
       payload: {}
+    };
+  }
+
+  if (message.type === "proximity:session:join") {
+    const payload = objectPayload(message.payload);
+    return {
+      ...base,
+      payload: {
+        clientNonce: cleanString(payload.clientNonce, 120) || cryptoRandomId("nonce")
+      }
+    };
+  }
+
+  if (message.type === "proximity:session:telemetry") {
+    const payload = objectPayload(message.payload);
+    return {
+      ...base,
+      payload: {
+        sessionId: cleanString(payload.sessionId || message.sessionId, 160) || null,
+        clientNonce: cleanString(payload.clientNonce, 120) || null,
+        metrics: validateProximityMetrics(objectPayload(payload.metrics || message.metrics || {})),
+        timing: {
+          bumpAt: safeNumber(payload.timing?.bumpAt ?? payload.bumpAt),
+          completedAt: safeNumber(payload.timing?.completedAt ?? payload.completedAt),
+          startedAt: safeNumber(payload.timing?.startedAt ?? payload.startedAt)
+        }
+      }
+    };
+  }
+
+  if (message.type === "proximity:session:cancel") {
+    const payload = objectPayload(message.payload);
+    return {
+      ...base,
+      payload: {
+        sessionId: cleanString(payload.sessionId || message.sessionId, 160) || null
+      }
     };
   }
 

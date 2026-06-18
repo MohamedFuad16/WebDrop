@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.41";
+import { formatBytes } from "../utils/format.js?v=1.0.42";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -23,15 +23,25 @@ export function createController({
   const proximityStartWaiters = new Map();
   const qrIssuedWaiters = new Map();
   const qrVerifiedWaiters = new Map();
+  let peerlessQrIssuedResolver = null;
+  let peerlessQrVerifiedResolver = null;
   let qrScanResolver = null;
   let qrCancelResolver = null;
   let qrFallbackResolver = null;
+  let failedProximityPeerId = null;
+  let proximitySessionId = null;
+  let proximitySessionJoinedResolver = null;
+  let proximitySessionStartResolver = null;
+  let proximityMatchResolver = null;
+  let proximitySessionFailedResolver = null;
   let pendingTransferPatch = null;
   let transferPatchFrame = 0;
+  let receivePresentationTimer = 0;
   let permissionRequestPromise = null;
   let suppressDisconnectToast = false;
   const storedPermissions = readStoredPermissions();
   proximity.restoreMotionPermission?.(storedPermissions.motion);
+  globalThis.addEventListener?.("pagehide", () => proximity.close?.(), { once: true });
 
   const scheduleTransferPatch = (transferPatch) => {
     pendingTransferPatch = transferPatch;
@@ -87,6 +97,8 @@ export function createController({
     });
     activePeerId = null;
     incomingInvite = null;
+    proximitySessionId = null;
+    clearProximitySessionWaiters();
     view.closeDynamicIsland();
     if (wasOnline) view.toast(view.translate("signalingLost"));
   });
@@ -102,6 +114,12 @@ export function createController({
       qrIssuedWaiters.delete(pairingId);
       qrVerifiedWaiters.get(pairingId)?.(null);
       qrVerifiedWaiters.delete(pairingId);
+    }
+    if (payload.type?.startsWith("proximity:qr:")) {
+      peerlessQrIssuedResolver?.(null);
+      peerlessQrIssuedResolver = null;
+      peerlessQrVerifiedResolver?.(null);
+      peerlessQrVerifiedResolver = null;
     }
     view.toast(view.translate("connectionRejected"));
   });
@@ -237,12 +255,14 @@ export function createController({
 
   signaling.on("proximity:qr:issued", (payload) => {
     if (!payload?.pairingId || !payload?.token) return;
+    peerlessQrIssuedResolver?.(payload);
     qrIssuedWaiters.get(payload.pairingId)?.(payload);
     qrIssuedWaiters.delete(payload.pairingId);
   });
 
   signaling.on("proximity:qr:verified", (payload) => {
     if (!payload?.pairingId) return;
+    peerlessQrVerifiedResolver?.(payload);
     qrVerifiedWaiters.get(payload.pairingId)?.(payload);
     qrVerifiedWaiters.delete(payload.pairingId);
     if (payload.valid) view.markIslandQrSuccess();
@@ -252,6 +272,32 @@ export function createController({
     qrFallbackResolver?.();
     qrFallbackResolver = null;
     view.closeDynamicIsland();
+  });
+
+  signaling.on("proximity:session:joined", (payload = {}) => {
+    proximitySessionId = payload.sessionId || proximitySessionId;
+    proximitySessionJoinedResolver?.(payload);
+    proximitySessionJoinedResolver = null;
+  });
+
+  signaling.on("proximity:session:start", (payload = {}) => {
+    proximitySessionId = payload.sessionId || proximitySessionId;
+    proximitySessionStartResolver?.(payload);
+    proximitySessionStartResolver = null;
+  });
+
+  signaling.on("proximity:match", (payload = {}) => {
+    proximityMatchResolver?.(payload);
+    proximityMatchResolver = null;
+  });
+
+  signaling.on("proximity:session:failed", (payload = {}) => {
+    proximitySessionFailedResolver?.(payload);
+    proximitySessionFailedResolver = null;
+    proximitySessionStartResolver?.(null);
+    proximitySessionStartResolver = null;
+    proximityMatchResolver?.(null);
+    proximityMatchResolver = null;
   });
 
   signaling.on("peerDisconnected", ({ peerId, pairingId } = {}) => {
@@ -278,11 +324,28 @@ export function createController({
     activePeerId = null;
     resolveQrCancellation();
     clearVerificationWaiters();
-    view.closeDynamicIsland();
+    if (!suppressDisconnectToast) view.closeDynamicIsland();
     if (!suppressDisconnectToast) {
       view.toast(view.translate("disconnected"));
     }
+    if (suppressDisconnectToast && failedProximityPeerId) activePeerId = failedProximityPeerId;
     suppressDisconnectToast = false;
+  });
+
+  transfer.on?.("receive-ready", ({ transferId, manifest }) => {
+    globalThis.clearTimeout(receivePresentationTimer);
+    receivePresentationTimer = 0;
+    store.patch({
+      transfer: {
+        transferId,
+        direction: "receive",
+        stage: "preparing",
+        name: manifest?.files?.[0]?.name || "",
+        ratio: 0,
+        transferredBytes: 0,
+        totalBytes: manifest?.totalBytes || 0
+      }
+    });
   });
 
   transfer.on?.("received", (result) => {
@@ -301,24 +364,52 @@ export function createController({
       status: file.openUnavailable ? "saved" : "ready",
       canSave: Boolean(file.blob || file.canSave)
     }));
-    store.update((state) => ({
-      ...state,
-      receivedCount: state.receivedCount + receivedItems.length,
-      receivedItems: [...state.receivedItems, ...receivedItems],
-      transfer: null
-    }));
+    store.update((state) => {
+      const activeReceive = state.transfer?.direction === "receive"
+        && [state.transfer?.transferId, state.transfer?.sessionId].includes(result.sessionId);
+      return {
+        ...state,
+        receivedCount: state.receivedCount + receivedItems.length,
+        receivedItems: [...state.receivedItems, ...receivedItems],
+        transfer: activeReceive ? {
+          ...state.transfer,
+          stage: "complete",
+          ratio: 1,
+          transferredBytes: state.transfer.totalBytes || result.receivedBytes || 0
+        } : state.transfer
+      };
+    });
+    globalThis.clearTimeout(receivePresentationTimer);
+    receivePresentationTimer = globalThis.setTimeout(() => {
+      receivePresentationTimer = 0;
+      const current = store.getState().transfer;
+      if (current?.direction === "receive" && [current.transferId, current.sessionId].includes(result.sessionId)) {
+        store.patch({ transfer: null });
+      }
+    }, 1400);
   });
 
   transfer.on?.("receive-progress", (progress) => {
-    scheduleTransferPatch({ ...progress, direction: "receive" });
+    const current = store.getState().transfer;
+    scheduleTransferPatch({
+      ...current,
+      ...progress,
+      transferId: progress.transferId || current?.transferId,
+      name: current?.name || progress.name || "",
+      direction: "receive"
+    });
   });
 
   transfer.on?.("failed", () => {
+    globalThis.clearTimeout(receivePresentationTimer);
+    receivePresentationTimer = 0;
     cancelPendingTransferPatch();
     store.patch({ transfer: null });
   });
 
   transfer.on?.("canceled", () => {
+    globalThis.clearTimeout(receivePresentationTimer);
+    receivePresentationTimer = 0;
     cancelPendingTransferPatch();
     store.patch({ transfer: null });
   });
@@ -425,15 +516,17 @@ export function createController({
       view.toast(view.translate("alreadyConnected", { name: connectedPeer.name }));
       return;
     }
-    const pendingPeerId = incomingInvite?.method === "proximity" ? incomingInvite.peerId : null;
-    const peer = pendingPeerId ? findPeer(pendingPeerId) : closestAvailablePeer();
-    if (!peer) {
+    const hasCandidate = store.getState().peers.some((peer) => peer.online !== false && !peer.connected);
+    if (!hasCandidate && runtime.productionSignaling) {
       view.toast(view.translate("noNearbyForConnection"));
       return;
     }
-    activePeerId = peer.id;
-    store.patch({ selectedPeerId: peer.id });
-    view.openConnectionMethodSheet(peer);
+    activePeerId = null;
+    activeConnectionMethod = "proximity";
+    const permissionPromise = runtime.realProximityCeremony
+      ? ensureProximityPermissions()
+      : null;
+    beginAnonymousProximityConnection(permissionPromise);
   });
 
   view.on("connection-bump", () => {
@@ -467,35 +560,38 @@ export function createController({
       view.toast(view.translate("alreadyConnected", { name: connectedPeer.name }));
       return;
     }
-    const peerId = incomingInvite?.method === "qr"
-      ? incomingInvite.peerId
-      : closestAvailablePeer()?.id;
-    if (!peerId) {
-      view.toast(view.translate("noNearbyForConnection"));
-      return;
-    }
-    const peer = findPeer(peerId);
+    const peerId = incomingInvite?.method === "qr" ? incomingInvite.peerId : null;
+    const peer = peerId ? findPeer(peerId) : anonymousPeer();
     if (!peer) {
       view.toast(view.translate("connectionRejected"));
       return;
     }
-    activePeerId = peerId;
+    activePeerId = peerId || null;
     activeConnectionMethod = "qr";
-    store.patch({ selectedPeerId: peerId });
+    store.patch({ selectedPeerId: peerId || null });
     view.openQrChoiceSheet(peer, {
-      incoming: incomingInvite?.method === "qr" && incomingInvite.peerId === peerId,
+      incoming: Boolean(peerId && incomingInvite?.method === "qr" && incomingInvite.peerId === peerId),
       suggestedRole: incomingInvite?.qrRole === "show" ? "scan" : "show"
     });
   });
 
   view.on("qr-show", () => beginQrConnection("show"));
-  view.on("qr-scan", () => beginQrConnection("scan"));
+  view.on("qr-scan", () => {
+    view.prepareIslandQrScannerCamera?.();
+    beginQrConnection("scan");
+  });
 
   function beginQrConnection(role) {
     const peerId = incomingInvite?.method === "qr"
       ? incomingInvite.peerId
-      : activePeerId || closestAvailablePeer()?.id;
-    const peer = findPeer(peerId);
+      : activePeerId;
+    const peer = peerId ? findPeer(peerId) : null;
+    if (!peerId) {
+      activeConnectionMethod = "qr";
+      activeQrRole = normalizeQrRole(role) || "show";
+      beginPeerlessQrConnection(activeQrRole);
+      return;
+    }
     if (!peer) {
       view.closeQrChoiceSheet?.();
       view.toast(view.translate("noNearbyForConnection"));
@@ -508,6 +604,76 @@ export function createController({
     beginActiveConnection();
   }
 
+  async function beginPeerlessQrConnection(role) {
+    const initialState = store.getState();
+    if (initialState.mode === "verifying" || initialState.mode === "disconnecting") return;
+    failedProximityPeerId = null;
+    activePeerId = null;
+    activeConnectionMethod = "qr";
+    activeQrRole = normalizeQrRole(role) || "show";
+    clearQrTransientWaiters();
+    store.patch({
+      mode: "verifying",
+      selectedPeerId: null,
+      pendingInviteId: null,
+      incomingInvite: null,
+      pairingId: null
+    });
+    await view.closePeerSheet();
+    await view.closeConnectionMethodSheet?.();
+    await view.closeQrChoiceSheet?.();
+    if (store.getState().mode !== "verifying") return;
+
+    const result = await runPeerlessQrPairing(activeQrRole);
+    if (store.getState().mode !== "verifying") return;
+    if (!result?.passed || !result.peerId || !result.pairingId) {
+      view.closeDynamicIsland();
+      store.patch({ mode: "lobby", selectedPeerId: null, pendingInviteId: null, incomingInvite: null, pairingId: null });
+      view.toast(view.translate(result?.reason === "scan-cancelled" ? "qrCancelled" : "qrInvalid"));
+      return;
+    }
+
+    const peer = normalizePeer(result.peer || { id: result.peerId, name: view.translate("anonymousNearbyPeer") });
+    activePeerId = peer.id;
+    store.patch({
+      pairingId: result.pairingId,
+      pendingInviteId: peer.id,
+      peers: upsertPeer(store.getState().peers, peer)
+    });
+    let path;
+    try {
+      path = runtime.realTransfer
+        ? await connectProductionTransport(peer.id, { initiator: store.getState().self.id < peer.id })
+        : await transport.preflight(peer.id);
+    } catch (error) {
+      console.warn("WebDrop QR transport failed.", {
+        message: error?.message || String(error),
+        peerId: peer.id,
+        pairingId: result.pairingId
+      });
+      await resetFailedVerification(peer.id);
+      return;
+    }
+    const islandRetracted = await view.finishIslandConnectionTransition();
+    if (!islandRetracted || store.getState().mode !== "verifying") return;
+    store.patch({
+      mode: "connected",
+      connectedPeerId: peer.id,
+      selectedPeerId: peer.id,
+      pendingInviteId: null,
+      incomingInvite: null,
+      path,
+      receivedCount: runtime.realTransfer ? 0 : 1,
+      receivedItems: runtime.realTransfer ? [] : demoPdfItems(),
+      peers: store.getState().peers.map((candidate) =>
+        candidate.id === peer.id ? { ...candidate, stage: "near", connected: true } : candidate
+      )
+    });
+    view.pulseConnectionHaptic();
+    activeConnectionMethod = "proximity";
+    activeQrRole = null;
+  }
+
   view.on("connect-peer", () => {
     const permissionPromise = activeConnectionMethod === "proximity" && runtime.realProximityCeremony
       ? ensureProximityPermissions()
@@ -515,8 +681,143 @@ export function createController({
     beginActiveConnection(permissionPromise);
   });
 
+  async function beginAnonymousProximityConnection(permissionPromise = null) {
+    const initialState = store.getState();
+    if (initialState.mode === "verifying" || initialState.mode === "disconnecting") return;
+    if (initialState.connectedPeerId) {
+      const connectedPeer = findPeer(initialState.connectedPeerId);
+      view.toast(view.translate("alreadyConnected", { name: connectedPeer?.name || "peer" }));
+      return;
+    }
+    failedProximityPeerId = null;
+    proximitySessionId = null;
+    clearProximitySessionWaiters();
+    store.patch({
+      mode: "verifying",
+      selectedPeerId: null,
+      pendingInviteId: null,
+      incomingInvite: null,
+      pairingId: null
+    });
+    await view.closePeerSheet();
+    await view.closeConnectionMethodSheet?.();
+    await view.closeQrChoiceSheet?.();
+    if (store.getState().mode !== "verifying") return;
+    view.showIslandAnonymousConnectionProgress({ self: initialState.self });
+    view.toast(view.translate("findingNearbyPeer"));
+
+    const clientNonce = crypto.randomUUID?.() || `nonce-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const joined = waitForProximitySessionJoined(10000);
+    await signaling.joinProximitySession?.({ clientNonce });
+    const joinedPayload = await joined;
+    const sessionId = joinedPayload?.sessionId;
+    if (!sessionId || !isCurrentAnonymousVerification()) {
+      await failAnonymousVerification({ score: 0, errors: [view.translate("proximityErrorSync")] });
+      return;
+    }
+    proximitySessionId = sessionId;
+    const startPayload = await waitForProximitySessionStart(sessionId, 30000);
+    if (!startPayload || !isCurrentProximitySession(sessionId)) {
+      await failAnonymousVerification({ score: 0, errors: [view.translate("proximityErrorSync")] });
+      return;
+    }
+
+    let result;
+    try {
+      result = runtime.realProximityCeremony
+        ? await runRealProximitySessionCeremony(startPayload, permissionPromise)
+        : {
+          passed: true,
+          score: 100,
+          metrics: {
+            peerId: "anonymous-session",
+            method: "mock-physical-session",
+            acoustic: true,
+            soundCorrelation: 1,
+            motionCorrelation: 1,
+            bump: true,
+            tilt: true,
+            lowRttHint: true
+          },
+          evidence: { motion: { bumpAt: Date.now(), bump: true, tilted: true } },
+          reason: "mock-physical-session"
+        };
+    } catch {
+      await failAnonymousVerification({ score: 0, errors: [view.translate("connectionRejected")] });
+      return;
+    }
+    if (!isCurrentProximitySession(sessionId)) return;
+    const match = waitForProximityMatch(sessionId, 30000);
+    await signaling.sendProximitySessionTelemetry?.({
+      sessionId,
+      clientNonce,
+      metrics: result.metrics,
+      timing: {
+        startedAt: startPayload.startAt,
+        bumpAt: result.evidence?.motion?.bumpAt || Date.now(),
+        completedAt: Date.now()
+      }
+    });
+    const matchPayload = await match;
+    if (!matchPayload?.peerId || !matchPayload?.pairingId || !isCurrentProximitySession(sessionId)) {
+      await failAnonymousVerification({
+        score: result?.score || 0,
+        errors: proximityFailureMessages(result, { analysis: { score: (result?.score || 0) / 100 } })
+      });
+      return;
+    }
+
+    const peer = normalizePeer(matchPayload.peer || { id: matchPayload.peerId, name: view.translate("anonymousNearbyPeer") });
+    activePeerId = peer.id;
+    store.patch({
+      pairingId: matchPayload.pairingId,
+      pendingInviteId: peer.id,
+      peers: upsertPeer(store.getState().peers, peer)
+    });
+    view.showIslandConnectionProgress({
+      self: store.getState().self,
+      peer,
+      ceremony: verifiedCeremonySnapshot(result)
+    });
+    let path;
+    try {
+      path = runtime.realTransfer
+        ? await connectProductionTransport(peer.id, { initiator: store.getState().self.id < peer.id })
+        : await transport.preflight(peer.id);
+    } catch (error) {
+      console.warn("WebDrop matched transport failed.", {
+        message: error?.message || String(error),
+        peerId: peer.id,
+        pairingId: matchPayload.pairingId
+      });
+      await resetFailedVerification(peer.id);
+      return;
+    }
+    const islandRetracted = await view.finishIslandConnectionTransition();
+    if (!islandRetracted || !isCurrentProximitySession(sessionId)) return;
+    store.patch({
+      mode: "connected",
+      connectedPeerId: peer.id,
+      selectedPeerId: peer.id,
+      pendingInviteId: null,
+      incomingInvite: null,
+      path,
+      receivedCount: runtime.realTransfer ? 0 : 1,
+      receivedItems: runtime.realTransfer ? [] : demoPdfItems(),
+      peers: store.getState().peers.map((candidate) =>
+        candidate.id === peer.id ? { ...candidate, stage: "near", connected: true } : candidate
+      )
+    });
+    view.pulseConnectionHaptic();
+    activeConnectionMethod = "proximity";
+    activeQrRole = null;
+    proximitySessionId = null;
+    clearProximitySessionWaiters();
+  }
+
   async function beginActiveConnection(permissionPromise = null) {
     if (!activePeerId) return;
+    failedProximityPeerId = null;
     const initialState = store.getState();
     if (initialState.mode === "verifying") return;
     const currentPeerId = initialState.connectedPeerId;
@@ -597,21 +898,25 @@ export function createController({
           score: result?.score || percentageScore(decision?.analysis?.score),
           errors: proximityFailureMessages(result, decision)
         });
+        failedProximityPeerId = peerId;
       } else {
         view.closeDynamicIsland();
+        failedProximityPeerId = null;
       }
       if (runtime.productionSignaling && pairingId) {
         suppressDisconnectToast = true;
         await signaling.disconnectPeer?.(peerId, pairingId);
       }
-      store.patch({ mode: "lobby", pendingInviteId: null, incomingInvite: null, pairingId: null });
+      store.patch({
+        mode: "lobby",
+        selectedPeerId: !verifiedByQr ? peerId : null,
+        pendingInviteId: null,
+        incomingInvite: null,
+        pairingId: null
+      });
       view.toast(view.translate(verifiedByQr ? "qrInvalid" : "proximityScoreFailed", {
         score: Math.round(result?.score || percentageScore(decision?.analysis?.score))
       }));
-      if (!verifiedByQr) {
-        activeConnectionMethod = "qr";
-        view.openQrChoiceSheet(peer, { suggestedRole: "show" });
-      }
       return;
     }
     let path;
@@ -646,6 +951,7 @@ export function createController({
     view.pulseConnectionHaptic();
     activeConnectionMethod = "proximity";
     activeQrRole = null;
+    failedProximityPeerId = null;
   }
 
   view.on("choose-files", () => view.openFilePicker());
@@ -703,13 +1009,17 @@ export function createController({
     } catch {
       if (!isActiveConnection(connectedPeerId, pairingId)) return;
       cancelPendingTransferPatch();
-      store.patch({ transfer: null });
+      if (store.getState().transfer?.direction === "send") store.patch({ transfer: null });
       view.toast(view.translate("transferFailed"));
       return;
     }
     if (!isActiveConnection(connectedPeerId, pairingId)) return;
     if (runtime.realTransfer) {
-      store.patch({ transfer: null, files: [] });
+      const currentTransfer = store.getState().transfer;
+      store.patch({
+        transfer: currentTransfer?.direction === "send" ? null : currentTransfer,
+        files: []
+      });
       view.closeActionSheets();
       view.toast(view.translate("transferComplete"));
       return;
@@ -828,6 +1138,9 @@ export function createController({
   view.on("island-cancel", async () => {
     const current = store.getState();
     resolveQrCancellation();
+    clearProximitySessionWaiters();
+    if (proximitySessionId) await signaling.cancelProximitySession?.(proximitySessionId);
+    proximitySessionId = null;
     view.closeDynamicIsland();
     if (current.pendingInviteId && current.pairingId) {
       await signaling.disconnectPeer?.(current.pendingInviteId, current.pairingId);
@@ -840,11 +1153,25 @@ export function createController({
       pairingId: null
     });
     activePeerId = null;
+    activeQrRole = null;
     view.toast(view.translate("qrCancelled"));
   });
 
   view.on("island-fallback", async () => {
     const current = store.getState();
+    if (current.mode !== "verifying") {
+      const peerId = failedProximityPeerId || activePeerId || current.selectedPeerId || null;
+      const peer = peerId ? findPeer(peerId) : anonymousPeer();
+      failedProximityPeerId = null;
+      activePeerId = peerId || null;
+      activeConnectionMethod = "qr";
+      activeQrRole = null;
+      store.patch({ selectedPeerId: peerId, pendingInviteId: null, incomingInvite: null, pairingId: null });
+      await view.closeDynamicIsland();
+      view.openQrChoiceSheet(peer, { suggestedRole: "show" });
+      view.toast(view.translate("qrInfo"));
+      return;
+    }
     if (current.pendingInviteId && current.pairingId) {
       await signaling.sendProximityFallback?.(current.pendingInviteId, current.pairingId);
     }
@@ -855,13 +1182,21 @@ export function createController({
 
   async function runRealProximityCeremony(peerId, permissionPromise) {
     view.updateIslandCeremony({ phase: "permissions", state: "active" });
-    const { microphone: microphonePermission, motion: motionPermission } = await (
+    const {
+      microphone: microphonePermission,
+      motion: motionPermission,
+      audioOutput: audioOutputPermission
+    } = await (
       permissionPromise || ensureProximityPermissions()
     );
     view.updateIslandCeremony({
       phase: "permissions",
-      state: microphonePermission.granted && motionPermission.granted ? "complete" : "failed",
-      permissions: { microphone: microphonePermission, motion: motionPermission }
+      state: microphonePermission.granted && motionPermission.granted && audioOutputPermission.granted ? "complete" : "failed",
+      permissions: {
+        microphone: microphonePermission,
+        motion: motionPermission,
+        audioOutput: audioOutputPermission
+      }
     });
     proximity.resetMotionCapture();
     if (motionPermission.granted) proximity.startMotionCapture();
@@ -889,7 +1224,7 @@ export function createController({
         });
       }, 120);
       const result = await proximity.runRealCeremony({
-        acoustic: microphonePermission.granted,
+        acoustic: microphonePermission.granted && audioOutputPermission.granted,
         acousticRole: store.getState().self.id < peerId ? "emit" : "detect",
         startAt: start.startAt,
         ceremonyDurationMs: start.durationMs,
@@ -901,6 +1236,7 @@ export function createController({
         metrics: {
           ...result.metrics,
           microphonePermission: microphonePermission.reason || (microphonePermission.granted ? "granted" : "denied"),
+          audioOutputPermission: audioOutputPermission.reason || (audioOutputPermission.granted ? "granted" : "denied"),
           motionPermission: motionPermission.reason || (motionPermission.granted ? "granted" : "denied"),
           peerId
         }
@@ -911,12 +1247,92 @@ export function createController({
     }
   }
 
+  async function runRealProximitySessionCeremony(startPayload, permissionPromise) {
+    view.updateIslandCeremony({ phase: "permissions", state: "active" });
+    const {
+      microphone: microphonePermission,
+      motion: motionPermission,
+      audioOutput: audioOutputPermission
+    } = await (
+      permissionPromise || ensureProximityPermissions()
+    );
+    view.updateIslandCeremony({
+      phase: "permissions",
+      state: microphonePermission.granted && motionPermission.granted && audioOutputPermission.granted ? "complete" : "failed",
+      permissions: {
+        microphone: microphonePermission,
+        motion: motionPermission,
+        audioOutput: audioOutputPermission
+      }
+    });
+    proximity.resetMotionCapture();
+    if (motionPermission.granted) proximity.startMotionCapture();
+    let motionTimer = 0;
+    try {
+      view.updateIslandCeremony({ phase: "sync", state: "active" });
+      motionTimer = globalThis.setInterval(() => {
+        view.updateIslandCeremony({
+          phase: "motion",
+          state: "active",
+          motion: proximity.getSnapshot().motion
+        });
+      }, 120);
+      const result = await proximity.runRealCeremony({
+        acoustic: microphonePermission.granted && audioOutputPermission.granted,
+        acousticRole: Number(startPayload.acousticSlot || 0) % 2 === 0 ? "emit" : "detect",
+        startAt: startPayload.startAt,
+        ceremonyDurationMs: startPayload.durationMs,
+        tokenFresh: Boolean(startPayload.sessionId),
+        onProgress: (progress) => view.updateIslandCeremony(progress)
+      });
+      return {
+        ...result,
+        metrics: {
+          ...result.metrics,
+          microphonePermission: microphonePermission.reason || (microphonePermission.granted ? "granted" : "denied"),
+          audioOutputPermission: audioOutputPermission.reason || (audioOutputPermission.granted ? "granted" : "denied"),
+          motionPermission: motionPermission.reason || (motionPermission.granted ? "granted" : "denied"),
+          sessionId: startPayload.sessionId,
+          acousticSlot: startPayload.acousticSlot
+        }
+      };
+    } finally {
+      globalThis.clearInterval(motionTimer);
+      stopProximitySensors();
+    }
+  }
+
+  async function failAnonymousVerification({ score = 0, errors = [] } = {}) {
+    const sessionId = proximitySessionId;
+    stopProximitySensors();
+    clearProximitySessionWaiters();
+    if (sessionId) await signaling.cancelProximitySession?.(sessionId).catch(() => {});
+    proximitySessionId = null;
+    await view.showIslandVerificationFailure({
+      score,
+      errors: errors.length ? errors : [view.translate("proximityMatchFailed")]
+    });
+    store.patch({
+      mode: "lobby",
+      selectedPeerId: null,
+      pendingInviteId: null,
+      incomingInvite: null,
+      pairingId: null
+    });
+    activePeerId = null;
+    failedProximityPeerId = null;
+    activeConnectionMethod = "proximity";
+    activeQrRole = null;
+    view.toast(view.translate("proximityScoreFailed", { score: Math.round(score) }));
+  }
+
   function ensureProximityPermissions() {
     if (permissionRequestPromise) return permissionRequestPromise;
     // Start both native prompts before yielding so every iPhone browser keeps user activation.
     const motionPromise = ["denied", "unsupported"].includes(storedPermissions.motion)
       ? Promise.resolve({ granted: false, reason: storedPermissions.motion, cached: true })
       : proximity.requestMotionPermission();
+    const audioOutputPromise = proximity.prepareAudioOutput();
     const microphonePromise = storedPermissions.microphone === "denied"
       ? Promise.resolve({ granted: false, reason: "denied", cached: true })
       : proximity.requestMicrophonePermission({
@@ -927,11 +1343,15 @@ export function createController({
         },
         video: false
       });
-    permissionRequestPromise = Promise.all([motionPromise, microphonePromise]).then(([motion, microphone]) => {
+    permissionRequestPromise = Promise.all([motionPromise, audioOutputPromise, microphonePromise]).then(([
+      motion,
+      audioOutput,
+      microphone
+    ]) => {
       storedPermissions.microphone = permissionState(microphone);
       storedPermissions.motion = permissionState(motion);
       writeStoredPermissions(storedPermissions);
-      return { microphone, motion };
+      return { microphone, motion, audioOutput };
     }).finally(() => {
       permissionRequestPromise = null;
     });
@@ -940,7 +1360,7 @@ export function createController({
 
   function stopProximitySensors() {
     proximity.stopMotionCapture();
-    proximity.stopAcousticCapture();
+    proximity.stopAcousticCapture({ releaseStream: false });
   }
 
   async function establishProductionPairing(peerId) {
@@ -1008,6 +1428,58 @@ export function createController({
     }
   }
 
+  async function runPeerlessQrPairing(role) {
+    const peer = anonymousPeer();
+    const state = store.getState();
+    const cancelled = waitForQrCancel();
+    const fallback = waitForQrFallback();
+    try {
+      if (role === "show") {
+        view.showIslandQrPreparing({ self: state.self, peer, role });
+        const issued = waitForPeerlessQrIssued(15000);
+        await signaling.issuePeerlessQrToken?.();
+        const payload = await Promise.race([issued, cancelled, fallback]);
+        if (payload?.fallback) return failedQrResult("qr-fallback-requested");
+        if (!payload?.token) return failedQrResult("issue-failed");
+        view.showIslandQrDisplay({ self: state.self, peer, token: payload.token });
+        const verified = waitForPeerlessQrVerified(payload.pairingId, 120000);
+        const result = await Promise.race([verified, cancelled, fallback]);
+        if (result?.fallback) return failedQrResult("qr-fallback-requested");
+        if (!result?.valid) return failedQrResult("verification-failed");
+        return peerlessQrSuccess(result);
+      }
+
+      view.showIslandQrScanner({ self: state.self, peer });
+      while (store.getState().mode === "verifying") {
+        const token = await Promise.race([waitForQrScan(120000), cancelled, fallback]);
+        if (token?.fallback) return failedQrResult("qr-fallback-requested");
+        if (!token) return failedQrResult("scan-cancelled");
+        const verified = waitForPeerlessQrVerified(null, 15000);
+        await signaling.verifyPeerlessQrToken?.(token);
+        const result = await Promise.race([verified, cancelled, fallback]);
+        if (result?.fallback) return failedQrResult("qr-fallback-requested");
+        if (result?.valid) return peerlessQrSuccess(result);
+        view.retryIslandQrScanner();
+      }
+      return failedQrResult("scan-cancelled");
+    } finally {
+      clearQrTransientWaiters();
+    }
+  }
+
+  function peerlessQrSuccess(result) {
+    return {
+      passed: true,
+      score: 100,
+      pairingId: result.pairingId,
+      peerId: result.peerId,
+      peer: result.peer,
+      metrics: { peerId: result.peerId, method: "peerless-qr", pairingId: result.pairingId },
+      evidence: { qrVerified: true },
+      reason: "qr-verified"
+    };
+  }
+
   function bypassProximityForTransferTest(peerId) {
     return {
       passed: true,
@@ -1032,6 +1504,35 @@ export function createController({
 
   function waitForQrVerified(pairingId, timeoutMs) {
     return waitForMapValue(qrVerifiedWaiters, pairingId, timeoutMs);
+  }
+
+  function waitForPeerlessQrIssued(timeoutMs) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        peerlessQrIssuedResolver = null;
+        resolve(null);
+      }, timeoutMs);
+      peerlessQrIssuedResolver = (payload) => {
+        clearTimeout(timer);
+        peerlessQrIssuedResolver = null;
+        resolve(payload);
+      };
+    });
+  }
+
+  function waitForPeerlessQrVerified(expectedPairingId, timeoutMs) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        peerlessQrVerifiedResolver = null;
+        resolve(null);
+      }, timeoutMs);
+      peerlessQrVerifiedResolver = (payload) => {
+        if (expectedPairingId && payload?.pairingId !== expectedPairingId) return;
+        clearTimeout(timer);
+        peerlessQrVerifiedResolver = null;
+        resolve(payload);
+      };
+    });
   }
 
   function waitForMapValue(map, key, timeoutMs) {
@@ -1078,12 +1579,18 @@ export function createController({
     qrCancelResolver?.();
     qrCancelResolver = null;
     qrFallbackResolver = null;
+    peerlessQrIssuedResolver?.(null);
+    peerlessQrIssuedResolver = null;
+    peerlessQrVerifiedResolver?.(null);
+    peerlessQrVerifiedResolver = null;
   }
 
   function clearQrTransientWaiters() {
     qrScanResolver = null;
     qrCancelResolver = null;
     qrFallbackResolver = null;
+    peerlessQrIssuedResolver = null;
+    peerlessQrVerifiedResolver = null;
   }
 
   function clearVerificationWaiters() {
@@ -1097,6 +1604,59 @@ export function createController({
     qrIssuedWaiters.clear();
     qrVerifiedWaiters.forEach((resolve) => resolve(null));
     qrVerifiedWaiters.clear();
+    clearProximitySessionWaiters();
+  }
+
+  function waitForProximitySessionJoined(timeoutMs) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        proximitySessionJoinedResolver = null;
+        resolve(null);
+      }, timeoutMs);
+      proximitySessionJoinedResolver = (payload) => {
+        clearTimeout(timer);
+        resolve(payload);
+      };
+    });
+  }
+
+  function waitForProximitySessionStart(sessionId, timeoutMs) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        proximitySessionStartResolver = null;
+        resolve(null);
+      }, timeoutMs);
+      proximitySessionStartResolver = (payload) => {
+        if (payload && payload.sessionId !== sessionId) return;
+        clearTimeout(timer);
+        resolve(payload);
+      };
+    });
+  }
+
+  function waitForProximityMatch(sessionId, timeoutMs) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        proximityMatchResolver = null;
+        resolve(null);
+      }, timeoutMs);
+      proximityMatchResolver = (payload) => {
+        if (payload && payload.sessionId !== sessionId) return;
+        clearTimeout(timer);
+        resolve(payload);
+      };
+    });
+  }
+
+  function clearProximitySessionWaiters() {
+    proximitySessionJoinedResolver?.(null);
+    proximitySessionJoinedResolver = null;
+    proximitySessionStartResolver?.(null);
+    proximitySessionStartResolver = null;
+    proximityMatchResolver?.(null);
+    proximityMatchResolver = null;
+    proximitySessionFailedResolver?.(null);
+    proximitySessionFailedResolver = null;
   }
 
   function failedQrResult(reason) {
@@ -1168,6 +1728,24 @@ export function createController({
 
   function findPeer(peerId) {
     return store.getState().peers.find((peer) => peer.id === peerId);
+  }
+
+  function anonymousPeer() {
+    return {
+      id: "anonymous-nearby-peer",
+      name: view.translate("anonymousNearbyPeer"),
+      avatar: store.getState().self.avatar,
+      avatarId: store.getState().self.avatar,
+      deviceFamily: "ios",
+      deviceLabel: "iPhone",
+      online: true
+    };
+  }
+
+  function upsertPeer(peers = [], peer) {
+    const normalized = normalizePeer(peer);
+    const replaced = peers.map((candidate) => candidate.id === normalized.id ? { ...candidate, ...normalized } : candidate);
+    return replaced.some((candidate) => candidate.id === normalized.id) ? replaced : [...replaced, normalized];
   }
 
   function closestAvailablePeer() {
@@ -1252,6 +1830,15 @@ export function createController({
     return state.mode === "verifying" && state.pendingInviteId === peerId;
   }
 
+  function isCurrentAnonymousVerification() {
+    const state = store.getState();
+    return state.mode === "verifying" && !state.pendingInviteId && !state.pairingId;
+  }
+
+  function isCurrentProximitySession(sessionId) {
+    return store.getState().mode === "verifying" && proximitySessionId === sessionId;
+  }
+
   function isActiveConnection(peerId, pairingId) {
     const state = store.getState();
     return state.mode === "connected"
@@ -1264,6 +1851,8 @@ export function createController({
     stopProximitySensors();
     resolveQrCancellation();
     clearVerificationWaiters();
+    if (proximitySessionId) await signaling.cancelProximitySession?.(proximitySessionId).catch(() => {});
+    proximitySessionId = null;
     view.closeDynamicIsland();
     if (runtime.productionSignaling && pairingId) {
       await signaling.disconnectPeer?.(peerId, pairingId).catch(() => {});
@@ -1311,11 +1900,31 @@ export function createController({
     activeQrRole = null;
   }
 
+  function verifiedCeremonySnapshot(result = {}) {
+    const metrics = result.metrics || {};
+    const evidenceMotion = result.evidence?.motion || {};
+    return {
+      score: Number.isFinite(Number(result.score)) ? percentageScore(result.score) : 100,
+      acoustic: {
+        detected: Boolean(metrics.acoustic || metrics.soundCorrelation || metrics.chirpCorrelation)
+      },
+      motion: {
+        ...evidenceMotion,
+        bump: Boolean(evidenceMotion.bump || metrics.bump),
+        tilted: Boolean(evidenceMotion.tilted || metrics.tilt),
+        samples: evidenceMotion.samples || (metrics.bump || metrics.tilt ? 1 : 0)
+      }
+    };
+  }
+
   function proximityFailureMessages(result, decision) {
     const messages = [];
     const metrics = result?.metrics || {};
     if (!["granted", undefined].includes(metrics.microphonePermission)) {
       messages.push(view.translate("proximityErrorMicrophone", { reason: metrics.microphonePermission }));
+    }
+    if (!["running", "granted", undefined].includes(metrics.audioOutputPermission)) {
+      messages.push(view.translate("proximityErrorAudioOutput", { reason: metrics.audioOutputPermission }));
     }
     if (!["granted", undefined].includes(metrics.motionPermission)) {
       messages.push(view.translate("proximityErrorMotion", { reason: metrics.motionPermission }));
@@ -1391,6 +2000,8 @@ function writeStoredPermissions(permissions) {
 function demoPdfItems() {
   return [
     {
+      id: "demo-guide-en",
+      transferId: "demo-guide",
       name: "WebDrop Demo Guide EN.pdf",
       size: "Demo PDF",
       icon: "P",
@@ -1398,6 +2009,8 @@ function demoPdfItems() {
       url: "output/pdf/webdrop-demo-en.pdf"
     },
     {
+      id: "demo-guide-ja",
+      transferId: "demo-guide",
       name: "WebDrop デモガイド JP.pdf",
       size: "デモPDF",
       icon: "P",
@@ -1441,6 +2054,10 @@ function waitForTransportConnection(transport, timeoutMs) {
 }
 
 function triggerBrowserDownload(url, name) {
+  if (isAppleTouchBrowser()) {
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+    if (opened) return;
+  }
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = name || "webdrop-file";
@@ -1451,6 +2068,13 @@ function triggerBrowserDownload(url, name) {
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
+}
+
+function isAppleTouchBrowser() {
+  const platform = navigator.platform || "";
+  const userAgent = navigator.userAgent || "";
+  const appleTouchMac = platform === "MacIntel" && navigator.maxTouchPoints > 1;
+  return /iPad|iPhone|iPod/.test(userAgent) || appleTouchMac;
 }
 
 function revokeReceivedItemUrls(items = []) {

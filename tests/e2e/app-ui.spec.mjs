@@ -70,6 +70,9 @@ test("keeps paused orbit peers centered on their rings without collisions", asyn
 
   const geometry = await page.evaluate(() => {
     const scene = document.querySelector(".orbit-scene").getBoundingClientRect();
+    const sceneStyle = getComputedStyle(document.querySelector(".orbit-scene"));
+    const peerStyle = getComputedStyle(document.querySelector(".peer-node"));
+    const ringStyle = getComputedStyle(document.querySelector(".orbit-ring"));
     const ringRadii = ["one", "two", "three", "four"].map((name) =>
       document.querySelector(`.orbit-ring--${name}`).getBoundingClientRect().width / 2
     );
@@ -103,12 +106,25 @@ test("keeps paused orbit peers centered on their rings without collisions", asyn
     }
     return {
       minimumClearance,
-      radiusErrors: peers.map((peer) => Math.abs(peer.centerDistance - ringRadii[peer.ring]))
+      radiusErrors: peers.map((peer) => Math.abs(peer.centerDistance - ringRadii[peer.ring])),
+      compositor: {
+        sceneContain: sceneStyle.contain,
+        peerWillChange: peerStyle.willChange,
+        ringWillChange: ringStyle.willChange,
+        peerTransform: peerStyle.transform
+      }
     };
   });
 
   expect(geometry.minimumClearance).toBeGreaterThanOrEqual(8);
   expect(Math.max(...geometry.radiusErrors)).toBeLessThanOrEqual(1.5);
+  expect(
+    ["content", "strict"].includes(geometry.compositor.sceneContain)
+      || geometry.compositor.sceneContain.includes("paint")
+  ).toBe(true);
+  expect(geometry.compositor.peerWillChange).toContain("transform");
+  expect(geometry.compositor.ringWillChange).toContain("transform");
+  expect(geometry.compositor.peerTransform).not.toBe("none");
 });
 
 test("imports the StreamSaver adapter in a real browser context", async ({ page, browserName }) => {
@@ -199,6 +215,115 @@ test("requests iPhone motion and microphone permissions from one user gesture", 
   });
 });
 
+test("requests iPhone QR camera permission from the Scan gesture", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "webkit-iphone-15-pro", "iPhone permission behavior is WebKit-specific.");
+
+  await page.goto("/tests/e2e/blank.html?qa=e2e-webkit-qr-permission", { waitUntil: "domcontentloaded" });
+  await page.evaluate(async () => {
+    const calls = [];
+    const stream = {
+      getTracks: () => [{ stop() {} }],
+      getVideoTracks: () => []
+    };
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        async getUserMedia(constraints) {
+          calls.push({ constraints, active: navigator.userActivation?.isActive ?? true });
+          return stream;
+        }
+      }
+    });
+    document.body.innerHTML = `
+      <section data-dynamic-island data-state="closed">
+        <button data-island-camera>Start camera</button>
+        <div data-island-scanner></div>
+        <video data-island-video muted playsinline></video>
+      </section>
+      <button id="scan">Scan QR</button>
+    `;
+    const { DynamicIsland } = await import("/js/ui/dynamic-island.js?v=e2e-webkit-camera-gesture");
+    const island = new DynamicIsland(document, (key) => key);
+    document.querySelector("#scan").addEventListener("click", () => island.prepareCameraFromGesture());
+    globalThis.__webdropCameraCalls = calls;
+  });
+
+  await page.getByRole("button", { name: "Scan QR" }).click();
+  await expect.poll(() => page.evaluate(() => globalThis.__webdropCameraCalls)).toMatchObject([{
+    active: true,
+    constraints: {
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      }
+    }
+  }]);
+});
+
+test("renders a nonblank Siri wave on iPhone WebKit without WebGL", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "webkit-iphone-15-pro", "iPhone rendering is WebKit-specific.");
+
+  await page.goto("/tests/e2e/blank.html?qa=e2e-webkit-siri-wave", { waitUntil: "domcontentloaded" });
+  const result = await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.style.width = "240px";
+    canvas.style.height = "116px";
+    document.body.append(canvas);
+    const { SiriWaveCore } = await import("/js/ui/siri-wave.js?v=e2e-webkit-wave");
+    const wave = new SiriWaveCore(canvas);
+    wave.renderOnce(1.2);
+    const context = wave.canvas.getContext("2d");
+    const pixels = context.getImageData(0, 0, wave.canvas.width, wave.canvas.height).data;
+    let nontransparent = 0;
+    for (let index = 3; index < pixels.length; index += 4) {
+      if (pixels[index] > 0) nontransparent += 1;
+    }
+    return {
+      renderer: wave.canvas.dataset.waveRenderer,
+      width: wave.canvas.width,
+      height: wave.canvas.height,
+      devicePixelRatio: window.devicePixelRatio || 1,
+      nontransparent
+    };
+  });
+
+  expect(result.renderer).toBe("canvas2d");
+  expect(result.width).toBeGreaterThan(100);
+  expect(result.width).toBeLessThanOrEqual(Math.ceil(240 * Math.min(1.5, result.devicePixelRatio)));
+  expect(result.height).toBeGreaterThan(50);
+  expect(result.height).toBeLessThanOrEqual(Math.ceil(116 * Math.min(1.5, result.devicePixelRatio)));
+  expect(result.nontransparent).toBeGreaterThan(500);
+});
+
+test("anchors Dynamic Island expansion to the hardware island safe area", async ({ page }) => {
+  await page.goto("/?qa=e2e-island-safe-area&runtime=mock", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });
+  const geometry = await page.locator("[data-dynamic-island]").evaluate((node) => {
+    document.documentElement.style.setProperty("--safe-top", "59px");
+    node.style.transition = "none";
+    node.querySelector(".webdrop-island__content").style.transition = "none";
+    node.dataset.state = "connecting";
+    getComputedStyle(node).transform;
+    const content = node.querySelector(".webdrop-island__content");
+    const pill = node.querySelector(".webdrop-island__pill");
+    const rect = node.getBoundingClientRect();
+    const pillRect = pill.getBoundingClientRect();
+    return {
+      top: Math.round(rect.top),
+      pillTop: Math.round(pillRect.top),
+      contentPaddingTop: Math.round(parseFloat(getComputedStyle(content).paddingTop)),
+      pillBottomOffset: Math.round(pillRect.bottom - rect.top)
+    };
+  });
+
+  expect(geometry.top).toBeGreaterThanOrEqual(6);
+  expect(geometry.top).toBeLessThanOrEqual(8);
+  expect(geometry.pillTop).toBeGreaterThanOrEqual(12);
+  expect(geometry.contentPaddingTop).toBeGreaterThan(geometry.pillBottomOffset + 24);
+});
+
 test("defers desktop receive chunks in IndexedDB until Save", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium-desktop", "Deferred IndexedDB streaming is validated on desktop Chromium.");
 
@@ -265,6 +390,43 @@ test("defers desktop receive chunks in IndexedDB until Save", async ({ page }, t
     afterSave: { streamCreations: 1, writes: [6, 5], closes: 1 },
     exportedOpenUnavailable: true
   });
+});
+
+test("opens received View in a new tab on iPhone WebKit without leaving WebDrop", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "webkit-iphone-15-pro", "iPhone new-tab receive behavior is WebKit-specific.");
+
+  await page.addInitScript(() => {
+    const calls = [];
+    window.open = (url, target, features) => {
+      calls.push({
+        url: String(url || ""),
+        target: String(target || ""),
+        features: String(features || ""),
+        active: navigator.userActivation?.isActive ?? true
+      });
+      return { closed: false, opener: null };
+    };
+    globalThis.__webdropWindowOpenCalls = calls;
+  });
+  await page.goto("/?qa=e2e-ios-view-received&runtime=mock", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });
+  await page.locator('[data-action="connect-nearby"]').click();
+  await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 7000 });
+  const beforeUrl = page.url();
+  await page.locator('[data-action="open-receive-sheet"]').click();
+  await expect(page.locator("[data-receive-sheet]")).toBeVisible();
+  await expect(page.locator("[data-received-list] [data-action='open-received']")).toHaveText(/View|表示/);
+  await page.locator("[data-received-list] [data-action='open-received']").click();
+
+  await expect.poll(() => page.evaluate(() => globalThis.__webdropWindowOpenCalls.length)).toBe(1);
+  const calls = await page.evaluate(() => globalThis.__webdropWindowOpenCalls);
+  expect(calls[0].url).toContain("output/pdf/webdrop-demo-en.pdf");
+  expect(calls[0].target).toBe("_blank");
+  expect(calls[0].features).toContain("noopener");
+  expect(calls[0].features).toContain("noreferrer");
+  expect(calls[0].active).toBe(true);
+  expect(page.url()).toBe(beforeUrl);
+  await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected");
 });
 
 test("admin readiness probe calls the public readiness endpoint", async ({ page }) => {
@@ -342,7 +504,7 @@ test("shows an honest offline state when production signaling cannot connect", a
   await expect(page.locator(".peer-node")).toHaveCount(0);
 });
 
-test("connects from the global proximity button, selects a file, and shows Dynamic Island transfer progress", async ({ page }) => {
+test("connects from the global proximity button, selects a file, and shows Dynamic Island transfer progress", async ({ page }, testInfo) => {
   const consoleProblems = [];
   let downloadCount = 0;
   page.on("pageerror", (error) => consoleProblems.push(error.message));
@@ -366,19 +528,18 @@ test("connects from the global proximity button, selects a file, and shows Dynam
   await expect(page.locator(".peer-node button")).toHaveCount(0);
   await page.locator('[data-action="connect-qr"]').click();
   await expect(page.locator("[data-qr-sheet]")).toBeVisible();
-  await expect(page.locator("[data-qr-sheet-peer]")).toContainText("Aki iPhone");
+  await expect(page.locator("[data-qr-sheet-peer]")).toContainText(/Nearby iPhone|近くのiPhone/);
   await expect(page.locator("[data-qr-sheet] [data-action='qr-show']")).toBeVisible();
   await expect(page.locator("[data-qr-sheet] [data-action='qr-scan']")).toBeVisible();
   await page.locator("[data-qr-sheet] [data-action='close-qr-sheet']").click();
   await expect(page.locator("[data-qr-sheet]")).toBeHidden();
   await page.locator('[data-action="connect-nearby"]').click();
-  await expect(page.locator("[data-connection-method-sheet]")).toBeVisible();
-  await page.locator("[data-action='connection-bump']").click();
   await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 7000 });
   await page.waitForTimeout(300);
   expect(downloadCount).toBe(0);
   await page.locator('[data-action="open-receive-sheet"]').click();
-  await expect(page.locator("[data-received-list] button").first()).toHaveText(/Save|保存/);
+  const receiveActionPattern = testInfo.project.name.includes("iphone") ? /View|表示/ : /Save|保存/;
+  await expect(page.locator("[data-received-list] button").first()).toHaveText(receiveActionPattern);
   expect(downloadCount).toBe(0);
   await page.locator('[data-receive-sheet] [data-action="close-action-sheet"]').click();
 

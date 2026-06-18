@@ -1,8 +1,8 @@
 export const DEFAULT_CHIRP = Object.freeze({
-  durationMs: 48,
-  startFrequencyHz: 17000,
-  endFrequencyHz: 19500,
-  gain: 0.12
+  durationMs: 72,
+  startFrequencyHz: 15800,
+  endFrequencyHz: 18000,
+  gain: 0.18
 });
 
 export class AcousticProximitySensor {
@@ -42,6 +42,30 @@ export class AcousticProximitySensor {
     }
   }
 
+  async prepareAudioOutput() {
+    try {
+      const context = this.#ensureContext();
+      const resume = context.state !== "running" ? context.resume() : Promise.resolve();
+      if (context.createOscillator && context.createGain) {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        gain.gain.value = 0.00001;
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start(context.currentTime || 0);
+        oscillator.stop((context.currentTime || 0) + 0.02);
+        oscillator.addEventListener?.("ended", () => {
+          oscillator.disconnect();
+          gain.disconnect();
+        }, { once: true });
+      }
+      await resume;
+      return { granted: context.state === "running", reason: context.state };
+    } catch (error) {
+      return { granted: false, reason: "audio-context-error", error };
+    }
+  }
+
   async emitChirp(options = {}) {
     const contextResult = await this.#getContextResult();
     if (!contextResult.context) {
@@ -74,8 +98,9 @@ export class AcousticProximitySensor {
 
   async detectChirp({
     timeoutMs = 2500,
-    threshold = 0.62,
-    pollIntervalMs = 32,
+    threshold = 0.38,
+    pollIntervalMs = 28,
+    requiredBandHits = 2,
     ...chirpOptions
   } = {}) {
     if (!this.stream?.active) {
@@ -97,16 +122,30 @@ export class AcousticProximitySensor {
       ...DEFAULT_CHIRP,
       ...chirpOptions
     });
-    this.analyser.fftSize = nextPowerOfTwo(Math.max(template.length * 2, 2048), 32768);
+    this.analyser.fftSize = nextPowerOfTwo(Math.max(template.length * 2, 4096), 16384);
     const samples = new Float32Array(this.analyser.fftSize);
+    const frequencies = new Float32Array(this.analyser.frequencyBinCount);
     const deadline = performanceNow() + timeoutMs;
-    let best = { correlation: 0, offset: -1 };
+    let best = { correlation: 0, offset: -1, band: null };
+    let bandHits = 0;
 
     while (performanceNow() < deadline) {
-      this.analyser.getFloatTimeDomainData(samples);
-      const candidate = findBestCorrelation(samples, template);
-      if (candidate.correlation > best.correlation) best = candidate;
-      if (best.correlation >= threshold) {
+      this.analyser.getFloatFrequencyData(frequencies);
+      const band = analyzeFrequencyBand(frequencies, {
+        sampleRate: context.sampleRate,
+        fftSize: this.analyser.fftSize,
+        startFrequencyHz: chirpOptions.startFrequencyHz || DEFAULT_CHIRP.startFrequencyHz,
+        endFrequencyHz: chirpOptions.endFrequencyHz || DEFAULT_CHIRP.endFrequencyHz
+      });
+      bandHits = band.detected ? bandHits + 1 : Math.max(0, bandHits - 1);
+      let candidate = { correlation: 0, offset: -1 };
+      if (band.detected) {
+        this.analyser.getFloatTimeDomainData(samples);
+        candidate = findBestCorrelation(samples, template, { step: 8 });
+      }
+      const confidence = Math.max(candidate.correlation, band.confidence);
+      if (confidence > best.correlation) best = { ...candidate, correlation: confidence, band };
+      if (candidate.correlation >= threshold || bandHits >= requiredBandHits) {
         return { detected: true, ...best, threshold };
       }
       await wait(pollIntervalMs);
@@ -115,13 +154,19 @@ export class AcousticProximitySensor {
     return { detected: false, ...best, threshold, reason: "timeout" };
   }
 
-  stop() {
+  stopCapture({ releaseStream = false } = {}) {
     this.source?.disconnect();
     this.analyser?.disconnect();
-    this.stream?.getTracks().forEach((track) => track.stop());
     this.source = null;
     this.analyser = null;
-    this.stream = null;
+    if (releaseStream) {
+      this.stream?.getTracks().forEach((track) => track.stop());
+      this.stream = null;
+    }
+  }
+
+  stop() {
+    this.stopCapture({ releaseStream: true });
   }
 
   async close() {
@@ -133,10 +178,13 @@ export class AcousticProximitySensor {
   }
 
   async #getRunningContext() {
-    if (!this.context || this.context.state === "closed") {
-      this.context = this.audioContextFactory();
-    }
-    if (this.context.state === "suspended") await this.context.resume();
+    const context = this.#ensureContext();
+    if (context.state !== "running") await context.resume();
+    return context;
+  }
+
+  #ensureContext() {
+    if (!this.context || this.context.state === "closed") this.context = this.audioContextFactory();
     return this.context;
   }
 
@@ -205,20 +253,71 @@ export function normalizedCorrelation(samples, template, offset = 0) {
   return denominator ? dot / denominator : 0;
 }
 
-export function findBestCorrelation(samples, template, { step = 1 } = {}) {
+export function findBestCorrelation(samples, template, { step = 8 } = {}) {
   let bestCorrelation = 0;
   let bestOffset = -1;
   const stride = Math.max(1, Math.floor(step));
 
   for (let offset = 0; offset + template.length <= samples.length; offset += stride) {
-    const correlation = normalizedCorrelation(samples, template, offset);
+    const correlation = Math.abs(normalizedCorrelation(samples, template, offset));
     if (correlation > bestCorrelation) {
       bestCorrelation = correlation;
       bestOffset = offset;
     }
   }
 
+  if (bestOffset >= 0 && stride > 1) {
+    const start = Math.max(0, bestOffset - stride);
+    const end = Math.min(samples.length - template.length, bestOffset + stride);
+    for (let offset = start; offset <= end; offset += 1) {
+      const correlation = Math.abs(normalizedCorrelation(samples, template, offset));
+      if (correlation > bestCorrelation) {
+        bestCorrelation = correlation;
+        bestOffset = offset;
+      }
+    }
+  }
   return { correlation: bestCorrelation, offset: bestOffset };
+}
+
+export function analyzeFrequencyBand(frequencies, {
+  sampleRate,
+  fftSize,
+  startFrequencyHz = DEFAULT_CHIRP.startFrequencyHz,
+  endFrequencyHz = DEFAULT_CHIRP.endFrequencyHz
+} = {}) {
+  const hzPerBin = Number(sampleRate) / Number(fftSize);
+  if (!frequencies?.length || !Number.isFinite(hzPerBin) || hzPerBin <= 0) {
+    return { detected: false, peakDb: -Infinity, noiseDb: -Infinity, marginDb: 0, confidence: 0 };
+  }
+  const valuesBetween = (start, end) => {
+    const first = Math.max(0, Math.floor(start / hzPerBin));
+    const last = Math.min(frequencies.length - 1, Math.ceil(end / hzPerBin));
+    const values = [];
+    for (let index = first; index <= last; index += 1) {
+      const value = frequencies[index];
+      if (Number.isFinite(value)) values.push(value);
+    }
+    return values;
+  };
+  const band = valuesBetween(startFrequencyHz, endFrequencyHz);
+  const guard = [
+    ...valuesBetween(Math.max(200, startFrequencyHz - 2600), startFrequencyHz - 500),
+    ...valuesBetween(endFrequencyHz + 500, Math.min(sampleRate / 2, endFrequencyHz + 2600))
+  ];
+  const peakDb = band.length ? Math.max(...band) : -Infinity;
+  const noiseDb = guard.length ? median(guard) : -100;
+  const marginDb = peakDb - noiseDb;
+  const levelConfidence = clamp((peakDb + 72) / 24, 0, 1);
+  const marginConfidence = clamp((marginDb - 3) / 12, 0, 1);
+  const confidence = Math.round(levelConfidence * marginConfidence * 1000) / 1000;
+  return {
+    detected: peakDb >= -66 && marginDb >= 6,
+    peakDb,
+    noiseDb,
+    marginDb,
+    confidence
+  };
 }
 
 function defaultAudioContextFactory() {
@@ -239,6 +338,13 @@ function nextPowerOfTwo(value, maximum) {
 
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+function median(values) {
+  if (!values.length) return -100;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
 function performanceNow() {

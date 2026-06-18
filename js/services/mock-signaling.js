@@ -1,5 +1,5 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.41";
-import { AVATAR_OPTIONS } from "../config/avatar-options.js?v=1.0.41";
+import { Emitter } from "../utils/emitter.js?v=1.0.42";
+import { AVATAR_OPTIONS } from "../config/avatar-options.js?v=1.0.42";
 
 const MOCK_PEERS = [
   { id: "peer-aki", name: "Aki iPhone", avatar: AVATAR_OPTIONS[1], ringIndex: 0, angle: -52, deviceFamily: "ios", deviceLabel: "iPhone 15 Pro", distanceBucket: "immediate", proximityScore: 54, connectedBefore: true, capabilities: { platform: { family: "ios", isIOS: true, isIPhone: true, dynamicIslandCapable: true } } },
@@ -64,6 +64,54 @@ export class MockSignalingAdapter extends Emitter {
     this.emit("telemetry", { peerId, metrics });
   }
 
+  async joinProximitySession({ clientNonce } = {}) {
+    const sessionId = `mock-session-${Date.now()}`;
+    queueMicrotask(() => {
+      this.emit("proximity:session:joined", {
+        sessionId,
+        clientNonce,
+        participantCount: 2,
+        joinUntil: Date.now() + 1200
+      });
+      setTimeout(() => {
+        this.emit("proximity:session:start", {
+          sessionId,
+          startAt: Date.now() + 700,
+          durationMs: 2600,
+          acousticSlot: 0,
+          participantCount: 2
+        });
+      }, 0);
+    });
+    return true;
+  }
+
+  async sendProximitySessionTelemetry({ sessionId, metrics }) {
+    const peer = MOCK_PEERS[0];
+    queueMicrotask(() => {
+      if (metrics?.soundCorrelation || metrics?.acoustic || metrics?.bump) {
+        this.emit("proximity:match", {
+          sessionId,
+          pairingId: `pair-${peer.id}`,
+          peerId: peer.id,
+          peer,
+          score: 0.92
+        });
+        this.emit("peers", MOCK_PEERS.map((candidate) =>
+          candidate.id === peer.id ? { ...candidate, connected: true, stage: "near" } : candidate
+        ));
+      } else {
+        this.emit("proximity:session:failed", { sessionId, reason: "score_too_low" });
+      }
+    });
+    return true;
+  }
+
+  async cancelProximitySession(sessionId) {
+    queueMicrotask(() => this.emit("proximity:session:failed", { sessionId, reason: "cancelled" }));
+    return true;
+  }
+
   async sendRtcSignal(peerId, signal) {
     this.emit("rtcSignal", { peerId, signal });
   }
@@ -83,6 +131,28 @@ export class MockSignalingAdapter extends Emitter {
     queueMicrotask(() => this.emit("proximity:qr:verified", {
       valid: true,
       pairingId,
+      verifiedAt: new Date().toISOString()
+    }));
+    return true;
+  }
+
+  async issuePeerlessQrToken() {
+    const pairingId = `mock-qr-${Date.now()}`;
+    queueMicrotask(() => this.emit("proximity:qr:issued", {
+      token: `mock-webdrop:${pairingId}:peerless`,
+      pairingId,
+      expiresAt: Date.now() + 120000
+    }));
+    return true;
+  }
+
+  async verifyPeerlessQrToken() {
+    const peer = MOCK_PEERS[0];
+    queueMicrotask(() => this.emit("proximity:qr:verified", {
+      valid: true,
+      pairingId: `pair-${peer.id}`,
+      peerId: peer.id,
+      peer,
       verifiedAt: new Date().toISOString()
     }));
     return true;

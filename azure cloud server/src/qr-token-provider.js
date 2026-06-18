@@ -14,7 +14,7 @@ export class QrTokenProvider {
     this.tokens.set(tokenDigest, {
       pairingId,
       issuerId,
-      targetId,
+      targetId: targetId || null,
       expiresAt,
       used: false
     });
@@ -25,12 +25,15 @@ export class QrTokenProvider {
     this.sweep();
     const tokenDigest = digest(token);
     const record = this.tokens.get(tokenDigest);
+    const peerless = record && !record.targetId && record.issuerId !== verifierId;
+    const pairingMatches = peerless
+      ? (!pairingId || !record.pairingId || record.pairingId === pairingId)
+      : (!record?.pairingId || record.pairingId === pairingId);
     const valid = Boolean(
       record &&
       !record.used &&
-      record.pairingId === pairingId &&
-      record.targetId === verifierId &&
-      record.issuerId === targetId &&
+      pairingMatches &&
+      (peerless || (record.targetId === verifierId && record.issuerId === targetId)) &&
       record.expiresAt > Date.now()
     );
     if (valid) {
@@ -39,7 +42,9 @@ export class QrTokenProvider {
     }
     return {
       valid,
-      pairingId,
+      pairingId: record?.pairingId || pairingId || null,
+      issuerId: valid ? record.issuerId : null,
+      verifierId: valid ? verifierId : null,
       verifiedAt: valid ? new Date().toISOString() : null
     };
   }

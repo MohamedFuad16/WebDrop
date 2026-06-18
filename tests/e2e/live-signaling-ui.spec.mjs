@@ -83,12 +83,12 @@ test("live signaling lets two same-browser pages discover only each other and co
     await expect(pageB.locator(".peer-node button")).toHaveCount(0);
 
     await pageA.locator("[data-action='connect-nearby']").click();
-    await expect(pageA.locator("[data-connection-method-sheet]")).toBeVisible();
-    await pageA.locator("[data-action='connection-bump']").click();
-    await expect(pageB.locator("[data-action='connect-nearby']")).toContainText(aliceName, { timeout: 15_000 });
+    await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "connecting", { timeout: 15_000 });
+    await expect(pageA.locator("[data-island-peer-name]")).toContainText("Nearby iPhone");
+    await expect(pageA.locator("[data-island-peer-name]")).not.toContainText(bobName);
     await pageB.locator("[data-action='connect-nearby']").click();
-    await expect(pageB.locator("[data-connection-method-sheet]")).toBeVisible();
-    await pageB.locator("[data-action='connection-bump']").click();
+    await expect(pageB.locator("[data-island-peer-name]")).toContainText("Nearby iPhone");
+    await expect(pageB.locator("[data-island-peer-name]")).not.toContainText(aliceName);
 
     await expect(pageA.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 45_000 });
     await expect(pageB.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 45_000 });
@@ -112,13 +112,16 @@ test("live signaling lets two same-browser pages discover only each other and co
     await expect(pageA.locator("[data-send-swipe-control]")).toHaveClass(/is-ready/);
     await expect(pageB.locator("[data-send-swipe-control]")).toHaveClass(/is-ready/);
 
-    await Promise.all([
-      pageA.locator("[data-send-swipe-thumb]").press("Enter"),
-      pageB.locator("[data-send-swipe-thumb]").press("Enter")
-    ]);
-
-    await expect(pageA.locator("[data-receive-badge]")).toHaveText("1", { timeout: 30_000 });
+    await pageA.locator("[data-send-swipe-thumb]").press("Enter");
+    await expect(pageB.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "transfer", { timeout: 15_000 });
+    await expect(pageB.locator("[data-dynamic-island]")).toHaveAttribute("data-transfer-direction", "receive");
+    await expect(pageB.locator("[data-island-transfer-name]")).toContainText(aliceFileName);
     await expect(pageB.locator("[data-receive-badge]")).toHaveText("1", { timeout: 30_000 });
+    await pageB.locator("[data-send-swipe-thumb]").press("Enter");
+    await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "transfer", { timeout: 15_000 });
+    await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-transfer-direction", "receive");
+    await expect(pageA.locator("[data-island-transfer-name]")).toContainText(bobFileName);
+    await expect(pageA.locator("[data-receive-badge]")).toHaveText("1", { timeout: 30_000 });
     await expect(pageA.locator("[data-send-sheet]")).toBeHidden({ timeout: 30_000 });
     await expect(pageB.locator("[data-send-sheet]")).toBeHidden({ timeout: 30_000 });
     await pageA.locator("[data-action='open-receive-sheet']").click();
@@ -193,14 +196,7 @@ test("manual QR backup connects explicit show and scan roles", async ({ browser,
       localStorage.setItem("webdrop.deviceId", `qr-scan-${runId}`);
       localStorage.setItem("webdrop.deviceName", scanName);
       sessionStorage.clear();
-      globalThis.__webdropQrToken = "";
-      globalThis.BarcodeDetector = class {
-        async detect() {
-          return globalThis.__webdropQrToken
-            ? [{ rawValue: globalThis.__webdropQrToken }]
-            : [];
-        }
-      };
+      delete globalThis.BarcodeDetector;
       const mediaDevices = navigator.mediaDevices;
       Object.defineProperty(mediaDevices, "getUserMedia", {
         configurable: true,
@@ -208,15 +204,17 @@ test("manual QR backup connects explicit show and scan roles", async ({ browser,
           const canvas = document.createElement("canvas");
           canvas.width = 320;
           canvas.height = 240;
+          globalThis.__webdropFakeCamera = canvas;
           const context2d = canvas.getContext("2d");
-          let frame = 0;
-          globalThis.__webdropFakeCameraTimer = setInterval(() => {
-            context2d.fillStyle = frame++ % 2 ? "#111" : "#eee";
-            context2d.fillRect(0, 0, canvas.width, canvas.height);
-          }, 80);
-          context2d.fillStyle = "#eee";
+          context2d.fillStyle = "#fff";
           context2d.fillRect(0, 0, canvas.width, canvas.height);
-          return canvas.captureStream(5);
+          if (globalThis.__webdropQrImage) {
+            context2d.drawImage(globalThis.__webdropQrImage, 50, 10, 220, 220);
+          }
+          globalThis.__webdropCameraRequestedDuringClick = true;
+          const stream = canvas.captureStream(12);
+          globalThis.__webdropFakeCameraTrack = stream.getVideoTracks()[0];
+          return stream;
         }
       });
     }, { runId, scanName });
@@ -229,23 +227,31 @@ test("manual QR backup connects explicit show and scan roles", async ({ browser,
     await pageShow.locator("[data-action='connect-qr']").click();
     await expect(pageShow.locator("[data-qr-sheet]")).toBeVisible();
     await pageShow.locator("[data-action='qr-show']").click();
-    await expect(pageScan.locator("[data-toast]")).toContainText(showName, { timeout: 15_000 });
+    await expect(pageShow.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "qr-display", { timeout: 20_000 });
+    const qrFrame = await pageShow.locator("[data-island-qr-canvas]").evaluate((canvas) => {
+      const context2d = canvas.getContext("2d");
+      const frame = context2d.getImageData(0, 0, canvas.width, canvas.height);
+      return {
+        token: globalThis.jsQR(frame.data, canvas.width, canvas.height)?.data || "",
+        dataUrl: canvas.toDataURL("image/png")
+      };
+    });
+    expect(qrFrame.token).not.toBe("");
+    await pageScan.evaluate(async (dataUrl) => {
+      const image = new Image();
+      await new Promise((resolve, reject) => {
+        image.addEventListener("load", resolve, { once: true });
+        image.addEventListener("error", reject, { once: true });
+        image.src = dataUrl;
+      });
+      globalThis.__webdropQrImage = image;
+    }, qrFrame.dataUrl);
 
     await pageScan.locator("[data-action='connect-qr']").click();
     await expect(pageScan.locator("[data-qr-sheet]")).toBeVisible();
     await pageScan.locator("[data-action='qr-scan']").click();
-    await expect(pageShow.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "qr-display", { timeout: 20_000 });
     await expect(pageScan.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "qr-scan", { timeout: 20_000 });
-
-    const token = await pageShow.locator("[data-island-qr-canvas]").evaluate((canvas) => {
-      const context2d = canvas.getContext("2d");
-      const frame = context2d.getImageData(0, 0, canvas.width, canvas.height);
-      return globalThis.jsQR(frame.data, canvas.width, canvas.height)?.data || "";
-    });
-    expect(token).not.toBe("");
-    await pageScan.evaluate((value) => {
-      globalThis.__webdropQrToken = value;
-    }, token);
+    await expect.poll(() => pageScan.evaluate(() => globalThis.__webdropCameraRequestedDuringClick)).toBe(true);
 
     await expect(pageShow.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 30_000 });
     await expect(pageScan.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 30_000 });
@@ -256,6 +262,7 @@ test("manual QR backup connects explicit show and scan roles", async ({ browser,
 });
 
 test("proximity failure below 55 shows the score error and offers QR backup", async ({ browser, baseURL }, testInfo) => {
+  test.setTimeout(120_000);
   test.skip(testInfo.project.name !== "chromium-desktop", "Physical-score failure is exercised once in Chromium.");
 
   const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -294,18 +301,20 @@ test("proximity failure below 55 shows the score error and offers QR backup", as
     await expect(pageA.locator(".peer-node")).toHaveCount(1, { timeout: 20_000 });
     await expect(pageB.locator(".peer-node")).toHaveCount(1, { timeout: 20_000 });
     await pageA.locator("[data-action='connect-nearby']").click();
-    await expect(pageA.locator("[data-connection-method-sheet]")).toBeVisible();
-    await pageA.locator("[data-action='connection-bump']").click();
-    await expect(pageB.locator("[data-action='connect-nearby']")).toContainText("Android A", { timeout: 15_000 });
+    await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "connecting", { timeout: 15_000 });
+    await expect(pageA.locator("[data-island-peer-name]")).toContainText("Nearby iPhone");
     await pageB.locator("[data-action='connect-nearby']").click();
-    await expect(pageB.locator("[data-connection-method-sheet]")).toBeVisible();
-    await pageB.locator("[data-action='connection-bump']").click();
+    await expect(pageB.locator("[data-island-peer-name]")).toContainText("Nearby iPhone");
 
     await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "verification-failed", { timeout: 30_000 });
     await expect(pageA.locator("[data-island-ceremony-stage]")).toContainText("Score not enough");
     await expect(pageA.locator("[data-island-ceremony-error]")).toContainText("must be at least 55");
+    await expect(pageA.locator("[data-island-fallback]")).toBeVisible();
+    await pageA.waitForTimeout(50_000);
+    await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "verification-failed");
+    await expect(pageA.locator("[data-qr-sheet]")).toBeHidden();
+    await pageA.locator("[data-island-fallback]").click();
     await expect(pageA.locator("[data-qr-sheet]")).toBeVisible({ timeout: 10_000 });
-    await expect(pageB.locator("[data-qr-sheet]")).toBeVisible({ timeout: 10_000 });
   } finally {
     await context.close();
   }

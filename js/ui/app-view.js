@@ -1,8 +1,8 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.41";
-import { formatBytes } from "../utils/format.js?v=1.0.41";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.41";
-import { translate } from "../config/i18n.js?v=1.0.41";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.41";
+import { Emitter } from "../utils/emitter.js?v=1.0.42";
+import { formatBytes } from "../utils/format.js?v=1.0.42";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.42";
+import { translate } from "../config/i18n.js?v=1.0.42";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.42";
 
 const ORBIT_RADII = [".46", ".37", ".28", ".19"];
 const ORBIT_PEER_LIMIT = 12;
@@ -114,9 +114,17 @@ export class AppView extends Emitter {
       this.emit("island-cancel");
     });
     this.dynamicIsland.on("fallback", () => this.emit("island-fallback"));
+    this.preloadCriticalAssets();
     this.bindEvents();
     this.bindSwipeControls();
     store.subscribe((state) => this.render(state));
+  }
+
+  preloadCriticalAssets() {
+    const firstFrames = AVATAR_OPTIONS
+      .flatMap((avatar) => animatedFramesForAvatar(avatar).slice(0, 1))
+      .filter(Boolean);
+    [...new Set(firstFrames)].forEach(preloadImage);
   }
 
   bindEvents() {
@@ -374,7 +382,11 @@ export class AppView extends Emitter {
   }
 
   showIslandConnectionProgress(payload) {
-    this.dynamicIsland.showConnectionProgress(payload.self, payload.peer);
+    this.dynamicIsland.showConnectionProgress(payload.self, payload.peer, payload.ceremony);
+  }
+
+  showIslandAnonymousConnectionProgress(payload) {
+    this.dynamicIsland.showAnonymousConnectionProgress(payload.self);
   }
 
   showIslandQrPreparing(payload) {
@@ -395,6 +407,10 @@ export class AppView extends Emitter {
 
   showIslandQrScanner(payload) {
     this.dynamicIsland.showQrScanner(payload);
+  }
+
+  prepareIslandQrScannerCamera() {
+    return this.dynamicIsland.prepareCameraFromGesture();
   }
 
   markIslandQrSuccess() {
@@ -701,7 +717,7 @@ export class AppView extends Emitter {
           <span>${escapeHtml(receivedFileStatus(this, item))}</span>
         </div>
         ${item.url || item.canSave
-          ? `<button type="button" data-action="open-received" data-transfer-id="${escapeHtml(item.transferId || "")}" data-file-id="${escapeHtml(item.id || "")}">${this.translate("save")}</button>`
+          ? `<button type="button" data-action="open-received" data-transfer-id="${escapeHtml(item.transferId || "")}" data-file-id="${escapeHtml(item.id || "")}">${this.translate(receivedActionKey(item))}</button>`
           : `<button type="button" class="received-file-state" disabled>${this.translate(item.status === "retry" ? "needsRetry" : "saved")}</button>`}
       </div>
     `).join("");
@@ -1132,6 +1148,17 @@ function fileType(file, t) {
   return t("file");
 }
 
+function receivedActionKey(item) {
+  return isAppleTouchBrowser() && (item.url || item.canSave) ? "view" : "save";
+}
+
+function isAppleTouchBrowser() {
+  const platform = navigator.platform || "";
+  const userAgent = navigator.userAgent || "";
+  return /iPhone|iPad|iPod/i.test(userAgent)
+    || (platform === "MacIntel" && Number(navigator.maxTouchPoints) > 1);
+}
+
 function normalizedPeerStage(peer, state) {
   if (state.connectedPeerId === peer.id) return "near";
   if (state.mode === "connected") return "lobby";
@@ -1358,6 +1385,7 @@ function renderAnimatedAvatar(node, avatar, stagger = 0) {
   const avatarKey = `animated:${normalizedAvatar}`;
   if (node.dataset.avatarKey === avatarKey) return;
   const frames = animatedFramesForAvatar(normalizedAvatar);
+  frames.forEach(preloadImage);
   if (!frames.length) {
     node.innerHTML = `<img src="${escapeHtml(normalizedAvatar)}" alt="">`;
     node.dataset.avatarKey = avatarKey;
@@ -1378,8 +1406,17 @@ function renderStaticAvatar(node, avatar) {
   const normalizedAvatar = normalizeAvatarChoice(avatar);
   const avatarKey = `static:${normalizedAvatar}`;
   if (node.dataset.avatarKey === avatarKey) return;
+  preloadImage(animatedFramesForAvatar(normalizedAvatar)[0] || normalizedAvatar);
   node.innerHTML = staticAvatarMarkup(normalizedAvatar);
   node.dataset.avatarKey = avatarKey;
+}
+
+function preloadImage(src) {
+  if (!src) return;
+  const image = new Image();
+  image.decoding = "async";
+  image.src = src;
+  image.decode?.().catch(() => {});
 }
 
 function avatarFrameDelay(index) {

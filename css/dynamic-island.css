@@ -1,13 +1,15 @@
 .webdrop-island {
   --island-width: min(92vw, 560px);
+  --island-top: max(0px, calc(var(--safe-top) - 52px));
+  --island-content-safe: max(0px, calc(var(--safe-top) - var(--island-top)));
   --island-ink: #fff;
   --island-muted: rgba(255, 255, 255, .58);
   position: fixed;
   z-index: 70;
-  top: 0;
+  top: var(--island-top);
   left: 50%;
   width: min(var(--island-width), calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px));
-  height: min(calc(48dvh + var(--safe-top)), calc(356px + var(--safe-top)));
+  height: min(calc(48dvh + var(--island-content-safe)), calc(356px + var(--island-content-safe)));
   max-height: calc(100dvh - var(--safe-bottom) - 8px);
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
@@ -20,6 +22,8 @@
   opacity: 1;
   transform: translateX(-50%) translateY(0) scale(1);
   transform-origin: 50% 0;
+  backface-visibility: hidden;
+  contain: layout paint style;
   transition:
     width 520ms var(--ease-out),
     height 520ms var(--ease-out),
@@ -65,15 +69,16 @@
   width: 106px;
   height: 28px;
   border-radius: 999px;
-  background: #000;
+  background: transparent;
   transform: translateX(-50%);
-  box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .12);
+  box-shadow: none;
+  opacity: 0;
   pointer-events: none;
 }
 
 .webdrop-island__content {
   height: 100%;
-  padding: max(48px, calc(var(--safe-top) + 30px)) 20px 20px;
+  padding: max(48px, calc(var(--island-content-safe) + 30px)) 20px 20px;
   opacity: 1;
   transition: opacity 260ms ease 100ms, transform 420ms var(--ease-out) 80ms;
 }
@@ -273,6 +278,20 @@
   text-align: left;
 }
 
+.webdrop-island__fallback {
+  justify-self: start;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--blue);
+  font-size: 11px;
+  font-weight: 780;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(52, 125, 245, .28);
+}
+
 .webdrop-island__avatar img {
   width: 100%;
   height: 100%;
@@ -299,6 +318,8 @@
     radial-gradient(circle at 45% 52%, rgba(98, 227, 213, .24), transparent 48%);
   filter: blur(18px);
   opacity: .88;
+  transform: translateZ(0);
+  will-change: opacity, transform;
 }
 
 .webdrop-island__wave {
@@ -309,6 +330,8 @@
   opacity: .98;
   mix-blend-mode: screen;
   filter: saturate(1.18) contrast(1.08) drop-shadow(0 16px 28px rgba(56, 126, 246, .18));
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .webdrop-island__transfer {
@@ -323,6 +346,7 @@
   transform: translateY(8px) scale(.96);
   transition: opacity 240ms ease, transform 320ms var(--ease-out);
   pointer-events: none;
+  will-change: opacity, transform;
 }
 
 .webdrop-island[data-state="transfer"] .webdrop-island__wave {
@@ -485,6 +509,7 @@
   background: var(--blue);
   box-shadow: 0 4px 12px rgba(52, 125, 245, .5);
   animation: islandScan 1800ms ease-in-out infinite alternate;
+  will-change: transform;
 }
 
 .webdrop-island[data-state="qr-display"] .webdrop-island__beam {
@@ -549,7 +574,7 @@
   }
 
   .webdrop-island__content {
-    padding: max(46px, calc(var(--safe-top) + 28px)) 14px 14px;
+    padding: max(46px, calc(var(--island-content-safe) + 28px)) 14px 14px;
   }
 
   .webdrop-island__qr {
@@ -580,7 +605,7 @@
   }
 
   .webdrop-island__content {
-    padding-top: max(42px, calc(var(--safe-top) + 24px));
+    padding-top: max(42px, calc(var(--island-content-safe) + 24px));
   }
 
   .webdrop-island__scanner {
