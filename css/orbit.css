@@ -9,7 +9,7 @@
   display: grid;
   place-items: center;
   isolation: isolate;
-  contain: layout paint style;
+  contain: style;
 }
 
 .app-shell[data-mode="connected"] .orbit-scene,
@@ -127,7 +127,7 @@
   transition: opacity var(--motion-control) ease;
   pointer-events: auto;
   backface-visibility: hidden;
-  contain: layout paint style;
+  contain: style;
   will-change: transform, opacity;
 }
 

@@ -159,6 +159,7 @@ test("keeps paused orbit peers centered on their rings without collisions", asyn
       radiusErrors: peers.map((peer) => Math.abs(peer.centerDistance - ringRadii[peer.ring])),
       compositor: {
         sceneContain: sceneStyle.contain,
+        peerContain: peerStyle.contain,
         peerWillChange: peerStyle.willChange,
         ringWillChange: ringStyle.willChange,
         peerTransform: peerStyle.transform
@@ -168,13 +169,39 @@ test("keeps paused orbit peers centered on their rings without collisions", asyn
 
   expect(geometry.minimumClearance).toBeGreaterThanOrEqual(8);
   expect(Math.max(...geometry.radiusErrors)).toBeLessThanOrEqual(1.5);
-  expect(
-    ["content", "strict"].includes(geometry.compositor.sceneContain)
-      || geometry.compositor.sceneContain.includes("paint")
-  ).toBe(true);
+  expect(geometry.compositor.sceneContain).toBe("style");
+  expect(geometry.compositor.peerContain).toBe("style");
   expect(geometry.compositor.peerWillChange).toContain("transform");
   expect(geometry.compositor.ringWillChange).toContain("transform");
   expect(geometry.compositor.peerTransform).not.toBe("none");
+});
+
+test("anchors the connected dock to a tall viewport instead of the orbit scene", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-desktop", "Tall resizable viewport geometry is validated once in Chromium.");
+  await page.setViewportSize({ width: 400, height: 970 });
+  await page.addInitScript(() => {
+    localStorage.setItem("webdrop.motionPaused", "true");
+  });
+  await page.goto("/?qa=e2e-tall-connected-layout&runtime=mock", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });
+  await page.locator('[data-action="connect-nearby"]').click();
+  await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 7000 });
+  await page.waitForTimeout(400);
+
+  const geometry = await page.evaluate(() => {
+    const orbit = document.querySelector(".orbit-scene").getBoundingClientRect();
+    const tray = document.querySelector(".connection-tray").getBoundingClientRect();
+    return {
+      trayBottomGap: Math.round(window.innerHeight - tray.bottom),
+      orbitToTrayGap: Math.round(tray.top - orbit.bottom),
+      trayOffsetParent: document.querySelector(".connection-tray").offsetParent?.className || null
+    };
+  });
+
+  expect(geometry.trayBottomGap).toBeGreaterThanOrEqual(17);
+  expect(geometry.trayBottomGap).toBeLessThanOrEqual(19);
+  expect(geometry.orbitToTrayGap).toBeGreaterThan(100);
+  expect(geometry.trayOffsetParent).toBeNull();
 });
 
 test("imports the StreamSaver adapter in a real browser context", async ({ page, browserName }) => {
