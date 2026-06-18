@@ -4,7 +4,7 @@ attribute vec2 aPos; void main(){ gl_Position=vec4(aPos,0.0,1.0); }
 
 const SIRI_WAVE_FRAGMENT_SHADER_SOURCE = `
 precision highp float;
-uniform vec2 iResolution; uniform float iTime;
+uniform vec2 iResolution; uniform float iTime; uniform float iDirection;
 const float PI = 3.14159265359;
 const float AMPLITUDE   = 0.32;
 const float FREQ        = 1.1;
@@ -50,7 +50,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
     float high = clamp(0.30 + 0.30*sin(t*2.9+4.0)*sin(t*0.71+2.0), 0.0, 1.0);
 
     float res   = clamp(RESOLVED, 0.0, 1.0);
-    float drift = mod(t, 20.0*PI) * SPEED;
+    float drift = mod(t, 20.0*PI) * SPEED * iDirection;
 
     float xN  = p.x / max(aspect, 1.0);
     float env = cos(PI*0.5 * min(abs(0.9*xN), 1.0));
@@ -118,6 +118,7 @@ export class SiriWaveCore {
     this.buffer = null;
     this.frameId = 0;
     this.running = false;
+    this.direction = 1;
     this.startedAt = 0;
     this.resizeObserver = null;
     this.resizeDirty = true;
@@ -145,6 +146,12 @@ export class SiriWaveCore {
       cancelAnimationFrame(this.frameId);
       this.frameId = 0;
     }
+  }
+
+  setDirection(direction) {
+    const nextDirection = direction < 0 ? -1 : 1;
+    if (nextDirection === this.direction) return;
+    this.direction = nextDirection;
   }
 
   destroy() {
@@ -184,6 +191,7 @@ export class SiriWaveCore {
     this.gl.vertexAttribPointer(aPos, 2, this.gl.FLOAT, false, 0, 0);
     this.uniforms.iResolution = this.gl.getUniformLocation(this.program, "iResolution");
     this.uniforms.iTime = this.gl.getUniformLocation(this.program, "iTime");
+    this.uniforms.iDirection = this.gl.getUniformLocation(this.program, "iDirection");
   }
 
   resize() {
@@ -211,6 +219,7 @@ export class SiriWaveCore {
     this.gl.useProgram(this.program);
     this.gl.uniform2f(this.uniforms.iResolution, this.canvas.width, this.canvas.height);
     this.gl.uniform1f(this.uniforms.iTime, time);
+    this.gl.uniform1f(this.uniforms.iDirection, this.direction || 1);
     this.gl.drawArrays(this.gl.TRIANGLES, 0, 3);
     this.frameId = requestAnimationFrame(() => this.frame());
   }

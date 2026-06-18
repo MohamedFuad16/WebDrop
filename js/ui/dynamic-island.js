@@ -110,6 +110,7 @@ export class DynamicIsland extends Emitter {
 
   showTransferProgress(self, peer, transfer = {}) {
     const opening = this.state !== "transfer";
+    this.setTransferDirection(transfer.direction);
     if (opening) {
       this.cancelConnectionMinimum(false);
       this.prepareToOpen(false);
@@ -216,9 +217,19 @@ export class DynamicIsland extends Emitter {
       this.root.setAttribute("aria-hidden", String(concealed));
       this.root.setAttribute("role", state.startsWith("qr-") ? "dialog" : "status");
       this.root.setAttribute("aria-modal", String(state.startsWith("qr-")));
+      if (state !== "transfer") {
+        delete this.root.dataset.transferDirection;
+        this.wave?.setDirection(1);
+      }
       this.root.inert = concealed;
       this.syncWave(state);
     }
+  }
+
+  setTransferDirection(direction) {
+    const normalizedDirection = direction === "receive" ? "receive" : "send";
+    if (this.root) this.root.dataset.transferDirection = normalizedDirection;
+    this.wave?.setDirection(normalizedDirection === "receive" ? -1 : 1);
   }
 
   syncWave(state = this.state) {
@@ -356,14 +367,18 @@ export class DynamicIsland extends Emitter {
   renderTransfer(transfer = {}) {
     const ratio = clampRatio(transfer.ratio);
     const percent = `${Math.round(ratio * 100)}%`;
-    const directionKey = transfer.direction === "receive" ? "receivingStatus" : "sending";
+    const receiving = transfer.direction === "receive";
+    const directionKey = receiving ? "receivingStatus" : "sending";
     const name = transfer.name || "";
     const bytes = Number.isFinite(transfer.transferredBytes) && Number.isFinite(transfer.totalBytes)
       ? `${formatBytes(transfer.transferredBytes)} / ${formatBytes(transfer.totalBytes)}`
       : "";
     if (this.nodes.transferLabel) this.nodes.transferLabel.textContent = this.translate(directionKey);
     if (this.nodes.transferPercent) this.nodes.transferPercent.textContent = percent;
-    if (this.nodes.transferBar) this.nodes.transferBar.style.transform = `scaleX(${ratio})`;
+    if (this.nodes.transferBar) {
+      this.nodes.transferBar.style.transformOrigin = receiving ? "right center" : "left center";
+      this.nodes.transferBar.style.transform = `scaleX(${ratio})`;
+    }
     if (this.nodes.transferName) {
       this.nodes.transferName.textContent = [name, bytes].filter(Boolean).join(" · ");
     }

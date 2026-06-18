@@ -140,6 +140,8 @@ test("live signaling lets two same-browser pages discover only each other and co
     ]);
     expect(downloadA.suggestedFilename()).toBe(bobFileName);
     expect(downloadB.suggestedFilename()).toBe(aliceFileName);
+    expect(pageA.url()).toContain("qa=live-signaling-a");
+    expect(pageB.url()).toContain("qa=live-signaling-b");
     expect(automaticDownloadsA).toBe(1);
     expect(automaticDownloadsB).toBe(1);
 

@@ -31,7 +31,7 @@ function isIgnorableBrowserNoise(text) {
   );
 }
 
-test("loads the WebDrop shell, receive UI, and streaming download copy", async ({ page }) => {
+test("loads the WebDrop shell, receive UI, and deferred storage copy", async ({ page }) => {
   const consoleProblems = [];
   page.on("pageerror", (error) => consoleProblems.push(error.message));
   page.on("console", (message) => {
@@ -45,7 +45,7 @@ test("loads the WebDrop shell, receive UI, and streaming download copy", async (
   await expect(page.locator("#app")).toHaveAttribute("data-mode", "lobby");
   await expect(page.locator(".brand-lockup strong")).toHaveText("WebDrop");
   await expect(page.locator("[data-receive-sheet]")).toBeAttached();
-  await expect(page.locator("[data-i18n='appInfoStackCopy']")).toContainText("streamed browser downloads with Blob fallback");
+  await expect(page.locator("[data-i18n='appInfoStackCopy']")).toContainText("deferred IndexedDB receive storage");
   await expect(page.locator("[data-i18n='appInfoFilesCopy']")).toContainText("saved by the receiving browser");
 
   const layout = await page.evaluate(() => ({

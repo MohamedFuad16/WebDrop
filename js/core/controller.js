@@ -1201,7 +1201,9 @@ function triggerBrowserDownload(url, name) {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = name || "webdrop-file";
+  anchor.target = "_blank";
   anchor.rel = "noopener";
+  anchor.referrerPolicy = "no-referrer";
   anchor.style.display = "none";
   document.body.append(anchor);
   anchor.click();
