@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js";
+import { formatBytes } from "../utils/format.js?v=1.0.38";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 

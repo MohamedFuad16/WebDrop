@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.37";
+const APP_VERSION = "1.0.38";
 const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [
@@ -89,6 +89,23 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(fetch(event.request, { cache: "no-store" }));
     return;
   }
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin === self.location.origin && isCodeAsset(requestUrl.pathname)) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-cache" })
+        .then(async (response) => {
+          if (response.status === 200) {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(event.request, response.clone());
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then((cached) =>
+          cached || caches.match(event.request, { ignoreSearch: true })
+        ))
+    );
+    return;
+  }
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
@@ -103,6 +120,10 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+function isCodeAsset(pathname) {
+  return pathname.endsWith(".js") || pathname.endsWith(".mjs") || pathname.endsWith(".css");
+}
 
 function shouldRuntimeCache(request) {
   if (request.headers.has("range")) return false;
