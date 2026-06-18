@@ -1,7 +1,8 @@
 .webdrop-island {
   --island-width: min(92vw, 560px);
-  --island-top: max(0px, calc(var(--safe-top) - 52px));
-  --island-content-safe: max(0px, calc(var(--safe-top) - var(--island-top)));
+  --island-top: 0px;
+  --island-content-safe: max(0px, var(--safe-top));
+  --island-capsule-y: max(8px, calc(var(--safe-top) / 2 - 18px));
   --island-ink: #fff;
   --island-muted: rgba(255, 255, 255, .58);
   position: fixed;
@@ -40,7 +41,7 @@
   border-color: rgba(255, 255, 255, .08);
   border-radius: 999px;
   opacity: 0;
-  transform: translateX(-50%) translateY(-22px) scale(.92);
+  transform: translateX(-50%) translateY(var(--island-capsule-y)) scale(.92);
   pointer-events: none;
 }
 
@@ -50,7 +51,7 @@
   border-color: rgba(255, 255, 255, .08);
   border-radius: 999px;
   opacity: 0;
-  transform: translateX(-50%) translateY(-18px) scale(.94);
+  transform: translateX(-50%) translateY(var(--island-capsule-y)) scale(.94);
   transition:
     width 580ms var(--ease-out),
     height 580ms var(--ease-out),
@@ -78,7 +79,7 @@
 
 .webdrop-island__content {
   height: 100%;
-  padding: max(48px, calc(var(--island-content-safe) + 30px)) 20px 20px;
+  padding: max(52px, calc(var(--island-content-safe) + 24px)) 20px 20px;
   opacity: 1;
   transition: opacity 260ms ease 100ms, transform 420ms var(--ease-out) 80ms;
 }
@@ -93,7 +94,7 @@
 .webdrop-island__cancel {
   position: absolute;
   z-index: 6;
-  top: 12px;
+  top: max(12px, calc(var(--safe-top) + 8px));
   right: 14px;
   width: 34px;
   height: 34px;
@@ -533,35 +534,6 @@
   opacity: 1;
 }
 
-.app-shell[data-theme="light"] .webdrop-island {
-  --island-ink: #16171a;
-  --island-muted: rgba(22, 23, 26, .58);
-  border-color: rgba(20, 20, 22, .1);
-  background:
-    radial-gradient(circle at 50% 110%, rgba(52, 125, 245, .16), transparent 50%),
-    rgba(255, 255, 255, .96);
-  box-shadow: 0 24px 70px rgba(30, 34, 42, .2), inset 0 1px #fff;
-}
-
-.app-shell[data-theme="light"] .webdrop-island__cancel {
-  color: rgba(20, 20, 22, .64);
-  background: rgba(20, 20, 22, .07);
-}
-
-.app-shell[data-theme="light"] .webdrop-island__flow::before {
-  background:
-    radial-gradient(circle at 50% 48%, rgba(38, 121, 242, .34), transparent 58%),
-    radial-gradient(circle at 45% 52%, rgba(24, 196, 176, .22), transparent 48%);
-  opacity: .96;
-  filter: blur(20px);
-}
-
-.app-shell[data-theme="light"] .webdrop-island__wave {
-  opacity: 1;
-  mix-blend-mode: multiply;
-  filter: saturate(1.28) contrast(1.18) drop-shadow(0 14px 30px rgba(38, 121, 242, .2));
-}
-
 @keyframes islandScan {
   to { transform: translateY(138px); }
 }
@@ -574,7 +546,7 @@
   }
 
   .webdrop-island__content {
-    padding: max(46px, calc(var(--island-content-safe) + 28px)) 14px 14px;
+    padding: max(52px, calc(var(--island-content-safe) + 24px)) 14px 14px;
   }
 
   .webdrop-island__qr {

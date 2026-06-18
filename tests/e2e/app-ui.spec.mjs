@@ -354,24 +354,54 @@ test("anchors Dynamic Island expansion to the hardware island safe area", async 
     document.documentElement.style.setProperty("--safe-top", "59px");
     node.style.transition = "none";
     node.querySelector(".webdrop-island__content").style.transition = "none";
+    node.querySelector(".webdrop-island__cancel").style.transition = "none";
+    const closedTransform = new DOMMatrix(getComputedStyle(node).transform);
     node.dataset.state = "connecting";
     getComputedStyle(node).transform;
     const content = node.querySelector(".webdrop-island__content");
     const pill = node.querySelector(".webdrop-island__pill");
+    const cancel = node.querySelector(".webdrop-island__cancel");
     const rect = node.getBoundingClientRect();
     const pillRect = pill.getBoundingClientRect();
+    const cancelRect = cancel.getBoundingClientRect();
     return {
       top: Math.round(rect.top),
+      closedTranslateY: Math.round(closedTransform.m42),
       pillTop: Math.round(pillRect.top),
       contentPaddingTop: Math.round(parseFloat(getComputedStyle(content).paddingTop)),
-      pillBottomOffset: Math.round(pillRect.bottom - rect.top)
+      pillBottomOffset: Math.round(pillRect.bottom - rect.top),
+      cancelTopOffset: Math.round(cancelRect.top - rect.top),
+      backgroundColor: getComputedStyle(node).backgroundColor,
+      inkColor: getComputedStyle(node).color
     };
   });
 
-  expect(geometry.top).toBeGreaterThanOrEqual(6);
-  expect(geometry.top).toBeLessThanOrEqual(8);
-  expect(geometry.pillTop).toBeGreaterThanOrEqual(12);
+  expect(geometry.top).toBe(0);
+  expect(geometry.closedTranslateY).toBeGreaterThanOrEqual(8);
+  expect(geometry.closedTranslateY).toBeLessThanOrEqual(12);
+  expect(geometry.pillTop).toBeGreaterThanOrEqual(6);
+  expect(geometry.pillTop).toBeLessThanOrEqual(7);
   expect(geometry.contentPaddingTop).toBeGreaterThan(geometry.pillBottomOffset + 24);
+  expect(geometry.cancelTopOffset).toBeGreaterThanOrEqual(67);
+  expect(geometry.backgroundColor).toBe("rgb(5, 5, 5)");
+  expect(geometry.inkColor).toBe("rgb(255, 255, 255)");
+});
+
+test("uses black browser chrome while the Dynamic Island is expanded", async ({ page }) => {
+  await page.goto("/?qa=e2e-island-browser-chrome&runtime=mock", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });
+  const colors = await page.evaluate(async () => {
+    const { DynamicIsland } = await import("/js/ui/dynamic-island.js?v=e2e-browser-chrome");
+    const island = new DynamicIsland(document, (key) => key);
+    island.setState("connecting");
+    const expanded = document.querySelector('meta[name="theme-color"]')?.content;
+    island.setState("closed");
+    const closed = document.querySelector('meta[name="theme-color"]')?.content;
+    return { expanded, closed };
+  });
+
+  expect(colors.expanded).toBe("#000000");
+  expect(colors.closed).toBe("#f3f3f1");
 });
 
 test("defers desktop receive chunks in IndexedDB until Save", async ({ page }, testInfo) => {
@@ -604,7 +634,7 @@ test("connects from the global proximity button, selects a file, and shows Dynam
   await expect(page.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "transfer", { timeout: 2500 });
   await expect.poll(async () =>
     page.locator("[data-island-wave]").evaluate((node) => getComputedStyle(node).mixBlendMode)
-  ).toBe("multiply");
+  ).toBe("screen");
 
   const island = await page.locator("[data-dynamic-island]").evaluate((node) => ({
     percent: node.querySelector("[data-island-transfer-percent]")?.textContent,

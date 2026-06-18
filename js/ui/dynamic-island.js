@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.43";
-import { Emitter } from "../utils/emitter.js?v=1.0.43";
-import { formatBytes } from "../utils/format.js?v=1.0.43";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.43";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.43";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.44";
+import { Emitter } from "../utils/emitter.js?v=1.0.44";
+import { formatBytes } from "../utils/format.js?v=1.0.44";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.44";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.44";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -322,6 +322,16 @@ export class DynamicIsland extends Emitter {
       this.root.inert = concealed;
       this.syncWave(state);
     }
+    this.syncBrowserChrome(state);
+  }
+
+  syncBrowserChrome(state = this.state) {
+    const meta = this.document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    const expanded = !["closed", "closing"].includes(state);
+    const theme = this.root?.closest(".app-shell")?.dataset.theme || "light";
+    const color = expanded ? "#000000" : theme === "dark" ? "#171818" : "#f3f3f1";
+    if (meta.getAttribute("content") !== color) meta.setAttribute("content", color);
   }
 
   setTransferDirection(direction) {

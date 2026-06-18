@@ -13,3 +13,4 @@
 - [x] Run full verification.
 - [x] Keep bidirectional acoustic chirps in fixed synchronized slots.
 - [x] Prove both virtual devices emit and detect the other device's chirp.
+- [x] Make the expanded surface originate from the hardware-island position instead of a light sheet below it.

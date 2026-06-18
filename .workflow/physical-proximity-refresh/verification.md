@@ -6,7 +6,7 @@
 - `npm test` passed: 14 tests.
 - `npm --prefix "azure cloud server" run check` passed.
 - `npm --prefix "azure cloud server" test` passed: 14 tests.
-- `npm run test:e2e` passed: 44 passed, 32 expected project skips.
+- `npm run test:e2e` passed: 48 passed, 32 expected project skips.
 - `npm run verify:full` passed, including audits and `git diff --check`.
 - Bidirectional acoustic regression proves both devices emit and detect the peer chirp over a timing-sensitive virtual audio link.
 - Chromium Web Audio loopback passed: the sender emitted a 72ms chirp at 48kHz and a second `AcousticProximitySensor` detected it at 0.9988 correlation with 48.2dB band margin.
@@ -27,6 +27,8 @@
 - WebKit iPhone received-file `View` calls `window.open(..., "_blank", "noopener,noreferrer")` and leaves the WebDrop app tab connected.
 - Desktop received-file behavior remains download-first.
 - Acoustic replies wait for the shared slot boundary even when detection resolves early, preventing the reply from being hidden under the first device's transmit phase.
+- WebKit iPhone geometry proves the island begins at viewport top, collapses toward the hardware capsule, stays black in light mode, clears a 59px safe area, and restores the normal browser theme color when closed.
+- WebKit iPhone QR-display visual smoke passed at 393x852 with black island/browser chrome, top offset 0, no horizontal overflow, and no console warnings or errors.
 
 ## Notes
 

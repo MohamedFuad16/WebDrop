@@ -1,8 +1,8 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.43";
-import { formatBytes } from "../utils/format.js?v=1.0.43";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.43";
-import { translate } from "../config/i18n.js?v=1.0.43";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.43";
+import { Emitter } from "../utils/emitter.js?v=1.0.44";
+import { formatBytes } from "../utils/format.js?v=1.0.44";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.44";
+import { translate } from "../config/i18n.js?v=1.0.44";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.44";
 
 const ORBIT_RADII = [".46", ".37", ".28", ".19"];
 const ORBIT_PEER_LIMIT = 12;
@@ -370,7 +370,9 @@ export class AppView extends Emitter {
   }
 
   syncThemeColor(theme) {
-    const themeColor = theme === "dark" ? "#171818" : "#f3f3f1";
+    const islandState = this.document.querySelector("[data-dynamic-island]")?.dataset.state;
+    const islandExpanded = islandState && !["closed", "closing"].includes(islandState);
+    const themeColor = islandExpanded ? "#000000" : theme === "dark" ? "#171818" : "#f3f3f1";
     const meta = this.document.querySelector('meta[name="theme-color"]');
     if (meta && meta.getAttribute("content") !== themeColor) {
       meta.setAttribute("content", themeColor);
