@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.45";
+import { formatBytes } from "../utils/format.js?v=1.0.47";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -454,8 +454,8 @@ export function createController({
       item.transferId === transferId && item.id === fileId
     );
     if (existing?.url) {
-      triggerBrowserDownload(existing.url, existing.downloadName);
-      view.toast(view.translate("downloadStarted"));
+      const disposition = triggerBrowserDownload(existing.url, existing.downloadName);
+      view.toast(view.translate(disposition === "opened" ? "openedNewTab" : "downloadStarted"));
       return;
     }
     if (!runtime.realTransfer || !transferId || !fileId) return;
@@ -467,9 +467,9 @@ export function createController({
       }
       if (!exported?.blob) return;
       const url = URL.createObjectURL(exported.blob);
-      triggerBrowserDownload(url, exported.name || existing?.downloadName);
+      const disposition = triggerBrowserDownload(url, exported.name || existing?.downloadName);
       window.setTimeout(() => URL.revokeObjectURL(url), 60000);
-      view.toast(view.translate("downloadStarted"));
+      view.toast(view.translate(disposition === "opened" ? "openedNewTab" : "downloadStarted"));
     } catch {
       view.toast(view.translate("noReceived"));
     }
@@ -2056,7 +2056,7 @@ function waitForTransportConnection(transport, timeoutMs) {
 function triggerBrowserDownload(url, name) {
   if (isAppleTouchBrowser()) {
     const opened = window.open(url, "_blank", "noopener,noreferrer");
-    if (opened) return;
+    if (opened) return "opened";
   }
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -2068,6 +2068,7 @@ function triggerBrowserDownload(url, name) {
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
+  return "download";
 }
 
 function isAppleTouchBrowser() {

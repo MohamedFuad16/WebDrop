@@ -9,7 +9,7 @@ This checkout now contains a first-run static, modular WebDrop v2 app plus archi
 - The earlier `proximity_architecture_monkeytype_v2.html` page was removed during the corrected rebuild.
 - `docs/implementation-checklist.md` is the current production-readiness source of truth.
 - `js/` contains the app state machine, controller, adapters, proximity, transport, transfer, storage client, and UI renderer.
-- `js/storage/storage-client.js` contains the active receive-side storage ladder: deferred IndexedDB chunks with StreamSaver export on Save, iPhone/iPad Blob fallback, direct-stream compatibility fallback, and a 500 MB receive-session cap.
+- `js/storage/storage-client.js` contains the active receive-side storage ladder: deferred IndexedDB chunks with StreamSaver export on Download, iPhone/iPad Blob fallback, direct-stream compatibility fallback, and a 500 MB receive-session cap.
 - `azure cloud server/` contains the deployable signaling backend package for WSS metadata, QR token issuance, TURN credential proxying, and enforcement policy.
 - `graphify-out/` exists, but the current index may be stale or unrelated. Follow `AGENTS.md`: try graph traversal first, record stale results when encountered, then keep any direct reads scoped to the task.
 
@@ -38,7 +38,7 @@ The browser client owns:
 - QR, audio, motion, and manual pairing ceremonies.
 - WebRTC peer setup.
 - Chunked file read and send.
-- Chunked receive into deferred browser storage, explicit Save actions, iPhone/iPad Blob fallback, and receive-sheet status actions.
+- Chunked receive into deferred browser storage, explicit Download or Open actions, iPhone/iPad Blob fallback, and receive-sheet status actions.
 - User-facing state transitions.
 
 ### Signaling lane
@@ -114,11 +114,11 @@ TURN credential requests are separately protected by an ephemeral access token r
 
 ## Storage model
 
-The active receive path writes incoming `RTCDataChannel` chunks into IndexedDB on capable non-iOS browsers. This does not start a download while the file is arriving. After completion, the receive badge and sheet expose an explicit Save action. That user action streams the stored chunks through the self-hosted StreamSaver helper into the browser download pipeline. iPhone and iPad Safari use capped Blob assembly so they also wait for Save instead of presenting an unsolicited download prompt. Direct receive-time streaming remains only a compatibility fallback when IndexedDB is unavailable.
+The active receive path writes incoming `RTCDataChannel` chunks into IndexedDB on capable non-iOS browsers. This does not start a download while the file is arriving. After completion, the receive badge and sheet expose an explicit Download action. That user action streams the stored chunks through the self-hosted StreamSaver helper into the browser download pipeline. iPhone and iPad Safari use capped Blob assembly and expose Open, which previews the file in a separate tab without navigating WebDrop away. Direct receive-time streaming remains only a compatibility fallback when IndexedDB is unavailable.
 
 Each send session is capped at 500 MB and each receive session is capped at 500 MB, so a connected pair can send up to 500 MB in each direction at the same time. The Blob fallback has a lower memory-safety cap and is intended for compatibility, not as the large-file path.
 
-The earlier durable worker writer and OPFS path are no longer used by the app runtime. IndexedDB chunks are cleaned when the page exits, with a 24-hour stale-record prune as recovery. Browser security still means WebDrop cannot read the final Downloads file path after Save.
+The earlier durable worker writer and OPFS path are no longer used by the app runtime. IndexedDB chunks are cleaned when the page exits, with a 24-hour stale-record prune as recovery. Browser security still means WebDrop cannot read the final Downloads file path after Download.
 
 ## Failure policy
 

@@ -110,6 +110,78 @@ test("loads the WebDrop shell, receive UI, and deferred storage copy", async ({ 
   expect(consoleProblems).toEqual([]);
 });
 
+test("renders a branded QR that remains machine-readable", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-desktop", "QR pixel output is validated once in Chromium.");
+  await page.goto("/?qa=e2e-branded-qr&runtime=mock", { waitUntil: "domcontentloaded" });
+  const result = await page.evaluate(async () => {
+    const { DynamicIsland } = await import("/js/ui/dynamic-island.js?v=e2e-branded-qr");
+    const island = new DynamicIsland(document, (key) => key);
+    const token = "webdrop:pair:branded-qr-regression-token";
+    island.drawQr(token);
+    const canvas = document.querySelector("[data-island-qr-canvas]");
+    const context = canvas.getContext("2d");
+    const frame = context.getImageData(0, 0, canvas.width, canvas.height);
+    const colors = new Set();
+    for (let index = 0; index < frame.data.length; index += 4) {
+      const alpha = frame.data[index + 3];
+      if (!alpha) continue;
+      colors.add(`${frame.data[index]},${frame.data[index + 1]},${frame.data[index + 2]}`);
+    }
+    return {
+      decoded: globalThis.jsQR(frame.data, canvas.width, canvas.height)?.data || "",
+      hasBlue: colors.has("23,104,229"),
+      hasTeal: colors.has("8,125,114"),
+      hasViolet: colors.has("96,69,184"),
+      colorCount: colors.size
+    };
+  });
+
+  expect(result.decoded).toBe("webdrop:pair:branded-qr-regression-token");
+  expect(result.hasBlue).toBe(true);
+  expect(result.hasTeal).toBe(true);
+  expect(result.hasViolet).toBe(true);
+  expect(result.colorCount).toBeGreaterThan(5);
+});
+
+test("attaches QR and receive sheets to every mobile viewport edge", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "webkit-iphone-15-pro", "Edge-to-edge sheet geometry is mobile-specific.");
+  await page.goto("/?qa=e2e-edge-to-edge-sheets&runtime=mock", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });
+
+  const measureSheet = (selector) => page.locator(selector).evaluate((sheet) => {
+    const rect = sheet.getBoundingClientRect();
+    return {
+      left: Math.round(rect.left),
+      right: Math.round(window.innerWidth - rect.right),
+      bottom: Math.round(window.innerHeight - rect.bottom),
+      width: Math.round(rect.width),
+      viewport: window.innerWidth,
+      radius: getComputedStyle(sheet).borderRadius
+    };
+  });
+
+  await page.locator('[data-action="connect-qr"]').click();
+  await expect(page.locator("[data-qr-sheet]")).toBeVisible();
+  await page.waitForTimeout(450);
+  const qrSheet = await measureSheet("[data-qr-sheet]");
+  await page.locator("[data-qr-sheet] [data-action='close-qr-sheet']").click();
+
+  await page.locator('[data-action="connect-nearby"]').click();
+  await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 7000 });
+  await page.locator('[data-action="open-receive-sheet"]').click();
+  await expect(page.locator("[data-receive-sheet]")).toBeVisible();
+  await page.waitForTimeout(450);
+  const receiveSheet = await measureSheet("[data-receive-sheet]");
+
+  for (const geometry of [qrSheet, receiveSheet]) {
+    expect(geometry.left).toBe(0);
+    expect(geometry.right).toBe(0);
+    expect(geometry.bottom).toBe(0);
+    expect(geometry.width).toBe(geometry.viewport);
+    expect(geometry.radius).toBe("30px 30px 0px 0px");
+  }
+});
+
 test("keeps paused orbit peers centered on their rings without collisions", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("webdrop.motionPaused", "true");
@@ -431,7 +503,7 @@ test("uses black browser chrome while the Dynamic Island is expanded", async ({ 
   expect(colors.closed).toBe("#f3f3f1");
 });
 
-test("defers desktop receive chunks in IndexedDB until Save", async ({ page }, testInfo) => {
+test("defers desktop receive chunks in IndexedDB until Download", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium-desktop", "Deferred IndexedDB streaming is validated on desktop Chromium.");
 
   await page.goto("/tests/e2e/blank.html?qa=e2e-deferred-storage", { waitUntil: "domcontentloaded" });
@@ -499,7 +571,7 @@ test("defers desktop receive chunks in IndexedDB until Save", async ({ page }, t
   });
 });
 
-test("opens received View in a new tab on iPhone WebKit without leaving WebDrop", async ({ page }, testInfo) => {
+test("opens a received file in a new tab on iPhone WebKit without leaving WebDrop", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "webkit-iphone-15-pro", "iPhone new-tab receive behavior is WebKit-specific.");
 
   await page.addInitScript(() => {
@@ -522,7 +594,7 @@ test("opens received View in a new tab on iPhone WebKit without leaving WebDrop"
   const beforeUrl = page.url();
   await page.locator('[data-action="open-receive-sheet"]').click();
   await expect(page.locator("[data-receive-sheet]")).toBeVisible();
-  await expect(page.locator("[data-received-list] [data-action='open-received']")).toHaveText(/View|表示/);
+  await expect(page.locator("[data-received-list] [data-action='open-received']")).toHaveText(/Open|開く/);
   await page.locator("[data-received-list] [data-action='open-received']").click();
 
   await expect.poll(() => page.evaluate(() => globalThis.__webdropWindowOpenCalls.length)).toBe(1);
@@ -532,6 +604,7 @@ test("opens received View in a new tab on iPhone WebKit without leaving WebDrop"
   expect(calls[0].features).toContain("noopener");
   expect(calls[0].features).toContain("noreferrer");
   expect(calls[0].active).toBe(true);
+  await expect(page.locator("[data-toast]")).toContainText(/Opened in a new tab|新しいタブで開きました/);
   expect(page.url()).toBe(beforeUrl);
   await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected");
 });
@@ -645,7 +718,7 @@ test("connects from the global proximity button, selects a file, and shows Dynam
   await page.waitForTimeout(300);
   expect(downloadCount).toBe(0);
   await page.locator('[data-action="open-receive-sheet"]').click();
-  const receiveActionPattern = testInfo.project.name.includes("iphone") ? /View|表示/ : /Save|保存/;
+  const receiveActionPattern = testInfo.project.name.includes("iphone") ? /Open|開く/ : /Download|ダウンロード/;
   await expect(page.locator("[data-received-list] button").first()).toHaveText(receiveActionPattern);
   expect(downloadCount).toBe(0);
   await page.locator('[data-receive-sheet] [data-action="close-action-sheet"]').click();

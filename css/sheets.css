@@ -40,6 +40,28 @@
     opacity var(--motion-backdrop-out) linear;
 }
 
+@media (max-width: 759px) {
+  .bottom-sheet {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - max(12px, var(--safe-top)));
+    margin: 0;
+    padding:
+      18px
+      max(18px, calc(var(--safe-right) + 14px))
+      calc(20px + var(--safe-bottom))
+      max(18px, calc(var(--safe-left) + 14px));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 30px 30px 0 0;
+    transform: translateY(100%);
+  }
+}
+
 .bottom-sheet::-webkit-scrollbar {
   width: 0;
   height: 0;

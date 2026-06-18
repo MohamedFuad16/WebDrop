@@ -15,3 +15,6 @@
 - [x] Prove both virtual devices emit and detect the other device's chirp.
 - [x] Make the expanded surface originate from the hardware-island position instead of a light sheet below it.
 - [x] Keep fixed connected controls viewport-anchored and remove square avatar shadow clipping.
+- [x] Attach mobile sheets to the full viewport width and bottom edge without seams.
+- [x] Brand the QR matrix while preserving machine-readable output.
+- [x] Replace ambiguous received-file Save/View actions with explicit Open or Download behavior.

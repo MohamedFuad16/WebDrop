@@ -1,8 +1,8 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.45";
-import { formatBytes } from "../utils/format.js?v=1.0.45";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.45";
-import { translate } from "../config/i18n.js?v=1.0.45";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.45";
+import { Emitter } from "../utils/emitter.js?v=1.0.47";
+import { formatBytes } from "../utils/format.js?v=1.0.47";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.47";
+import { translate } from "../config/i18n.js?v=1.0.47";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.47";
 
 const ORBIT_RADII = [".46", ".37", ".28", ".19"];
 const ORBIT_PEER_LIMIT = 12;
@@ -247,6 +247,7 @@ export class AppView extends Emitter {
     };
     const complete = () => {
       if (isControlDisabled()) return;
+      if (control.classList.contains("is-complete")) return;
       allowHapticToggle = true;
       control.classList.add("is-complete");
       text.textContent = this.translate(completeTextKey);
@@ -286,13 +287,21 @@ export class AppView extends Emitter {
       if (!["Enter", " "].includes(event.key)) return;
       if (isControlDisabled()) return;
       event.preventDefault();
+      completeFromKeyboard();
+    });
+    thumb.addEventListener("click", (event) => {
+      if (event.detail !== 0 || isControlDisabled()) return;
+      event.preventDefault();
+      completeFromKeyboard();
+    });
+    const completeFromKeyboard = () => {
       const controlBox = control.getBoundingClientRect();
       const thumbBox = thumb.getBoundingClientRect();
       maxDistance = axis === "x"
         ? Math.max(0, controlBox.width - thumbBox.width - 12)
         : Math.max(0, controlBox.height - thumbBox.height - 12);
       complete();
-    });
+    };
     return reset;
   }
 
@@ -1151,7 +1160,7 @@ function fileType(file, t) {
 }
 
 function receivedActionKey(item) {
-  return isAppleTouchBrowser() && (item.url || item.canSave) ? "view" : "save";
+  return isAppleTouchBrowser() && (item.url || item.canSave) ? "open" : "download";
 }
 
 function isAppleTouchBrowser() {

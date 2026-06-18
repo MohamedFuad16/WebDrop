@@ -21,6 +21,8 @@
   --motion-sheet-out: 240ms;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
   --blue: #347df5;
   --purple: #8a76dc;
   --rose: #ef7b88;

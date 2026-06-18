@@ -81,7 +81,7 @@ Keep these boundaries stable:
 - WebRTC `RTCDataChannel` carries file chunks.
 - TURN is fallback transport, not the default happy path.
 - Relay mode should be capped and disclosed.
-- Receiver storage defers DataChannel chunks in IndexedDB where supported, exports them only after Save, and uses capped Blob assembly on iPhone/iPad.
+- Receiver storage defers DataChannel chunks in IndexedDB where supported, exports them only after Download, and uses capped Blob assembly on iPhone/iPad.
 - Large received files are capped at 500 MB per receive session.
 - QR remains the universal fallback when audio or motion permissions are unavailable.
 
@@ -93,7 +93,7 @@ For future runtime edits, verify:
 - Send/receive controls are absent before connected state.
 - Send/receive controls appear for a selected connected peer.
 - No file bytes are sent through signaling code.
-- Receiving a file must not start a browser download. The receive badge appears first; Save then hands IndexedDB chunks or the Blob fallback to the browser download pipeline.
+- Receiving a file must not start a browser download. The receive badge appears first; Download hands IndexedDB chunks to the browser, while iPhone and iPad use Open to preview the capped Blob in a separate tab.
 - Relay mode applies a clear cap and user-facing explanation.
 
 ## Production handoff reminders

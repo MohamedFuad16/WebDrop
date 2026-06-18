@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.45";
-import { Emitter } from "../utils/emitter.js?v=1.0.45";
-import { formatBytes } from "../utils/format.js?v=1.0.45";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.45";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.45";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.47";
+import { Emitter } from "../utils/emitter.js?v=1.0.47";
+import { formatBytes } from "../utils/format.js?v=1.0.47";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.47";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.47";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -590,15 +590,23 @@ export class DynamicIsland extends Emitter {
     const context = canvas.getContext("2d");
     const count = qr.getModuleCount();
     context.imageSmoothingEnabled = false;
-    const pad = 24;
+    const frame = 9;
+    const pad = 28;
     const size = canvas.width - pad * 2;
     const cell = size / count;
-    context.fillStyle = "#ffffff";
+    const finderColors = ["#1768e5", "#087d72", "#6045b8"];
+    const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, "#65d0a3");
+    gradient.addColorStop(.52, "#347df5");
+    gradient.addColorStop(1, "#9c7bff");
+    context.fillStyle = gradient;
     context.fillRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = "#050505";
+    context.fillStyle = "#ffffff";
+    context.fillRect(frame, frame, canvas.width - frame * 2, canvas.height - frame * 2);
     for (let row = 0; row < count; row += 1) {
       for (let column = 0; column < count; column += 1) {
         if (!qr.isDark(row, column)) continue;
+        context.fillStyle = qrFinderColor(row, column, count, finderColors) || "#071b33";
         context.fillRect(
           Math.floor(pad + column * cell),
           Math.floor(pad + row * cell),
@@ -841,6 +849,13 @@ function escapeHtml(text) {
     '"': "&quot;",
     "'": "&#039;"
   }[character]));
+}
+
+function qrFinderColor(row, column, count, colors) {
+  if (row < 7 && column < 7) return colors[0];
+  if (row < 7 && column >= count - 7) return colors[1];
+  if (row >= count - 7 && column < 7) return colors[2];
+  return "";
 }
 
 function clampRatio(value) {
