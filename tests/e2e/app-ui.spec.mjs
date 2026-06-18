@@ -78,7 +78,7 @@ test("keeps paused orbit peers centered on their rings without collisions", asyn
       y: scene.top + scene.height / 2
     };
     const peers = [...document.querySelectorAll(".peer-node")].map((node) => {
-      const rect = node.querySelector("button").getBoundingClientRect();
+      const rect = node.querySelector(".peer-avatar").getBoundingClientRect();
       const peerCenter = {
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height / 2
@@ -290,7 +290,7 @@ test("shows an honest offline state when production signaling cannot connect", a
   await expect(page.locator(".peer-node")).toHaveCount(0);
 });
 
-test("connects by swipe, selects a file, and shows Dynamic Island transfer progress", async ({ page }) => {
+test("connects from the global proximity button, selects a file, and shows Dynamic Island transfer progress", async ({ page }) => {
   const consoleProblems = [];
   let downloadCount = 0;
   page.on("pageerror", (error) => consoleProblems.push(error.message));
@@ -308,12 +308,16 @@ test("connects by swipe, selects a file, and shows Dynamic Island transfer progr
   });
   await page.goto("/?qa=e2e-transfer-island&runtime=mock", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });
-  await expect(page.locator('[data-action="open-nearby-sheet"]')).toBeVisible({ timeout: 7000 });
+  await expect(page.locator('[data-action="connect-nearby"]')).toBeVisible({ timeout: 7000 });
+  await expect(page.locator('[data-action="connect-qr"]')).toBeVisible({ timeout: 7000 });
   await expect(page.locator(".peer-node").first()).toBeVisible({ timeout: 7000 });
-  await page.locator('[data-action="open-nearby-sheet"]').click();
-  await expect(page.locator('[data-nearby-device-id="peer-aki"]')).toBeVisible();
-  await page.locator('[data-nearby-device-id="peer-aki"] .nearby-connect').click();
-  await page.locator("[data-swipe-thumb]").press("Enter");
+  await expect(page.locator(".peer-node button")).toHaveCount(0);
+  await page.locator('[data-action="connect-qr"]').click();
+  await expect(page.locator("[data-peer-sheet]")).toBeVisible();
+  await expect(page.locator("[data-sheet-peer-name]")).toContainText("Aki iPhone");
+  await page.locator("[data-peer-sheet] [data-action='close-sheet']").click();
+  await expect(page.locator("[data-peer-sheet]")).toBeHidden();
+  await page.locator('[data-action="connect-nearby"]').click();
   await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 7000 });
   await page.waitForTimeout(300);
   expect(downloadCount).toBe(0);

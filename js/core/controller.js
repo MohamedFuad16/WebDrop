@@ -13,6 +13,7 @@ export function createController({
   runtime = {}
 }) {
   let activePeerId = null;
+  let activeConnectionMethod = "proximity";
   let incomingInvite = null;
   const pairingWaiters = new Map();
   const proximityDecisionWaiters = new Map();
@@ -130,10 +131,7 @@ export function createController({
     pairingWaiters.get(peerId)?.({ peerId, pairingId });
     pairingWaiters.delete(peerId);
     if (runtime.realTransfer) transport.enable({ peerId, pairingId });
-    if (!wasVerifying) {
-      view.toast(view.translate("acceptedToast", { name: peer.name }));
-      view.openPeerSheet(peer, { peers: store.getState().peers });
-    }
+    if (!wasVerifying) view.toast(view.translate("acceptedToast", { name: peer.name }));
   });
 
   signaling.on("invite", (payload) => {
@@ -141,6 +139,19 @@ export function createController({
     const peer = store.getState().peers.find((candidate) => candidate.id === peerId) || payload?.from;
     if (!peerId || !peer) return;
     const state = store.getState();
+    const connectionMethod = payload?.payload?.method === "qr" ? "qr" : "proximity";
+    if (state.mode === "verifying" && state.pendingInviteId === peerId && connectionMethod === "proximity") {
+      incomingInvite = {
+        peerId,
+        pairingId: payload.pairingId || null,
+        receivedAt: payload.receivedAt || new Date().toISOString(),
+        from: peer,
+        method: connectionMethod
+      };
+      activeConnectionMethod = connectionMethod;
+      signaling.acceptInvite?.(peerId, payload.pairingId);
+      return;
+    }
     if (state.connectedPeerId || state.mode === "verifying" || state.mode === "disconnecting") {
       signaling.rejectInvite?.(peerId, payload.pairingId);
       view.toast(view.translate("inviteDeclinedBusy", { name: peer.name }));
@@ -150,9 +161,11 @@ export function createController({
       peerId,
       pairingId: payload.pairingId || null,
       receivedAt: payload.receivedAt || new Date().toISOString(),
-      from: peer
+      from: peer,
+      method: connectionMethod
     };
     activePeerId = peerId;
+    activeConnectionMethod = connectionMethod;
     store.patch({
       mode: "lobby",
       selectedPeerId: peerId,
@@ -160,8 +173,16 @@ export function createController({
       incomingInvite,
       pairingId: payload.pairingId || null
     });
-    view.openPeerSheet(peer, { peers: store.getState().peers, direction: "incoming" });
-    view.toast(view.translate("incomingInviteToast", { name: peer.name }));
+    if (connectionMethod === "qr") {
+      view.openPeerSheet(peer, {
+        peers: store.getState().peers,
+        direction: "incoming",
+        method: "qr"
+      });
+      view.toast(view.translate("incomingQrInviteToast", { name: peer.name }));
+    } else {
+      view.toast(view.translate("incomingInviteToast", { name: peer.name }));
+    }
   });
 
   signaling.on("invite:reject", (payload = {}) => {
@@ -287,8 +308,6 @@ export function createController({
   view.on("open-information", () => view.openInformation());
   view.on("back-to-settings", () => view.backToSettings());
   view.on("close-information", () => view.closeInformation());
-  view.on("open-nearby-sheet", () => view.openNearbySheet());
-  view.on("close-nearby-sheet", () => view.closeNearbySheet());
   view.on("toggle-qr-preview", () => view.toggleQrScannerPreview());
   view.on("close-sheet", async () => {
     if (incomingInvite?.peerId) {
@@ -375,7 +394,7 @@ export function createController({
     store.update((state) => ({ ...state, self: { ...state.self, name: clean } }));
   });
 
-  view.on("peer-select", (peerId) => {
+  view.on("connect-nearby", () => {
     const { connectedPeerId, mode } = store.getState();
     if (mode === "verifying" || mode === "disconnecting") {
       view.toast(view.translate(mode === "verifying" ? "verifying" : "disconnecting"));
@@ -383,11 +402,43 @@ export function createController({
     }
     if (connectedPeerId) {
       const connectedPeer = findPeer(connectedPeerId);
-      view.toast(
-        connectedPeerId === peerId
-          ? view.translate("alreadyConnected", { name: connectedPeer.name })
-          : view.translate("disconnectFirst", { name: connectedPeer.name })
-      );
+      view.toast(view.translate("alreadyConnected", { name: connectedPeer.name }));
+      return;
+    }
+    const pendingPeerId = incomingInvite?.method === "proximity" ? incomingInvite.peerId : null;
+    const peer = pendingPeerId ? findPeer(pendingPeerId) : closestAvailablePeer();
+    if (!peer) {
+      view.toast(view.translate("noNearbyForConnection"));
+      return;
+    }
+    activePeerId = peer.id;
+    activeConnectionMethod = "proximity";
+    store.patch({ selectedPeerId: peer.id });
+    const permissionPromises = runtime.realProximityCeremony
+      ? {
+        microphone: proximity.requestMicrophonePermission(),
+        motion: proximity.requestMotionPermission()
+      }
+      : null;
+    beginActiveConnection(permissionPromises);
+  });
+
+  view.on("connect-qr", () => {
+    const { connectedPeerId, mode } = store.getState();
+    if (mode === "verifying" || mode === "disconnecting") {
+      view.toast(view.translate(mode === "verifying" ? "verifying" : "disconnecting"));
+      return;
+    }
+    if (connectedPeerId) {
+      const connectedPeer = findPeer(connectedPeerId);
+      view.toast(view.translate("alreadyConnected", { name: connectedPeer.name }));
+      return;
+    }
+    const peerId = incomingInvite?.method === "qr"
+      ? incomingInvite.peerId
+      : closestAvailablePeer()?.id;
+    if (!peerId) {
+      view.toast(view.translate("noNearbyForConnection"));
       return;
     }
     const peer = findPeer(peerId);
@@ -396,11 +447,25 @@ export function createController({
       return;
     }
     activePeerId = peerId;
+    activeConnectionMethod = "qr";
     store.patch({ selectedPeerId: peerId });
-    view.openPeerSheet(peer, { peers: store.getState().peers });
+    view.openPeerSheet(peer, {
+      peers: store.getState().peers,
+      method: "qr"
+    });
   });
 
-  view.on("swipe-connect", async () => {
+  view.on("connect-peer", () => {
+    const permissionPromises = activeConnectionMethod === "proximity" && runtime.realProximityCeremony
+      ? {
+        microphone: proximity.requestMicrophonePermission(),
+        motion: proximity.requestMotionPermission()
+      }
+      : null;
+    beginActiveConnection(permissionPromises);
+  });
+
+  async function beginActiveConnection(permissionPromises = null) {
     if (!activePeerId) return;
     const initialState = store.getState();
     if (initialState.mode === "verifying") return;
@@ -420,13 +485,7 @@ export function createController({
     }
     const acceptingIncoming = incomingInvite?.peerId === peerId;
     let productionInitiator = !acceptingIncoming;
-    const useQrPairing = shouldUseQrPairing(peer);
-    const permissionPromises = runtime.realProximityCeremony && !useQrPairing
-      ? {
-        microphone: proximity.requestMicrophonePermission(),
-        motion: proximity.requestMotionPermission()
-      }
-      : null;
+    const useQrPairing = runtime.qrPairing && activeConnectionMethod === "qr";
     if (acceptingIncoming && !runtime.productionSignaling) {
       const invite = incomingInvite;
       incomingInvite = null;
@@ -439,6 +498,7 @@ export function createController({
       view.showIslandQrScanner({ self: initialState.self, peer, autoStartCamera: false });
     } else {
       view.showIslandConnectionProgress({ self: initialState.self, peer });
+      view.toast(view.translate("proximityPrompt"));
     }
     if (runtime.productionSignaling) {
       const pairing = await establishProductionPairing(peerId);
@@ -518,7 +578,8 @@ export function createController({
       )
     });
     view.pulseConnectionHaptic();
-  });
+    activeConnectionMethod = "proximity";
+  }
 
   view.on("choose-files", () => view.openFilePicker());
 
@@ -784,7 +845,7 @@ export function createController({
       return confirmation ? { ...confirmation, initiator: false } : null;
     }
     const accepted = waitForPairing(peerId, 30000);
-    await signaling.sendInvite(peerId);
+    await signaling.sendInvite(peerId, { method: activeConnectionMethod });
     const pairing = await accepted;
     return pairing ? { ...pairing, initiator: true } : null;
   }
@@ -834,22 +895,6 @@ export function createController({
     } finally {
       clearQrTransientWaiters();
     }
-  }
-
-  function shouldUseQrPairing(peer) {
-    if (!runtime.qrPairing) return false;
-    const selfPlatform = store.getState().capabilities?.platform;
-    const selfCapabilities = store.getState().capabilities;
-    const peerPlatform = peer?.capabilities?.platform;
-    const peerCapabilities = peer?.capabilities;
-    return Boolean(
-      selfPlatform?.isIPhone
-      && peerPlatform?.isIPhone
-      && selfCapabilities?.camera
-      && selfCapabilities?.qrScanner
-      && peerCapabilities?.camera
-      && peerCapabilities?.qrScanner
-    );
   }
 
   function bypassProximityForTransferTest(peerId) {
@@ -1011,6 +1056,25 @@ export function createController({
     return store.getState().peers.find((peer) => peer.id === peerId);
   }
 
+  function closestAvailablePeer() {
+    const distanceRank = {
+      immediate: 5,
+      near: 4,
+      room: 3,
+      building: 2,
+      far: 1
+    };
+    return [...store.getState().peers]
+      .filter((peer) => peer?.online !== false && !peer?.connected)
+      .sort((a, b) => {
+        const proximityDelta = Number(b.proximityScore || 0) - Number(a.proximityScore || 0);
+        if (proximityDelta) return proximityDelta;
+        const distanceDelta = (distanceRank[b.distanceBucket] || 0) - (distanceRank[a.distanceBucket] || 0);
+        if (distanceDelta) return distanceDelta;
+        return String(a.name || "").localeCompare(String(b.name || ""));
+      })[0] || null;
+  }
+
   function sanitizePeers(peers = []) {
     const state = store.getState();
     const seen = new Set();
@@ -1101,6 +1165,7 @@ export function createController({
       path: "unknown"
     });
     activePeerId = null;
+    activeConnectionMethod = "proximity";
     incomingInvite = null;
     view.toast(view.translate("connectionRejected"));
   }
@@ -1127,6 +1192,7 @@ export function createController({
       pairingId: null
     });
     activePeerId = null;
+    activeConnectionMethod = "proximity";
   }
 
   function setTheme(theme) {

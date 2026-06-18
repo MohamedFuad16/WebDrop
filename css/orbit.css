@@ -123,7 +123,7 @@
   pointer-events: auto;
 }
 
-.peer-node button {
+.peer-node .peer-avatar {
   position: relative;
   width: var(--peer-hit-target);
   height: var(--peer-hit-target);
@@ -134,10 +134,7 @@
   border-radius: 50%;
   color: var(--ink);
   background: transparent;
-  cursor: pointer;
-  transition:
-    transform var(--motion-control) var(--ease-out),
-    filter var(--motion-control) ease;
+  pointer-events: none;
 }
 
 .peer-node img,

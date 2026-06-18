@@ -14,7 +14,7 @@ function collectConsoleProblems(page, bucket) {
   });
 }
 
-test("live signaling lets two same-browser pages discover only each other and connect", async ({ browser, baseURL }, testInfo) => {
+test("live signaling lets two same-browser pages discover only each other and connect without peer selection", async ({ browser, baseURL }, testInfo) => {
   test.skip(
     !["chromium-desktop", "webkit-iphone-15-pro"].includes(testInfo.project.name),
     "Run the live UI signaling proof once per supported browser engine."
@@ -70,27 +70,21 @@ test("live signaling lets two same-browser pages discover only each other and co
     await pageB.goto(`${baseURL}/?qa=live-signaling-b`, { waitUntil: "domcontentloaded" });
     await expect(pageA.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 10_000 });
     await expect(pageB.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 10_000 });
-    await expect(pageA.locator("[data-action='open-nearby-sheet']")).toBeVisible({ timeout: 10_000 });
-    await expect(pageB.locator("[data-action='open-nearby-sheet']")).toBeVisible({ timeout: 10_000 });
+    await expect(pageA.locator("[data-action='connect-nearby']")).toBeVisible({ timeout: 10_000 });
+    await expect(pageB.locator("[data-action='connect-nearby']")).toBeVisible({ timeout: 10_000 });
+    await expect(pageA.locator("[data-action='connect-qr']")).toBeVisible({ timeout: 10_000 });
+    await expect(pageB.locator("[data-action='connect-qr']")).toBeVisible({ timeout: 10_000 });
     await expect(pageA.locator("[data-connection-label]")).toContainText(/Looking nearby|Connected with/, { timeout: 10_000 });
     await expect(pageB.locator("[data-connection-label]")).toContainText(/Looking nearby|Connected with/, { timeout: 10_000 });
 
-    await pageA.locator("[data-action='open-nearby-sheet']").click();
-    await expect(pageA.locator("[data-nearby-sheet]")).toBeVisible({ timeout: 10_000 });
-    await expect(pageA.locator(`.nearby-device-row:has-text('${bobName}')`)).toHaveCount(1, { timeout: 20_000 });
+    await expect(pageA.locator(`.peer-node:has-text('${bobName}')`)).toHaveCount(1, { timeout: 20_000 });
+    await expect(pageB.locator(`.peer-node:has-text('${aliceName}')`)).toHaveCount(1, { timeout: 20_000 });
+    await expect(pageA.locator(".peer-node button")).toHaveCount(0);
+    await expect(pageB.locator(".peer-node button")).toHaveCount(0);
 
-    await pageB.locator("[data-action='open-nearby-sheet']").click();
-    await expect(pageB.locator("[data-nearby-sheet]")).toBeVisible({ timeout: 10_000 });
-    await expect(pageB.locator(`.nearby-device-row:has-text('${aliceName}')`)).toHaveCount(1, { timeout: 20_000 });
-    await pageB.locator("[data-action='close-nearby-sheet']").click();
-
-    await pageA.locator(`.nearby-device-row:has-text('${bobName}') .nearby-connect`).click();
-    await expect(pageA.locator("[data-peer-sheet]")).toBeVisible({ timeout: 10_000 });
-    await pageA.locator("[data-swipe-thumb]").press("Enter");
-    await expect(pageB.locator("[data-peer-sheet]")).toBeVisible({ timeout: 15_000 });
-    await expect(pageB.locator("[data-sheet-peer-name]")).toContainText(aliceName);
-
-    await pageB.locator("[data-swipe-thumb]").press("Enter");
+    await pageA.locator("[data-action='connect-nearby']").click();
+    await expect(pageB.locator("[data-action='connect-nearby']")).toContainText(aliceName, { timeout: 15_000 });
+    await pageB.locator("[data-action='connect-nearby']").click();
 
     await expect(pageA.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 45_000 });
     await expect(pageB.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 45_000 });

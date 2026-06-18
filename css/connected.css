@@ -10,6 +10,35 @@
   animation: dockIn var(--motion-sheet-in) var(--ease-out);
 }
 
+.connect-fab {
+  position: fixed;
+  z-index: 18;
+  left: 50%;
+  bottom: calc(18px + var(--safe-bottom));
+  min-width: 154px;
+  height: 54px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 20px;
+  color: #fff;
+  background: linear-gradient(180deg, #4f95ff, var(--blue));
+  box-shadow: 0 16px 34px rgba(52, 125, 245, .28);
+  font-size: 15px;
+  font-weight: 780;
+  cursor: pointer;
+  transform: translateX(-50%);
+  transition: transform var(--motion-control) var(--ease-out), opacity var(--motion-control) ease;
+}
+
+.connect-fab:active:not(:disabled) {
+  transform: translateX(-50%) scale(.97);
+}
+
+.connect-fab:disabled {
+  cursor: default;
+  opacity: .54;
+}
+
 .nearby-fab {
   position: fixed;
   z-index: 18;
@@ -149,7 +178,9 @@
 }
 
 .app-shell[data-mode="connected"] .nearby-fab,
-.app-shell[data-mode="disconnecting"] .nearby-fab {
+.app-shell[data-mode="disconnecting"] .nearby-fab,
+.app-shell[data-mode="connected"] .connect-fab,
+.app-shell[data-mode="disconnecting"] .connect-fab {
   display: none;
 }
 

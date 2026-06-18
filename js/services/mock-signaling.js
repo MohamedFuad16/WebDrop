@@ -33,7 +33,8 @@ export class MockSignalingAdapter extends Emitter {
     this.emit("disconnected");
   }
 
-  async sendInvite(peerId) {
+  async sendInvite(peerId, { method = "proximity" } = {}) {
+    this.pendingInviteMethod = method;
     this.emit("peers", MOCK_PEERS.map((peer) =>
       peer.id === peerId ? { ...peer, stage: "intent" } : peer
     ));
@@ -48,12 +49,13 @@ export class MockSignalingAdapter extends Emitter {
     this.emit("inviteRejected", { peerId, pairingId });
   }
 
-  simulateIncomingInvite(peerId = "peer-aki") {
+  simulateIncomingInvite(peerId = "peer-aki", { method = "proximity" } = {}) {
     const peer = MOCK_PEERS.find((candidate) => candidate.id === peerId) || MOCK_PEERS[0];
     this.emit("invite", {
       fromId: peer.id,
       from: peer,
       pairingId: `pair-${peer.id}`,
+      payload: { method },
       receivedAt: new Date().toISOString()
     });
   }

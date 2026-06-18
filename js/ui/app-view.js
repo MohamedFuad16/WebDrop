@@ -49,15 +49,11 @@ export class AppView extends Emitter {
       languageChoice: document.querySelector(".language-choice"),
       motionChoice: document.querySelector(".motion-choice"),
       connectionLabel: document.querySelector("[data-connection-label]"),
+      connectNearby: document.querySelector("[data-connect-nearby]"),
       tray: document.querySelector("[data-connection-tray]"),
       connectedPeer: document.querySelector("[data-connected-peer]"),
       disconnectHaptic: document.querySelector("[data-disconnect-haptic]"),
       peerSheet: document.querySelector("[data-peer-sheet]"),
-      nearbySheet: document.querySelector("[data-nearby-sheet]"),
-      nearbySearch: document.querySelector("[data-nearby-search]"),
-      nearbyList: document.querySelector("[data-nearby-list]"),
-      nearbyOverflowCount: document.querySelector("[data-nearby-overflow-count]"),
-      nearbyFilterChoice: document.querySelector(".nearby-filter-choice"),
       settingsSheet: document.querySelector("[data-settings-sheet]"),
       informationSheet: document.querySelector("[data-information-sheet]"),
       sendSheet: document.querySelector("[data-send-sheet]"),
@@ -74,10 +70,7 @@ export class AppView extends Emitter {
       chatPanel: document.querySelector("[data-chat-panel]"),
       chatInput: document.querySelector("[data-chat-input]"),
       friendStrip: document.querySelector("[data-friend-strip]"),
-      swipeControl: document.querySelector("[data-swipe-control]"),
-      swipeThumb: document.querySelector("[data-swipe-thumb]"),
-      swipeText: document.querySelector("[data-swipe-text]"),
-      connectHaptic: document.querySelector("[data-connect-haptic]"),
+      connectButton: document.querySelector("[data-connect-peer]"),
       sendSwipeControl: document.querySelector("[data-send-swipe-control]"),
       sendSwipeThumb: document.querySelector("[data-send-swipe-thumb]"),
       sendSwipeText: document.querySelector("[data-send-swipe-text]"),
@@ -101,8 +94,6 @@ export class AppView extends Emitter {
       document.querySelector("[data-connection-tray]"),
       document.querySelector("[data-dynamic-island]")
     ].filter(Boolean);
-    this.nearbyFilter = "all";
-    this.nearbyQuery = "";
     this.avatarOptionsRendered = false;
     this.peerRenderSignature = "";
     this.receivedRenderSignature = "";
@@ -125,11 +116,6 @@ export class AppView extends Emitter {
 
   bindEvents() {
     this.document.addEventListener("click", (event) => {
-      const peerButton = event.target.closest("[data-peer-id]");
-      if (peerButton) {
-        this.emit("peer-select", peerButton.dataset.peerId);
-        return;
-      }
       const actionTarget = event.target.closest("[data-action]");
       const action = actionTarget?.dataset.action;
       if (!action) return;
@@ -139,11 +125,6 @@ export class AppView extends Emitter {
       }
       if (action === "select-ring") {
         this.emit(action, actionTarget.dataset.ring);
-        return;
-      }
-      if (action === "set-nearby-filter") {
-        this.nearbyFilter = actionTarget.dataset.nearbyFilter || "all";
-        this.renderNearbyDirectory(this.currentState);
         return;
       }
       if (action === "open-received") {
@@ -166,11 +147,6 @@ export class AppView extends Emitter {
       event.target.value = "";
     });
 
-    this.nodes.nearbySearch?.addEventListener("input", (event) => {
-      this.nearbyQuery = event.target.value;
-      this.renderNearbyDirectory(this.currentState);
-    });
-
     this.nodes.disconnectHaptic?.addEventListener("change", () => {
       window.requestAnimationFrame(() => {
         this.nodes.disconnectHaptic.checked = false;
@@ -190,16 +166,6 @@ export class AppView extends Emitter {
   }
 
   bindSwipeControls() {
-    this.resetSwipe = this.bindSwipe({
-      control: this.nodes.swipeControl,
-      thumb: this.nodes.swipeThumb,
-      text: this.nodes.swipeText,
-      axis: "x",
-      defaultText: "swipeConnect",
-      completeText: "connecting",
-      eventName: "swipe-connect",
-      hapticSwitch: this.nodes.connectHaptic
-    });
     this.resetSendSwipe = this.bindSwipe({
       control: this.nodes.sendSwipeControl,
       thumb: this.nodes.sendSwipeThumb,
@@ -272,7 +238,6 @@ export class AppView extends Emitter {
       control.classList.add("is-complete");
       text.textContent = this.translate(completeTextKey);
       setX(maxDistance);
-      if (eventName === "swipe-connect") this.pulseConnectGestureHaptic();
       this.emit(eventName);
       window.setTimeout(reset, 900);
     };
@@ -344,8 +309,6 @@ export class AppView extends Emitter {
       "open-information": () => this.openInformation(),
       "back-to-settings": () => this.backToSettings(),
       "close-information": () => this.closeInformation(),
-      "open-nearby-sheet": () => this.openNearbySheet(),
-      "close-nearby-sheet": () => this.closeNearbySheet(),
       "close-action-sheet": () => this.closeActionSheets(),
       "close-all-sheets": () => this.closeAllSheets()
     };
@@ -384,7 +347,7 @@ export class AppView extends Emitter {
     this.renderAvatarSettings(state);
     this.renderCapabilities(state.capabilities);
     this.renderPeers(state);
-    this.renderNearbyDirectory(state);
+    this.renderConnectControl(state);
     this.renderTray(state);
     this.renderFiles(state);
     this.renderReceiveBadge(state);
@@ -522,7 +485,6 @@ export class AppView extends Emitter {
         ? CONNECTED_ORBIT_RADII[layout.ringIndex]
         : `calc(var(--orbit-size) * ${ORBIT_RADII[layout.ringIndex]})`;
       const duration = state.connectedPeerId ? 76 : 72;
-      const peerId = escapeHtml(String(peer.id || ""));
       const peerName = escapeHtml(String(peer.name || ""));
       const peerLabel = escapeHtml(this.translate("openPeer", { name: peer.name || "" }));
       const avatar = peerDisplayAvatar(peer, index);
@@ -533,67 +495,34 @@ export class AppView extends Emitter {
           data-ring-index="${layout.ringIndex}"
           style="--angle:${layout.angle}deg;--radius:${radius};--orbit-duration:${duration}s"
         >
-          <button type="button" data-peer-id="${peerId}" aria-label="${peerLabel}">
+          <div class="peer-avatar" aria-label="${peerLabel}">
             ${staticAvatarMarkup(avatar)}
-          </button>
+          </div>
           <span>${peerName}</span>
         </div>
       `;
     }).join("");
   }
 
-  renderNearbyDirectory(state) {
-    if (!state || !this.nodes.nearbyList) return;
-    const rankedPeers = rankPeersForDisplay(state.peers, state);
-    const visibleLimit = state.connectedPeerId ? CONNECTED_ORBIT_PEER_LIMIT : ORBIT_PEER_LIMIT;
-    const hiddenCount = Math.max(0, rankedPeers.length - visibleLimit);
-    if (this.nodes.nearbyOverflowCount) {
-      this.nodes.nearbyOverflowCount.hidden = hiddenCount <= 0;
-      this.nodes.nearbyOverflowCount.textContent = hiddenCount > 99 ? "99+" : String(hiddenCount);
-    }
-    this.nodes.nearbyFilterChoice?.querySelectorAll("[data-nearby-filter]").forEach((button) => {
-      const selected = button.dataset.nearbyFilter === this.nearbyFilter;
-      button.classList.toggle("is-selected", selected);
-      button.setAttribute("aria-pressed", String(selected));
-    });
-    const query = normalizeSearch(this.nearbyQuery);
-    const filtered = rankedPeers.filter((peer) => {
-      if (!matchesNearbyFilter(peer, state, this.nearbyFilter)) return false;
-      if (!query) return true;
-      return normalizeSearch(`${peer.name} ${peerDeviceLabel(peer)} ${peerDeviceFamily(peer)}`).includes(query);
-    });
-    if (!filtered.length) {
-      this.nodes.nearbyList.innerHTML = `<div class="nearby-empty">${this.translate("nearbyEmpty")}</div>`;
-      return;
-    }
-    this.nodes.nearbyList.innerHTML = filtered.map((peer, index) => {
-      const peerId = escapeHtml(String(peer.id || ""));
-      const name = escapeHtml(String(peer.name || ""));
-      const device = escapeHtml(peerDeviceLabel(peer));
-      const brand = deviceBrandMarkup(peer);
-      const avatar = peerDisplayAvatar(peer, index);
-      const distance = escapeHtml(this.translate(peerDistanceKey(peer)));
-      const score = Math.max(0, Math.min(100, Math.round(peer.__rankScore || 0)));
-      const onlineClass = peer.online === false ? " is-offline" : " is-online";
-      const history = peerPreviouslyConnected(peer)
-        ? `<span class="nearby-device-history"><span class="nearby-history-chip">${this.translate("connectedBeforeShort")}</span></span>`
-        : "";
-      return `
-        <article class="nearby-device-row" data-nearby-device-id="${peerId}">
-          <span class="nearby-device-avatar${onlineClass}" aria-hidden="true">${staticAvatarMarkup(avatar)}</span>
-          <div class="nearby-device-copy">
-            <strong class="nearby-device-name">${brand}<span>${name}</span></strong>
-            <span>${device}</span>
-            <span class="nearby-device-meta">
-              <span class="nearby-pill">${distance}</span>
-              <span class="nearby-pill">${this.translate("rankScore", { score })}</span>
-            </span>
-            ${history}
-          </div>
-          <button class="nearby-connect" type="button" data-peer-id="${peerId}">${this.translate("connect")}</button>
-        </article>
-      `;
-    }).join("");
+  renderConnectControl(state) {
+    if (!this.nodes.connectNearby) return;
+    const incoming = state.incomingInvite?.method !== "qr"
+      ? state.incomingInvite
+      : null;
+    const incomingPeer = incoming ? state.peers.find((peer) => peer.id === incoming.peerId) : null;
+    const connected = state.mode === "connected" || state.mode === "disconnecting";
+    const verifying = state.mode === "verifying";
+    const hasCandidate = Boolean(incomingPeer || state.peers.some((peer) => peer.online !== false && !peer.connected));
+    const labelKey = verifying
+      ? "verifying"
+      : incomingPeer
+        ? "joinNearbyConnection"
+        : "connectNearby";
+    const label = this.translate(labelKey, { name: incomingPeer?.name || "" });
+    this.nodes.connectNearby.hidden = connected;
+    this.nodes.connectNearby.disabled = verifying || state.signalingStatus === "offline" || !hasCandidate;
+    this.nodes.connectNearby.textContent = label;
+    this.nodes.connectNearby.setAttribute("aria-label", label);
   }
 
   renderAvatarOptions() {
@@ -781,57 +710,54 @@ export class AppView extends Emitter {
     }
   }
 
-  openPeerSheet(peer, { peers, direction = "outgoing" } = {}) {
-    if (this.nodes.nearbySheet && !this.nodes.nearbySheet.hidden) {
-      this.hideSheet(this.nodes.nearbySheet, undefined, { keepBackdrop: true });
-    }
+  openPeerSheet(peer, { peers, direction = "outgoing", method = "proximity" } = {}) {
     const incoming = direction === "incoming";
+    const qr = method === "qr";
     this.nodes.peerSheet.dataset.inviteDirection = incoming ? "incoming" : "outgoing";
+    this.nodes.peerSheet.dataset.connectionMethod = qr ? "qr" : "proximity";
     this.nodes.peerSheet.setAttribute(
       "aria-label",
       this.translate(incoming ? "incomingPeerActions" : "peerActions")
     );
     this.nodes.peerSheet.querySelector(".sheet-kicker").textContent = this.translate(
-      incoming ? "incomingInviteKicker" : "nearbyCandidate"
+      qr ? "manualQrKicker" : incoming ? "incomingInviteKicker" : "nearbyCandidate"
     );
     this.nodes.sheetPeerName.innerHTML = `${deviceBrandMarkup(peer)}<span>${escapeHtml(peer.name)}</span>`;
     renderAnimatedAvatar(this.nodes.sheetPeerAvatar, peerDisplayAvatar(peer, 0), 1);
     this.nodes.sheetCopy.textContent = this.translate(
-      incoming ? "incomingInviteCopy" : "peerSheetReadyCopy",
+      qr
+        ? incoming ? "incomingQrInviteCopy" : "outgoingQrCopy"
+        : incoming ? "incomingInviteCopy" : "peerSheetReadyCopy",
       { name: peer.name }
     );
     const stripAvatars = previewAvatarStrip(peer, peers);
     this.nodes.friendStrip.innerHTML = stripAvatars.map((avatar, index) =>
       animatedAvatarMarkup(avatar, index)
     ).join("") + "<span>+</span>";
-    this.resetSwipe?.({
-      defaultText: incoming ? "swipeAccept" : "swipeConnect",
-      completeText: incoming ? "accepting" : "connecting"
-    });
-    this.nodes.swipeThumb?.setAttribute("aria-label", this.translate(incoming ? "swipeAccept" : "swipeConnect"));
+    if (this.nodes.connectButton) {
+      const labelKey = qr
+        ? incoming ? "scanQr" : "showQr"
+        : incoming ? "acceptConnection" : "startProximity";
+      this.nodes.connectButton.textContent = this.translate(labelKey);
+      this.nodes.connectButton.setAttribute("aria-label", this.translate(labelKey));
+    }
     if (this.nodes.peerSheetCancel) {
       this.nodes.peerSheetCancel.textContent = this.translate(incoming ? "decline" : "cancel");
     }
     this.showSheet(this.nodes.peerSheet);
   }
 
-  openNearbySheet() {
-    if (this.nodes.nearbySearch) this.nodes.nearbySearch.value = this.nearbyQuery;
-    this.renderNearbyDirectory(this.currentState);
-    this.showSheet(this.nodes.nearbySheet, () => this.nodes.nearbySearch?.focus({ preventScroll: true }));
-  }
-
-  closeNearbySheet() {
-    return this.hideSheet(this.nodes.nearbySheet);
-  }
-
   closePeerSheet() {
     return this.hideSheet(this.nodes.peerSheet, () => {
       this.nodes.peerSheet.dataset.inviteDirection = "outgoing";
+      this.nodes.peerSheet.dataset.connectionMethod = "proximity";
       this.nodes.peerSheet.setAttribute("aria-label", this.translate("peerActions"));
       this.nodes.peerSheet.querySelector(".sheet-kicker").textContent = this.translate("nearbyCandidate");
       if (this.nodes.peerSheetCancel) this.nodes.peerSheetCancel.textContent = this.translate("cancel");
-      this.resetSwipe?.({ defaultText: "swipeConnect", completeText: "connecting" });
+      if (this.nodes.connectButton) {
+        this.nodes.connectButton.textContent = this.translate("startProximity");
+        this.nodes.connectButton.setAttribute("aria-label", this.translate("startProximity"));
+      }
     });
   }
 
@@ -893,7 +819,6 @@ export class AppView extends Emitter {
   closeAllSheets() {
     [
       this.nodes.peerSheet,
-      this.nodes.nearbySheet,
       this.nodes.settingsSheet,
       this.nodes.informationSheet,
       this.nodes.sendSheet,
@@ -950,7 +875,6 @@ export class AppView extends Emitter {
         this.sheetHideTimers.delete(sheet);
         const anyVisible = [
           this.nodes.peerSheet,
-          this.nodes.nearbySheet,
           this.nodes.settingsSheet,
           this.nodes.informationSheet,
           this.nodes.sendSheet,
@@ -986,7 +910,6 @@ export class AppView extends Emitter {
   hideBackdropIfIdle() {
     const hasOpenSheet = [
       this.nodes.peerSheet,
-      this.nodes.nearbySheet,
       this.nodes.settingsSheet,
       this.nodes.informationSheet,
       this.nodes.sendSheet,
@@ -1032,7 +955,6 @@ export class AppView extends Emitter {
   visibleSheet() {
     return [
       this.nodes.peerSheet,
-      this.nodes.nearbySheet,
       this.nodes.settingsSheet,
       this.nodes.informationSheet,
       this.nodes.sendSheet,

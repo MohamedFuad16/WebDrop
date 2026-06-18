@@ -136,8 +136,8 @@ export class WebSocketSignalingAdapter extends Emitter {
     this.socket = null;
   }
 
-  async sendInvite(targetId) {
-    this.send({ type: "invite", targetId });
+  async sendInvite(targetId, { method = "proximity" } = {}) {
+    this.send({ type: "invite", targetId, payload: { method } });
   }
 
   async acceptInvite(targetId, pairingId) {
