@@ -206,12 +206,12 @@ The actual file path should be:
 
 The active app caps each send session and each receive session at 500 MB. Save/export still depends on browser download behavior; normal web pages cannot silently choose an arbitrary filesystem path or reopen an OS Downloads file after the browser has released it.
 
-## Proximity Score Readiness
+## Proximity Verification
 
-The backend is prepared to analyze proximity telemetry, but enforcement is disabled by default.
+The production backend analyzes proximity telemetry and enforces a verified decision before transfer signaling is allowed.
 
 ```text
-ENABLE_PROXIMITY_ANALYSIS=false
+ENABLE_PROXIMITY_ANALYSIS=true
 ```
 
 Policy endpoint:
@@ -246,7 +246,7 @@ Telemetry can be routed today:
 
 Paired clients send `proximity:ready` after browser permissions are resolved. When both are ready, the server returns the same future `proximity:start` timestamp and ceremony duration to both devices.
 
-When `ENABLE_PROXIMITY_ANALYSIS=true`, the server normalizes sound, motion, bump, tilt, and QR signals into a score and attaches analysis metadata to routed telemetry. RTC signaling, chat, path metrics, and transfer metadata remain blocked until both peers receive a `verified` decision. With the default flag off, the backend remains report-only; this keeps the real analysis path ready without activating permissions or scoring users.
+When `ENABLE_PROXIMITY_ANALYSIS=true`, the server normalizes sound, motion, bump, tilt, and QR signals into a score and attaches analysis metadata to routed telemetry. RTC signaling, chat, path metrics, and transfer metadata remain blocked until both peers receive a `verified` decision.
 
 Browser permission requests must still happen only in frontend UI after explicit user gestures. The backend only publishes the readiness policy.
 
@@ -310,7 +310,7 @@ Important variables:
 - `PUBLIC_ORIGIN=https://signal.webdrop.example.com`
 - `ALLOWED_ORIGINS=https://web-drop-lyart.vercel.app,https://webdrop.example.com`
 - `MAX_JSON_BYTES=65536`
-- `ENABLE_PROXIMITY_ANALYSIS=false`
+- `ENABLE_PROXIMITY_ANALYSIS=true`
 - `CLOUDFLARE_TURN_KEY_ID=<turn-token-id>`
 - `CLOUDFLARE_TURN_API_TOKEN=<turn-api-token>`
 - `TURN_TTL_SECONDS=86400`
