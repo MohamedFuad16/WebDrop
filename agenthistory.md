@@ -697,3 +697,73 @@ Verification:
 - `npx playwright test tests/e2e/app-ui.spec.mjs --reporter=line` passed: 9 tests across desktop, iPhone 15 Pro emulation, and Pixel emulation.
 - `npm run test:relay -- --reporter=line` passed with live TURN credentials, relay-only ICE, and bidirectional DataChannel payloads.
 - Live AWS smoke passed against `https://webdrop-wss-0617.japaneast.cloudapp.azure.com`: health, proximity policy, WSS connect, TURN credential proxy, invite pairing, and bidirectional chat.
+
+## 2026-06-18 Version 1.0.31 signaling resilience and full regression pass
+
+Scope:
+- Repaired a responder-side WebRTC race that could replace the active peer connection and emit an empty answer SDP.
+- Added a deterministic signaling handshake deadline and honest offline UI for unreachable production endpoints.
+- Aligned admin/readiness documentation with the implemented test suites, active 256 KiB transfer protocol, and streaming-download receive path.
+
+Implementation:
+- Made `WebRtcTransport` peer-connection creation single-flight and kept offer/answer/candidate handling on one stable connection instance.
+- Capped Cloudflare TURN `customIdentifier` values at the documented 64-character service limit.
+- Added an 8-second WebSocket handshake timeout with exponential reconnect behavior and explicit `connecting`, `online`, and `offline` app state.
+- Added English and Japanese unavailable-service copy; stale peers are cleared when signaling is offline.
+- Added a quiet Node static server for Playwright and made the e2e environment own both frontend and local Azure signaling processes.
+- Updated admin blockers, Azure server documentation, activation guidance, package/cache/query versions, and PDF-generation metadata to `1.0.31`.
+
+Verification:
+- `npm run verify:full` passed, including secret scans and zero frontend/backend dependency vulnerabilities.
+- Frontend unit tests passed with storage, concurrent WebRTC responder, and WebSocket handshake deadline coverage.
+- Azure backend tests passed with SDP schema and Cloudflare TURN provider coverage.
+- Full Playwright matrix passed with 17 tests and 4 intentional project-scope skips, including local two-page signaling and simultaneous bidirectional multi-chunk transfer.
+- In-app Browser verified the offline state and `/admin/` tab interaction. External Playwright screenshots verified centered desktop and 393x852 mobile offline layouts with no horizontal overflow.
+- The configured Japan East hostname resolved, but TCP 443 and `/healthz` timed out during this pass. No authenticated Azure CLI session was available on this machine, so VM recovery remains external.
+
+## 2026-06-18 Version 1.0.32 production server validation and recovery hardening
+
+Scope:
+- Separated the unreachable Azure VM from the health of the signaling, TURN, and WebRTC implementation.
+- Exercised the ignored production server environment locally using the deployed Vercel origin and real Cloudflare TURN credentials.
+- Added fail-fast production configuration checks and operator recovery tooling.
+
+Implementation:
+- Added `/readyz` with non-secret environment readiness metadata and nginx routing.
+- Production startup now rejects empty or wildcard origins, disabled TURN authentication, missing TURN credentials when fallback is disabled, and placeholder metrics tokens.
+- Hardened the smoke test to preserve HTTP error responses and optionally require a real `turn:` or `turns:` credential.
+- Updated the local ignored server environment to the deployed Vercel origin, production mode, authenticated TURN, and no STUN-only fallback.
+- Enhanced Azure start/stop scripts with CLI authentication checks, power-state reporting, readiness polling, and actionable Run Command diagnostics.
+- Installed Azure CLI 2.87.0 on the operator Mac; account login is still required before the VM can be started.
+- Corrected the complete guide, production activation guide, checklist, README, and PDF source copy to reflect the production-configured runtime and verified local networking stack.
+- Added a matching `/readyz` probe to the admin console and a three-profile browser regression test confirming public readiness checks do not receive bearer credentials.
+
+Verification:
+- Production-mode local smoke passed for `/healthz`, `/readyz`, proximity policy, exact-origin WebSocket admission, authenticated Cloudflare TURN credentials, invite pairing, and bidirectional chat.
+- The ICE response contained managed TURN credentials with fallback disabled.
+- Playwright live signaling passed with two pages discovering only each other, accepting a connection, transferring 320 KiB and 384 KiB files simultaneously in opposite directions with 256 KiB chunks, and disconnecting cleanly.
+- Playwright forced-relay proof passed with bidirectional DataChannel bytes and relay ICE candidate classification.
+- Eight Azure backend tests passed, including four new production-environment validation cases.
+- The complete browser matrix now passes 20 tests with 4 intentional project-scoped skips.
+- The public Japan East VM remains unreachable on ports 22, 80, 443, and 8080. Azure CLI is installed but not authenticated, so public recovery still requires `az login`.
+
+## 2026-06-18 Version 1.0.33 mobile WebKit and orbit geometry hardening
+
+Scope:
+- Extended browser coverage to the Safari/WebKit engine using an iPhone 15 Pro profile.
+- Rechecked the orbit and Dynamic Island visually after the production-readiness pass.
+
+Implementation:
+- Added a maintained `webkit-iphone-15-pro` Playwright project.
+- Enabled live signaling and forced Cloudflare TURN relay proofs once per supported browser engine.
+- Replaced the twelve lobby orbit slots with staggered four-ring phases that prevent adjacent-ring avatar collisions.
+- Added a geometry regression test for minimum peer clearance and exact ring centering.
+- Changed the light Dynamic Island Siri wave from `screen` to `multiply` blending so the animation remains visible on the white surface; dark mode remains unchanged.
+
+Verification:
+- iPhone 15 Pro WebKit app UI suite passed with five applicable tests and one Chromium-only StreamSaver import skip.
+- WebKit live signaling and forced relay tests passed, including bidirectional multi-chunk DataChannel files.
+- Orbit geometry passed on desktop Chromium, iPhone Chromium, Pixel Chromium, and iPhone WebKit.
+- The expanded complete Playwright matrix passed 31 tests with 5 intentional project-scoped skips and no failures.
+- Settled light/dark WebKit screenshots showed clean orbit spacing and a visible Siri wave with no browser console errors.
+- A native iOS Simulator run remains unavailable because Xcode has no installed iOS runtime and the machine has insufficient free disk for a safe runtime installation.

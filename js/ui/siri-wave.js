@@ -120,11 +120,15 @@ export class SiriWaveCore {
     this.running = false;
     this.startedAt = 0;
     this.resizeObserver = null;
+    this.resizeDirty = true;
+    this.frameCount = 0;
     if (!this.gl) return;
     this.build();
     this.resize();
     if ("ResizeObserver" in globalThis) {
-      this.resizeObserver = new ResizeObserver(() => this.resize());
+      this.resizeObserver = new ResizeObserver(() => {
+        this.resizeDirty = true;
+      });
       this.resizeObserver.observe(this.canvas);
     }
   }
@@ -135,6 +139,7 @@ export class SiriWaveCore {
     this.running = running;
     if (running) {
       this.startedAt = performance.now();
+      this.resizeDirty = true;
       this.frameId = requestAnimationFrame(() => this.frame());
     } else {
       cancelAnimationFrame(this.frameId);
@@ -186,15 +191,22 @@ export class SiriWaveCore {
     const rect = this.canvas.getBoundingClientRect();
     const width = Math.max(1, Math.round(rect.width * this.renderScale));
     const height = Math.max(1, Math.round(rect.height * this.renderScale));
-    if (this.canvas.width === width && this.canvas.height === height) return;
+    if (this.canvas.width === width && this.canvas.height === height) {
+      this.resizeDirty = false;
+      return;
+    }
     this.canvas.width = width;
     this.canvas.height = height;
     this.gl.viewport(0, 0, width, height);
+    this.resizeDirty = false;
   }
 
   frame() {
     if (!this.running || !this.gl || !this.program) return;
-    this.resize();
+    this.frameCount += 1;
+    if (this.resizeDirty || (!this.resizeObserver && this.frameCount % 30 === 0)) {
+      this.resize();
+    }
     const time = (performance.now() - this.startedAt) / 1000;
     this.gl.useProgram(this.program);
     this.gl.uniform2f(this.uniforms.iResolution, this.canvas.width, this.canvas.height);

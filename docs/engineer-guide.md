@@ -17,11 +17,11 @@ The deployed site at `https://web-drop-lyart.vercel.app/` may be used as a produ
 As of this pass:
 
 - The active local runnable artifact is `index.html`.
-- The visible app/package/service-worker version is `1.0.28`.
+- The visible app/package/service-worker version is `1.0.34`.
 - The old architecture HTML page was deleted during the corrected rebuild.
 - `js/app.js` boots the modular static app.
 - `js/core/controller.js` owns the state transitions that gate file controls.
-- `js/storage/storage-client.js` owns the receive storage ladder, byte-count checks, streaming browser download handoff, Blob fallback, and the 500 MB receive-session cap.
+- `js/storage/storage-client.js` owns deferred IndexedDB receive chunks, byte-count checks, StreamSaver export on Save, iPhone/iPad Blob fallback, cleanup, and the 500 MB receive-session cap.
 - `azure cloud server/` owns the deployable signaling backend package; it coordinates metadata only and must not carry file bytes.
 - The repository is a Git working tree from this directory; preserve unrelated local changes.
 
@@ -81,7 +81,7 @@ Keep these boundaries stable:
 - WebRTC `RTCDataChannel` carries file chunks.
 - TURN is fallback transport, not the default happy path.
 - Relay mode should be capped and disclosed.
-- Receiver storage writes DataChannel chunks to a browser download stream where supported and falls back to Blob assembly for smaller files.
+- Receiver storage defers DataChannel chunks in IndexedDB where supported, exports them only after Save, and uses capped Blob assembly on iPhone/iPad.
 - Large received files are capped at 500 MB per receive session.
 - QR remains the universal fallback when audio or motion permissions are unavailable.
 
@@ -93,7 +93,7 @@ For future runtime edits, verify:
 - Send/receive controls are absent before connected state.
 - Send/receive controls appear for a selected connected peer.
 - No file bytes are sent through signaling code.
-- Received files save through the browser download pipeline. Blob fallback files remain available from the receive sheet Save action; streamed downloads show saved status because browsers do not expose the final Downloads path.
+- Receiving a file must not start a browser download. The receive badge appears first; Save then hands IndexedDB chunks or the Blob fallback to the browser download pipeline.
 - Relay mode applies a clear cap and user-facing explanation.
 
 ## Production handoff reminders

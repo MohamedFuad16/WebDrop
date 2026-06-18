@@ -1,6 +1,6 @@
 # WebDrop Complete Technical Guide
 
-Version: WebDrop v2 production-readiness handoff for app version 1.0.28
+Version: WebDrop v2 production-readiness handoff for app version 1.0.34
 Scope: `/Users/mfuad16/Documents/web_drop_v2`
 Primary app entrypoint: `index.html` and `js/app.js`
 
@@ -8,17 +8,18 @@ Primary app entrypoint: `index.html` and `js/app.js`
 
 ## How to read this guide
 
-This guide is written for product, engineering, QA, and production handoff work. It intentionally separates the default demo runtime from the production paths that are now wired but still disabled until deployment configuration is supplied.
+This guide is written for product, engineering, QA, and production handoff work. It separates the production-configured browser runtime from the explicit local mock mode used for deterministic UI testing.
 
-The current repository ships a static browser application plus an Azure signaling-server package. The default app still runs as a safe static demo: production signaling is off, runtime URLs are blank, and the app uses mock peers without requesting microphone, motion, or camera permissions. Behind those gates, the code now includes production WebSocket signaling, one-time QR token routing, real WebRTC offer/answer/ICE handling, separate control/file data channels, transfer manifests, sender hashing, receiver ACK/cancel/retry semantics, StreamSaver-backed browser downloads, Blob fallback for smaller unsupported cases, and Cloudflare TURN credential proxying. The core product boundaries remain: discovery and trust happen before file controls appear; signaling carries metadata; file bytes belong on an `RTCDataChannel`; and large receives should stream into the browser download pipeline rather than one giant in-memory object.
+The current repository ships a static browser application plus an Azure signaling-server package. The default app is configured for the Japan East production signaling URL and real WebRTC transfer. Localhost can opt into deterministic mock peers with `?runtime=mock`. Microphone, motion, and camera ceremonies remain disabled until physical-device calibration is complete. The code includes production WebSocket signaling, one-time QR token routing, real WebRTC offer/answer/ICE handling, separate control/file data channels, transfer manifests, sender hashing, receiver ACK/cancel/retry semantics, deferred IndexedDB receives with StreamSaver export on Save, iPhone/iPad Blob fallback, and Cloudflare TURN credential proxying. The core product boundaries remain: discovery and trust happen before file controls appear; signaling carries metadata; file bytes belong on an `RTCDataChannel`; and receiving bytes must not trigger an unsolicited download.
 
 ### Production readiness status
 
-- App/package/service-worker version: `1.0.28`.
-- Default frontend runtime: safe demo mode because `productionSignaling` is `false` and both production URLs are blank in `js/config/runtime-config.js`.
+- App/package/service-worker version: `1.0.34`.
+- Default frontend runtime: production signaling and real transfer are enabled for `webdrop-wss-0617.japaneast.cloudapp.azure.com`; the UI reports the service unavailable when the endpoint cannot be reached.
 - Effective feature gating: `js/config/runtime-flags.js` refuses to enable real proximity, real transfer, or QR pairing unless production signaling is enabled with a valid WSS URL.
 - Backend package: `azure cloud server/` contains the Node WebSocket signaling service, QR token provider, TURN credential proxy, nginx/systemd/deploy assets, and load-test assets.
-- Still external: Azure VM deployment, DNS/TLS, valid rotated Cloudflare TURN credentials, real WSS/TURN URLs, physical-device proximity calibration, two-browser direct/TURN transfer proof, load testing, and any horizontal-scaling state store.
+- Verified locally on June 18, 2026: production-origin WebSocket pairing, bidirectional chat, authenticated Cloudflare TURN credential issuance, simultaneous bidirectional DataChannel file transfer, and a forced TURN relay transfer using 256 KiB chunks.
+- Still external: restoring the unreachable Azure VM endpoint, physical-device proximity calibration, public end-to-end transfer proof, load testing, and any horizontal-scaling state store.
 
 The production roadmap sections describe the backend and browser-work needed to turn those boundaries into a real multi-device transfer system.
 
@@ -81,8 +82,8 @@ The active implementation is static and module-based. These are the files most d
 | TURN/STUN | `js/services/turn-config.js` | uses Cloudflare STUN by default and fetches ephemeral TURN credentials only from the configured backend |
 | WebRTC | `js/services/webrtc-transport.js` | disabled-gated offer/answer/ICE exchange, receiver data channels, path stats, and control/file channels |
 | Transfer | `js/services/transfer-engine.js`, `js/services/data-channel-transfer-protocol.js` | mock progress by default; disabled-gated real manifests, chunks, ACKs, cancel, retry, and completion ACK |
-| Storage client | `js/storage/storage-client.js` | receive storage ladder with StreamSaver download writer, Blob fallback, quota/cap checks, export, abort, and cleanup |
-| StreamSaver helper | `vendor/streamsaver/` | self-hosted MITM page and service worker used only for browser download streaming |
+| Storage client | `js/storage/storage-client.js` | deferred IndexedDB receive chunks, explicit-Save StreamSaver export, iPhone/iPad Blob fallback, quota/cap checks, abort, and cleanup |
+| StreamSaver helper | `vendor/streamsaver/` | self-hosted MITM page and service worker invoked after Save to stream deferred chunks into a browser download |
 | Offline cache | `service-worker.js` | caches static files and demo PDFs outside localhost |
 
 The existing `docs/architecture.md` and `docs/engineer-guide.md` are concise architecture notes. This guide is the expanded technical package.
@@ -96,13 +97,13 @@ The local Graphify index was checked first, but it appears stale or unrelated fo
 1. Build `initialState` from defaults and `localStorage`.
 2. Create the store with `createStore`.
 3. Create `AppView`, which subscribes to store changes.
-4. Create mock signaling and a future WebSocket adapter.
+4. Select mock signaling only for explicit local QA; otherwise create the production WebSocket adapter.
 5. Create proximity, TURN config, WebRTC transport, receive storage client, and transfer engine.
 6. Create the controller with all dependencies.
-7. Detect capabilities, patch them into state, and connect mock signaling.
+7. Detect capabilities, patch them into state, and connect the selected signaling adapter.
 8. Register the service worker outside localhost.
 
-That architecture is deliberately small. There is no bundler, no framework runtime, and no server dependency for the default demo path. The production path is present but inert until `productionSignaling`, a real WSS URL, and the staged feature flags are configured.
+That architecture is deliberately small. There is no bundler or framework runtime. The production path is active when the configured WSS endpoint is available, while `?runtime=mock` keeps deterministic local UI testing independent of the server.
 
 <div class="page-break" style="page-break-after: always;"></div>
 
@@ -446,18 +447,18 @@ WebDrop has two signaling adapters:
 - `MockSignalingAdapter` for the default static demo.
 - `WebSocketSignalingAdapter` for the production Azure signaling endpoint.
 
-The mock adapter emits demo peers and accepts invite-style method calls. It makes the UI useful without a server. The WebSocket adapter is intentionally inactive unless a production URL is configured. Its unconfigured event means no endpoint is baked into the static app:
+The mock adapter emits demo peers and accepts invite-style method calls for local QA. The WebSocket adapter is active in the default runtime and reports a bounded connection failure when its endpoint is unreachable. It remains safe when no URL is supplied:
 
 ```js
 if (!this.url) {
   this.emit("unconfigured", {
-    reason: "Production WSS endpoint is intentionally not built in this repo."
+    reason: "Production signaling URL is not configured."
   });
   return;
 }
 ```
 
-That is a healthy boundary. The Azure package supplies the server-side origin validation, session management, rate limits, TURN credential minting, QR token provider, and abuse controls, but it still needs deployment and production environment configuration.
+That is a healthy boundary. The Azure package supplies server-side origin validation, session management, rate limits, TURN credential minting, QR token routing, readiness checks, and abuse controls. The current public endpoint must be restarted or redeployed before the default hosted app can discover peers.
 
 ### Metadata that belongs on signaling
 
@@ -588,7 +589,7 @@ The first option is usually cleaner: keep control and data separate.
 
 ### Chunk size
 
-The current transfer protocol uses `64 * 1024`, or 64 KiB, chunks. That is a reasonable starting point. Larger chunks reduce overhead but can increase buffering and latency. Smaller chunks make progress smoother but increase message count.
+The current transfer protocol uses `256 * 1024`, or 256 KiB, chunks. That reduces per-file message overhead while still keeping each DataChannel payload modest enough for browser buffering and retry bookkeeping.
 
 Production chunk size should adapt to:
 
@@ -610,8 +611,8 @@ Before sending chunks, the sender should send a manifest:
   "name": "example.pdf",
   "mime": "application/pdf",
   "size": 1832044,
-  "chunkSize": 65536,
-  "chunkCount": 28,
+  "chunkSize": 262144,
+  "chunkCount": 7,
   "hash": "sha-256-if-known"
 }
 ```
@@ -623,9 +624,9 @@ Each chunk message should be attributable to a transfer and file:
   "type": "file:chunk",
   "transferId": "uuid",
   "fileId": "uuid",
-  "index": 7,
-  "offset": 458752,
-  "byteLength": 65536
+  "index": 2,
+  "offset": 524288,
+  "byteLength": 262144
 }
 ```
 
@@ -776,7 +777,7 @@ The complete production flow has three lanes: UI trust, signaling negotiation, a
 5. WebRTC preflight creates a local probe connection.
 6. Connected state appears.
 7. User chooses files.
-8. Transfer engine reads files in 64 KiB slices and reports progress.
+8. Transfer engine reads files in 256 KiB slices and reports progress.
 9. UI appends selected files to the receive list as a local demo.
 
 This default path is still the safe offline demo. When production signaling and real transfer are enabled, file bytes move on the WebRTC file data channel while manifests and control metadata stay on the control channel/signaling boundary.
@@ -797,7 +798,7 @@ This default path is still the safe offline demo. When production signaling and 
 12. Sender sends transfer manifest.
 13. Receiver checks storage quota and accepts or rejects.
 14. Sender streams chunks while respecting backpressure.
-15. Receiver writes chunks to a browser download stream or Blob fallback.
+15. Receiver writes chunks to deferred IndexedDB storage or the capped iPhone/iPad Blob fallback.
 16. Receiver verifies byte count and hash metadata.
 17. Receiver finalizes and exposes saved/open status.
 18. Both sides show complete state.
@@ -807,14 +808,14 @@ This default path is still the safe offline demo. When production signaling and 
 The receiver must not wait until the whole file is available. On manifest:
 
 1. Check file size and policy.
-2. Check streaming download support and Blob fallback limits.
-3. Open a StreamSaver download writer or Blob fallback target.
+2. Check IndexedDB quota, StreamSaver export support, and Blob fallback limits.
+3. Open a deferred IndexedDB receive session or Blob fallback target without starting a download.
 4. Reply `file:ready`.
 5. For each chunk, enqueue a storage write.
 6. Periodically ACK received progress.
 7. On final chunk, verify total bytes.
 8. Compute or finalize hash.
-9. Close the browser download writer or create a Blob object URL.
+9. Mark the file ready and expose Save; only that action starts StreamSaver export or a Blob download.
 
 The user should see a clear difference between "incoming file request," "receiving," "verifying," and "ready to open."
 
@@ -836,20 +837,15 @@ The current `StorageClient` is a promise-based strategy wrapper. It exposes:
 
 The active backend ladder is:
 
-1. Use the self-hosted StreamSaver helper when `WritableStream`, service workers, secure context, and browser support are available.
-2. Fall back to Blob assembly for smaller files when streaming is unavailable.
-3. Reject larger unsupported receive sessions before accepting file bytes.
+1. On capable non-iOS browsers, write ordered chunks to IndexedDB while receiving. No download begins yet.
+2. When the user presses Save, stream those stored chunks through the self-hosted StreamSaver helper into the browser download pipeline.
+3. On iPhone and iPad Safari, keep a capped Blob fallback and trigger its download only from Save.
+4. Keep direct receive-time StreamSaver writing only as a compatibility fallback when IndexedDB is unavailable and the session is too large for Blob memory safety.
+5. Reject unsupported sessions before accepting bytes when no safe backend can handle their size.
 
-### Streaming browser download
+### Deferred IndexedDB save
 
-StreamSaver creates a browser-managed download response from client-side chunks. WebDrop writes each received `RTCDataChannel` chunk into the active `WritableStream`. The browser then saves the file through the user's normal download pipeline. JavaScript does not receive a final local Downloads path, so streamed files show saved status rather than a guaranteed Save/Open action.
-
-### Blob fallback
-
-Blob fallback keeps compatibility for browsers where StreamSaver is unavailable or unreliable. It stores chunk buffers in memory and creates an object URL after completion. This is why fallback has a lower memory-safety cap and why the receive sheet can only offer Open for fallback files.
-6. The storage client writes chunks by order.
-7. The storage client closes the stream on finalize.
-8. The storage client returns saved/open metadata for the receive sheet.
+IndexedDB separates transfer completion from download initiation. Each ordered DataChannel chunk is persisted under its session, file, and chunk index. Finalization verifies byte counts and marks the file ready in the Received sheet. Save then reads chunks in order and writes them to StreamSaver. Current-session data is removed on page exit, and records older than 24 hours are pruned after real transfer storage is enabled.
 
 ### Blob fallback
 
@@ -859,7 +855,7 @@ Blob fallback is the compatibility path when streaming download support is unava
 
 ## 16. Workers and Main-Thread Safety
 
-Workers keep expensive transfer work away from the UI thread where the platform supports it. The current repository no longer creates a receive storage worker. Instead, `StorageClient` writes received chunks to a browser `WritableStream` through the self-hosted StreamSaver helper when available, and uses capped Blob fallback otherwise.
+Workers keep expensive transfer work away from the UI thread where the platform supports it. The current repository no longer creates a receive storage worker. Instead, `StorageClient` writes received chunks asynchronously to IndexedDB, then exports them after Save through StreamSaver where supported. iPhone and iPad use capped Blob fallback.
 
 The main thread owns UI state, user gestures, stream writer lifecycle, and receive metadata. The sender-side incremental hash helper remains worker-friendly and can stay separate from the receive storage decision.
 
@@ -969,7 +965,8 @@ Chat is useful as a connected-peer affordance, but production chat should not di
 - Device motion API availability.
 - Device motion permission API availability.
 - WebRTC support.
-- WritableStream and service worker support for streaming downloads.
+- IndexedDB support and quota for deferred receives.
+- WritableStream and service worker support for StreamSaver export after Save.
 - Blob fallback availability.
 - WebSocket support.
 
@@ -1005,7 +1002,7 @@ Fallbacks should be treated as first-class paths:
 - No microphone: QR.
 - No motion: QR or explicit accept.
 - No WebRTC: explain unsupported browser or offer cloud relay only if product policy allows.
-- No streaming download support: Blob fallback under its memory cap.
+- No IndexedDB: Blob fallback under its memory cap or direct stream compatibility path.
 - Blob fallback above cap: reject before receiving bytes.
 - No service worker: reject large receives or use Blob fallback only for small files.
 
@@ -1144,27 +1141,30 @@ The current app is a polished static demo with disabled-gated production transfe
 - Settings, theme, profile icon, ring color, language, motion preference.
 - Service worker static cache outside localhost.
 
-### Implemented but disabled or unconfigured
+### Implemented and production-configured
 
-- Azure WebSocket signaling endpoint, schemas, sessions, rate limits, and payload-safe observability.
-- Backend-issued QR tokens and frontend Dynamic Island QR display/scan flow.
-- Real microphone chirp and motion evidence ceremony.
+- Azure WebSocket signaling endpoint, schemas, sessions, rate limits, readiness checks, and payload-safe observability.
 - Real SDP offer/answer and ICE exchange through signaling.
 - Separate WebRTC control and file data channels.
-- Real file manifests, 64 KiB chunks, backpressure, ACKs, cancel, retry, completion ACK, and sender SHA-256.
+- Real file manifests, 256 KiB chunks, backpressure, ACKs, cancel, retry, completion ACK, and sender SHA-256.
 - Receiver-side StreamSaver writer, Blob fallback, quota/cap checks, byte/hash metadata verification, saved/open status, abort, and cleanup.
 - Cloudflare TURN credential proxy with bearer access bound to the live signaling session.
 - Transfer failure, retry, and receive-completion protocol events.
 
+### Implemented but intentionally disabled
+
+- Backend-issued QR tokens and frontend Dynamic Island QR display/scan flow.
+- Real microphone chirp and motion evidence ceremony.
+- Proximity enforcement; the backend currently exposes report-only policy.
+
 ### Remaining before production launch
 
-1. Deploy `azure cloud server/` to Azure VM with DNS, nginx, Certbot, systemd, firewall rules, exact `ALLOWED_ORIGINS`, and protected metrics token.
-2. Rotate and configure valid Cloudflare TURN Server credentials on Azure VM only; the latest audit recorded the provided Cloudflare identifier returning HTTP 404 as a TURN Key ID.
-3. Configure real `signalingUrl` and `turnConfigUrl` in `js/config/runtime-config.js`, then enable flags in the staged order from `docs/production-activation.md`.
-4. Run physical-device calibration for iOS Safari and Android Chrome across QR, microphone, motion, denied-permission, noisy-room, and fallback cases.
-5. Prove two-browser direct and TURN transfers over the deployed backend, including cancellation, retry, receiver storage exhaustion, and large-file paths.
-6. Load-test signaling toward the 10,000-client target and add Redis/shared presence before horizontal scaling beyond one Node signaling process.
-7. Regenerate the English and Japanese screenshot inventories and PDF guides whenever visible UI or app versioning changes.
+1. Start or redeploy the existing Azure VM and verify public `/healthz`, `/readyz`, `/ws`, and `/api/ice-servers`.
+2. Copy the validated local server environment to `/etc/webdrop/signaling.env` without exposing its long-lived Cloudflare token.
+3. Run physical-device calibration for iOS Safari and Android Chrome across QR, microphone, motion, denied-permission, noisy-room, and fallback cases.
+4. Repeat the proven two-browser direct and TURN transfers over the public backend, including cancellation, retry, receiver storage exhaustion, and files near the 500 MB session cap.
+5. Load-test signaling toward the 10,000-client target and add Redis/shared presence before horizontal scaling beyond one Node signaling process.
+6. Regenerate the English and Japanese screenshot inventories and PDF guides whenever visible UI or app versioning changes.
 
 ### Documentation stance
 

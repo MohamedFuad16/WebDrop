@@ -22,12 +22,45 @@ export function createController({
   let qrScanResolver = null;
   let qrCancelResolver = null;
   let qrFallbackResolver = null;
+  let pendingTransferPatch = null;
+  let transferPatchFrame = 0;
 
-  signaling.on("connected", () => {});
+  const scheduleTransferPatch = (transferPatch) => {
+    pendingTransferPatch = transferPatch;
+    if (transferPatchFrame) return;
+    const schedule = globalThis.requestAnimationFrame || ((callback) => globalThis.setTimeout(callback, 16));
+    transferPatchFrame = schedule(() => {
+      transferPatchFrame = 0;
+      const nextTransfer = pendingTransferPatch;
+      pendingTransferPatch = null;
+      if (nextTransfer) store.patch({ transfer: nextTransfer });
+    });
+  };
+
+  const cancelPendingTransferPatch = () => {
+    pendingTransferPatch = null;
+    if (!transferPatchFrame) return;
+    const cancel = globalThis.cancelAnimationFrame || globalThis.clearTimeout;
+    cancel(transferPatchFrame);
+    transferPatchFrame = 0;
+  };
+
+  signaling.on("connected", () => {
+    store.patch({ signalingStatus: "online" });
+  });
+
+  signaling.on("connection-failed", () => {
+    if (!runtime.productionSignaling) return;
+    const wasOffline = store.getState().signalingStatus === "offline";
+    store.patch({ signalingStatus: "offline", peers: [] });
+    if (!wasOffline) view.toast(view.translate("signalingUnavailable"));
+  });
 
   signaling.on("disconnected", () => {
     if (!runtime.productionSignaling) return;
+    const wasOnline = store.getState().signalingStatus === "online";
     transport.close?.();
+    cancelPendingTransferPatch();
     resolveQrCancellation();
     clearVerificationWaiters();
     store.patch({
@@ -41,12 +74,13 @@ export function createController({
       transfer: null,
       path: "unknown",
       chatMessages: [],
-      unreadChatCount: 0
+      unreadChatCount: 0,
+      signalingStatus: "offline"
     });
     activePeerId = null;
     incomingInvite = null;
     view.closeDynamicIsland();
-    view.toast(view.translate("signalingLost"));
+    if (wasOnline) view.toast(view.translate("signalingLost"));
   });
 
   signaling.on("route:error", (payload = {}) => {
@@ -211,6 +245,7 @@ export function createController({
   });
 
   transfer.on?.("received", (result) => {
+    cancelPendingTransferPatch();
     const receivedItems = (result.files || []).map((file) => ({
       id: file.fileId,
       transferId: result.sessionId,
@@ -223,7 +258,7 @@ export function createController({
       url: file.blob ? URL.createObjectURL(file.blob) : "",
       downloadName: file.name,
       status: file.openUnavailable ? "saved" : "ready",
-      canSave: Boolean(file.blob)
+      canSave: Boolean(file.blob || file.canSave)
     }));
     store.update((state) => ({
       ...state,
@@ -234,14 +269,16 @@ export function createController({
   });
 
   transfer.on?.("receive-progress", (progress) => {
-    store.patch({ transfer: { ...progress, direction: "receive" } });
+    scheduleTransferPatch({ ...progress, direction: "receive" });
   });
 
   transfer.on?.("failed", () => {
+    cancelPendingTransferPatch();
     store.patch({ transfer: null });
   });
 
   transfer.on?.("canceled", () => {
+    cancelPendingTransferPatch();
     store.patch({ transfer: null });
   });
 
@@ -532,11 +569,12 @@ export function createController({
         pairingId,
         onProgress(progress) {
           if (!isActiveConnection(connectedPeerId, pairingId)) return;
-          store.patch({ transfer: { ...progress, direction: "send" } });
+          scheduleTransferPatch({ ...progress, direction: "send" });
         }
       });
     } catch {
       if (!isActiveConnection(connectedPeerId, pairingId)) return;
+      cancelPendingTransferPatch();
       store.patch({ transfer: null });
       view.toast(view.translate("transferFailed"));
       return;
@@ -616,6 +654,7 @@ export function createController({
     const current = store.getState();
     if (!current.connectedPeerId || current.mode === "disconnecting") return;
     view.pulseDisconnectHaptic();
+    cancelPendingTransferPatch();
     store.patch({ mode: "disconnecting", transfer: null });
     view.closeAllSheets();
     view.closeDynamicIsland();

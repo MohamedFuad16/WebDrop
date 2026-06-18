@@ -13,6 +13,7 @@ import { TurnConfigProvider } from "./turn-provider.js";
 const logger = createLogger("server");
 
 export function createWebDropServer({ env = process.env, logger: providedLogger = logger, fetchImpl = fetch } = {}) {
+  const environmentStatus = validateServerEnvironment(env);
   const maxJsonBytes = parsePositiveInt(env.MAX_JSON_BYTES, 65536);
   const turnProvider = new TurnConfigProvider({ env, fetchImpl, logger: providedLogger });
   const permissionPolicy = new PermissionPolicyProvider({ env });
@@ -24,9 +25,6 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
   });
   const metrics = new ServerMetrics();
   const allowedOrigins = parseAllowedOrigins(env.ALLOWED_ORIGINS);
-  if (env.NODE_ENV === "production" && allowedOrigins.length === 0) {
-    throw new Error("ALLOWED_ORIGINS is required when NODE_ENV=production.");
-  }
   const httpRateLimits = new TokenBucket({ capacity: 60, refillPerSecond: 10 });
 
   const server = http.createServer(async (request, response) => {
@@ -65,6 +63,20 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
           service: "webdrop-signaling",
           uptimeSeconds: Math.round(process.uptime()),
           time: new Date().toISOString()
+        }, corsHeaders || {});
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/readyz") {
+        sendJson(response, 200, {
+          ok: true,
+          service: "webdrop-signaling",
+          environment: environmentStatus.environment,
+          allowedOrigins: environmentStatus.allowedOrigins,
+          turnConfigured: environmentStatus.turnConfigured,
+          turnFallbackAllowed: environmentStatus.turnFallbackAllowed,
+          turnAuthRequired: environmentStatus.turnAuthRequired,
+          proximityAnalysisEnabled: proximityAnalyzer.enabled
         }, corsHeaders || {});
         return;
       }
@@ -198,6 +210,45 @@ function parseAllowedOrigins(value) {
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+}
+
+export function validateServerEnvironment(env = process.env) {
+  const environment = env.NODE_ENV || "development";
+  const allowedOrigins = parseAllowedOrigins(env.ALLOWED_ORIGINS);
+  const turnConfigured = Boolean(env.CLOUDFLARE_TURN_KEY_ID && env.CLOUDFLARE_TURN_API_TOKEN);
+  const turnFallbackAllowed = env.ALLOW_STUN_FALLBACK !== "false";
+  const turnAuthRequired = env.REQUIRE_TURN_AUTH !== "false";
+
+  if (environment === "production") {
+    if (allowedOrigins.length === 0) {
+      throw new Error("ALLOWED_ORIGINS is required when NODE_ENV=production.");
+    }
+    if (allowedOrigins.includes("*")) {
+      throw new Error("ALLOWED_ORIGINS cannot contain a wildcard in production.");
+    }
+    if (!turnAuthRequired) {
+      throw new Error("REQUIRE_TURN_AUTH must remain enabled in production.");
+    }
+    if (!turnFallbackAllowed && !turnConfigured) {
+      throw new Error("Cloudflare TURN credentials are required when STUN fallback is disabled.");
+    }
+    if (env.ENABLE_METRICS_ENDPOINT === "true" && isPlaceholderSecret(env.METRICS_API_TOKEN)) {
+      throw new Error("A non-placeholder METRICS_API_TOKEN is required when metrics are enabled.");
+    }
+  }
+
+  return {
+    environment,
+    allowedOrigins: allowedOrigins.length,
+    turnConfigured,
+    turnFallbackAllowed,
+    turnAuthRequired
+  };
+}
+
+function isPlaceholderSecret(value) {
+  const text = String(value || "").trim();
+  return !text || /^(replace|change|example|placeholder)/i.test(text);
 }
 
 function hasMetricsAuthorization(request, expectedToken) {

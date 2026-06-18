@@ -19,6 +19,7 @@ export class WebRtcTransport extends Emitter {
     this.rtcConfig = rtcConfig;
     this.protocolOptions = protocolOptions;
     this.peerConnection = null;
+    this.peerConnectionPromise = null;
     this.channel = null;
     this.controlChannel = null;
     this.fileChannel = null;
@@ -164,24 +165,24 @@ export class WebRtcTransport extends Emitter {
     this.peerId = this.peerId || peerId;
     this.pairingId = this.pairingId || pairingId;
 
-    if (!this.peerConnection) await this._createPeerConnection({ initiator: false });
+    const connection = await this._createPeerConnection({ initiator: false });
     switch (signal.type) {
       case "offer": {
-        await this.peerConnection.setRemoteDescription(normalizeSessionDescription(signal, "offer"));
+        await connection.setRemoteDescription(normalizeSessionDescription(signal, "offer"));
         await this._flushPendingCandidates();
-        const answer = await this.peerConnection.createAnswer();
-        await this.peerConnection.setLocalDescription(answer);
-        await this._sendSignal({ type: "answer", description: this.peerConnection.localDescription });
+        const answer = await connection.createAnswer();
+        await connection.setLocalDescription(answer);
+        await this._sendSignal({ type: "answer", description: connection.localDescription });
         break;
       }
       case "answer":
-        await this.peerConnection.setRemoteDescription(normalizeSessionDescription(signal, "answer"));
+        await connection.setRemoteDescription(normalizeSessionDescription(signal, "answer"));
         await this._flushPendingCandidates();
         break;
       case "candidate":
       case "ice-candidate":
-        if (signal.candidate && this.peerConnection.remoteDescription) {
-          await this.peerConnection.addIceCandidate(signal.candidate);
+        if (signal.candidate && connection.remoteDescription) {
+          await connection.addIceCandidate(signal.candidate);
         } else if (signal.candidate) {
           this.pendingCandidates.push(signal.candidate);
         }
@@ -213,6 +214,7 @@ export class WebRtcTransport extends Emitter {
     this.fileChannel = null;
     this.channel = null;
     this.peerConnection = null;
+    this.peerConnectionPromise = null;
     this.pendingCandidates = [];
     this.peerId = null;
     this.pairingId = null;
@@ -220,34 +222,45 @@ export class WebRtcTransport extends Emitter {
   }
 
   async _createPeerConnection({ initiator }) {
-    if (this.peerConnection) return;
-    const iceServers = await this.turnConfig.getIceServers();
-    this.emit("peer-connection-create", { initiator, iceServerCount: iceServers.length });
-    const connection = new RTCPeerConnection({ ...this.rtcConfig, iceServers });
-    this.peerConnection = connection;
-    connection.addEventListener("icecandidate", ({ candidate }) => {
-      if (candidate) this._sendSignal({ type: "ice-candidate", candidate }).catch((error) => {
-        this.emit("error", { error, stage: "ice-candidate" });
-      });
-    });
-    connection.addEventListener("datachannel", ({ channel }) => this._attachDataChannel(channel));
-    connection.addEventListener("connectionstatechange", () => {
-      this.emit("connection-state", { state: connection.connectionState });
-      if (["connected", "failed", "disconnected"].includes(connection.connectionState)) {
-        this.getPathStats().then((stats) => this.emit("path-stats", stats)).catch(() => {});
-      }
-    });
-    connection.addEventListener("iceconnectionstatechange", () => {
-      this.emit("ice-state", { state: connection.iceConnectionState });
-    });
+    if (this.peerConnection) return this.peerConnection;
+    if (this.peerConnectionPromise) return this.peerConnectionPromise;
 
-    if (initiator) {
-      this._attachDataChannel(connection.createDataChannel(DATA_CHANNEL_LABELS.control, {
-        ordered: true
-      }));
-      this._attachDataChannel(connection.createDataChannel(DATA_CHANNEL_LABELS.file, {
-        ordered: true
-      }));
+    this.peerConnectionPromise = (async () => {
+      const iceServers = await this.turnConfig.getIceServers();
+      this.emit("peer-connection-create", { initiator, iceServerCount: iceServers.length });
+      const connection = new RTCPeerConnection({ ...this.rtcConfig, iceServers });
+      this.peerConnection = connection;
+      connection.addEventListener("icecandidate", ({ candidate }) => {
+        if (candidate) this._sendSignal({ type: "ice-candidate", candidate }).catch((error) => {
+          this.emit("error", { error, stage: "ice-candidate" });
+        });
+      });
+      connection.addEventListener("datachannel", ({ channel }) => this._attachDataChannel(channel));
+      connection.addEventListener("connectionstatechange", () => {
+        this.emit("connection-state", { state: connection.connectionState });
+        if (["connected", "failed", "disconnected"].includes(connection.connectionState)) {
+          this.getPathStats().then((stats) => this.emit("path-stats", stats)).catch(() => {});
+        }
+      });
+      connection.addEventListener("iceconnectionstatechange", () => {
+        this.emit("ice-state", { state: connection.iceConnectionState });
+      });
+
+      if (initiator) {
+        this._attachDataChannel(connection.createDataChannel(DATA_CHANNEL_LABELS.control, {
+          ordered: true
+        }));
+        this._attachDataChannel(connection.createDataChannel(DATA_CHANNEL_LABELS.file, {
+          ordered: true
+        }));
+      }
+      return connection;
+    })();
+
+    try {
+      return await this.peerConnectionPromise;
+    } finally {
+      this.peerConnectionPromise = null;
     }
   }
 
@@ -296,8 +309,10 @@ export class WebRtcTransport extends Emitter {
   }
 
   async _flushPendingCandidates() {
+    const connection = this.peerConnection;
+    if (!connection) return;
     for (const candidate of this.pendingCandidates.splice(0)) {
-      await this.peerConnection.addIceCandidate(candidate);
+      await connection.addIceCandidate(candidate);
     }
   }
 

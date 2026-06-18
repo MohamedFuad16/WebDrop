@@ -8,13 +8,50 @@ cd "${SERVER_DIR}"
 BASE_URL="${BASE_URL:-http://127.0.0.1:8080}"
 WS_URL="${WS_URL:-${BASE_URL/http:/ws:}/ws}"
 ORIGIN="${ORIGIN:-}"
-export BASE_URL WS_URL ORIGIN
+EXPECT_TURN="${EXPECT_TURN:-false}"
+export BASE_URL WS_URL ORIGIN EXPECT_TURN
+
+assert_json_endpoint() {
+  local url="$1"
+  local origin="$2"
+  local assertion="$3"
+  local response_file
+  response_file="$(mktemp)"
+
+  local status
+  if [[ -n "$origin" ]]; then
+    status="$(curl -sS -o "$response_file" -w '%{http_code}' -H "Origin: ${origin}" "$url")"
+  else
+    status="$(curl -sS -o "$response_file" -w '%{http_code}' "$url")"
+  fi
+  if [[ "$status" != "200" ]]; then
+    echo "Request to ${url} failed with HTTP ${status}." >&2
+    node -e '
+      const fs = require("node:fs");
+      const text = fs.readFileSync(process.argv[1], "utf8");
+      try { console.error(JSON.parse(text)); } catch { console.error(text || "<empty response>"); }
+    ' "$response_file"
+    rm -f "$response_file"
+    return 1
+  fi
+
+  node -e "
+    const fs = require('node:fs');
+    const body = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
+    if (!(${assertion})) process.exit(1);
+    console.log(body);
+  " "$response_file"
+  rm -f "$response_file"
+}
 
 echo "Checking ${BASE_URL}/healthz"
-curl -fsS "${BASE_URL}/healthz" | node -e 'const chunks=[];process.stdin.on("data",c=>chunks.push(c));process.stdin.on("end",()=>{const body=JSON.parse(Buffer.concat(chunks)); if(!body.ok) process.exit(1); console.log(body);});'
+assert_json_endpoint "${BASE_URL}/healthz" "" 'body.ok === true'
+
+echo "Checking ${BASE_URL}/readyz"
+assert_json_endpoint "${BASE_URL}/readyz" "" 'body.ok === true && body.turnAuthRequired === true'
 
 echo "Checking ${BASE_URL}/api/proximity-policy"
-curl -fsS ${ORIGIN:+-H "Origin: ${ORIGIN}"} "${BASE_URL}/api/proximity-policy" | node -e 'const chunks=[];process.stdin.on("data",c=>chunks.push(c));process.stdin.on("end",()=>{const body=JSON.parse(Buffer.concat(chunks)); if(typeof body.proximity?.enabled !== "boolean") process.exit(1); console.log({proximity: body.proximity.mode, permissions: body.permissions.mode});});'
+assert_json_endpoint "${BASE_URL}/api/proximity-policy" "${ORIGIN}" 'typeof body.proximity?.enabled === "boolean"'
 
 echo "Checking WebSocket upgrade and TURN credential proxy at ${WS_URL}"
 node --input-type=module <<'NODE'
@@ -44,11 +81,20 @@ socket.on("message", async (data) => {
         console.error({ status: response.status, body });
         process.exit(1);
       }
+      const hasTurn = body.iceServers.some((entry) => {
+        const urls = Array.isArray(entry.urls) ? entry.urls : [entry.urls];
+        return urls.some((url) => typeof url === "string" && /^turns?:/i.test(url));
+      });
+      if (process.env.EXPECT_TURN === "true" && !hasTurn) {
+        console.error("Expected managed TURN credentials, but the response contained STUN only.");
+        process.exit(1);
+      }
       clearTimeout(timeout);
       console.log({
         connected: true,
         id: message.payload.id,
         iceServers: body.iceServers.length,
+        hasTurn,
         relayPolicy: body.relayPolicy
       });
       socket.close();

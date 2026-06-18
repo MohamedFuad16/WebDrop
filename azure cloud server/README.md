@@ -42,7 +42,7 @@ Browser static app over HTTPS
         v
 nginx TLS/WSS proxy on Azure VM
         |
-        | /ws, /healthz, /api/ice-servers
+        | /ws, /healthz, /readyz, /api/ice-servers
         v
 Node signaling server on 127.0.0.1:8080
         |
@@ -107,7 +107,7 @@ The first client message must be:
     },
     "capabilities": {
       "webRtc": true,
-      "storage": "opfs"
+      "storage": "stream-download"
     }
   }
 }
@@ -180,14 +180,14 @@ The transfer manifest tells the receiver what is coming over the `RTCDataChannel
   "payload": {
     "transferId": "tx-1",
     "totalBytes": 2500000,
-    "chunkSize": 65536,
+    "chunkSize": 262144,
     "files": [
       {
         "id": "file-1",
         "name": "demo.pdf",
         "type": "application/pdf",
         "size": 2500000,
-        "chunks": 39,
+        "chunks": 10,
         "lastModified": 1781443265000
       }
     ]
@@ -201,8 +201,10 @@ The actual file path should be:
 2. Sender creates a manifest and routes it over WebSocket.
 3. Sender slices each `Blob` into chunks.
 4. Sender converts chunks to `ArrayBuffer` or sends supported binary chunks over `RTCDataChannel`.
-5. Receiver writes chunks using worker-backed storage.
-6. Receiver exports the file as a separate user-visible save/open step.
+5. Receiver persists incoming chunks into the app's deferred receive storage while the transfer is active, without prompting the browser download UI.
+6. When the user taps Save in the receive sheet, WebDrop exports through a browser download stream where supported, or through the size-limited Blob fallback on browsers such as iOS Safari.
+
+The active app caps each send session and each receive session at 500 MB. Save/export still depends on browser download behavior; normal web pages cannot silently choose an arbitrary filesystem path or reopen an OS Downloads file after the browser has released it.
 
 ## Proximity Score Readiness
 
@@ -320,7 +322,7 @@ Important variables:
 cd "azure cloud server"
 npm install
 npm run check
-npm test # reports that no Azure server test files are shipped in this build
+npm test # validates message schemas and Cloudflare TURN credential handling
 npm start
 ```
 
@@ -372,8 +374,18 @@ Verify:
 
 ```bash
 curl -fsS https://signal.example.com/healthz
-BASE_URL=https://signal.example.com WS_URL=wss://signal.example.com/ws ORIGIN=https://web-drop-lyart.vercel.app bash scripts/smoke-test.sh
+curl -fsS https://signal.example.com/readyz
+BASE_URL=https://signal.example.com WS_URL=wss://signal.example.com/ws ORIGIN=https://web-drop-lyart.vercel.app EXPECT_TURN=true bash scripts/smoke-test.sh
 ```
+
+From an authenticated operator Mac, the VM can be started, readiness-checked, or deallocated without remembering the Azure resource names:
+
+```bash
+bash scripts/azure-vm-start.sh
+bash scripts/azure-vm-stop.sh
+```
+
+`azure-vm-start.sh` waits for the public `/readyz` endpoint and prints an Azure Run Command diagnostic when the VM starts but nginx or Node does not become ready.
 
 ## nginx 10,000-User Readiness
 
@@ -395,7 +407,7 @@ nginx's documented default is only `512` connections per worker. The nginx limit
 For real production scale, add:
 
 - staged load testing
-- CloudWatch metrics and alarms
+- Azure Monitor metrics and alerts
 - process supervision metrics
 - autoscaling or multiple signaling nodes
 - Redis/shared presence if more than one Node process is used

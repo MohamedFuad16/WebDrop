@@ -13,18 +13,18 @@ const CONNECTED_ORBIT_RADII = [
   "calc(var(--orbit-size) * .23)"
 ];
 const ORBIT_LAYOUT_SLOTS = [
-  { ringIndex: 0, angle: 24 },
-  { ringIndex: 1, angle: 74 },
-  { ringIndex: 2, angle: 22 },
-  { ringIndex: 3, angle: 90 },
-  { ringIndex: 0, angle: 116 },
-  { ringIndex: 1, angle: 188 },
-  { ringIndex: 2, angle: 142 },
-  { ringIndex: 0, angle: 206 },
-  { ringIndex: 3, angle: 270 },
-  { ringIndex: 1, angle: 302 },
-  { ringIndex: 2, angle: 262 },
-  { ringIndex: 0, angle: 296 }
+  { ringIndex: 0, angle: 0 },
+  { ringIndex: 1, angle: 45 },
+  { ringIndex: 2, angle: 85 },
+  { ringIndex: 3, angle: 15 },
+  { ringIndex: 0, angle: 120 },
+  { ringIndex: 1, angle: 165 },
+  { ringIndex: 2, angle: 205 },
+  { ringIndex: 3, angle: 135 },
+  { ringIndex: 0, angle: 240 },
+  { ringIndex: 1, angle: 285 },
+  { ringIndex: 2, angle: 325 },
+  { ringIndex: 3, angle: 255 }
 ];
 const CONNECTED_LAYOUT = [
   { ringIndex: 0, angle: -30 },
@@ -105,6 +105,9 @@ export class AppView extends Emitter {
     this.nearbyQuery = "";
     this.avatarOptionsRendered = false;
     this.peerRenderSignature = "";
+    this.receivedRenderSignature = "";
+    this.chatRenderSignature = "";
+    this.lastChatMessageCount = 0;
     this.dynamicIsland = new DynamicIsland(document, (key, params) => this.translate(key, params));
     this.dynamicIsland.on("detected", (token) => this.emit("island-qr-detected", token));
     this.dynamicIsland.on("cancel", () => {
@@ -150,6 +153,7 @@ export class AppView extends Emitter {
         });
         return;
       }
+      if (!this.listeners.has(action) && this.handleLocalAction(action)) return;
       this.emit(action);
     });
 
@@ -333,6 +337,24 @@ export class AppView extends Emitter {
     return navigator.vibrate(duration);
   }
 
+  handleLocalAction(action) {
+    const actions = {
+      settings: () => this.openSettings(),
+      "close-settings": () => this.closeSettings(),
+      "open-information": () => this.openInformation(),
+      "back-to-settings": () => this.backToSettings(),
+      "close-information": () => this.closeInformation(),
+      "open-nearby-sheet": () => this.openNearbySheet(),
+      "close-nearby-sheet": () => this.closeNearbySheet(),
+      "close-action-sheet": () => this.closeActionSheets(),
+      "close-all-sheets": () => this.closeAllSheets()
+    };
+    const handler = actions[action];
+    if (!handler) return false;
+    handler();
+    return true;
+  }
+
   render(state) {
     this.currentState = state;
     this.nodes.app.dataset.mode = state.mode;
@@ -354,7 +376,11 @@ export class AppView extends Emitter {
     const connectedPeer = state.peers.find((peer) => peer.id === state.connectedPeerId);
     this.nodes.connectionLabel.textContent = connectedPeer
       ? this.translate("connectedWith", { name: connectedPeer.name })
-      : this.translate("lookingNearby");
+      : state.signalingStatus === "offline"
+        ? this.translate("signalingUnavailableShort")
+        : state.signalingStatus === "connecting"
+          ? this.translate("signalingConnecting")
+          : this.translate("lookingNearby");
     this.renderAvatarSettings(state);
     this.renderCapabilities(state.capabilities);
     this.renderPeers(state);
@@ -659,6 +685,20 @@ export class AppView extends Emitter {
   renderReceivedList(state) {
     if (!this.nodes.receivedList) return;
     const receivedItems = visibleReceivedItems(state);
+    const signature = [
+      state.locale || "en",
+      ...receivedItems.map((item) => [
+        item.id,
+        item.transferId,
+        item.name,
+        item.size,
+        item.status,
+        item.url ? "url" : "",
+        item.canSave ? "save" : ""
+      ].join(":"))
+    ].join("|");
+    if (signature === this.receivedRenderSignature) return;
+    this.receivedRenderSignature = signature;
     if (!receivedItems.length) {
       this.nodes.receivedList.innerHTML = `
         <div class="empty-receive">
@@ -699,6 +739,19 @@ export class AppView extends Emitter {
 
   renderChat(state) {
     if (!this.nodes.chatPanel) return;
+    const signature = [
+      state.locale || "en",
+      ...state.chatMessages.map((message) => {
+        const normalized = typeof message === "string"
+          ? { author: "self", text: message }
+          : message;
+        return `${normalized.author || ""}:${normalized.text || ""}:${normalized.receivedAt || ""}`;
+      })
+    ].join("|");
+    if (signature === this.chatRenderSignature) return;
+    const shouldScroll = this.isChatSheetOpen() && state.chatMessages.length > this.lastChatMessageCount;
+    this.chatRenderSignature = signature;
+    this.lastChatMessageCount = state.chatMessages.length;
     if (!state.chatMessages.length) {
       this.nodes.chatPanel.innerHTML = `<div class="chat-empty">${this.translate("noMessages")}</div>`;
       return;
@@ -718,12 +771,14 @@ export class AppView extends Emitter {
         }).join("")}
       </div>
     `;
-    requestAnimationFrame(() =>
-      this.nodes.chatPanel.scrollTo({
-        top: this.nodes.chatPanel.scrollHeight,
-        behavior: "smooth"
-      })
-    );
+    if (shouldScroll) {
+      requestAnimationFrame(() =>
+        this.nodes.chatPanel.scrollTo({
+          top: this.nodes.chatPanel.scrollHeight,
+          behavior: "smooth"
+        })
+      );
+    }
   }
 
   openPeerSheet(peer, { peers, direction = "outgoing" } = {}) {

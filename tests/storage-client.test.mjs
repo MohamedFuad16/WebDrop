@@ -4,11 +4,12 @@ import { StorageClient, StorageClientError } from "../js/storage/storage-client.
 
 const MB = 1024 * 1024;
 
-test("streams received chunks to a browser download writer and closes once", async () => {
+test("streams received chunks when deferred and Blob storage are unavailable", async () => {
   const writes = [];
   let closeCount = 0;
   const storage = new StorageClient(null, {
     enabled: true,
+    blobFallbackCapBytes: 0,
     streamSaver: {
       createWriteStream(name, options) {
         assert.equal(name, "hello.txt");

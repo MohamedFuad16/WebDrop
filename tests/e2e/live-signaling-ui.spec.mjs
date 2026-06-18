@@ -15,56 +15,143 @@ function collectConsoleProblems(page, bucket) {
 }
 
 test("live signaling lets two same-browser pages discover only each other and connect", async ({ browser, baseURL }, testInfo) => {
-  test.skip(testInfo.project.name !== "chromium-desktop", "Run the live UI signaling proof once on desktop Chromium.");
+  test.skip(
+    !["chromium-desktop", "webkit-iphone-15-pro"].includes(testInfo.project.name),
+    "Run the live UI signaling proof once per supported browser engine."
+  );
 
-  const runId = Date.now().toString(36);
+  const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const aliceName = `Alice Live ${runId}`;
+  const bobName = `Bob Live ${runId}`;
   const context = await browser.newContext();
-  const pageA = await context.newPage();
-  const pageB = await context.newPage();
   const consoleProblems = [];
-  collectConsoleProblems(pageA, consoleProblems);
-  collectConsoleProblems(pageB, consoleProblems);
+  try {
+    await context.route("**/js/config/runtime-config.js*", async (route) => {
+      await route.fulfill({
+        contentType: "application/javascript",
+        body: `globalThis.WEBDROP_RUNTIME_CONFIG = Object.freeze({
+          productionSignaling: true,
+          realProximityCeremony: false,
+          realTransfer: true,
+          qrPairing: false,
+          signalingUrl: "ws://127.0.0.1:8080/ws",
+          turnConfigUrl: "http://127.0.0.1:8080/api/ice-servers"
+        });`
+      });
+    });
 
-  await pageA.addInitScript(({ runId }) => {
-    localStorage.setItem("webdrop.deviceId", `pw-alice-device-${runId}`);
-    localStorage.setItem("webdrop.deviceName", "Alice Live");
-    localStorage.setItem("webdrop.motionPaused", "true");
-    sessionStorage.clear();
-  }, { runId });
-  await pageB.addInitScript(({ runId }) => {
-    localStorage.setItem("webdrop.deviceId", `pw-bob-device-${runId}`);
-    localStorage.setItem("webdrop.deviceName", "Bob Live");
-    localStorage.setItem("webdrop.motionPaused", "true");
-    sessionStorage.clear();
-  }, { runId });
+    const pageA = await context.newPage();
+    const pageB = await context.newPage();
+    let automaticDownloadsA = 0;
+    let automaticDownloadsB = 0;
+    pageA.on("download", () => {
+      automaticDownloadsA += 1;
+    });
+    pageB.on("download", () => {
+      automaticDownloadsB += 1;
+    });
+    collectConsoleProblems(pageA, consoleProblems);
+    collectConsoleProblems(pageB, consoleProblems);
 
-  await pageA.goto(`${baseURL}/?qa=live-signaling-a`, { waitUntil: "domcontentloaded" });
-  await pageB.goto(`${baseURL}/?qa=live-signaling-b`, { waitUntil: "domcontentloaded" });
+    await pageA.addInitScript(({ runId, aliceName }) => {
+      localStorage.setItem("webdrop.deviceId", `pw-alice-device-${runId}`);
+      localStorage.setItem("webdrop.deviceName", aliceName);
+      localStorage.setItem("webdrop.motionPaused", "true");
+      sessionStorage.clear();
+    }, { runId, aliceName });
+    await pageB.addInitScript(({ runId, bobName }) => {
+      localStorage.setItem("webdrop.deviceId", `pw-bob-device-${runId}`);
+      localStorage.setItem("webdrop.deviceName", bobName);
+      localStorage.setItem("webdrop.motionPaused", "true");
+      sessionStorage.clear();
+    }, { runId, bobName });
 
-  await pageA.locator("[data-action='open-nearby-sheet']").click();
-  await expect(pageA.locator(".nearby-device-row:has-text('Bob Live')")).toHaveCount(1, { timeout: 15_000 });
+    await pageA.goto(`${baseURL}/?qa=live-signaling-a`, { waitUntil: "domcontentloaded" });
+    await pageB.goto(`${baseURL}/?qa=live-signaling-b`, { waitUntil: "domcontentloaded" });
+    await expect(pageA.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 10_000 });
+    await expect(pageB.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 10_000 });
+    await expect(pageA.locator("[data-action='open-nearby-sheet']")).toBeVisible({ timeout: 10_000 });
+    await expect(pageB.locator("[data-action='open-nearby-sheet']")).toBeVisible({ timeout: 10_000 });
+    await expect(pageA.locator("[data-connection-label]")).toContainText(/Looking nearby|Connected with/, { timeout: 10_000 });
+    await expect(pageB.locator("[data-connection-label]")).toContainText(/Looking nearby|Connected with/, { timeout: 10_000 });
 
-  await pageB.locator("[data-action='open-nearby-sheet']").click();
-  await expect(pageB.locator(".nearby-device-row:has-text('Alice Live')")).toHaveCount(1, { timeout: 15_000 });
-  await pageB.locator("[data-action='close-nearby-sheet']").click();
+    await pageA.locator("[data-action='open-nearby-sheet']").click();
+    await expect(pageA.locator("[data-nearby-sheet]")).toBeVisible({ timeout: 10_000 });
+    await expect(pageA.locator(`.nearby-device-row:has-text('${bobName}')`)).toHaveCount(1, { timeout: 20_000 });
 
-  await pageA.locator(".nearby-device-row:has-text('Bob Live') .nearby-connect").click();
-  await expect(pageA.locator("[data-peer-sheet]")).toBeVisible({ timeout: 10_000 });
-  await pageA.locator("[data-swipe-thumb]").press("Enter");
-  await expect(pageB.locator("[data-peer-sheet]")).toBeVisible({ timeout: 15_000 });
-  await expect(pageB.locator("[data-sheet-peer-name]")).toContainText("Alice Live");
+    await pageB.locator("[data-action='open-nearby-sheet']").click();
+    await expect(pageB.locator("[data-nearby-sheet]")).toBeVisible({ timeout: 10_000 });
+    await expect(pageB.locator(`.nearby-device-row:has-text('${aliceName}')`)).toHaveCount(1, { timeout: 20_000 });
+    await pageB.locator("[data-action='close-nearby-sheet']").click();
 
-  await pageB.locator("[data-swipe-thumb]").press("Enter");
+    await pageA.locator(`.nearby-device-row:has-text('${bobName}') .nearby-connect`).click();
+    await expect(pageA.locator("[data-peer-sheet]")).toBeVisible({ timeout: 10_000 });
+    await pageA.locator("[data-swipe-thumb]").press("Enter");
+    await expect(pageB.locator("[data-peer-sheet]")).toBeVisible({ timeout: 15_000 });
+    await expect(pageB.locator("[data-sheet-peer-name]")).toContainText(aliceName);
 
-  await expect(pageA.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 45_000 });
-  await expect(pageB.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 45_000 });
-  await expect(pageA.locator("[data-connection-label]")).toContainText(/Bob Live|Connected with/, { timeout: 10_000 });
-  await expect(pageB.locator("[data-connection-label]")).toContainText(/Alice Live|Connected with/, { timeout: 10_000 });
+    await pageB.locator("[data-swipe-thumb]").press("Enter");
 
-  await pageA.locator("[data-action='disconnect']").first().click();
-  await expect(pageA.locator("#app")).toHaveAttribute("data-mode", "lobby", { timeout: 10_000 });
-  await expect(pageB.locator("#app")).toHaveAttribute("data-mode", "lobby", { timeout: 10_000 });
+    await expect(pageA.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 45_000 });
+    await expect(pageB.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 45_000 });
+    await expect(pageA.locator("[data-connection-label]")).toContainText(bobName, { timeout: 10_000 });
+    await expect(pageB.locator("[data-connection-label]")).toContainText(aliceName, { timeout: 10_000 });
 
-  await context.close();
-  expect(consoleProblems).toEqual([]);
+    const aliceFileName = `alice-to-bob-${runId}.bin`;
+    const bobFileName = `bob-to-alice-${runId}.bin`;
+    await pageA.locator("[data-action='open-send-sheet']").click();
+    await pageA.locator("[data-file-input]").setInputFiles({
+      name: aliceFileName,
+      mimeType: "application/octet-stream",
+      buffer: Buffer.alloc(320 * 1024, 0x41)
+    });
+    await pageB.locator("[data-action='open-send-sheet']").click();
+    await pageB.locator("[data-file-input]").setInputFiles({
+      name: bobFileName,
+      mimeType: "application/octet-stream",
+      buffer: Buffer.alloc(384 * 1024, 0x42)
+    });
+    await expect(pageA.locator("[data-send-swipe-control]")).toHaveClass(/is-ready/);
+    await expect(pageB.locator("[data-send-swipe-control]")).toHaveClass(/is-ready/);
+
+    await Promise.all([
+      pageA.locator("[data-send-swipe-thumb]").press("Enter"),
+      pageB.locator("[data-send-swipe-thumb]").press("Enter")
+    ]);
+
+    await expect(pageA.locator("[data-receive-badge]")).toHaveText("1", { timeout: 30_000 });
+    await expect(pageB.locator("[data-receive-badge]")).toHaveText("1", { timeout: 30_000 });
+    await expect(pageA.locator("[data-send-sheet]")).toBeHidden({ timeout: 30_000 });
+    await expect(pageB.locator("[data-send-sheet]")).toBeHidden({ timeout: 30_000 });
+    await pageA.locator("[data-action='open-receive-sheet']").click();
+    await pageB.locator("[data-action='open-receive-sheet']").click();
+    await expect(pageA.locator("[data-received-list]")).toContainText(bobFileName, { timeout: 10_000 });
+    await expect(pageB.locator("[data-received-list]")).toContainText(aliceFileName, { timeout: 10_000 });
+    expect(automaticDownloadsA).toBe(0);
+    expect(automaticDownloadsB).toBe(0);
+
+    const [downloadA] = await Promise.all([
+      pageA.waitForEvent("download"),
+      pageA.locator(`.received-file:has-text('${bobFileName}') [data-action='open-received']`).click()
+    ]);
+    const [downloadB] = await Promise.all([
+      pageB.waitForEvent("download"),
+      pageB.locator(`.received-file:has-text('${aliceFileName}') [data-action='open-received']`).click()
+    ]);
+    expect(downloadA.suggestedFilename()).toBe(bobFileName);
+    expect(downloadB.suggestedFilename()).toBe(aliceFileName);
+    expect(automaticDownloadsA).toBe(1);
+    expect(automaticDownloadsB).toBe(1);
+
+    await pageA.locator("[data-receive-sheet] [data-action='close-action-sheet']").click();
+    await pageB.locator("[data-receive-sheet] [data-action='close-action-sheet']").click();
+
+    await pageA.locator("[data-action='disconnect']").first().click();
+    await expect(pageA.locator("#app")).toHaveAttribute("data-mode", "lobby", { timeout: 10_000 });
+    await expect(pageB.locator("#app")).toHaveAttribute("data-mode", "lobby", { timeout: 10_000 });
+
+    expect(consoleProblems).toEqual([]);
+  } finally {
+    await context.close();
+  }
 });

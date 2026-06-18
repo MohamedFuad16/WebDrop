@@ -14,13 +14,22 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "off"
   },
-  webServer: {
-    command: "python3 -m http.server 4180 --bind 127.0.0.1",
-    url: "http://127.0.0.1:4180",
-    reuseExistingServer: !process.env.CI,
-    stdout: "ignore",
-    stderr: "pipe"
-  },
+  webServer: [
+    {
+      command: "node scripts/static-server.mjs . 4180 127.0.0.1",
+      url: "http://127.0.0.1:4180",
+      reuseExistingServer: !process.env.CI,
+      stdout: "ignore",
+      stderr: "pipe"
+    },
+    {
+      command: "npm --prefix \"azure cloud server\" run start:local",
+      url: "http://127.0.0.1:8080/healthz",
+      reuseExistingServer: !process.env.CI,
+      stdout: "ignore",
+      stderr: "pipe"
+    }
+  ],
   projects: [
     {
       name: "chromium-desktop",
@@ -33,6 +42,10 @@ export default defineConfig({
     {
       name: "chromium-pixel-8",
       use: { ...devices["Pixel 7"], browserName: "chromium" }
+    },
+    {
+      name: "webkit-iphone-15-pro",
+      use: { ...devices["iPhone 15 Pro"] }
     }
   ]
 });

@@ -1,6 +1,6 @@
 {
   "name": "webdrop-v2-static",
-  "version": "1.0.30",
+  "version": "1.0.34",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
     "test:relay": "playwright test tests/e2e/live-relay.spec.mjs --project=chromium-desktop",
     "verify": "npm run check && npm test",
     "verify:full": "npm run verify && npm run audit:secrets && npm audit --omit=dev && npm --prefix \"azure cloud server\" run check && npm --prefix \"azure cloud server\" test && npm --prefix \"azure cloud server\" audit --omit=dev && git diff --check",
-    "serve": "python3 -m http.server 4178"
+    "serve": "node scripts/static-server.mjs . 4178 127.0.0.1"
   },
   "dependencies": {
     "qrcode-generator": "2.0.4"

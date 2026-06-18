@@ -10,6 +10,17 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
+if [[ "$DOMAIN" == "signal.webdrop.example.com" ]]; then
+  echo "Set DOMAIN to the real signaling hostname before deployment." >&2
+  exit 1
+fi
+if [[ ! -f /etc/webdrop/signaling.env ]]; then
+  echo "Missing /etc/webdrop/signaling.env. Create it from .env.example before deployment." >&2
+  exit 1
+fi
+chown root:webdrop /etc/webdrop/signaling.env
+chmod 0640 /etc/webdrop/signaling.env
+
 install -d -o webdrop -g webdrop "$APP_DIR"
 rsync -a --delete \
   --exclude node_modules \
@@ -46,6 +57,15 @@ server {
         proxy_set_header X-Forwarded-For \$remote_addr;
         proxy_set_header X-Forwarded-Proto http;
     }
+
+    location /readyz {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$remote_addr;
+        proxy_set_header X-Forwarded-Proto http;
+    }
 }
 NGINX
   echo "TLS certificate was not found for ${DOMAIN}; installed HTTP bootstrap vhost. Run certbot-init.sh, then deploy.sh again."
@@ -58,4 +78,6 @@ systemctl enable webdrop-signaling
 systemctl restart webdrop-signaling
 systemctl reload nginx
 
+sleep 1
+curl -fsS http://127.0.0.1:8080/readyz >/dev/null
 echo "Deployed WebDrop signaling. Check: systemctl status webdrop-signaling --no-pager"

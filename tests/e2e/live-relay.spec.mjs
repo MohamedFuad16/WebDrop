@@ -1,12 +1,15 @@
 import { expect, test } from "@playwright/test";
 import WebSocket from "ws";
 
-const BASE_URL = process.env.WEBDROP_SIGNALING_BASE_URL || "https://webdrop-wss-0617.japaneast.cloudapp.azure.com";
-const WS_URL = process.env.WEBDROP_SIGNALING_WS_URL || "wss://webdrop-wss-0617.japaneast.cloudapp.azure.com/ws";
-const ORIGIN = process.env.WEBDROP_SIGNALING_ORIGIN || "https://web-drop-lyart.vercel.app";
+const BASE_URL = process.env.WEBDROP_SIGNALING_BASE_URL || "http://127.0.0.1:8080";
+const WS_URL = process.env.WEBDROP_SIGNALING_WS_URL || "ws://127.0.0.1:8080/ws";
+const ORIGIN = process.env.WEBDROP_SIGNALING_ORIGIN || "http://127.0.0.1:4180";
 
 test("live Cloudflare TURN relay carries bidirectional DataChannel bytes", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "chromium-desktop", "Run the live relay proof once on desktop Chromium.");
+  test.skip(
+    !["chromium-desktop", "webkit-iphone-15-pro"].includes(testInfo.project.name),
+    "Run the live relay proof once per supported browser engine."
+  );
 
   const { iceServers, relayPolicy } = await getLiveIceServers();
   expect(Array.isArray(iceServers)).toBe(true);
@@ -18,8 +21,8 @@ test("live Cloudflare TURN relay carries bidirectional DataChannel bytes", async
 
   expect(result.receivedByA).toBe(384 * 1024);
   expect(result.receivedByB).toBe(512 * 1024);
-  expect(result.messagesA).toBe(6);
-  expect(result.messagesB).toBe(8);
+  expect(result.messagesA).toBe(2);
+  expect(result.messagesB).toBe(2);
   expect(result.path).toBe("relay");
   expect(result.localCandidateType === "relay" || result.remoteCandidateType === "relay").toBe(true);
 });
@@ -224,8 +227,8 @@ async function runForcedRelayTransfer({ iceServers }) {
   await waitUntilInPage(() => channelB?.readyState === "open", "Relay peer channel did not open.");
 
   await Promise.all([
-    sendChunksInPage(channelA, 512 * 1024, 64 * 1024, 17),
-    sendChunksInPage(channelB, 384 * 1024, 64 * 1024, 29),
+    sendChunksInPage(channelA, 512 * 1024, 256 * 1024, 17),
+    sendChunksInPage(channelB, 384 * 1024, 256 * 1024, 29),
     doneA.promise,
     doneB.promise
   ]);
@@ -238,94 +241,5 @@ async function runForcedRelayTransfer({ iceServers }) {
     messagesA: received.messagesA,
     messagesB: received.messagesB,
     ...stats
-  };
-}
-
-async function sendChunks(channel, totalBytes, chunkBytes, seed) {
-  for (let offset = 0; offset < totalBytes; offset += chunkBytes) {
-    const size = Math.min(chunkBytes, totalBytes - offset);
-    const chunk = new Uint8Array(size);
-    chunk.fill((seed + offset / chunkBytes) % 255);
-    if (channel.bufferedAmount > 4 * 1024 * 1024) {
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error("Timed out waiting for DataChannel buffer.")), 10_000);
-        channel.bufferedAmountLowThreshold = 1024 * 1024;
-        channel.onbufferedamountlow = () => {
-          clearTimeout(timeout);
-          channel.onbufferedamountlow = null;
-          resolve();
-        };
-      });
-    }
-    channel.send(chunk);
-  }
-}
-
-function deferred(timeoutMs, message) {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  const timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
-  return {
-    promise: promise.finally(() => clearTimeout(timeout)),
-    resolve,
-    reject
-  };
-}
-
-function waitForOpen(channel) {
-  if (channel.readyState === "open") return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("DataChannel did not open.")), 20_000);
-    channel.onopen = () => {
-      clearTimeout(timeout);
-      resolve();
-    };
-  });
-}
-
-function waitUntil(predicate, message) {
-  const startedAt = Date.now();
-  return new Promise((resolve, reject) => {
-    const tick = () => {
-      if (predicate()) {
-        resolve();
-        return;
-      }
-      if (Date.now() - startedAt > 20_000) {
-        reject(new Error(message));
-        return;
-      }
-      setTimeout(tick, 50);
-    };
-    tick();
-  });
-}
-
-async function getPathStats(peerConnection) {
-  const stats = await peerConnection.getStats();
-  let selectedPair = null;
-  for (const report of stats.values()) {
-    if (report.type === "transport" && report.selectedCandidatePairId) {
-      selectedPair = stats.get(report.selectedCandidatePairId);
-    }
-    if (report.type === "candidate-pair" && report.state === "succeeded" && report.nominated) {
-      selectedPair = report;
-    }
-  }
-  const localCandidate = selectedPair ? stats.get(selectedPair.localCandidateId) : null;
-  const remoteCandidate = selectedPair ? stats.get(selectedPair.remoteCandidateId) : null;
-  const localCandidateType = localCandidate?.candidateType || "unknown";
-  const remoteCandidateType = remoteCandidate?.candidateType || "unknown";
-  return {
-    path: localCandidateType === "relay" || remoteCandidateType === "relay" ? "relay" : "direct",
-    localCandidateType,
-    remoteCandidateType,
-    localProtocol: localCandidate?.protocol || null,
-    remoteProtocol: remoteCandidate?.protocol || null,
-    currentRoundTripTime: selectedPair?.currentRoundTripTime ?? null
   };
 }

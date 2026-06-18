@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.30";
+const APP_VERSION = "1.0.34";
 const CHUNK_SIZE = 256 * 1024;
 
 const readinessItems = [
@@ -24,18 +24,18 @@ const readinessItems = [
   },
   {
     title: "Production signaling code",
-    status: "Ready, unconfigured",
-    score: 72,
+    status: "Ready, endpoint check required",
+    score: 82,
     checks: [
-      "Azure WebSocket server package exists",
+      "Azure WebSocket server package and local integration tests pass",
       "Presence, invites, RTC, chat and transfer metadata schemas",
       "nginx, Certbot, systemd and load-test assets"
     ]
   },
   {
     title: "TURN credential path",
-    status: "Ready, unconfigured",
-    score: 64,
+    status: "Ready, external verification",
+    score: 76,
     checks: [
       "Server-side Cloudflare TURN credential endpoint",
       "Frontend adapter requests temporary iceServers",
@@ -53,13 +53,13 @@ const readinessItems = [
     ]
   },
   {
-    title: "Streaming receive storage",
+    title: "Deferred receive storage",
     status: "Ready, live",
     score: 84,
     checks: [
       "500 MB send and receive session caps",
-      "StreamSaver browser download writer",
-      "Blob fallback waits for explicit Save"
+      "IndexedDB keeps desktop chunks pending until Save",
+      "iPhone and iPad Blob fallback waits for explicit Save"
     ]
   },
   {
@@ -75,9 +75,9 @@ const readinessItems = [
   {
     title: "Production proof",
     status: "External verification",
-    score: 34,
+    score: 42,
     checks: [
-      "Needs deployed WSS/TURN endpoint",
+      "Configured WSS/TURN endpoint must remain reachable and healthy",
       "Needs physical iOS/Android calibration",
       "Needs direct and relay transfer proof"
     ]
@@ -85,13 +85,11 @@ const readinessItems = [
 ];
 
 const blockers = [
-  ["Deploy Azure signaling", "Configure Azure VM, DNS, TLS, nginx, systemd, firewall and health checks.", "High"],
-  ["Rotate and configure TURN", "Use valid Cloudflare TURN Server credentials only in the Azure VM environment file.", "High"],
-  ["Set production URLs", "Configure WSS and TURN endpoint URLs in js/config/runtime-config.js.", "High"],
+  ["Verify Azure signaling availability", "The configured Japan East health, WSS and ICE endpoints must pass from the public app before launch.", "High"],
+  ["Verify TURN credentials", "Confirm the server can issue temporary Cloudflare TURN credentials without exposing the long-lived token.", "High"],
   ["Calibrate proximity", "Test QR, microphone chirps, tilt and bump on physical iOS and Android devices.", "High"],
   ["Prove real transfer", "Run direct and TURN file transfers with cancellation, retry and storage exhaustion cases.", "High"],
   ["Load test signaling", "Ramp WebSocket load toward the 10,000-client target while watching nginx and Node limits.", "Medium"],
-  ["Add real tests", "Replace placeholder test commands with unit, WebSocket, worker and Playwright suites.", "Medium"],
   ["Plan horizontal scale", "Add shared state such as Redis or sticky session routing before multi-node signaling.", "Medium"]
 ];
 
@@ -137,6 +135,7 @@ function bindEvents() {
   $("[data-action='ws-ping']").addEventListener("click", sendPing);
   $("[data-action='ws-disconnect']").addEventListener("click", disconnectWebSocket);
   $("[data-action='probe-health']").addEventListener("click", () => probeApi("/healthz"));
+  $("[data-action='probe-ready']").addEventListener("click", () => probeApi("/readyz"));
   $("[data-action='probe-ice']").addEventListener("click", () => probeApi("/api/ice-servers"));
   $("[data-action='probe-metrics']").addEventListener("click", () => probeApi("/api/metrics-summary"));
   $("[data-action='ice-gather']").addEventListener("click", gatherIceCandidates);
@@ -293,7 +292,9 @@ async function probeApi(path) {
   }
   const headers = {};
   const token = $("[data-bearer-token]").value.trim();
-  if (token && path !== "/healthz") headers.Authorization = `Bearer ${token}`;
+  if (token && !["/healthz", "/readyz"].includes(path)) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   try {
     const url = path === "/api/ice-servers"
       ? `${base}${path}?clientId=${encodeURIComponent(adminState.session?.id || `admin-${Date.now()}`)}`

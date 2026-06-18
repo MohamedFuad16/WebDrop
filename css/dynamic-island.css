@@ -427,7 +427,8 @@
 
 .app-shell[data-theme="light"] .webdrop-island__wave {
   opacity: 1;
-  filter: saturate(1.32) contrast(1.28) brightness(1.18) drop-shadow(0 14px 30px rgba(38, 121, 242, .22));
+  mix-blend-mode: multiply;
+  filter: saturate(1.28) contrast(1.18) drop-shadow(0 14px 30px rgba(38, 121, 242, .2));
 }
 
 @keyframes islandScan {

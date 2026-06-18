@@ -1,11 +1,21 @@
 import { Emitter } from "../utils/emitter.js";
 
 export class WebSocketSignalingAdapter extends Emitter {
-  constructor({ url, protocols, WebSocketImpl = globalThis.WebSocket } = {}) {
+  constructor({
+    url,
+    protocols,
+    WebSocketImpl = globalThis.WebSocket,
+    handshakeTimeoutMs = 8000,
+    setTimeoutImpl,
+    clearTimeoutImpl
+  } = {}) {
     super();
     this.url = url;
     this.protocols = protocols;
     this.WebSocketImpl = WebSocketImpl;
+    this.handshakeTimeoutMs = handshakeTimeoutMs;
+    this.setTimeoutImpl = setTimeoutImpl || ((callback, delay) => globalThis.setTimeout(callback, delay));
+    this.clearTimeoutImpl = clearTimeoutImpl || ((timer) => globalThis.clearTimeout(timer));
     this.socket = null;
     this.connectPromise = null;
     this.turnAccessToken = "";
@@ -19,7 +29,7 @@ export class WebSocketSignalingAdapter extends Emitter {
 
   async connect(payload) {
     if (!this.url) {
-      this.emit("unconfigured", { reason: "Production WSS endpoint is intentionally not built in this repo." });
+      this.emit("unconfigured", { reason: "Production signaling URL is not configured." });
       return false;
     }
     if (!this.WebSocketImpl) throw new Error("WebSocket is not available in this environment.");
@@ -34,7 +44,10 @@ export class WebSocketSignalingAdapter extends Emitter {
     this.socket = socket;
     this.selfId = payload?.self?.id || "";
     this.connectPromise = new Promise((resolve, reject) => {
+      let handshakeTimer = 0;
       const cleanupHandshake = () => {
+        this.clearTimeoutImpl(handshakeTimer);
+        handshakeTimer = 0;
         socket.removeEventListener("open", onOpen);
         socket.removeEventListener("error", onError);
         socket.removeEventListener("close", onCloseBeforeOpen);
@@ -58,9 +71,17 @@ export class WebSocketSignalingAdapter extends Emitter {
         this.emit("connection-failed", { reason: "socket-closed-before-open" });
         resolve(false);
       };
+      const onHandshakeTimeout = () => {
+        cleanupHandshake();
+        this.emit("connection-failed", { reason: "socket-handshake-timeout" });
+        this.scheduleReconnect();
+        socket.close();
+        resolve(false);
+      };
       socket.addEventListener("open", onOpen, { once: true });
       socket.addEventListener("error", onError, { once: true });
       socket.addEventListener("close", onCloseBeforeOpen, { once: true });
+      handshakeTimer = this.setTimeoutImpl(onHandshakeTimeout, this.handshakeTimeoutMs);
     }).finally(() => {
       this.connectPromise = null;
     });
@@ -108,7 +129,7 @@ export class WebSocketSignalingAdapter extends Emitter {
 
   async disconnect() {
     this.shouldReconnect = false;
-    globalThis.clearTimeout(this.reconnectTimer);
+    this.clearTimeoutImpl(this.reconnectTimer);
     this.reconnectTimer = 0;
     this.stopHeartbeat();
     this.socket?.close();
@@ -200,7 +221,7 @@ export class WebSocketSignalingAdapter extends Emitter {
     if (!this.shouldReconnect || !this.url || !this.lastConnectPayload || this.reconnectTimer) return;
     const delay = Math.min(15000, 1000 * (2 ** this.reconnectAttempt));
     this.reconnectAttempt += 1;
-    this.reconnectTimer = globalThis.setTimeout(() => {
+    this.reconnectTimer = this.setTimeoutImpl(() => {
       this.reconnectTimer = 0;
       this.connect(this.lastConnectPayload).catch(() => this.scheduleReconnect());
     }, delay);

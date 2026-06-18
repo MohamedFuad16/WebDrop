@@ -94,9 +94,11 @@ function parsePositiveInt(value, fallback) {
 
 function sanitizeCustomIdentifier(value) {
   if (!value) return "";
+  // Cloudflare rejects custom identifiers longer than 64 characters with
+  // "invalid argument"; WebDrop browser client ids can be longer than that.
   return String(value)
     .replace(/[^a-zA-Z0-9_.:-]/g, "-")
-    .slice(0, 128);
+    .slice(0, 64);
 }
 
 async function safeText(response) {
