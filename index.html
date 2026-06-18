@@ -202,6 +202,27 @@
         </div>
       </section>
 
+      <section class="bottom-sheet qr-choice-sheet" data-connection-method-sheet hidden role="dialog" aria-modal="true" aria-labelledby="connection-method-title" aria-describedby="connection-method-copy" aria-label="Choose connection method" data-i18n-aria="connectionMethodDialog" tabindex="-1">
+        <button class="sheet-close-icon" type="button" data-action="close-connection-method" aria-label="Close connection choices" data-i18n-aria="closeConnectionMethod">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg>
+        </button>
+        <span class="sheet-handle" aria-hidden="true"></span>
+        <p class="sheet-kicker" data-i18n="connectionMethodKicker">Nearby connection</p>
+        <h2 id="connection-method-title" data-i18n="connectionMethodTitle">How do you want to connect?</h2>
+        <p id="connection-method-copy" data-i18n="connectionMethodCopy">Use the physical ceremony, or choose QR as the backup.</p>
+        <strong class="qr-choice-sheet__peer" data-connection-method-peer></strong>
+        <div class="qr-choice-sheet__actions">
+          <button type="button" data-action="connection-bump">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h4l2-6 3 12 2-6h3M4 4l2 2M20 4l-2 2M4 20l2-2M20 20l-2-2"></path></svg>
+            <span><strong data-i18n="connectionBump">Bump</strong><small data-i18n="connectionBumpHelp">Ultrasound, bump, and tilt score above 90</small></span>
+          </button>
+          <button type="button" data-action="connection-qr">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM15 14h2M20 14v3M14 18h3v2M20 20h.01"></path></svg>
+            <span><strong data-i18n="connectionQr">QR code</strong><small data-i18n="connectionQrHelp">Show or scan a one-time backup code</small></span>
+          </button>
+        </div>
+      </section>
+
       <section class="bottom-sheet qr-choice-sheet" data-qr-sheet hidden role="dialog" aria-modal="true" aria-labelledby="qr-choice-title" aria-describedby="qr-choice-copy" aria-label="Manual QR connection" data-i18n-aria="qrConnectionDialog" tabindex="-1">
         <button class="sheet-close-icon" type="button" data-action="close-qr-sheet" aria-label="Close QR connection" data-i18n-aria="closeQrConnection">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg>
@@ -278,7 +299,7 @@
         </button>
         <div class="app-version">
           <span data-i18n="appVersion">App version</span>
-          <strong>1.0.39</strong>
+          <strong>1.0.40</strong>
         </div>
       </section>
 
@@ -402,8 +423,8 @@
       <input data-file-input type="file" multiple hidden>
     </div>
 
-    <script src="js/vendor/jsqr.js?v=1.0.39"></script>
-    <script src="js/config/runtime-config.js?v=1.0.39"></script>
-    <script type="module" src="js/app.js?v=1.0.39"></script>
+    <script src="js/vendor/jsqr.js?v=1.0.40"></script>
+    <script src="js/config/runtime-config.js?v=1.0.40"></script>
+    <script type="module" src="js/app.js?v=1.0.40"></script>
   </body>
 </html>

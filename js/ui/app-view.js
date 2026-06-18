@@ -1,8 +1,8 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.39";
-import { formatBytes } from "../utils/format.js?v=1.0.39";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.39";
-import { translate } from "../config/i18n.js?v=1.0.39";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.39";
+import { Emitter } from "../utils/emitter.js?v=1.0.40";
+import { formatBytes } from "../utils/format.js?v=1.0.40";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.40";
+import { translate } from "../config/i18n.js?v=1.0.40";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.40";
 
 const ORBIT_RADII = [".46", ".37", ".28", ".19"];
 const ORBIT_PEER_LIMIT = 12;
@@ -54,6 +54,8 @@ export class AppView extends Emitter {
       connectedPeer: document.querySelector("[data-connected-peer]"),
       disconnectHaptic: document.querySelector("[data-disconnect-haptic]"),
       peerSheet: document.querySelector("[data-peer-sheet]"),
+      connectionMethodSheet: document.querySelector("[data-connection-method-sheet]"),
+      connectionMethodPeer: document.querySelector("[data-connection-method-peer]"),
       qrSheet: document.querySelector("[data-qr-sheet]"),
       qrSheetPeer: document.querySelector("[data-qr-sheet-peer]"),
       qrSheetCopy: document.querySelector("[data-qr-sheet-copy]"),
@@ -312,6 +314,7 @@ export class AppView extends Emitter {
       "open-information": () => this.openInformation(),
       "back-to-settings": () => this.backToSettings(),
       "close-information": () => this.closeInformation(),
+      "close-connection-method": () => this.closeConnectionMethodSheet(),
       "close-qr-sheet": () => this.closeQrChoiceSheet(),
       "close-action-sheet": () => this.closeActionSheets(),
       "close-all-sheets": () => this.closeAllSheets()
@@ -404,6 +407,19 @@ export class AppView extends Emitter {
 
   closeDynamicIsland() {
     return this.dynamicIsland.close();
+  }
+
+  openConnectionMethodSheet(peer) {
+    if (!this.nodes.connectionMethodSheet) return;
+    if (this.nodes.connectionMethodPeer) {
+      this.nodes.connectionMethodPeer.textContent = this.translate("connectionMethodPeer", { name: peer.name });
+    }
+    this.showSheet(this.nodes.connectionMethodSheet);
+  }
+
+  closeConnectionMethodSheet() {
+    if (!this.nodes.connectionMethodSheet) return Promise.resolve();
+    return this.hideSheet(this.nodes.connectionMethodSheet);
   }
 
   openQrChoiceSheet(peer, { incoming = false, suggestedRole = "show" } = {}) {
@@ -856,6 +872,7 @@ export class AppView extends Emitter {
   closeAllSheets() {
     [
       this.nodes.peerSheet,
+      this.nodes.connectionMethodSheet,
       this.nodes.qrSheet,
       this.nodes.settingsSheet,
       this.nodes.informationSheet,
@@ -913,6 +930,7 @@ export class AppView extends Emitter {
         this.sheetHideTimers.delete(sheet);
         const anyVisible = [
           this.nodes.peerSheet,
+          this.nodes.connectionMethodSheet,
           this.nodes.qrSheet,
           this.nodes.settingsSheet,
           this.nodes.informationSheet,
@@ -994,6 +1012,7 @@ export class AppView extends Emitter {
   visibleSheet() {
     return [
       this.nodes.peerSheet,
+      this.nodes.connectionMethodSheet,
       this.nodes.qrSheet,
       this.nodes.settingsSheet,
       this.nodes.informationSheet,

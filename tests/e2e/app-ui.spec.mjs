@@ -320,6 +320,8 @@ test("connects from the global proximity button, selects a file, and shows Dynam
   await page.locator("[data-qr-sheet] [data-action='close-qr-sheet']").click();
   await expect(page.locator("[data-qr-sheet]")).toBeHidden();
   await page.locator('[data-action="connect-nearby"]').click();
+  await expect(page.locator("[data-connection-method-sheet]")).toBeVisible();
+  await page.locator("[data-action='connection-bump']").click();
   await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 7000 });
   await page.waitForTimeout(300);
   expect(downloadCount).toBe(0);

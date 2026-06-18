@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.39";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.39";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.39";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.40";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.40";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.40";
 
 export class ProximityEngine {
   constructor({

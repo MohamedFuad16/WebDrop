@@ -83,8 +83,12 @@ test("live signaling lets two same-browser pages discover only each other and co
     await expect(pageB.locator(".peer-node button")).toHaveCount(0);
 
     await pageA.locator("[data-action='connect-nearby']").click();
+    await expect(pageA.locator("[data-connection-method-sheet]")).toBeVisible();
+    await pageA.locator("[data-action='connection-bump']").click();
     await expect(pageB.locator("[data-action='connect-nearby']")).toContainText(aliceName, { timeout: 15_000 });
     await pageB.locator("[data-action='connect-nearby']").click();
+    await expect(pageB.locator("[data-connection-method-sheet]")).toBeVisible();
+    await pageB.locator("[data-action='connection-bump']").click();
 
     await expect(pageA.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 45_000 });
     await expect(pageB.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 45_000 });
@@ -292,6 +296,12 @@ test("Android proximity failure shows the score error and offers QR backup", asy
     await Promise.all([
       pageA.locator("[data-action='connect-nearby']").click(),
       pageB.locator("[data-action='connect-nearby']").click()
+    ]);
+    await expect(pageA.locator("[data-connection-method-sheet]")).toBeVisible();
+    await expect(pageB.locator("[data-connection-method-sheet]")).toBeVisible();
+    await Promise.all([
+      pageA.locator("[data-action='connection-bump']").click(),
+      pageB.locator("[data-action='connection-bump']").click()
     ]);
 
     await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "verification-failed", { timeout: 30_000 });

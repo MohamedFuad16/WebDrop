@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.39";
+import { formatBytes } from "../utils/format.js?v=1.0.40";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_THRESHOLD = 90;
@@ -432,19 +432,28 @@ export function createController({
       return;
     }
     activePeerId = peer.id;
-    if (runtime.realProximityCeremony && !supportsPhysicalCeremony(peer)) {
-      activeConnectionMethod = "qr";
-      store.patch({ selectedPeerId: peer.id });
-      view.openQrChoiceSheet(peer, { suggestedRole: "show" });
-      view.toast(view.translate("androidProximityOnly"));
-      return;
-    }
-    activeConnectionMethod = "proximity";
     store.patch({ selectedPeerId: peer.id });
+    view.openConnectionMethodSheet(peer);
+  });
+
+  view.on("connection-bump", () => {
+    if (!activePeerId) return;
+    activeConnectionMethod = "proximity";
     const permissionPromise = runtime.realProximityCeremony
       ? ensureProximityPermissions()
       : null;
     beginActiveConnection(permissionPromise);
+  });
+
+  view.on("connection-qr", async () => {
+    const peer = findPeer(activePeerId);
+    if (!peer) return;
+    activeConnectionMethod = "qr";
+    await view.closeConnectionMethodSheet?.();
+    view.openQrChoiceSheet(peer, {
+      incoming: incomingInvite?.method === "qr" && incomingInvite.peerId === peer.id,
+      suggestedRole: incomingInvite?.qrRole === "show" ? "scan" : "show"
+    });
   });
 
   view.on("connect-qr", () => {
@@ -534,6 +543,7 @@ export function createController({
     }
     store.patch({ mode: "verifying", pendingInviteId: peerId, incomingInvite: null });
     await view.closePeerSheet();
+    await view.closeConnectionMethodSheet?.();
     await view.closeQrChoiceSheet?.();
     if (!isCurrentVerification(peerId)) return;
     if (useQrPairing) {
@@ -1170,12 +1180,6 @@ export function createController({
         if (distanceDelta) return distanceDelta;
         return String(a.name || "").localeCompare(String(b.name || ""));
       })[0] || null;
-  }
-
-  function supportsPhysicalCeremony(peer) {
-    const selfFamily = String(store.getState().self.deviceFamily || "").toLowerCase();
-    const peerFamily = String(peer?.deviceFamily || peer?.capabilities?.platform?.family || "").toLowerCase();
-    return selfFamily === "android" || peerFamily === "android";
   }
 
   function sanitizePeers(peers = []) {
