@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { PROXIMITY_SCORE_MINIMUM, proximityScore } from "../js/services/proximity-engine.js";
+import { ProximityEngine, PROXIMITY_SCORE_MINIMUM, proximityScore } from "../js/services/proximity-engine.js";
 import {
   AcousticProximitySensor,
   analyzeFrequencyBand,
@@ -167,3 +167,81 @@ test("chirp correlation accepts inverted microphone polarity", () => {
   assert.equal(result.correlation, 1);
   assert.equal(result.offset, 0);
 });
+
+test("two devices emit and receive chirps in separate synchronized slots", async () => {
+  const medium = createVirtualAcousticMedium();
+  const motion = {
+    getSnapshot() {
+      return { bump: true, tilted: true, samples: 4 };
+    },
+    stopCapture() {}
+  };
+  const emitEngine = new ProximityEngine({
+    enabled: true,
+    acoustic: medium.createSensor("emit-device"),
+    motion
+  });
+  const detectEngine = new ProximityEngine({
+    enabled: true,
+    acoustic: medium.createSensor("detect-device"),
+    motion
+  });
+  const startAt = Date.now() + 25;
+
+  const [emitResult, detectResult] = await Promise.all([
+    emitEngine.runRealCeremony({
+      acousticRole: "emit",
+      acousticOptions: { intervalMs: 180 },
+      startAt,
+      ceremonyDurationMs: 1600
+    }),
+    detectEngine.runRealCeremony({
+      acousticRole: "detect",
+      acousticOptions: { intervalMs: 180 },
+      startAt,
+      ceremonyDurationMs: 1600
+    })
+  ]);
+
+  assert.equal(emitResult.evidence.acoustic.emitted, true);
+  assert.equal(emitResult.evidence.acoustic.detected, true);
+  assert.equal(detectResult.evidence.acoustic.emitted, true);
+  assert.equal(detectResult.evidence.acoustic.detected, true);
+  assert.ok(medium.detections.has("emit-device<-detect-device"));
+  assert.ok(medium.detections.has("detect-device<-emit-device"));
+});
+
+function createVirtualAcousticMedium() {
+  const pulses = new Map();
+  const detections = new Set();
+  const peerFor = (deviceId) => deviceId === "emit-device" ? "detect-device" : "emit-device";
+  return {
+    detections,
+    createSensor(deviceId) {
+      return {
+        async emitChirp() {
+          pulses.set(deviceId, Date.now());
+          await sleep(20);
+          return { emitted: true, durationMs: 20, sampleRate: 48_000 };
+        },
+        async detectChirp({ timeoutMs = 700 } = {}) {
+          const peerId = peerFor(deviceId);
+          const deadline = Date.now() + timeoutMs;
+          while (Date.now() < deadline) {
+            const pulseAgeMs = Date.now() - (pulses.get(peerId) || 0);
+            if (pulseAgeMs >= 0 && pulseAgeMs <= 70) {
+              detections.add(`${deviceId}<-${peerId}`);
+              return { detected: true, correlation: 0.92, threshold: 0.38 };
+            }
+            await sleep(5);
+          }
+          return { detected: false, correlation: 0, threshold: 0.38, reason: "timeout" };
+        }
+      };
+    }
+  };
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

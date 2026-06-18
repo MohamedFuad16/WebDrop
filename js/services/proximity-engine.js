@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.42";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.42";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.42";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.43";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.43";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.43";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 
@@ -155,13 +155,18 @@ export class ProximityEngine {
 async function exchangeChirps(acoustic, { role, options = {}, durationMs = 3000 }) {
   const phaseDurationMs = Math.max(700, Math.floor((durationMs - 200) / 2));
   const startedAt = Date.now();
+  const secondPhaseAt = startedAt + phaseDurationMs;
   let emitted;
   let detected;
   if (role === "emit") {
     emitted = await emitChirpSequence(acoustic, options, phaseDurationMs);
+    await waitUntil(secondPhaseAt);
     detected = await acoustic.detectChirp({ timeoutMs: phaseDurationMs, ...options });
   } else {
     detected = await acoustic.detectChirp({ timeoutMs: phaseDurationMs, ...options });
+    // Detection may resolve on the first pulse. Keep the receiver in its
+    // assigned slot so its reply does not overlap the other device's output.
+    await waitUntil(secondPhaseAt);
     emitted = await emitChirpSequence(acoustic, options, phaseDurationMs);
   }
   return {
@@ -179,11 +184,13 @@ async function emitChirpSequence(acoustic, options = {}, durationMs = 1400) {
   const startedAt = Date.now();
   let emittedCount = 0;
   let latest = { emitted: false, reason: "not-started" };
-  while (Date.now() - startedAt < durationMs - intervalMs) {
+  while (Date.now() - startedAt < durationMs) {
     latest = await acoustic.emitChirp(options);
     if (!latest.emitted) break;
     emittedCount += 1;
-    await delay(intervalMs);
+    const remainingMs = durationMs - (Date.now() - startedAt);
+    if (remainingMs < intervalMs) break;
+    await delay(Math.min(intervalMs, remainingMs));
   }
   return {
     ...latest,

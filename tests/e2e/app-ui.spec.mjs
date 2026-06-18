@@ -31,6 +31,56 @@ function isIgnorableBrowserNoise(text) {
   );
 }
 
+test("emitted chirp reaches and is recognized by a second acoustic sensor", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-desktop", "Web Audio loopback is validated once in desktop Chromium.");
+  await page.goto("/tests/e2e/blank.html");
+  await page.evaluate(() => {
+    document.body.innerHTML = '<button type="button" data-audio-unlock>Unlock audio</button>';
+  });
+  await page.locator("[data-audio-unlock]").click();
+
+  const result = await page.evaluate(async () => {
+    const { AcousticProximitySensor } = await import("/js/services/acoustic-proximity.js?qa=chirp-loopback");
+    const context = new AudioContext({ sampleRate: 48_000 });
+    await context.resume();
+    const link = context.createMediaStreamDestination();
+    const outputContext = {
+      get state() { return context.state; },
+      get currentTime() { return context.currentTime; },
+      get sampleRate() { return context.sampleRate; },
+      destination: link,
+      resume: () => context.resume(),
+      createBuffer: (...args) => context.createBuffer(...args),
+      createBufferSource: () => context.createBufferSource(),
+      createGain: () => context.createGain()
+    };
+    const sender = new AcousticProximitySensor({ audioContextFactory: () => outputContext });
+    const receiver = new AcousticProximitySensor({
+      audioContextFactory: () => context,
+      mediaDevices: { getUserMedia: async () => link.stream }
+    });
+    const permission = await receiver.requestMicrophonePermission();
+    const detectionPromise = receiver.detectChirp({
+      timeoutMs: 1000,
+      pollIntervalMs: 8,
+      requiredBandHits: 2
+    });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const emitted = await sender.emitChirp();
+    const detected = await detectionPromise;
+    receiver.stopCapture();
+    link.stream.getTracks().forEach((track) => track.stop());
+    await context.close();
+    return { permission: permission.granted, emitted, detected };
+  });
+
+  expect(result.permission).toBe(true);
+  expect(result.emitted).toMatchObject({ emitted: true, durationMs: 72, sampleRate: 48_000 });
+  expect(result.detected.detected).toBe(true);
+  expect(result.detected.correlation).toBeGreaterThan(0.9);
+  expect(result.detected.band.marginDb).toBeGreaterThan(20);
+});
+
 test("loads the WebDrop shell, receive UI, and deferred storage copy", async ({ page }) => {
   const consoleProblems = [];
   page.on("pageerror", (error) => consoleProblems.push(error.message));
