@@ -1,6 +1,6 @@
 {
   "name": "webdrop-v2-static",
-  "version": "1.0.38",
+  "version": "1.0.39",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,6 +14,7 @@
     "serve": "node scripts/static-server.mjs . 4178 127.0.0.1"
   },
   "dependencies": {
+    "jsqr": "^1.4.0",
     "qrcode-generator": "2.0.4"
   },
   "devDependencies": {

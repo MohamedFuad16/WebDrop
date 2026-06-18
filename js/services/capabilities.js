@@ -23,7 +23,7 @@ export async function detectCapabilities() {
     worker,
     secure,
     camera: Boolean(navigator.mediaDevices?.getUserMedia) && secure,
-    qrScanner: "BarcodeDetector" in window,
+    qrScanner: "BarcodeDetector" in window || typeof globalThis.jsQR === "function",
     platform
   };
 }

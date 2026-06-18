@@ -7,8 +7,8 @@ const DEFAULT_WEIGHTS = Object.freeze({
 });
 
 const DEFAULT_THRESHOLDS = Object.freeze({
-  verified: 0.82,
-  review: 0.62
+  verified: 0.9,
+  review: 0.75
 });
 
 export class ProximityScoreAnalyzer {
@@ -30,13 +30,14 @@ export class ProximityScoreAnalyzer {
       decision: this.classify(score),
       confidence: confidenceFor(normalized),
       normalized,
-      reasons: reasonsFor(normalized)
+      reasons: reasonsFor(normalized),
+      failures: failuresFor(normalized)
     };
   }
 
   classify(score) {
     if (!this.enabled) return "not_enforced";
-    if (score >= this.thresholds.verified) return "verified";
+    if (score > this.thresholds.verified) return "verified";
     if (score >= this.thresholds.review) return "review";
     return "insufficient";
   }
@@ -47,7 +48,7 @@ export class ProximityScoreAnalyzer {
       mode: this.enabled ? "analysis" : "report-only",
       thresholds: this.thresholds,
       weights: this.weights,
-      note: "Proximity scoring is prepared for backend analysis but is not an enforcement gate unless explicitly enabled."
+      note: "A physical proximity score above 90 percent is required when analysis is enabled."
     };
   }
 }
@@ -91,6 +92,15 @@ function reasonsFor(metrics) {
   if (metrics.tilt > 0) reasons.push("tilt-gesture");
   if (metrics.qr > 0) reasons.push("qr-fallback");
   return reasons;
+}
+
+function failuresFor(metrics) {
+  const failures = [];
+  if (metrics.sound < 1) failures.push("ultrasound-not-detected");
+  if (metrics.motion < 1) failures.push("motion-not-correlated");
+  if (metrics.bump < 1) failures.push("bump-not-detected");
+  if (metrics.tilt < 1) failures.push("tilt-not-detected");
+  return failures;
 }
 
 function clamp01(value) {

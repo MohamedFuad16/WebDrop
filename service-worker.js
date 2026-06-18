@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.38";
+const APP_VERSION = "1.0.39";
 const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [
@@ -34,6 +34,7 @@ const ASSETS = [
   "./js/ui/app-view.js",
   "./js/ui/dynamic-island.js",
   "./js/ui/siri-wave.js",
+  "./js/vendor/jsqr.js",
   "./js/vendor/qrcode-generator.mjs",
   "./js/utils/emitter.js",
   "./js/utils/format.js",

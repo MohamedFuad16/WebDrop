@@ -16,6 +16,12 @@ export class MotionProximitySensor {
   }
 
   async requestPermission() {
+    if (this.permission === "granted") {
+      return { granted: true, reason: "granted", cached: true };
+    }
+    if (["denied", "unsupported"].includes(this.permission)) {
+      return { granted: false, reason: this.permission, cached: true };
+    }
     const DeviceMotionEvent = this.target.DeviceMotionEvent;
     if (!DeviceMotionEvent) {
       this.permission = "unsupported";
@@ -32,6 +38,13 @@ export class MotionProximitySensor {
       this.permission = "error";
       return { granted: false, reason: "error", error };
     }
+  }
+
+  restorePermission(permission) {
+    if (["granted", "denied", "unsupported"].includes(permission)) {
+      this.permission = permission;
+    }
+    return this.permission;
   }
 
   startCapture() {

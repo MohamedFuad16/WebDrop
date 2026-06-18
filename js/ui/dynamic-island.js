@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.38";
-import { Emitter } from "../utils/emitter.js?v=1.0.38";
-import { formatBytes } from "../utils/format.js?v=1.0.38";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.38";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.38";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.39";
+import { Emitter } from "../utils/emitter.js?v=1.0.39";
+import { formatBytes } from "../utils/format.js?v=1.0.39";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.39";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.39";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -23,6 +23,16 @@ export class DynamicIsland extends Emitter {
       canvas: this.root?.querySelector("[data-island-qr-canvas]"),
       video: this.root?.querySelector("[data-island-video]"),
       wave: this.root?.querySelector("[data-island-wave]"),
+      ceremony: this.root?.querySelector("[data-island-ceremony]"),
+      ceremonyStage: this.root?.querySelector("[data-island-ceremony-stage]"),
+      ceremonyScore: this.root?.querySelector("[data-island-ceremony-score]"),
+      ceremonyError: this.root?.querySelector("[data-island-ceremony-error]"),
+      audioMetric: this.root?.querySelector("[data-island-metric='audio']"),
+      audioValue: this.root?.querySelector("[data-island-audio-value]"),
+      bumpMetric: this.root?.querySelector("[data-island-metric='bump']"),
+      bumpValue: this.root?.querySelector("[data-island-bump-value]"),
+      tiltMetric: this.root?.querySelector("[data-island-metric='tilt']"),
+      tiltValue: this.root?.querySelector("[data-island-tilt-value]"),
       transfer: this.root?.querySelector("[data-island-transfer]"),
       transferLabel: this.root?.querySelector("[data-island-transfer-label]"),
       transferPercent: this.root?.querySelector("[data-island-transfer-percent]"),
@@ -51,6 +61,8 @@ export class DynamicIsland extends Emitter {
     this.connectionDelayResolver = null;
     this.cameraRequestId = 0;
     this.detectionPaused = false;
+    this.scanCanvas = document.createElement("canvas");
+    this.scanContext = this.scanCanvas.getContext("2d", { willReadFrequently: true });
     this.previousFocus = null;
     this.copyKeys = { title: null, status: null };
     this.backgroundNodes = [...document.querySelectorAll(".topbar, .main-stage, .connection-tray, [data-backdrop], [data-sheet]")];
@@ -92,7 +104,19 @@ export class DynamicIsland extends Emitter {
     this.currentConnectedPeerId = peer.id;
     this.connectionOpenedAt = this.now();
     this.renderPeople(self, peer);
+    this.resetCeremony();
     this.setState("connecting");
+  }
+
+  showQrPreparing({ self, peer, role = "show" }) {
+    this.prepareToOpen(true);
+    this.stopCamera();
+    this.renderPeople(self, peer);
+    this.setState("qr-preparing");
+    this.setCopy(
+      role === "scan" ? "qrScanTitle" : "qrShowTitle",
+      role === "scan" ? "qrWaitingToScan" : "qrPreparingCode"
+    );
   }
 
   showConnection(self, peer) {
@@ -158,6 +182,57 @@ export class DynamicIsland extends Emitter {
     this.setStatus("qrConnected");
   }
 
+  updateCeremony({ phase, state, permissions, acoustic, motion, score } = {}) {
+    if (!this.nodes.ceremony || !["connecting", "verification-failed"].includes(this.state)) return;
+    if (phase) this.root.dataset.ceremonyPhase = phase;
+    const stageKeys = {
+      permissions: "ceremonyPermissions",
+      sync: "ceremonySync",
+      audio: state === "active" ? "ceremonyAudioActive" : "ceremonyAudioComplete",
+      motion: "ceremonyMotion",
+      score: state === "failed" ? "ceremonyScoreFailed" : "ceremonyScore"
+    };
+    if (stageKeys[phase] && this.nodes.ceremonyStage) {
+      this.nodes.ceremonyStage.textContent = this.translate(stageKeys[phase]);
+    }
+    if (permissions) {
+      this.setMetricState(this.nodes.audioMetric, permissions.microphone?.granted ? "ready" : "failed");
+      if (!permissions.microphone?.granted && this.nodes.audioValue) {
+        this.nodes.audioValue.textContent = this.translate("ceremonyPermissionDenied");
+      }
+      const motionReady = permissions.motion?.granted;
+      this.setMetricState(this.nodes.bumpMetric, motionReady ? "ready" : "failed");
+      this.setMetricState(this.nodes.tiltMetric, motionReady ? "ready" : "failed");
+    }
+    if (phase === "audio") {
+      const detected = Boolean(acoustic?.detected);
+      this.setMetricState(this.nodes.audioMetric, state === "active" ? "active" : detected ? "complete" : "failed");
+      if (this.nodes.audioValue) {
+        this.nodes.audioValue.textContent = state === "active"
+          ? this.translate("ceremonyAudioSending")
+          : detected
+            ? this.translate("ceremonyDetected")
+            : this.translate("ceremonyMissed");
+      }
+    }
+    if (motion) this.renderMotionMetrics(motion);
+    if (Number.isFinite(score) && this.nodes.ceremonyScore) {
+      this.nodes.ceremonyScore.textContent = `${Math.round(score)} / 100`;
+      this.nodes.ceremonyScore.dataset.passed = String(score > 90);
+    }
+  }
+
+  async showVerificationFailure({ score = 0, errors = [] } = {}) {
+    this.setState("verification-failed");
+    this.updateCeremony({ phase: "score", state: "failed", score });
+    if (this.nodes.ceremonyError) {
+      this.nodes.ceremonyError.hidden = false;
+      this.nodes.ceremonyError.textContent = errors.filter(Boolean).join(" · ");
+    }
+    await new Promise((resolve) => this.scheduleTimeout(resolve, this.prefersReducedMotion() ? 700 : 3000));
+    return true;
+  }
+
   close() {
     if (this.state === "closed") return Promise.resolve(true);
     if (this.state === "closing" && this.closePromise) return this.closePromise;
@@ -187,7 +262,7 @@ export class DynamicIsland extends Emitter {
     const minimumVisibleMs = this.prefersReducedMotion() ? 80 : 2200;
     const elapsedMs = Math.max(0, this.now() - this.connectionOpenedAt);
     const canClose = await this.waitForConnectionMinimum(Math.max(0, minimumVisibleMs - elapsedMs));
-    if (!canClose || !["connecting", "qr-display", "qr-scan"].includes(this.state)) return false;
+    if (!canClose || !["connecting", "qr-preparing", "qr-display", "qr-scan"].includes(this.state)) return false;
     return this.close();
   }
 
@@ -364,6 +439,39 @@ export class DynamicIsland extends Emitter {
     renderAvatar(this.nodes.peerAvatar, peer.avatar);
   }
 
+  resetCeremony() {
+    if (this.nodes.ceremonyStage) this.nodes.ceremonyStage.textContent = this.translate("ceremonyPermissions");
+    if (this.nodes.ceremonyScore) {
+      this.nodes.ceremonyScore.textContent = `0 / 100`;
+      delete this.nodes.ceremonyScore.dataset.passed;
+    }
+    if (this.nodes.ceremonyError) {
+      this.nodes.ceremonyError.hidden = true;
+      this.nodes.ceremonyError.textContent = "";
+    }
+    [this.nodes.audioMetric, this.nodes.bumpMetric, this.nodes.tiltMetric].forEach((node) => this.setMetricState(node, "waiting"));
+    if (this.nodes.audioValue) this.nodes.audioValue.textContent = this.translate("ceremonyWaiting");
+    if (this.nodes.bumpValue) this.nodes.bumpValue.textContent = "0.0";
+    if (this.nodes.tiltValue) this.nodes.tiltValue.textContent = "0°";
+  }
+
+  renderMotionMetrics(motion = {}) {
+    const bump = Boolean(motion.bump);
+    const beta = Number(motion.tilt?.beta || 0);
+    const gamma = Number(motion.tilt?.gamma || 0);
+    const degrees = Math.round(Math.max(Math.abs(beta), Math.abs(gamma)));
+    this.setMetricState(this.nodes.bumpMetric, bump ? "complete" : motion.samples ? "active" : "waiting");
+    this.setMetricState(this.nodes.tiltMetric, motion.tilted ? "complete" : motion.samples ? "active" : "waiting");
+    if (this.nodes.bumpValue) {
+      this.nodes.bumpValue.textContent = bump ? "+20" : Number(motion.maxAcceleration || 0).toFixed(1);
+    }
+    if (this.nodes.tiltValue) this.nodes.tiltValue.textContent = `${degrees}°`;
+  }
+
+  setMetricState(node, state) {
+    if (node) node.dataset.status = state;
+  }
+
   renderTransfer(transfer = {}) {
     const ratio = clampRatio(transfer.ratio);
     const percent = `${Math.round(ratio * 100)}%`;
@@ -416,7 +524,7 @@ export class DynamicIsland extends Emitter {
       this.setStatus("cameraUnavailable");
       return;
     }
-    if (!("BarcodeDetector" in window)) {
+    if (!("BarcodeDetector" in window) && typeof globalThis.jsQR !== "function") {
       this.stopCamera();
       this.setStatus("qrDetectorUnavailable");
       return;
@@ -439,7 +547,9 @@ export class DynamicIsland extends Emitter {
       await this.nodes.video.play();
       this.nodes.scanner.classList.add("is-live");
       this.setStatus("qrLooking");
-      this.detector = new BarcodeDetector({ formats: ["qr_code"] });
+      this.detector = "BarcodeDetector" in window
+        ? new BarcodeDetector({ formats: ["qr_code"] })
+        : null;
       this.detectionPaused = false;
       this.scanFrame = requestAnimationFrame((now) => this.detect(now));
     } catch {
@@ -451,13 +561,14 @@ export class DynamicIsland extends Emitter {
   }
 
   async detect(now) {
-    if (!this.detector || !this.stream || this.state !== "qr-scan") return;
+    if ((!this.detector && typeof globalThis.jsQR !== "function") || !this.stream || this.state !== "qr-scan") return;
     if (this.detectionPaused) return;
     if (now - this.lastDetectionAt > 180 && this.nodes.video.readyState >= 2) {
       this.lastDetectionAt = now;
       try {
-        const codes = await this.detector.detect(this.nodes.video);
-        const value = codes.find((code) => code.rawValue)?.rawValue;
+        const value = this.detector
+          ? (await this.detector.detect(this.nodes.video)).find((code) => code.rawValue)?.rawValue
+          : this.detectQrWithFallback();
         if (value) {
           this.detectionPaused = true;
           this.emit("detected", value);
@@ -484,8 +595,20 @@ export class DynamicIsland extends Emitter {
     this.nodes.scanner?.classList.remove("is-live");
   }
 
+  detectQrWithFallback() {
+    const video = this.nodes.video;
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    if (!width || !height || !this.scanContext) return null;
+    this.scanCanvas.width = width;
+    this.scanCanvas.height = height;
+    this.scanContext.drawImage(video, 0, 0, width, height);
+    const frame = this.scanContext.getImageData(0, 0, width, height);
+    return globalThis.jsQR(frame.data, width, height, { inversionAttempts: "attemptBoth" })?.data || null;
+  }
+
   retryScanner() {
-    if (!this.stream || !this.detector || this.state !== "qr-scan") return;
+    if (!this.stream || (!this.detector && typeof globalThis.jsQR !== "function") || this.state !== "qr-scan") return;
     this.detectionPaused = false;
     this.setStatus("qrInvalid");
     cancelAnimationFrame(this.scanFrame);

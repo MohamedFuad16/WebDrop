@@ -223,6 +223,74 @@
   flex: 0 0 50px;
 }
 
+.qr-choice-sheet__peer {
+  display: block;
+  margin: -4px 0 14px;
+  color: var(--blue);
+  font-size: 12px;
+  text-align: center;
+}
+
+.qr-choice-sheet__actions {
+  display: grid;
+  gap: 9px;
+}
+
+.qr-choice-sheet__actions > button {
+  width: 100%;
+  min-height: 70px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--panel-subtle);
+  text-align: left;
+  cursor: pointer;
+}
+
+.qr-choice-sheet__actions > button:focus-visible,
+.qr-choice-sheet__actions > button:hover {
+  border-color: color-mix(in srgb, var(--blue) 42%, var(--line));
+  background: color-mix(in srgb, var(--blue) 8%, var(--panel-subtle));
+}
+
+.qr-choice-sheet__actions svg {
+  width: 30px;
+  height: 30px;
+  justify-self: center;
+  fill: none;
+  stroke: var(--blue);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.qr-choice-sheet__actions span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.qr-choice-sheet__actions strong,
+.qr-choice-sheet__actions small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qr-choice-sheet__actions strong {
+  font-size: 14px;
+}
+
+.qr-choice-sheet__actions small {
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
 .friend-strip > span:not(.avatar-animation) {
   display: grid;
   place-items: center;

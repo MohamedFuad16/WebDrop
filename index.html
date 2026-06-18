@@ -45,6 +45,24 @@
               <span data-island-peer-name>Nearby peer</span>
               <span class="webdrop-island__avatar" data-island-peer-avatar aria-hidden="true"></span>
             </div>
+            <div class="webdrop-island__ceremony" data-island-ceremony>
+              <div class="webdrop-island__ceremony-head">
+                <strong data-island-ceremony-stage>Checking permissions</strong>
+                <span data-island-ceremony-score>0 / 100</span>
+              </div>
+              <div class="webdrop-island__metrics">
+                <span data-island-metric="audio" data-status="waiting">
+                  <i aria-hidden="true"></i><small data-i18n="ceremonyAudio">Audio chime</small><strong data-island-audio-value>Waiting</strong>
+                </span>
+                <span data-island-metric="bump" data-status="waiting">
+                  <i aria-hidden="true"></i><small data-i18n="ceremonyBump">Bump</small><strong data-island-bump-value>0.0</strong>
+                </span>
+                <span data-island-metric="tilt" data-status="waiting">
+                  <i aria-hidden="true"></i><small data-i18n="ceremonyTilt">Tilt</small><strong data-island-tilt-value>0&deg;</strong>
+                </span>
+              </div>
+              <p class="webdrop-island__ceremony-error" data-island-ceremony-error hidden></p>
+            </div>
           </div>
           <div class="webdrop-island__qr" data-island-qr>
             <div class="webdrop-island__qr-copy">
@@ -184,6 +202,27 @@
         </div>
       </section>
 
+      <section class="bottom-sheet qr-choice-sheet" data-qr-sheet hidden role="dialog" aria-modal="true" aria-labelledby="qr-choice-title" aria-describedby="qr-choice-copy" aria-label="Manual QR connection" data-i18n-aria="qrConnectionDialog" tabindex="-1">
+        <button class="sheet-close-icon" type="button" data-action="close-qr-sheet" aria-label="Close QR connection" data-i18n-aria="closeQrConnection">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg>
+        </button>
+        <span class="sheet-handle" aria-hidden="true"></span>
+        <p class="sheet-kicker" data-i18n="manualQrKicker">Manual fallback</p>
+        <h2 id="qr-choice-title" data-i18n="qrConnectionTitle">Connect with a QR code</h2>
+        <p id="qr-choice-copy" data-qr-sheet-copy>Choose which device shows the one-time code.</p>
+        <strong class="qr-choice-sheet__peer" data-qr-sheet-peer></strong>
+        <div class="qr-choice-sheet__actions">
+          <button type="button" data-action="qr-show">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM15 14h2M20 14v3M14 18h3v2M20 20h.01"></path></svg>
+            <span><strong data-i18n="showQr">Show QR code</strong><small data-i18n="showQrHelp">Let the other device scan this screen</small></span>
+          </button>
+          <button type="button" data-action="qr-scan">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M8 8h8v8H8z"></path></svg>
+            <span><strong data-i18n="scanQr">Scan QR code</strong><small data-i18n="scanQrHelp">Use this device's camera</small></span>
+          </button>
+        </div>
+      </section>
+
       <section class="bottom-sheet" data-settings-sheet hidden role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-label="Settings" data-i18n-aria="settingsDialog" tabindex="-1">
         <button class="sheet-close-icon" type="button" data-action="close-settings" aria-label="Close settings" data-i18n-aria="closeSettings">
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -239,7 +278,7 @@
         </button>
         <div class="app-version">
           <span data-i18n="appVersion">App version</span>
-          <strong>1.0.38</strong>
+          <strong>1.0.39</strong>
         </div>
       </section>
 
@@ -363,7 +402,8 @@
       <input data-file-input type="file" multiple hidden>
     </div>
 
-    <script src="js/config/runtime-config.js?v=1.0.38"></script>
-    <script type="module" src="js/app.js?v=1.0.38"></script>
+    <script src="js/vendor/jsqr.js?v=1.0.39"></script>
+    <script src="js/config/runtime-config.js?v=1.0.39"></script>
+    <script type="module" src="js/app.js?v=1.0.39"></script>
   </body>
 </html>

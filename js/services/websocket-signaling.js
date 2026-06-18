@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.38";
+import { Emitter } from "../utils/emitter.js?v=1.0.39";
 
 export class WebSocketSignalingAdapter extends Emitter {
   constructor({
@@ -136,8 +136,8 @@ export class WebSocketSignalingAdapter extends Emitter {
     this.socket = null;
   }
 
-  async sendInvite(targetId, { method = "proximity" } = {}) {
-    this.send({ type: "invite", targetId, payload: { method } });
+  async sendInvite(targetId, { method = "proximity", qrRole = null } = {}) {
+    this.send({ type: "invite", targetId, payload: { method, qrRole } });
   }
 
   async acceptInvite(targetId, pairingId) {

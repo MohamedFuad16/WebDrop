@@ -313,10 +313,12 @@ test("connects from the global proximity button, selects a file, and shows Dynam
   await expect(page.locator(".peer-node").first()).toBeVisible({ timeout: 7000 });
   await expect(page.locator(".peer-node button")).toHaveCount(0);
   await page.locator('[data-action="connect-qr"]').click();
-  await expect(page.locator("[data-peer-sheet]")).toBeVisible();
-  await expect(page.locator("[data-sheet-peer-name]")).toContainText("Aki iPhone");
-  await page.locator("[data-peer-sheet] [data-action='close-sheet']").click();
-  await expect(page.locator("[data-peer-sheet]")).toBeHidden();
+  await expect(page.locator("[data-qr-sheet]")).toBeVisible();
+  await expect(page.locator("[data-qr-sheet-peer]")).toContainText("Aki iPhone");
+  await expect(page.locator("[data-qr-sheet] [data-action='qr-show']")).toBeVisible();
+  await expect(page.locator("[data-qr-sheet] [data-action='qr-scan']")).toBeVisible();
+  await page.locator("[data-qr-sheet] [data-action='close-qr-sheet']").click();
+  await expect(page.locator("[data-qr-sheet]")).toBeHidden();
   await page.locator('[data-action="connect-nearby"]').click();
   await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 7000 });
   await page.waitForTimeout(300);

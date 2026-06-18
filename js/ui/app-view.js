@@ -1,8 +1,8 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.38";
-import { formatBytes } from "../utils/format.js?v=1.0.38";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.38";
-import { translate } from "../config/i18n.js?v=1.0.38";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.38";
+import { Emitter } from "../utils/emitter.js?v=1.0.39";
+import { formatBytes } from "../utils/format.js?v=1.0.39";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.39";
+import { translate } from "../config/i18n.js?v=1.0.39";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.39";
 
 const ORBIT_RADII = [".46", ".37", ".28", ".19"];
 const ORBIT_PEER_LIMIT = 12;
@@ -54,6 +54,9 @@ export class AppView extends Emitter {
       connectedPeer: document.querySelector("[data-connected-peer]"),
       disconnectHaptic: document.querySelector("[data-disconnect-haptic]"),
       peerSheet: document.querySelector("[data-peer-sheet]"),
+      qrSheet: document.querySelector("[data-qr-sheet]"),
+      qrSheetPeer: document.querySelector("[data-qr-sheet-peer]"),
+      qrSheetCopy: document.querySelector("[data-qr-sheet-copy]"),
       settingsSheet: document.querySelector("[data-settings-sheet]"),
       informationSheet: document.querySelector("[data-information-sheet]"),
       sendSheet: document.querySelector("[data-send-sheet]"),
@@ -309,6 +312,7 @@ export class AppView extends Emitter {
       "open-information": () => this.openInformation(),
       "back-to-settings": () => this.backToSettings(),
       "close-information": () => this.closeInformation(),
+      "close-qr-sheet": () => this.closeQrChoiceSheet(),
       "close-action-sheet": () => this.closeActionSheets(),
       "close-all-sheets": () => this.closeAllSheets()
     };
@@ -370,6 +374,18 @@ export class AppView extends Emitter {
     this.dynamicIsland.showConnectionProgress(payload.self, payload.peer);
   }
 
+  showIslandQrPreparing(payload) {
+    this.dynamicIsland.showQrPreparing(payload);
+  }
+
+  updateIslandCeremony(payload) {
+    this.dynamicIsland.updateCeremony(payload);
+  }
+
+  showIslandVerificationFailure(payload) {
+    return this.dynamicIsland.showVerificationFailure(payload);
+  }
+
   finishIslandConnectionTransition() {
     return this.dynamicIsland.finishConnectionTransition();
   }
@@ -388,6 +404,27 @@ export class AppView extends Emitter {
 
   closeDynamicIsland() {
     return this.dynamicIsland.close();
+  }
+
+  openQrChoiceSheet(peer, { incoming = false, suggestedRole = "show" } = {}) {
+    if (!this.nodes.qrSheet) return;
+    this.nodes.qrSheet.dataset.incoming = String(incoming);
+    this.nodes.qrSheet.dataset.suggestedRole = suggestedRole;
+    if (this.nodes.qrSheetPeer) {
+      this.nodes.qrSheetPeer.textContent = this.translate("qrChoicePeer", { name: peer.name });
+    }
+    if (this.nodes.qrSheetCopy) {
+      this.nodes.qrSheetCopy.textContent = this.translate(
+        incoming ? "qrChoiceIncomingCopy" : "qrChoiceCopy",
+        { name: peer.name }
+      );
+    }
+    this.showSheet(this.nodes.qrSheet);
+  }
+
+  closeQrChoiceSheet() {
+    if (!this.nodes.qrSheet) return Promise.resolve();
+    return this.hideSheet(this.nodes.qrSheet);
   }
 
   toggleQrScannerPreview() {
@@ -819,6 +856,7 @@ export class AppView extends Emitter {
   closeAllSheets() {
     [
       this.nodes.peerSheet,
+      this.nodes.qrSheet,
       this.nodes.settingsSheet,
       this.nodes.informationSheet,
       this.nodes.sendSheet,
@@ -875,6 +913,7 @@ export class AppView extends Emitter {
         this.sheetHideTimers.delete(sheet);
         const anyVisible = [
           this.nodes.peerSheet,
+          this.nodes.qrSheet,
           this.nodes.settingsSheet,
           this.nodes.informationSheet,
           this.nodes.sendSheet,
@@ -955,6 +994,7 @@ export class AppView extends Emitter {
   visibleSheet() {
     return [
       this.nodes.peerSheet,
+      this.nodes.qrSheet,
       this.nodes.settingsSheet,
       this.nodes.informationSheet,
       this.nodes.sendSheet,

@@ -7,7 +7,7 @@
   top: 0;
   left: 50%;
   width: min(var(--island-width), calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 16px));
-  height: min(calc(42dvh + var(--safe-top)), calc(300px + var(--safe-top)));
+  height: min(calc(48dvh + var(--safe-top)), calc(356px + var(--safe-top)));
   max-height: calc(100dvh - var(--safe-bottom) - 8px);
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
@@ -132,6 +132,7 @@
   height: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(92px, 1.15fr) minmax(0, 1fr);
+  grid-template-rows: minmax(118px, 1fr) auto;
   align-items: center;
   gap: 8px;
   padding: 8px 8px 2px;
@@ -156,7 +157,7 @@
 }
 
 .webdrop-island__avatar {
-  width: clamp(72px, 20vw, 116px);
+  width: clamp(64px, 17vw, 102px);
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -165,6 +166,111 @@
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 0 0 5px rgba(98, 215, 165, .14), 0 12px 28px rgba(0, 0, 0, .28);
+}
+
+.webdrop-island__ceremony {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 10px 2px;
+  border-top: 1px solid color-mix(in srgb, var(--island-ink) 10%, transparent);
+}
+
+.webdrop-island[data-state="connected"] .webdrop-island__ceremony,
+.webdrop-island[data-state="transfer"] .webdrop-island__ceremony {
+  display: none;
+}
+
+.webdrop-island__ceremony-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.webdrop-island__ceremony-head strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webdrop-island__ceremony-head span {
+  flex: 0 0 auto;
+  color: var(--island-muted);
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.webdrop-island__ceremony-head span[data-passed="true"] {
+  color: #26a76d;
+}
+
+.webdrop-island__ceremony-head span[data-passed="false"] {
+  color: #e24d4d;
+}
+
+.webdrop-island__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.webdrop-island__metrics > span {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--island-ink) 7%, transparent);
+}
+
+.webdrop-island__metrics i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--island-ink) 28%, transparent);
+}
+
+.webdrop-island__metrics [data-status="active"] i {
+  background: #347df5;
+  box-shadow: 0 0 0 4px rgba(52, 125, 245, .16);
+}
+
+.webdrop-island__metrics [data-status="complete"] i,
+.webdrop-island__metrics [data-status="ready"] i {
+  background: #26a76d;
+}
+
+.webdrop-island__metrics [data-status="failed"] i {
+  background: #e24d4d;
+}
+
+.webdrop-island__metrics small,
+.webdrop-island__metrics strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.webdrop-island__metrics small {
+  color: var(--island-muted);
+}
+
+.webdrop-island__ceremony-error {
+  max-height: 34px;
+  overflow: hidden;
+  margin: 0;
+  color: #e24d4d;
+  font-size: 10px;
+  font-weight: 680;
+  line-height: 1.35;
+  text-align: left;
 }
 
 .webdrop-island__avatar img {
@@ -438,7 +544,7 @@
 @media (max-width: 480px) {
   .webdrop-island {
     --island-width: calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px) - 20px);
-    height: min(calc(44dvh + var(--safe-top)), calc(286px + var(--safe-top)));
+    height: min(calc(52dvh + var(--safe-top)), calc(356px + var(--safe-top)));
     border-radius: 34px;
   }
 
@@ -449,6 +555,20 @@
   .webdrop-island__qr {
     grid-template-columns: minmax(0, 1fr) minmax(118px, 42%);
     gap: 10px;
+  }
+
+  .webdrop-island__connection {
+    grid-template-columns: minmax(0, 1fr) minmax(84px, 1.05fr) minmax(0, 1fr);
+    grid-template-rows: minmax(108px, 1fr) auto;
+    padding-inline: 0;
+  }
+
+  .webdrop-island__metrics > span {
+    grid-template-columns: 7px minmax(0, 1fr);
+  }
+
+  .webdrop-island__metrics strong {
+    grid-column: 2;
   }
 }
 

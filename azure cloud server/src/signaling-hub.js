@@ -252,6 +252,7 @@ export class SignalingHub {
       this.recordProximityDecision(pairingId, sender.id, payload.analysis);
       const decision = {
         pairingId,
+        subjectId: sender.id,
         analysis: payload.analysis,
         pairVerified: this.isProximityVerified(pairingId)
       };

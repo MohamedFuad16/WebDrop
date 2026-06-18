@@ -15,6 +15,9 @@ export class AcousticProximitySensor {
   }
 
   async requestMicrophonePermission(constraints = { audio: true }) {
+    if (this.stream?.active) {
+      return { granted: true, reason: "granted", stream: this.stream, cached: true };
+    }
     const mediaDevices = globalThis.navigator?.mediaDevices;
     if (!mediaDevices?.getUserMedia) {
       return { granted: false, reason: "unsupported" };

@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.38";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.38";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.38";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.39";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.39";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.39";
 
 export class ProximityEngine {
   constructor({
@@ -24,6 +24,10 @@ export class ProximityEngine {
 
   async requestMotionPermission() {
     return this.motion.requestPermission();
+  }
+
+  restoreMotionPermission(permission) {
+    return this.motion.restorePermission?.(permission);
   }
 
   startMotionCapture() {
@@ -73,13 +77,15 @@ export class ProximityEngine {
     ceremonyDurationMs = 3000,
     tokenFresh = false,
     qrToken,
-    qrOptions
+    qrOptions,
+    onProgress = () => {}
   } = {}) {
     if (!this.enabled) {
       return disabledResult();
     }
 
     await waitUntil(startAt);
+    onProgress({ phase: "audio", state: acoustic ? "active" : "unavailable" });
     const acousticResult = acoustic
       ? await exchangeChirps(this.acoustic, {
         role: acousticRole,
@@ -88,13 +94,16 @@ export class ProximityEngine {
       })
       : { detected: false, reason: "skipped" };
     const motion = this.motion.getSnapshot();
+    onProgress({ phase: "audio", state: acousticResult.detected ? "complete" : "failed", acoustic: acousticResult });
+    onProgress({ phase: "motion", state: "complete", motion });
     const qr = qrToken
       ? validateQrToken(qrToken, qrOptions)
       : { valid: false, reason: "not-provided" };
     const metrics = {
       tokenFresh: tokenFresh || qr.valid,
       acoustic: acousticResult.detected,
-      soundCorrelation: acousticResult.correlation || 0,
+      soundCorrelation: acousticResult.detected ? 1 : 0,
+      acousticCorrelation: acousticResult.correlation || 0,
       motionCorrelation: motion.bump && motion.tilted ? 1 : motion.samples > 0 ? 0.4 : 0,
       tilt: motion.tilted,
       bump: motion.bump,
@@ -102,9 +111,11 @@ export class ProximityEngine {
       lowRttHint: false
     };
     const score = proximityScore(metrics);
+    const passed = score > 90;
+    onProgress({ phase: "score", state: passed ? "complete" : "failed", score, metrics, motion });
 
     return {
-      passed: score >= 58,
+      passed,
       score,
       metrics,
       evidence: { acoustic: { ...acousticResult, role: acousticRole }, motion, qr }
@@ -123,7 +134,7 @@ export class ProximityEngine {
     };
     const score = proximityScore(metrics);
     return {
-      passed: score >= 58,
+      passed: score > 90,
       score,
       metrics
     };
@@ -181,14 +192,18 @@ function waitUntil(timestamp) {
 }
 
 export function proximityScore(metrics) {
-  let score = 0;
-  if (metrics.tokenFresh) score += 24;
-  if (metrics.acoustic) score += 30;
-  if (metrics.tilt) score += 12;
-  if (metrics.bump) score += 14;
-  if (metrics.lowRttHint) score += 6;
-  if (metrics.qrFallback) score += 30;
-  return score;
+  const sound = metricValue(metrics.soundCorrelation ?? metrics.acoustic);
+  const motion = metricValue(metrics.motionCorrelation);
+  const bump = metricValue(metrics.bump);
+  const tilt = metricValue(metrics.tilt);
+  const qr = metricValue(metrics.qrMatch ?? metrics.qrFallback);
+  return Math.round((sound * 34 + motion * 26 + bump * 20 + tilt * 12 + qr * 8) * 10) / 10;
+}
+
+function metricValue(value) {
+  if (typeof value === "boolean") return value ? 1 : 0;
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : 0;
 }
 
 function delay(ms) {

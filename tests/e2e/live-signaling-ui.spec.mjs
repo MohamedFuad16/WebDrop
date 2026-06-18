@@ -151,3 +151,155 @@ test("live signaling lets two same-browser pages discover only each other and co
     await context.close();
   }
 });
+
+test("manual QR backup connects explicit show and scan roles", async ({ browser, baseURL }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-desktop", "QR camera fallback is exercised once in Chromium.");
+
+  const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const showName = `QR Show ${runId}`;
+  const scanName = `QR Scan ${runId}`;
+  const context = await browser.newContext();
+  const consoleProblems = [];
+  try {
+    await context.route("**/js/config/runtime-config.js*", async (route) => {
+      await route.fulfill({
+        contentType: "application/javascript",
+        body: `globalThis.WEBDROP_RUNTIME_CONFIG = Object.freeze({
+          productionSignaling: true,
+          realProximityCeremony: true,
+          realTransfer: false,
+          qrPairing: true,
+          signalingUrl: "ws://127.0.0.1:8080/ws",
+          turnConfigUrl: "http://127.0.0.1:8080/api/ice-servers"
+        });`
+      });
+    });
+
+    const pageShow = await context.newPage();
+    const pageScan = await context.newPage();
+    collectConsoleProblems(pageShow, consoleProblems);
+    collectConsoleProblems(pageScan, consoleProblems);
+
+    await pageShow.addInitScript(({ runId, showName }) => {
+      localStorage.setItem("webdrop.deviceId", `qr-show-${runId}`);
+      localStorage.setItem("webdrop.deviceName", showName);
+      sessionStorage.clear();
+    }, { runId, showName });
+    await pageScan.addInitScript(({ runId, scanName }) => {
+      localStorage.setItem("webdrop.deviceId", `qr-scan-${runId}`);
+      localStorage.setItem("webdrop.deviceName", scanName);
+      sessionStorage.clear();
+      globalThis.__webdropQrToken = "";
+      globalThis.BarcodeDetector = class {
+        async detect() {
+          return globalThis.__webdropQrToken
+            ? [{ rawValue: globalThis.__webdropQrToken }]
+            : [];
+        }
+      };
+      const mediaDevices = navigator.mediaDevices;
+      Object.defineProperty(mediaDevices, "getUserMedia", {
+        configurable: true,
+        value: async () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 320;
+          canvas.height = 240;
+          const context2d = canvas.getContext("2d");
+          let frame = 0;
+          globalThis.__webdropFakeCameraTimer = setInterval(() => {
+            context2d.fillStyle = frame++ % 2 ? "#111" : "#eee";
+            context2d.fillRect(0, 0, canvas.width, canvas.height);
+          }, 80);
+          context2d.fillStyle = "#eee";
+          context2d.fillRect(0, 0, canvas.width, canvas.height);
+          return canvas.captureStream(5);
+        }
+      });
+    }, { runId, scanName });
+
+    await pageShow.goto(`${baseURL}/?qa=live-qr-show`, { waitUntil: "domcontentloaded" });
+    await pageScan.goto(`${baseURL}/?qa=live-qr-scan`, { waitUntil: "domcontentloaded" });
+    await expect(pageShow.locator(`.peer-node:has-text('${scanName}')`)).toHaveCount(1, { timeout: 20_000 });
+    await expect(pageScan.locator(`.peer-node:has-text('${showName}')`)).toHaveCount(1, { timeout: 20_000 });
+
+    await pageShow.locator("[data-action='connect-qr']").click();
+    await expect(pageShow.locator("[data-qr-sheet]")).toBeVisible();
+    await pageShow.locator("[data-action='qr-show']").click();
+    await expect(pageScan.locator("[data-toast]")).toContainText(showName, { timeout: 15_000 });
+
+    await pageScan.locator("[data-action='connect-qr']").click();
+    await expect(pageScan.locator("[data-qr-sheet]")).toBeVisible();
+    await pageScan.locator("[data-action='qr-scan']").click();
+    await expect(pageShow.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "qr-display", { timeout: 20_000 });
+    await expect(pageScan.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "qr-scan", { timeout: 20_000 });
+
+    const token = await pageShow.locator("[data-island-qr-canvas]").evaluate((canvas) => {
+      const context2d = canvas.getContext("2d");
+      const frame = context2d.getImageData(0, 0, canvas.width, canvas.height);
+      return globalThis.jsQR(frame.data, canvas.width, canvas.height)?.data || "";
+    });
+    expect(token).not.toBe("");
+    await pageScan.evaluate((value) => {
+      globalThis.__webdropQrToken = value;
+    }, token);
+
+    await expect(pageShow.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 30_000 });
+    await expect(pageScan.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 30_000 });
+    expect(consoleProblems).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
+
+test("Android proximity failure shows the score error and offers QR backup", async ({ browser, baseURL }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-desktop", "Physical-score failure is exercised once in Chromium.");
+
+  const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const context = await browser.newContext({
+    userAgent: "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/136 Mobile Safari/537.36"
+  });
+  try {
+    await context.route("**/js/config/runtime-config.js*", async (route) => {
+      await route.fulfill({
+        contentType: "application/javascript",
+        body: `globalThis.WEBDROP_RUNTIME_CONFIG = Object.freeze({
+          productionSignaling: true,
+          realProximityCeremony: true,
+          realTransfer: false,
+          qrPairing: true,
+          signalingUrl: "ws://127.0.0.1:8080/ws",
+          turnConfigUrl: "http://127.0.0.1:8080/api/ice-servers"
+        });`
+      });
+    });
+    const pageA = await context.newPage();
+    const pageB = await context.newPage();
+    await pageA.addInitScript((id) => {
+      localStorage.setItem("webdrop.deviceId", `android-a-${id}`);
+      localStorage.setItem("webdrop.deviceName", `Android A ${id}`);
+      sessionStorage.clear();
+    }, runId);
+    await pageB.addInitScript((id) => {
+      localStorage.setItem("webdrop.deviceId", `android-b-${id}`);
+      localStorage.setItem("webdrop.deviceName", `Android B ${id}`);
+      sessionStorage.clear();
+    }, runId);
+
+    await pageA.goto(`${baseURL}/?qa=android-score-a`, { waitUntil: "domcontentloaded" });
+    await pageB.goto(`${baseURL}/?qa=android-score-b`, { waitUntil: "domcontentloaded" });
+    await expect(pageA.locator(".peer-node")).toHaveCount(1, { timeout: 20_000 });
+    await expect(pageB.locator(".peer-node")).toHaveCount(1, { timeout: 20_000 });
+    await Promise.all([
+      pageA.locator("[data-action='connect-nearby']").click(),
+      pageB.locator("[data-action='connect-nearby']").click()
+    ]);
+
+    await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "verification-failed", { timeout: 30_000 });
+    await expect(pageA.locator("[data-island-ceremony-stage]")).toContainText("Score not enough");
+    await expect(pageA.locator("[data-island-ceremony-error]")).toContainText("must be above 90");
+    await expect(pageA.locator("[data-qr-sheet]")).toBeVisible({ timeout: 10_000 });
+    await expect(pageB.locator("[data-qr-sheet]")).toBeVisible({ timeout: 10_000 });
+  } finally {
+    await context.close();
+  }
+});
