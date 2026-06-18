@@ -179,6 +179,27 @@ receiver.socket.send(JSON.stringify({
 const accepted = await waitFor(sender, (message) => message.type === "invite:accept" && message.payload?.pairingId === invite.payload.pairingId, "invite accept");
 await waitFor(receiver, (message) => message.type === "invite:accept" && message.payload?.pairingId === invite.payload.pairingId, "invite accept echo");
 
+const proximityMetrics = {
+  soundCorrelation: 1,
+  motionCorrelation: 1,
+  bumpCorrelation: 0,
+  tiltMatch: 0
+};
+sender.socket.send(JSON.stringify({
+  type: "proximity:telemetry",
+  targetId: receiver.id,
+  pairingId: accepted.payload.pairingId,
+  metrics: proximityMetrics
+}));
+receiver.socket.send(JSON.stringify({
+  type: "proximity:telemetry",
+  targetId: sender.id,
+  pairingId: accepted.payload.pairingId,
+  metrics: proximityMetrics
+}));
+await waitFor(sender, (message) => message.type === "proximity:decision" && message.payload?.pairVerified === true, "verified proximity decision");
+await waitFor(receiver, (message) => message.type === "proximity:decision" && message.payload?.pairVerified === true, "verified proximity decision echo");
+
 sender.socket.send(JSON.stringify({
   type: "chat:message",
   targetId: receiver.id,
