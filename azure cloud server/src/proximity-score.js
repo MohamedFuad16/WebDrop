@@ -7,8 +7,8 @@ const DEFAULT_WEIGHTS = Object.freeze({
 });
 
 const DEFAULT_THRESHOLDS = Object.freeze({
-  verified: 0.9,
-  review: 0.75
+  verified: 0.55,
+  review: 0.4
 });
 
 export class ProximityScoreAnalyzer {
@@ -37,7 +37,7 @@ export class ProximityScoreAnalyzer {
 
   classify(score) {
     if (!this.enabled) return "not_enforced";
-    if (score > this.thresholds.verified) return "verified";
+    if (score >= this.thresholds.verified) return "verified";
     if (score >= this.thresholds.review) return "review";
     return "insufficient";
   }
@@ -48,7 +48,7 @@ export class ProximityScoreAnalyzer {
       mode: this.enabled ? "analysis" : "report-only",
       thresholds: this.thresholds,
       weights: this.weights,
-      note: "A physical proximity score above 90 percent is required when analysis is enabled."
+      note: "A physical proximity score of at least 55 percent is required when analysis is enabled."
     };
   }
 }

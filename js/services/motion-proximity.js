@@ -2,7 +2,7 @@ export class MotionProximitySensor {
   constructor({
     target = globalThis,
     bumpThreshold = 14,
-    tiltThreshold = 25,
+    tiltThreshold = 30,
     now = () => Date.now()
   } = {}) {
     this.target = target;
@@ -41,8 +41,11 @@ export class MotionProximitySensor {
   }
 
   restorePermission(permission) {
-    if (["granted", "denied", "unsupported"].includes(permission)) {
+    // iPhone browsers must revalidate native motion access from a fresh user gesture.
+    if (["denied", "unsupported"].includes(permission)) {
       this.permission = permission;
+    } else {
+      this.permission = "unknown";
     }
     return this.permission;
   }
@@ -84,8 +87,7 @@ export class MotionProximitySensor {
     const tilt = tiltFromAcceleration(event.accelerationIncludingGravity);
     const acceleration = vectorMagnitude(event.acceleration);
     const bump = acceleration >= this.bumpThreshold;
-    const tilted = Math.abs(tilt.beta) >= this.tiltThreshold
-      || Math.abs(tilt.gamma) >= this.tiltThreshold;
+    const tilted = exceedsTiltThreshold(tilt, this.tiltThreshold);
 
     this.snapshot = {
       samples: this.snapshot.samples + 1,
@@ -114,6 +116,11 @@ export function tiltFromAcceleration(acceleration = {}) {
   const beta = Math.atan2(y, Math.sqrt(x * x + z * z)) * 180 / Math.PI;
   const gamma = Math.atan2(x, Math.sqrt(y * y + z * z)) * 180 / Math.PI;
   return { beta, gamma };
+}
+
+export function exceedsTiltThreshold(tilt = {}, threshold = 30) {
+  return Math.abs(finite(tilt.beta)) > threshold
+    || Math.abs(finite(tilt.gamma)) > threshold;
 }
 
 function finite(value) {

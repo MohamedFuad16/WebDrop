@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.40";
-import { Emitter } from "../utils/emitter.js?v=1.0.40";
-import { formatBytes } from "../utils/format.js?v=1.0.40";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.40";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.40";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.41";
+import { Emitter } from "../utils/emitter.js?v=1.0.41";
+import { formatBytes } from "../utils/format.js?v=1.0.41";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.41";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.41";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -218,7 +218,7 @@ export class DynamicIsland extends Emitter {
     if (motion) this.renderMotionMetrics(motion);
     if (Number.isFinite(score) && this.nodes.ceremonyScore) {
       this.nodes.ceremonyScore.textContent = `${Math.round(score)} / 100`;
-      this.nodes.ceremonyScore.dataset.passed = String(score > 90);
+      this.nodes.ceremonyScore.dataset.passed = String(score >= 55);
     }
   }
 

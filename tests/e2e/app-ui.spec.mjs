@@ -147,6 +147,58 @@ test("uses deferred Blob receive storage on iPhone WebKit", async ({ page }, tes
   expect(result.backend).toBe("blob");
 });
 
+test("requests iPhone motion and microphone permissions from one user gesture", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "webkit-iphone-15-pro", "iPhone permission behavior is WebKit-specific.");
+
+  await page.goto("/tests/e2e/blank.html?qa=e2e-webkit-proximity-permissions", { waitUntil: "domcontentloaded" });
+  await page.evaluate(async () => {
+    const calls = [];
+    globalThis.DeviceMotionEvent = {
+      async requestPermission() {
+        calls.push("motion");
+        return "granted";
+      }
+    };
+    const mediaDevices = {
+      async getUserMedia(constraints) {
+        calls.push("microphone");
+        globalThis.__webdropRequestedAudio = constraints;
+        return { active: true };
+      }
+    };
+    const [{ MotionProximitySensor }, { AcousticProximitySensor }] = await Promise.all([
+      import("/js/services/motion-proximity.js?v=e2e-webkit-permissions"),
+      import("/js/services/acoustic-proximity.js?v=e2e-webkit-permissions")
+    ]);
+    const button = document.createElement("button");
+    button.textContent = "Allow proximity";
+    button.addEventListener("click", async () => {
+      const motion = new MotionProximitySensor({ target: globalThis });
+      const acoustic = new AcousticProximitySensor({ mediaDevices });
+      const motionPromise = motion.requestPermission();
+      const microphonePromise = acoustic.requestMicrophonePermission();
+      const [motionResult, microphoneResult] = await Promise.all([motionPromise, microphonePromise]);
+      globalThis.__webdropPermissionResult = { calls, motionResult, microphoneResult };
+    });
+    document.body.append(button);
+  });
+
+  await page.getByRole("button", { name: "Allow proximity" }).click();
+  await expect.poll(() => page.evaluate(() => globalThis.__webdropPermissionResult)).toMatchObject({
+    calls: ["motion", "microphone"],
+    motionResult: { granted: true },
+    microphoneResult: { granted: true }
+  });
+  await expect.poll(() => page.evaluate(() => globalThis.__webdropRequestedAudio)).toEqual({
+    audio: {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false
+    },
+    video: false
+  });
+});
+
 test("defers desktop receive chunks in IndexedDB until Save", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium-desktop", "Deferred IndexedDB streaming is validated on desktop Chromium.");
 

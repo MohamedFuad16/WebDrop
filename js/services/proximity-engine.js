@@ -1,6 +1,8 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.40";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.40";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.40";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.41";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.41";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.41";
+
+export const PROXIMITY_SCORE_MINIMUM = 55;
 
 export class ProximityEngine {
   constructor({
@@ -111,7 +113,7 @@ export class ProximityEngine {
       lowRttHint: false
     };
     const score = proximityScore(metrics);
-    const passed = score > 90;
+    const passed = score >= PROXIMITY_SCORE_MINIMUM;
     onProgress({ phase: "score", state: passed ? "complete" : "failed", score, metrics, motion });
 
     return {
@@ -134,7 +136,7 @@ export class ProximityEngine {
     };
     const score = proximityScore(metrics);
     return {
-      passed: score > 90,
+      passed: score >= PROXIMITY_SCORE_MINIMUM,
       score,
       metrics
     };

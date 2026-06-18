@@ -1,7 +1,7 @@
-import { formatBytes } from "../utils/format.js?v=1.0.40";
+import { formatBytes } from "../utils/format.js?v=1.0.41";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
-const PROXIMITY_SCORE_THRESHOLD = 90;
+const PROXIMITY_SCORE_MINIMUM = 55;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
 
 export function createController({
@@ -913,14 +913,21 @@ export function createController({
 
   function ensureProximityPermissions() {
     if (permissionRequestPromise) return permissionRequestPromise;
-    permissionRequestPromise = Promise.all([
-      storedPermissions.microphone === "denied"
-        ? Promise.resolve({ granted: false, reason: "denied", cached: true })
-        : proximity.requestMicrophonePermission(),
-      ["denied", "unsupported"].includes(storedPermissions.motion)
-        ? Promise.resolve({ granted: false, reason: storedPermissions.motion, cached: true })
-        : proximity.requestMotionPermission()
-    ]).then(([microphone, motion]) => {
+    // Start both native prompts before yielding so every iPhone browser keeps user activation.
+    const motionPromise = ["denied", "unsupported"].includes(storedPermissions.motion)
+      ? Promise.resolve({ granted: false, reason: storedPermissions.motion, cached: true })
+      : proximity.requestMotionPermission();
+    const microphonePromise = storedPermissions.microphone === "denied"
+      ? Promise.resolve({ granted: false, reason: "denied", cached: true })
+      : proximity.requestMicrophonePermission({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        },
+        video: false
+      });
+    permissionRequestPromise = Promise.all([motionPromise, microphonePromise]).then(([motion, microphone]) => {
       storedPermissions.microphone = permissionState(microphone);
       storedPermissions.motion = permissionState(motion);
       writeStoredPermissions(storedPermissions);
@@ -1324,8 +1331,8 @@ export function createController({
       messages.push(view.translate("proximityErrorRemote"));
     }
     const score = Math.round(result?.score || percentageScore(decision?.analysis?.score));
-    if (score <= PROXIMITY_SCORE_THRESHOLD) {
-      messages.push(view.translate("proximityErrorScore", { score, required: PROXIMITY_SCORE_THRESHOLD }));
+    if (score < PROXIMITY_SCORE_MINIMUM) {
+      messages.push(view.translate("proximityErrorScore", { score, required: PROXIMITY_SCORE_MINIMUM }));
     }
     return [...new Set(messages)];
   }

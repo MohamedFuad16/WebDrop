@@ -6,19 +6,30 @@ export const DEFAULT_CHIRP = Object.freeze({
 });
 
 export class AcousticProximitySensor {
-  constructor({ audioContextFactory = defaultAudioContextFactory } = {}) {
+  constructor({
+    audioContextFactory = defaultAudioContextFactory,
+    mediaDevices = globalThis.navigator?.mediaDevices
+  } = {}) {
     this.audioContextFactory = audioContextFactory;
+    this.mediaDevices = mediaDevices;
     this.context = null;
     this.stream = null;
     this.source = null;
     this.analyser = null;
   }
 
-  async requestMicrophonePermission(constraints = { audio: true }) {
+  async requestMicrophonePermission(constraints = {
+    audio: {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false
+    },
+    video: false
+  }) {
     if (this.stream?.active) {
       return { granted: true, reason: "granted", stream: this.stream, cached: true };
     }
-    const mediaDevices = globalThis.navigator?.mediaDevices;
+    const mediaDevices = this.mediaDevices;
     if (!mediaDevices?.getUserMedia) {
       return { granted: false, reason: "unsupported" };
     }

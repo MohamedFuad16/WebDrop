@@ -255,7 +255,7 @@ test("manual QR backup connects explicit show and scan roles", async ({ browser,
   }
 });
 
-test("Android proximity failure shows the score error and offers QR backup", async ({ browser, baseURL }, testInfo) => {
+test("proximity failure below 55 shows the score error and offers QR backup", async ({ browser, baseURL }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium-desktop", "Physical-score failure is exercised once in Chromium.");
 
   const runId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -293,20 +293,17 @@ test("Android proximity failure shows the score error and offers QR backup", asy
     await pageB.goto(`${baseURL}/?qa=android-score-b`, { waitUntil: "domcontentloaded" });
     await expect(pageA.locator(".peer-node")).toHaveCount(1, { timeout: 20_000 });
     await expect(pageB.locator(".peer-node")).toHaveCount(1, { timeout: 20_000 });
-    await Promise.all([
-      pageA.locator("[data-action='connect-nearby']").click(),
-      pageB.locator("[data-action='connect-nearby']").click()
-    ]);
+    await pageA.locator("[data-action='connect-nearby']").click();
     await expect(pageA.locator("[data-connection-method-sheet]")).toBeVisible();
+    await pageA.locator("[data-action='connection-bump']").click();
+    await expect(pageB.locator("[data-action='connect-nearby']")).toContainText("Android A", { timeout: 15_000 });
+    await pageB.locator("[data-action='connect-nearby']").click();
     await expect(pageB.locator("[data-connection-method-sheet]")).toBeVisible();
-    await Promise.all([
-      pageA.locator("[data-action='connection-bump']").click(),
-      pageB.locator("[data-action='connection-bump']").click()
-    ]);
+    await pageB.locator("[data-action='connection-bump']").click();
 
     await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "verification-failed", { timeout: 30_000 });
     await expect(pageA.locator("[data-island-ceremony-stage]")).toContainText("Score not enough");
-    await expect(pageA.locator("[data-island-ceremony-error]")).toContainText("must be above 90");
+    await expect(pageA.locator("[data-island-ceremony-error]")).toContainText("must be at least 55");
     await expect(pageA.locator("[data-qr-sheet]")).toBeVisible({ timeout: 10_000 });
     await expect(pageB.locator("[data-qr-sheet]")).toBeVisible({ timeout: 10_000 });
   } finally {
