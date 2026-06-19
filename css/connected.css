@@ -284,6 +284,19 @@
   cursor: pointer;
 }
 
+.received-file-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.received-file-actions button[data-received-intent="view"] {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--blue), #63b3ff);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--blue) 22%, transparent);
+}
+
 .received-file button:disabled,
 .received-file-state {
   color: var(--ink-muted);

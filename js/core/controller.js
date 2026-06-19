@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.53";
+import { formatBytes } from "../utils/format.js?v=1.0.54";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -356,6 +356,7 @@ export function createController({
       name: file.name,
       size: formatBytes(file.receivedBytes),
       icon: file.type?.includes("pdf") ? "P" : file.type?.startsWith("image/") ? "◎" : "⌁",
+      type: file.type || "application/octet-stream",
       storageBackend: file.backend,
       sha256: file.sha256,
       ready: true,
@@ -449,13 +450,12 @@ export function createController({
     store.patch({ unreadChatCount: 0 });
     view.openChatSheet();
   });
-  view.on("open-received", async ({ transferId, fileId }) => {
+  view.on("open-received", async ({ transferId, fileId, intent = "download" }) => {
     const existing = store.getState().receivedItems.find((item) =>
       item.transferId === transferId && item.id === fileId
     );
     if (existing?.url) {
-      const disposition = triggerBrowserDownload(existing.url, existing.downloadName);
-      view.toast(view.translate(disposition === "opened" ? "openedNewTab" : "downloadStarted"));
+      openReceivedUrl(view, existing.url, existing, intent);
       return;
     }
     if (!runtime.realTransfer || !transferId || !fileId) return;
@@ -467,9 +467,13 @@ export function createController({
       }
       if (!exported?.blob) return;
       const url = URL.createObjectURL(exported.blob);
-      const disposition = triggerBrowserDownload(url, exported.name || existing?.downloadName);
+      openReceivedUrl(view, url, {
+        ...existing,
+        name: exported.name || existing?.name,
+        downloadName: exported.name || existing?.downloadName,
+        type: exported.type || existing?.type
+      }, intent);
       window.setTimeout(() => URL.revokeObjectURL(url), 60000);
-      view.toast(view.translate(disposition === "opened" ? "openedNewTab" : "downloadStarted"));
     } catch {
       view.toast(view.translate("noReceived"));
     }
@@ -505,7 +509,14 @@ export function createController({
     store.update((state) => ({ ...state, self: { ...state.self, name: clean } }));
   });
 
-  view.on("connect-nearby", () => {
+  view.on("connect-nearby", startNearbyConnectionFromUi);
+
+  view.on("island-retry", async () => {
+    await view.closeDynamicIsland();
+    startNearbyConnectionFromUi();
+  });
+
+  function startNearbyConnectionFromUi() {
     const { connectedPeerId, mode } = store.getState();
     if (mode === "verifying" || mode === "disconnecting") {
       view.toast(view.translate(mode === "verifying" ? "verifying" : "disconnecting"));
@@ -527,7 +538,7 @@ export function createController({
       ? ensureProximityPermissions()
       : null;
     beginAnonymousProximityConnection(permissionPromise);
-  });
+  }
 
   view.on("connection-bump", () => {
     if (!activePeerId) return;
@@ -2014,6 +2025,7 @@ function demoPdfItems() {
       name: "WebDrop Demo Guide EN.pdf",
       size: "Demo PDF",
       icon: "P",
+      type: "application/pdf",
       locale: "en",
       url: "output/pdf/webdrop-demo-en.pdf"
     },
@@ -2023,6 +2035,7 @@ function demoPdfItems() {
       name: "WebDrop デモガイド JP.pdf",
       size: "デモPDF",
       icon: "P",
+      type: "application/pdf",
       locale: "ja",
       url: "output/pdf/webdrop-demo-ja.pdf"
     }
@@ -2062,11 +2075,22 @@ function waitForTransportConnection(transport, timeoutMs) {
   });
 }
 
-function triggerBrowserDownload(url, name) {
-  if (isAppleTouchBrowser()) {
-    const opened = window.open(url, "_blank", "noopener,noreferrer");
-    if (opened) return "opened";
+function openReceivedUrl(view, url, item = {}, intent = "download") {
+  if (intent === "view" && isPreviewableReceivedItem(item)) {
+    const opened = triggerBrowserView(url);
+    view.toast(view.translate(opened ? "openedNewTab" : "downloadStarted"));
+    if (opened) return;
   }
+  triggerBrowserDownload(url, item.downloadName || item.name);
+  view.toast(view.translate("downloadStarted"));
+}
+
+function triggerBrowserView(url) {
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  return Boolean(opened);
+}
+
+function triggerBrowserDownload(url, name) {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = name || "webdrop-file";
@@ -2077,14 +2101,13 @@ function triggerBrowserDownload(url, name) {
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
-  return "download";
 }
 
-function isAppleTouchBrowser() {
-  const platform = navigator.platform || "";
-  const userAgent = navigator.userAgent || "";
-  const appleTouchMac = platform === "MacIntel" && navigator.maxTouchPoints > 1;
-  return /iPad|iPhone|iPod/.test(userAgent) || appleTouchMac;
+function isPreviewableReceivedItem(item = {}) {
+  const type = String(item.type || "").toLowerCase();
+  const name = String(item.name || item.downloadName || "").toLowerCase();
+  if (type.startsWith("image/") || type.startsWith("video/") || type === "application/pdf") return true;
+  return /\.(png|jpe?g|gif|webp|avif|pdf|mp4|mov|webm)$/i.test(name);
 }
 
 function revokeReceivedItemUrls(items = []) {

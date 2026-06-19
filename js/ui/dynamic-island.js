@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.53";
-import { Emitter } from "../utils/emitter.js?v=1.0.53";
-import { formatBytes } from "../utils/format.js?v=1.0.53";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.53";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.53";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.54";
+import { Emitter } from "../utils/emitter.js?v=1.0.54";
+import { formatBytes } from "../utils/format.js?v=1.0.54";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.54";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.54";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -27,6 +27,8 @@ export class DynamicIsland extends Emitter {
       ceremonyStage: this.root?.querySelector("[data-island-ceremony-stage]"),
       ceremonyScore: this.root?.querySelector("[data-island-ceremony-score]"),
       ceremonyError: this.root?.querySelector("[data-island-ceremony-error]"),
+      failureActions: this.root?.querySelector("[data-island-failure-actions]"),
+      retry: this.root?.querySelector("[data-island-retry]"),
       fallback: this.root?.querySelector("[data-island-fallback]"),
       audioMetric: this.root?.querySelector("[data-island-metric='audio']"),
       audioValue: this.root?.querySelector("[data-island-audio-value]"),
@@ -71,9 +73,13 @@ export class DynamicIsland extends Emitter {
     this.scanContext = this.scanCanvas.getContext("2d", { willReadFrequently: true });
     this.previousFocus = null;
     this.copyKeys = { title: null, status: null };
+    this.transferDisplayRatio = 0;
+    this.transferTargetRatio = 0;
+    this.transferAnimationFrame = 0;
     this.backgroundNodes = [...document.querySelectorAll(".topbar, .main-stage, .connection-tray, [data-backdrop], [data-sheet]")];
     this.nodes.camera?.addEventListener("click", () => this.startCamera());
     this.nodes.cancel?.addEventListener("click", () => this.emit("cancel"));
+    this.nodes.retry?.addEventListener("click", () => this.emit("retry"));
     this.nodes.fallback?.addEventListener("click", () => this.emit("fallback"));
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && this.state.startsWith("qr-")) {
@@ -125,7 +131,7 @@ export class DynamicIsland extends Emitter {
     this.connectionOpenedAt = this.now();
     this.renderPeople(self, {
       name: this.translate("anonymousNearbyPeer"),
-      avatar: self.avatar
+      avatar: anonymousAvatarFor(self.avatar)
     });
     this.resetCeremony();
     this.setState("connecting");
@@ -162,6 +168,7 @@ export class DynamicIsland extends Emitter {
       this.cancelConnectionMinimum(false);
       this.prepareToOpen(false);
       this.stopCamera();
+      this.resetTransferProgress();
       clearTimeout(this.autoHideTimer);
       this.copyKeys = { title: null, status: null };
       this.currentConnectedPeerId = peer.id;
@@ -255,7 +262,7 @@ export class DynamicIsland extends Emitter {
       this.nodes.ceremonyError.hidden = false;
       this.nodes.ceremonyError.textContent = errors.filter(Boolean).join(" · ");
     }
-    if (this.nodes.fallback) this.nodes.fallback.hidden = false;
+    if (this.nodes.failureActions) this.nodes.failureActions.hidden = false;
     return true;
   }
 
@@ -502,6 +509,7 @@ export class DynamicIsland extends Emitter {
       this.nodes.status.textContent = this.translate(this.copyKeys.status);
     }
     if (this.nodes.camera) this.nodes.camera.textContent = this.translate("startCamera");
+    if (this.nodes.retry) this.nodes.retry.textContent = this.translate("retry");
     if (this.nodes.fallback) this.nodes.fallback.textContent = this.translate("useQrInstead");
   }
 
@@ -522,7 +530,7 @@ export class DynamicIsland extends Emitter {
       this.nodes.ceremonyError.hidden = true;
       this.nodes.ceremonyError.textContent = "";
     }
-    if (this.nodes.fallback) this.nodes.fallback.hidden = true;
+    if (this.nodes.failureActions) this.nodes.failureActions.hidden = true;
     [this.nodes.audioMetric, this.nodes.bumpMetric, this.nodes.tiltMetric].forEach((node) => this.setMetricState(node, "waiting"));
     if (this.nodes.audioValue) this.nodes.audioValue.textContent = this.translate("ceremonyWaiting");
     if (this.nodes.bumpValue) this.nodes.bumpValue.textContent = "0.0";
@@ -566,7 +574,6 @@ export class DynamicIsland extends Emitter {
 
   renderTransfer(transfer = {}) {
     const ratio = clampRatio(transfer.ratio);
-    const percent = `${Math.round(ratio * 100)}%`;
     const receiving = transfer.direction === "receive";
     const directionKey = receiving ? "receivingStatus" : "sending";
     const name = transfer.name || "";
@@ -574,13 +581,61 @@ export class DynamicIsland extends Emitter {
       ? `${formatBytes(transfer.transferredBytes)} / ${formatBytes(transfer.totalBytes)}`
       : "";
     if (this.nodes.transferLabel) this.nodes.transferLabel.textContent = this.translate(directionKey);
-    if (this.nodes.transferPercent) this.nodes.transferPercent.textContent = percent;
     if (this.nodes.transferBar) {
       this.nodes.transferBar.style.transformOrigin = receiving ? "right center" : "left center";
-      this.nodes.transferBar.style.transform = `scaleX(${ratio})`;
     }
     if (this.nodes.transferName) {
       this.nodes.transferName.textContent = [name, bytes].filter(Boolean).join(" · ");
+    }
+    this.animateTransferProgress(ratio);
+  }
+
+  resetTransferProgress() {
+    if (this.transferAnimationFrame) cancelAnimationFrame(this.transferAnimationFrame);
+    this.transferAnimationFrame = 0;
+    this.transferDisplayRatio = 0;
+    this.transferTargetRatio = 0;
+    this.paintTransferProgress(0);
+  }
+
+  animateTransferProgress(targetRatio) {
+    const target = clampRatio(targetRatio);
+    if (this.transferAnimationFrame) cancelAnimationFrame(this.transferAnimationFrame);
+    const start = Number.isFinite(this.transferDisplayRatio) ? this.transferDisplayRatio : 0;
+    this.transferTargetRatio = target;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const distance = Math.abs(target - start);
+    if (reduced || distance < 0.006 || target < start) {
+      this.paintTransferProgress(target);
+      return;
+    }
+    const duration = Math.min(680, Math.max(260, distance * 900));
+    const startedAt = performance.now();
+    const tick = (now) => {
+      const elapsed = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - elapsed, 3);
+      const value = start + (target - start) * eased;
+      this.paintTransferProgress(value);
+      if (elapsed < 1 && this.transferTargetRatio === target) {
+        this.transferAnimationFrame = requestAnimationFrame(tick);
+      } else {
+        this.paintTransferProgress(target);
+        this.transferAnimationFrame = 0;
+      }
+    };
+    this.transferAnimationFrame = requestAnimationFrame(tick);
+  }
+
+  paintTransferProgress(ratio) {
+    const value = clampRatio(ratio);
+    this.transferDisplayRatio = value;
+    if (this.nodes.transferPercent) {
+      this.nodes.transferPercent.textContent = `${Math.round(value * 100)}%`;
+      this.nodes.transferPercent.style.setProperty("--transfer-progress", value.toFixed(4));
+    }
+    if (this.nodes.transferBar) {
+      this.nodes.transferBar.style.transform = `scaleX(${value})`;
+      this.nodes.transferBar.style.setProperty("--transfer-progress", value.toFixed(4));
     }
   }
 
@@ -835,6 +890,13 @@ function renderAvatar(node, avatar) {
   };
   node.replaceChildren(image);
   image.decode?.().catch(() => {});
+}
+
+function anonymousAvatarFor(selfAvatar) {
+  const normalized = normalizeAvatarChoice(selfAvatar);
+  return normalized.includes("user-01.png")
+    ? "assets/icons/avatars/user-02.png"
+    : "assets/icons/avatars/user-01.png";
 }
 
 function escapeHtml(text) {

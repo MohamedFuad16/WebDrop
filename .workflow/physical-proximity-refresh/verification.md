@@ -3,16 +3,16 @@
 ## Completed
 
 - `npm run check` passed.
-- `npm test` passed: 16 tests.
+- `npm test` passed: 18 tests.
 - `npm --prefix "azure cloud server" run check` passed.
 - `npm --prefix "azure cloud server" test` passed: 21 tests.
-- `npm run test:e2e` passed on `1.0.53`: 53 passed, 47 expected project skips.
+- `npm run test:e2e` passed on `1.0.54`: 53 passed, 47 expected project skips.
 - `npm run verify:full` passed, including audits and `git diff --check`.
 - Bidirectional acoustic regression proves both devices emit and detect the peer chirp over a timing-sensitive virtual audio link.
 - Chromium Web Audio loopback passed: the sender emitted a 72ms chirp at 48kHz and a second `AcousticProximitySensor` detected it at 0.9988 correlation with 48.2dB band margin.
 - Browser mobile smoke passed with Playwright WebKit at `http://127.0.0.1:4178/?qa=browser-qa&runtime=mock`: app ready, no horizontal overflow at iPhone 15 Pro width, mock proximity entered verification, the verified peer reveal showed `100 / 100`, Canvas2D Siri wave was nonblank, and console errors/warnings list was empty.
 - In-app browser lightweight mobile smoke passed at the same local URL: app ready, no horizontal overflow at 390px, and console warnings/errors list was empty.
-- Receive-open browser smoke passed with Playwright WebKit at `http://127.0.0.1:4178/?qa=webkit-receive-copy&runtime=mock`: connected state stayed active, the received demo PDF action rendered as `Open`, opened a separate tab, and console errors/warnings list was empty.
+- Receive-open browser smoke passed with Playwright WebKit at `http://127.0.0.1:4178/?qa=webkit-receive-copy&runtime=mock`: connected state stayed active, the received demo PDF action rendered explicit `View` and `Download` buttons, `View` opened a separate tab, and console errors/warnings list was empty.
 - Screenshot evidence saved to `.workflow/physical-proximity-refresh/browser-mobile-smoke.png`.
 - Receive-view screenshot evidence saved to `.workflow/physical-proximity-refresh/browser-webkit-receive-view.png`.
 
@@ -24,8 +24,8 @@
 - Manual peerless QR show/scan connects after camera scan.
 - WebKit iPhone Siri wave renders nonblank without WebGL.
 - iPhone-style permission tests cover same-gesture motion, microphone, and QR camera warmup.
-- WebKit iPhone received-file `Open` calls `window.open(..., "_blank", "noopener,noreferrer")`, confirms the new tab, and leaves the WebDrop app tab connected.
-- Desktop received-file behavior is explicitly labeled `Download`.
+- WebKit iPhone received-file `View` calls `window.open(..., "_blank", "noopener,noreferrer")`, confirms the new tab, and leaves the WebDrop app tab connected.
+- Previewable received files expose explicit `View` and `Download` actions; non-previewable files stay download-only.
 - Acoustic replies wait for the shared slot boundary even when detection resolves early, preventing the reply from being hidden under the first device's transmit phase.
 - WebKit iPhone geometry proves the island begins at viewport top, collapses toward the hardware capsule, stays black in light mode, clears a 59px safe area, and restores the normal browser theme color when closed.
 - WebKit iPhone QR-display visual smoke passed at 393x852 with black island/browser chrome, top offset 0, no horizontal overflow, and no console warnings or errors.
@@ -54,7 +54,11 @@
 - A score above 55 is rejected when ultrasound, bump, or tilt evidence is missing.
 - Telemetry outside the server-issued ceremony time window is rejected.
 - A one-device session gets one short grace window so a slightly late partner does not trigger a false sync failure.
-- Release `1.0.53` adds live acoustic slot diagnostics to the Dynamic Island: emitting/listening/detected/missed slot, emitted count, margin, and frequency band are now surfaced during the physical ceremony.
+- Release `1.0.54` adds live acoustic slot diagnostics to the Dynamic Island: emitting/listening/detected/missed slot, emitted count, margin, and frequency band are now surfaced during the physical ceremony.
 - `node --test tests/proximity-engine.test.mjs` passed after adding progress-event coverage for emitted and detected anonymous acoustic signature slots.
 - `npx playwright test tests/e2e/app-ui.spec.mjs --project=chromium-desktop --grep 'acoustic slot diagnostics'` passed and proved the visible island text renders as `Detected 2/4 +31dB 20.4-20.6kHz`.
-- Release `1.0.53` also keeps the final acoustic summary after completion/failure, including `Missed 2 slots 20.4-20.9kHz` for failed multi-slot detection.
+- Release `1.0.54` also keeps the final acoustic summary after completion/failure, including `Missed 2 slots 20.4-20.9kHz` for failed multi-slot detection.
+- Release `1.0.54` replaces received-file `Open` with explicit `View`/`Download` actions and smooths the Dynamic Island transfer percentage/bar.
+- Focused checks passed: `npm run check`, `node --test tests/proximity-engine.test.mjs`, WebKit E2E for received-file new-tab behavior, WebKit transfer-progress E2E, and Chromium transfer-progress E2E.
+- The failed island now exposes translated `Retry` and `Use QR instead` actions; the below-55 E2E keeps the island open for 50 seconds and proves QR remains hidden until explicitly tapped.
+- Anonymous acoustic sessions now add a short late-listen grace pass after the scheduled slots; unit coverage proves a peer signature missed in the normal slot can still be detected before scoring fails.

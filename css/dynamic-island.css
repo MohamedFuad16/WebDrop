@@ -288,17 +288,33 @@
   text-align: left;
 }
 
-.webdrop-island__fallback {
+.webdrop-island__failure-actions {
   justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.webdrop-island__retry,
+.webdrop-island__fallback {
   min-height: 34px;
   padding: 0 14px;
   border: 0;
   border-radius: 999px;
-  color: #fff;
-  background: var(--blue);
   font-size: 11px;
   font-weight: 780;
   cursor: pointer;
+}
+
+.webdrop-island__retry {
+  color: var(--island-ink);
+  background: color-mix(in srgb, var(--island-ink) 12%, transparent);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .12);
+}
+
+.webdrop-island__fallback {
+  color: #fff;
+  background: var(--blue);
   box-shadow: 0 10px 24px rgba(52, 125, 245, .28);
 }
 
@@ -385,8 +401,12 @@
 .webdrop-island__transfer strong {
   color: var(--island-ink);
   font-size: clamp(22px, 5vw, 34px);
+  font-variant-numeric: tabular-nums;
   line-height: 1;
   text-align: center;
+  letter-spacing: 0;
+  transform: translateZ(0) scale(calc(.992 + var(--transfer-progress, 0) * .008));
+  transition: transform 220ms var(--ease-out);
 }
 
 .webdrop-island__meter {
@@ -406,7 +426,8 @@
   background: linear-gradient(90deg, #62e3d5, #347df5 56%, #9c7bff);
   transform: scaleX(0);
   transform-origin: left center;
-  transition: transform 220ms linear;
+  transition: transform 360ms cubic-bezier(.22, 1, .36, 1);
+  will-change: transform;
 }
 
 .webdrop-island__qr {

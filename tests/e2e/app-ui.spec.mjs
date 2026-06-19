@@ -704,8 +704,11 @@ test("opens a received file in a new tab on iPhone WebKit without leaving WebDro
   const beforeUrl = page.url();
   await page.locator('[data-action="open-receive-sheet"]').click();
   await expect(page.locator("[data-receive-sheet]")).toBeVisible();
-  await expect(page.locator("[data-received-list] [data-action='open-received']")).toHaveText(/Open|開く/);
-  await page.locator("[data-received-list] [data-action='open-received']").click();
+  const viewAction = page.locator("[data-received-list] [data-action='open-received'][data-received-intent='view']");
+  const downloadAction = page.locator("[data-received-list] [data-action='open-received'][data-received-intent='download']");
+  await expect(viewAction).toHaveText(/View|表示/);
+  await expect(downloadAction).toHaveText(/Download|ダウンロード/);
+  await viewAction.click();
 
   await expect.poll(() => page.evaluate(() => globalThis.__webdropWindowOpenCalls.length)).toBe(1);
   const calls = await page.evaluate(() => globalThis.__webdropWindowOpenCalls);
@@ -828,8 +831,8 @@ test("connects from the global proximity button, selects a file, and shows Dynam
   await page.waitForTimeout(300);
   expect(downloadCount).toBe(0);
   await page.locator('[data-action="open-receive-sheet"]').click();
-  const receiveActionPattern = testInfo.project.name.includes("iphone") ? /Open|開く/ : /Download|ダウンロード/;
-  await expect(page.locator("[data-received-list] button").first()).toHaveText(receiveActionPattern);
+  await expect(page.locator("[data-received-list] [data-received-intent='view']").first()).toHaveText(/View|表示/);
+  await expect(page.locator("[data-received-list] [data-received-intent='download']").first()).toHaveText(/Download|ダウンロード/);
   expect(downloadCount).toBe(0);
   await page.locator('[data-receive-sheet] [data-action="close-action-sheet"]').click();
 
@@ -850,11 +853,15 @@ test("connects from the global proximity button, selects a file, and shows Dynam
     percent: node.querySelector("[data-island-transfer-percent]")?.textContent,
     label: node.querySelector("[data-island-transfer-label]")?.textContent,
     name: node.querySelector("[data-island-transfer-name]")?.textContent,
-    bar: node.querySelector("[data-island-transfer-bar]")?.style.transform
+    bar: node.querySelector("[data-island-transfer-bar]")?.style.transform,
+    barTransition: getComputedStyle(node.querySelector("[data-island-transfer-bar]")).transitionTimingFunction,
+    percentNumeric: getComputedStyle(node.querySelector("[data-island-transfer-percent]")).fontVariantNumeric
   }));
 
   expect(island.label).toMatch(/Sending|送信中/);
   expect(island.name).toContain("webdrop-transfer-proof.bin");
   expect(island.bar).toContain("scaleX");
+  expect(island.barTransition).toContain("cubic-bezier");
+  expect(island.percentNumeric).toContain("tabular-nums");
   expect(consoleProblems).toEqual([]);
 });

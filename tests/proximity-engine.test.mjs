@@ -363,6 +363,55 @@ test("anonymous acoustic plans keep a final missed-slot summary for failed physi
   assert.equal(result.evidence.acoustic.endFrequencyHz, 20880);
 });
 
+test("anonymous acoustic plans keep listening briefly for a late peer signature", async () => {
+  const detectCalls = [];
+  const acoustic = {
+    async emitChirp() {
+      return { emitted: true };
+    },
+    async detectChirp(options) {
+      detectCalls.push(options);
+      const graceAttempt = detectCalls.length > 1;
+      return graceAttempt
+        ? {
+          detected: true,
+          correlation: 0.84,
+          band: { marginDb: 24 }
+        }
+        : {
+          detected: false,
+          correlation: 0.1,
+          reason: "timeout"
+        };
+    }
+  };
+  const motion = {
+    getSnapshot() {
+      return { bump: true, tilted: true, samples: 4 };
+    },
+    stopCapture() {}
+  };
+  const engine = new ProximityEngine({ enabled: true, acoustic, motion });
+
+  const result = await engine.runRealCeremony({
+    acousticPlan: [
+      { id: "self-signature", startFrequencyHz: 20050, endFrequencyHz: 20280 },
+      { id: "late-peer", startFrequencyHz: 20350, endFrequencyHz: 20580 }
+    ],
+    acousticSignatureId: "self-signature",
+    acousticOptions: { intervalMs: 500 },
+    startAt: Date.now() + 5,
+    ceremonyDurationMs: 1040
+  });
+
+  assert.equal(detectCalls.length, 2);
+  assert.equal(result.evidence.acoustic.detected, true);
+  assert.equal(result.evidence.acoustic.mode, "detected");
+  assert.equal(result.evidence.acoustic.targetSignatureId, "late-peer");
+  assert.equal(result.evidence.acoustic.marginDb, 24);
+  assert.equal(result.metrics.heardAcousticSignatureId, "late-peer");
+});
+
 function createVirtualAcousticMedium() {
   const pulses = new Map();
   const detections = new Set();

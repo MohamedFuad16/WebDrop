@@ -309,6 +309,8 @@ test("proximity failure below 55 shows the score error and offers QR backup", as
     await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "verification-failed", { timeout: 30_000 });
     await expect(pageA.locator("[data-island-ceremony-stage]")).toContainText("Score not enough");
     await expect(pageA.locator("[data-island-ceremony-error]")).toContainText("must be at least 55");
+    await expect(pageA.locator("[data-island-retry]")).toBeVisible();
+    await expect(pageA.locator("[data-island-retry]")).toHaveText("Retry");
     await expect(pageA.locator("[data-island-fallback]")).toBeVisible();
     await pageA.waitForTimeout(50_000);
     await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "verification-failed");

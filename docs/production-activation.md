@@ -73,7 +73,7 @@ Real-device acoustic thresholds and timing may require tuning after measurements
 
 ## Verified on June 19, 2026
 
-- Pre-patch production Vercel served app version `1.0.50`; this changeset advances the app/cache key to `1.0.53` for deployment verification.
+- Pre-patch production Vercel served app version `1.0.50`; this changeset advances the app/cache key to `1.0.54` for deployment verification.
 - Japan East `/readyz` reported production healthy with `proximityAnalysisEnabled:true`.
 - Azure `signaling-hub.js` matched the local source hash.
 - Public WSS assigned unique anonymous acoustic signatures for four clients and matched only reciprocal pairs.

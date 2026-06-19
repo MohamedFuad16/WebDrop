@@ -1,8 +1,8 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.53";
-import { formatBytes } from "../utils/format.js?v=1.0.53";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.53";
-import { translate } from "../config/i18n.js?v=1.0.53";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.53";
+import { Emitter } from "../utils/emitter.js?v=1.0.54";
+import { formatBytes } from "../utils/format.js?v=1.0.54";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.54";
+import { translate } from "../config/i18n.js?v=1.0.54";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.54";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;
@@ -113,6 +113,7 @@ export class AppView extends Emitter {
       }
       this.emit("island-cancel");
     });
+    this.dynamicIsland.on("retry", () => this.emit("island-retry"));
     this.dynamicIsland.on("fallback", () => this.emit("island-fallback"));
     this.preloadCriticalAssets();
     this.bindEvents();
@@ -143,7 +144,8 @@ export class AppView extends Emitter {
       if (action === "open-received") {
         this.emit(action, {
           transferId: actionTarget.dataset.transferId,
-          fileId: actionTarget.dataset.fileId
+          fileId: actionTarget.dataset.fileId,
+          intent: actionTarget.dataset.receivedIntent || "download"
         });
         return;
       }
@@ -727,9 +729,7 @@ export class AppView extends Emitter {
           <strong>${escapeHtml(item.name)}</strong>
           <span>${escapeHtml(receivedFileStatus(this, item))}</span>
         </div>
-        ${item.url || item.canSave
-          ? `<button type="button" data-action="open-received" data-transfer-id="${escapeHtml(item.transferId || "")}" data-file-id="${escapeHtml(item.id || "")}">${this.translate(receivedActionKey(item))}</button>`
-          : `<button type="button" class="received-file-state" disabled>${this.translate(item.status === "retry" ? "needsRetry" : "saved")}</button>`}
+        ${receivedActionMarkup(this, item)}
       </div>
     `).join("");
   }
@@ -1159,15 +1159,27 @@ function fileType(file, t) {
   return t("file");
 }
 
-function receivedActionKey(item) {
-  return isAppleTouchBrowser() && (item.url || item.canSave) ? "open" : "download";
+function receivedActionMarkup(view, item) {
+  if (!item.url && !item.canSave) {
+    return `<button type="button" class="received-file-state" disabled>${view.translate(item.status === "retry" ? "needsRetry" : "saved")}</button>`;
+  }
+  const transferId = escapeHtml(item.transferId || "");
+  const fileId = escapeHtml(item.id || "");
+  const actions = isPreviewableReceivedItem(item) ? ["view", "download"] : ["download"];
+  return `
+    <span class="received-file-actions">
+      ${actions.map((intent) => `
+        <button type="button" data-action="open-received" data-received-intent="${intent}" data-transfer-id="${transferId}" data-file-id="${fileId}">${view.translate(intent)}</button>
+      `).join("")}
+    </span>
+  `;
 }
 
-function isAppleTouchBrowser() {
-  const platform = navigator.platform || "";
-  const userAgent = navigator.userAgent || "";
-  return /iPhone|iPad|iPod/i.test(userAgent)
-    || (platform === "MacIntel" && Number(navigator.maxTouchPoints) > 1);
+function isPreviewableReceivedItem(item = {}) {
+  const type = String(item.type || "").toLowerCase();
+  const name = String(item.name || item.downloadName || "").toLowerCase();
+  if (type.startsWith("image/") || type.startsWith("video/") || type === "application/pdf") return true;
+  return /\.(png|jpe?g|gif|webp|avif|pdf|mp4|mov|webm)$/i.test(name);
 }
 
 function normalizedPeerStage(peer, state) {
@@ -1437,5 +1449,6 @@ function avatarFrameDelay(index) {
 
 export const __appViewTest = Object.freeze({
   escapeHtml,
-  staticAvatarMarkup
+  staticAvatarMarkup,
+  isPreviewableReceivedItem
 });

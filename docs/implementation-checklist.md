@@ -1,7 +1,7 @@
 # WebDrop Production Implementation Checklist
 
 Updated: June 19, 2026
-App version: 1.0.53
+App version: 1.0.54
 
 This is the source of truth for the production-readiness package. `Ready, live` means the implementation is active in the current runtime. `Ready, disabled` means the implementation is wired to the frontend but cannot become effective unless its runtime flag and infrastructure are enabled. `Ready, unconfigured` means the code exists but requires deployment secrets or infrastructure. `External verification` means the code is ready but requires Azure, Cloudflare, or physical devices.
 

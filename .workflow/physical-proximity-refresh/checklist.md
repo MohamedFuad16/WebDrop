@@ -17,7 +17,7 @@
 - [x] Keep fixed connected controls viewport-anchored and remove square avatar shadow clipping.
 - [x] Attach mobile sheets to the full viewport width and bottom edge without seams.
 - [x] Brand the QR matrix while preserving machine-readable output.
-- [x] Replace ambiguous received-file Save/View actions with explicit Open or Download behavior.
+- [x] Replace ambiguous received-file Save/Open actions with explicit View and Download behavior.
 - [x] Expand the mobile Dynamic Island to both viewport edges.
 - [x] Center and standardize the Siri wave on Canvas2D across browsers.
 - [x] Place peer avatar centers on the visible SVG ring paths.
@@ -28,3 +28,6 @@
 - [x] Let a one-device session accept one slightly late partner before failing.
 - [x] Surface live acoustic slot diagnostics in the Dynamic Island for physical iPhone testing.
 - [x] Keep final acoustic detected/missed summaries visible after the ceremony completes.
+- [x] Smooth the Dynamic Island transfer percentage and progress bar animation.
+- [x] Add Retry inside the failed Dynamic Island so users can restart bump without hunting for the page button.
+- [x] Keep listening briefly for late peer ultrasonic signatures before declaring audio failure.
