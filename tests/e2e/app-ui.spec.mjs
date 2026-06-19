@@ -142,6 +142,24 @@ test("keeps mobile sheet controls at least 44 CSS pixels", async ({ page }) => {
   }
 });
 
+test("keeps Japanese QR instructions fully visible at 320 CSS pixels", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("webdrop.locale", "ja"));
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/?qa=e2e-japanese-qr-copy&runtime=mock", { waitUntil: "domcontentloaded" });
+  await page.locator('[data-action="connect-qr"]').click();
+  await expect(page.locator("[data-qr-sheet]")).toHaveClass(/is-open/);
+
+  const descriptions = page.locator("[data-qr-sheet] .qr-choice-sheet__actions small");
+  await expect(descriptions).toHaveCount(2);
+  for (const description of await descriptions.all()) {
+    const dimensions = await description.evaluate((node) => ({
+      clientWidth: node.clientWidth,
+      scrollWidth: node.scrollWidth
+    }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+  }
+});
+
 test("does not steal focus when a sheet finishes opening", async ({ page }) => {
   await page.goto("/?qa=e2e-sheet-focus&runtime=mock", { waitUntil: "domcontentloaded" });
 

@@ -1,8 +1,8 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.61";
-import { formatBytes } from "../utils/format.js?v=1.0.61";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.61";
-import { translate } from "../config/i18n.js?v=1.0.61";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.61";
+import { Emitter } from "../utils/emitter.js?v=1.0.62";
+import { formatBytes } from "../utils/format.js?v=1.0.62";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.62";
+import { translate } from "../config/i18n.js?v=1.0.62";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.62";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;

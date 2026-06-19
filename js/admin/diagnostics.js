@@ -1,12 +1,12 @@
-import { AcousticLab } from "./acoustic-lab.js?v=1.0.61";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.61";
+import { AcousticLab } from "./acoustic-lab.js?v=1.0.62";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.62";
 import {
   apiBaseFrom,
   escapeHtml,
   formatAge,
   formatFrequency,
   formatNumber
-} from "./shared.js?v=1.0.61";
+} from "./shared.js?v=1.0.62";
 
 const runtime = globalThis.WEBDROP_RUNTIME_CONFIG || {};
 const nodes = {

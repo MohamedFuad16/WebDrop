@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.61";
+const APP_VERSION = "1.0.62";
 const CHUNK_SIZE = 256 * 1024;
 
 const readinessItems = [
