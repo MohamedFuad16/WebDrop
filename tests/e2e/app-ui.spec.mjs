@@ -510,6 +510,7 @@ test("shows acoustic slot diagnostics in the Dynamic Island ceremony", async ({ 
       name: "WebDrop Device",
       avatar: "assets/icons/avatars/user-01.png"
     });
+    globalThis.__webdropDiagnosticIsland = island;
     island.updateCeremony({
       phase: "audio",
       state: "active",
@@ -537,6 +538,22 @@ test("shows acoustic slot diagnostics in the Dynamic Island ceremony", async ({ 
   expect(audioValueStyle.whiteSpace).not.toBe("nowrap");
   expect(audioValueStyle.textOverflow).not.toBe("ellipsis");
   expect(audioValueStyle.height).toBeGreaterThan(10);
+
+  await page.evaluate(() => {
+    globalThis.__webdropDiagnosticIsland.updateCeremony({
+      phase: "audio",
+      state: "failed",
+      acoustic: {
+        mode: "missed",
+        detected: false,
+        missedCount: 2,
+        slotCount: 3,
+        startFrequencyHz: 20350,
+        endFrequencyHz: 20880
+      }
+    });
+  });
+  await expect(page.locator("[data-island-audio-value]")).toHaveText("Missed 2 slots 20.4-20.9kHz");
 });
 
 test("anchors Dynamic Island expansion to the hardware island safe area", async ({ page }) => {

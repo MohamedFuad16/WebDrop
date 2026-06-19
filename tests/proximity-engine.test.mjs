@@ -266,7 +266,7 @@ test("anonymous acoustic plans emit the assigned signature and report the strong
   assert.deepEqual(detectedBands, [[20350, 20580]]);
   assert.deepEqual(
     progressEvents
-      .filter((event) => event.phase === "audio" && event.acoustic?.mode)
+      .filter((event) => event.phase === "audio" && event.state === "active" && event.acoustic?.mode)
       .map((event) => ({
         mode: event.acoustic?.mode,
         slot: event.acoustic?.slot,
@@ -313,6 +313,54 @@ test("anonymous acoustic plans emit the assigned signature and report the strong
   assert.equal(result.metrics.acousticSignatureId, "self-signature");
   assert.equal(result.metrics.heardAcousticSignatureId, "peer-signature");
   assert.equal(result.evidence.acoustic.detected, true);
+  assert.equal(result.evidence.acoustic.mode, "detected");
+  assert.equal(result.evidence.acoustic.slot, 2);
+  assert.equal(result.evidence.acoustic.slotCount, 2);
+  assert.equal(result.evidence.acoustic.marginDb, 31);
+  assert.equal(result.evidence.acoustic.startFrequencyHz, 20350);
+  assert.equal(result.evidence.acoustic.endFrequencyHz, 20580);
+});
+
+test("anonymous acoustic plans keep a final missed-slot summary for failed physical tests", async () => {
+  const acoustic = {
+    async emitChirp() {
+      return { emitted: true };
+    },
+    async detectChirp() {
+      return {
+        detected: false,
+        correlation: 0.12,
+        reason: "timeout"
+      };
+    }
+  };
+  const motion = {
+    getSnapshot() {
+      return { bump: true, tilted: true, samples: 4 };
+    },
+    stopCapture() {}
+  };
+  const engine = new ProximityEngine({ enabled: true, acoustic, motion });
+  const plan = [
+    { id: "self-signature", startFrequencyHz: 20050, endFrequencyHz: 20280 },
+    { id: "peer-one", startFrequencyHz: 20350, endFrequencyHz: 20580 },
+    { id: "peer-two", startFrequencyHz: 20650, endFrequencyHz: 20880 }
+  ];
+
+  const result = await engine.runRealCeremony({
+    acousticPlan: plan,
+    acousticSignatureId: "self-signature",
+    acousticOptions: { intervalMs: 500 },
+    startAt: Date.now() + 5,
+    ceremonyDurationMs: 1260
+  });
+
+  assert.equal(result.evidence.acoustic.detected, false);
+  assert.equal(result.evidence.acoustic.mode, "missed");
+  assert.equal(result.evidence.acoustic.missedCount, 2);
+  assert.equal(result.evidence.acoustic.slotCount, 3);
+  assert.equal(result.evidence.acoustic.startFrequencyHz, 20350);
+  assert.equal(result.evidence.acoustic.endFrequencyHz, 20880);
 });
 
 function createVirtualAcousticMedium() {

@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.52";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.52";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.52";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.53";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.53";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.53";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 
@@ -176,6 +176,7 @@ async function exchangeSignatureChirps(acoustic, {
   const signatures = normalizeAcousticPlan(plan);
   const slotDurationMs = Math.max(420, Math.floor(durationMs / Math.max(1, signatures.length)));
   const detections = [];
+  const listenedSlots = [];
   let emittedCount = 0;
 
   for (let index = 0; index < signatures.length; index += 1) {
@@ -234,12 +235,19 @@ async function exchangeSignatureChirps(acoustic, {
       ...signatureOptions,
       timeoutMs: slotDurationMs - 80
     });
+    const slotResult = {
+      signatureId: signature.id,
+      slot: index + 1,
+      slotCount: signatures.length,
+      startFrequencyHz: signature.startFrequencyHz,
+      endFrequencyHz: signature.endFrequencyHz,
+      detected: Boolean(detected.detected),
+      correlation: detected.correlation || 0,
+      marginDb: detected.band?.marginDb || 0
+    };
+    listenedSlots.push(slotResult);
     if (detected.detected) {
-      detections.push({
-        signatureId: signature.id,
-        correlation: detected.correlation || 0,
-        marginDb: detected.band?.marginDb || 0
-      });
+      detections.push(slotResult);
     }
     onProgress({
       phase: "audio",
@@ -261,6 +269,18 @@ async function exchangeSignatureChirps(acoustic, {
 
   detections.sort((a, b) => b.marginDb - a.marginDb || b.correlation - a.correlation);
   const strongest = detections[0] || null;
+  const summary = strongest
+    ? {
+      mode: "detected",
+      slot: strongest.slot,
+      slotCount: strongest.slotCount,
+      marginDb: strongest.marginDb,
+      correlation: strongest.correlation,
+      targetSignatureId: strongest.signatureId,
+      startFrequencyHz: strongest.startFrequencyHz,
+      endFrequencyHz: strongest.endFrequencyHz
+    }
+    : acousticMissSummary(listenedSlots, signatures.length);
   return {
     emitted: emittedCount > 0,
     emittedCount,
@@ -268,7 +288,20 @@ async function exchangeSignatureChirps(acoustic, {
     correlation: strongest?.correlation || 0,
     ownSignatureId,
     heardSignatureId: strongest?.signatureId || null,
-    detections
+    detections,
+    ...summary
+  };
+}
+
+function acousticMissSummary(listenedSlots, slotCount) {
+  const slots = listenedSlots.filter(Boolean);
+  if (!slots.length) return { mode: "missed", slotCount };
+  return {
+    mode: "missed",
+    missedCount: slots.length,
+    slotCount,
+    startFrequencyHz: Math.min(...slots.map((slot) => slot.startFrequencyHz)),
+    endFrequencyHz: Math.max(...slots.map((slot) => slot.endFrequencyHz))
   };
 }
 

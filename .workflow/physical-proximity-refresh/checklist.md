@@ -27,3 +27,4 @@
 - [x] Require ultrasound, bump, tilt, valid timing, and score >=55 independently.
 - [x] Let a one-device session accept one slightly late partner before failing.
 - [x] Surface live acoustic slot diagnostics in the Dynamic Island for physical iPhone testing.
+- [x] Keep final acoustic detected/missed summaries visible after the ceremony completes.

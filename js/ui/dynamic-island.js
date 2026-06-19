@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.52";
-import { Emitter } from "../utils/emitter.js?v=1.0.52";
-import { formatBytes } from "../utils/format.js?v=1.0.52";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.52";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.52";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.53";
+import { Emitter } from "../utils/emitter.js?v=1.0.53";
+import { formatBytes } from "../utils/format.js?v=1.0.53";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.53";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.53";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -849,11 +849,7 @@ function escapeHtml(text) {
 
 function formatAcousticStatus(acoustic = {}, { fallback, translate }) {
   const mode = acoustic?.mode;
-  const slot = Number(acoustic?.slot);
-  const slotCount = Number(acoustic?.slotCount);
-  const slotLabel = Number.isFinite(slot) && Number.isFinite(slotCount)
-    ? ` ${slot}/${slotCount}`
-    : "";
+  const slotLabel = formatAcousticSlot(acoustic);
   const band = formatFrequencyBand(acoustic);
   const margin = Number(acoustic?.marginDb);
   const marginLabel = Number.isFinite(margin) && margin > 0 ? ` +${Math.round(margin)}dB` : "";
@@ -870,6 +866,15 @@ function formatAcousticStatus(acoustic = {}, { fallback, translate }) {
   const key = keyByMode[mode];
   if (!key) return fallback;
   return `${translate(key)}${slotLabel}${countLabel}${marginLabel}${band}`;
+}
+
+function formatAcousticSlot(acoustic = {}) {
+  const missedCount = Number(acoustic?.missedCount);
+  const slot = Number(acoustic?.slot);
+  const slotCount = Number(acoustic?.slotCount);
+  if (Number.isFinite(missedCount) && missedCount > 1) return ` ${missedCount} slots`;
+  if (Number.isFinite(slot) && Number.isFinite(slotCount)) return ` ${slot}/${slotCount}`;
+  return "";
 }
 
 function formatFrequencyBand(acoustic = {}) {
