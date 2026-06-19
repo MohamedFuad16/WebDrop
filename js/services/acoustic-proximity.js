@@ -1,9 +1,11 @@
 export const DEFAULT_CHIRP = Object.freeze({
   durationMs: 72,
-  startFrequencyHz: 15800,
-  endFrequencyHz: 18000,
-  gain: 0.18
+  startFrequencyHz: 20200,
+  endFrequencyHz: 21200,
+  gain: 0.1
 });
+
+export const MIN_INAUDIBLE_FREQUENCY_HZ = 20000;
 
 export class AcousticProximitySensor {
   constructor({
@@ -73,26 +75,45 @@ export class AcousticProximitySensor {
     }
     const context = contextResult.context;
     const chirp = { ...DEFAULT_CHIRP, ...options };
+    if (!supportsInaudibleChirp(context.sampleRate, chirp)) {
+      return {
+        emitted: false,
+        reason: "inaudible-frequency-unsupported",
+        sampleRate: context.sampleRate
+      };
+    }
     const samples = createChirpSamples(context.sampleRate, chirp);
     const buffer = context.createBuffer(1, samples.length, context.sampleRate);
     buffer.copyToChannel(samples, 0);
 
     const source = context.createBufferSource();
     const gain = context.createGain();
+    const highpass = context.createBiquadFilter?.() || null;
     source.buffer = buffer;
     gain.gain.value = chirp.gain;
-    source.connect(gain);
+    if (highpass) {
+      highpass.type = "highpass";
+      highpass.frequency.value = 19_500;
+      highpass.Q.value = .7;
+      source.connect(highpass);
+      highpass.connect(gain);
+    } else {
+      source.connect(gain);
+    }
     gain.connect(context.destination);
     source.start();
 
     await ended(source, samples.length / context.sampleRate);
     source.disconnect();
+    highpass?.disconnect();
     gain.disconnect();
 
     return {
       emitted: true,
       durationMs: chirp.durationMs,
-      sampleRate: context.sampleRate
+      sampleRate: context.sampleRate,
+      startFrequencyHz: chirp.startFrequencyHz,
+      endFrequencyHz: chirp.endFrequencyHz
     };
   }
 
@@ -117,10 +138,18 @@ export class AcousticProximitySensor {
       };
     }
     const context = contextResult.context;
+    const chirp = { ...DEFAULT_CHIRP, ...chirpOptions };
+    if (!supportsInaudibleChirp(context.sampleRate, chirp)) {
+      return {
+        detected: false,
+        correlation: 0,
+        reason: "inaudible-frequency-unsupported",
+        sampleRate: context.sampleRate
+      };
+    }
     this.#ensureAnalyser(context);
     const template = createChirpSamples(context.sampleRate, {
-      ...DEFAULT_CHIRP,
-      ...chirpOptions
+      ...chirp
     });
     this.analyser.fftSize = nextPowerOfTwo(Math.max(template.length * 2, 4096), 16384);
     const samples = new Float32Array(this.analyser.fftSize);
@@ -216,14 +245,16 @@ export function createChirpSamples(sampleRate, {
 } = {}) {
   const length = Math.max(1, Math.round(sampleRate * durationMs / 1000));
   const samples = new Float32Array(length);
+  if (
+    startFrequencyHz >= MIN_INAUDIBLE_FREQUENCY_HZ
+    && !supportsInaudibleChirp(sampleRate, { startFrequencyHz, endFrequencyHz })
+  ) {
+    return samples;
+  }
   const durationSeconds = length / sampleRate;
   const maximumFrequencyHz = sampleRate * 0.45;
   const safeEndFrequencyHz = clamp(endFrequencyHz, 1, maximumFrequencyHz);
-  const safeStartFrequencyHz = clamp(
-    startFrequencyHz,
-    1,
-    Math.max(1, safeEndFrequencyHz * 0.88)
-  );
+  const safeStartFrequencyHz = clamp(startFrequencyHz, 1, safeEndFrequencyHz);
   const sweepRate = (safeEndFrequencyHz - safeStartFrequencyHz) / durationSeconds;
 
   for (let index = 0; index < length; index += 1) {
@@ -233,6 +264,17 @@ export function createChirpSamples(sampleRate, {
     samples[index] = Math.sin(phase) * envelope;
   }
   return samples;
+}
+
+export function supportsInaudibleChirp(sampleRate, {
+  startFrequencyHz = DEFAULT_CHIRP.startFrequencyHz,
+  endFrequencyHz = DEFAULT_CHIRP.endFrequencyHz
+} = {}) {
+  const maximumFrequencyHz = Number(sampleRate) * 0.45;
+  return Number.isFinite(maximumFrequencyHz)
+    && startFrequencyHz >= MIN_INAUDIBLE_FREQUENCY_HZ
+    && endFrequencyHz > startFrequencyHz
+    && endFrequencyHz <= maximumFrequencyHz;
 }
 
 export function normalizedCorrelation(samples, template, offset = 0) {
@@ -312,7 +354,7 @@ export function analyzeFrequencyBand(frequencies, {
   const marginConfidence = clamp((marginDb - 3) / 12, 0, 1);
   const confidence = Math.round(levelConfidence * marginConfidence * 1000) / 1000;
   return {
-    detected: peakDb >= -66 && marginDb >= 6,
+    detected: peakDb >= -70 && marginDb >= 6,
     peakDb,
     noiseDb,
     marginDb,

@@ -325,8 +325,5 @@ export class SiriWaveCore {
 }
 
 function prefersCanvas2dWave() {
-  const navigator = globalThis.navigator;
-  const userAgent = navigator?.userAgent || "";
-  return /iPhone|iPad|iPod/i.test(userAgent)
-    || (navigator?.platform === "MacIntel" && Number(navigator?.maxTouchPoints) > 1);
+  return true;
 }

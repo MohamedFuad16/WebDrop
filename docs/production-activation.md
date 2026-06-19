@@ -49,6 +49,8 @@ When enabled, a peer swipe triggers permission calls while the user gesture is s
 3. Send `proximity:ready` to the signaling server.
 4. Receive the same future `proximity:start` timestamp.
 5. Exchange chirps in opposite time slots and measure real Web Audio correlation.
+   The shipped signature stays between 20.2 and 21.2 kHz; contexts that cannot
+   preserve that inaudible band must fail closed and offer QR.
 6. Capture actual bump and tilt evidence during the shared ceremony window.
 7. Stop motion capture and microphone tracks.
 8. Send normalized telemetry to the server.

@@ -1,6 +1,6 @@
 {
   "name": "webdrop-v2-static",
-  "version": "1.0.47",
+  "version": "1.0.48",
   "private": true,
   "type": "module",
   "scripts": {

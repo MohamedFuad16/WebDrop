@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.47";
-import { Emitter } from "../utils/emitter.js?v=1.0.47";
-import { formatBytes } from "../utils/format.js?v=1.0.47";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.47";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.47";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.48";
+import { Emitter } from "../utils/emitter.js?v=1.0.48";
+import { formatBytes } from "../utils/format.js?v=1.0.48";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.48";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.48";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -590,19 +590,12 @@ export class DynamicIsland extends Emitter {
     const context = canvas.getContext("2d");
     const count = qr.getModuleCount();
     context.imageSmoothingEnabled = false;
-    const frame = 9;
-    const pad = 28;
+    const pad = 22;
     const size = canvas.width - pad * 2;
     const cell = size / count;
     const finderColors = ["#1768e5", "#087d72", "#6045b8"];
-    const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, "#65d0a3");
-    gradient.addColorStop(.52, "#347df5");
-    gradient.addColorStop(1, "#9c7bff");
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = "#ffffff";
-    context.fillRect(frame, frame, canvas.width - frame * 2, canvas.height - frame * 2);
+    context.fillRect(0, 0, canvas.width, canvas.height);
     for (let row = 0; row < count; row += 1) {
       for (let column = 0; column < count; column += 1) {
         if (!qr.isDark(row, column)) continue;

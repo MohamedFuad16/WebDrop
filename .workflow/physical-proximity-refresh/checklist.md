@@ -18,3 +18,7 @@
 - [x] Attach mobile sheets to the full viewport width and bottom edge without seams.
 - [x] Brand the QR matrix while preserving machine-readable output.
 - [x] Replace ambiguous received-file Save/View actions with explicit Open or Download behavior.
+- [x] Expand the mobile Dynamic Island to both viewport edges.
+- [x] Center and standardize the Siri wave on Canvas2D across browsers.
+- [x] Place peer avatar centers on the visible SVG ring paths.
+- [x] Keep acoustic signatures above 20 kHz or refuse emission.

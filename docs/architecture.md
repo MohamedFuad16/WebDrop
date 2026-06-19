@@ -98,6 +98,10 @@ Supported evidence can include:
 
 QR should remain the reliable fallback when microphone, motion, or audio playback permissions fail.
 
+Acoustic verification uses a 20.2-21.2 kHz, 72ms signature with a 19.5 kHz
+high-pass filter. WebDrop refuses to emit when the active sample rate cannot
+keep the complete signature above 20 kHz, then relies on the explicit QR path.
+
 ### Dynamic Island ceremony
 
 The safe-area-aware Dynamic Island is a presentation layer over the existing state machine:

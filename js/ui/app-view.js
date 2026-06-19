@@ -1,16 +1,16 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.47";
-import { formatBytes } from "../utils/format.js?v=1.0.47";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.47";
-import { translate } from "../config/i18n.js?v=1.0.47";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.47";
+import { Emitter } from "../utils/emitter.js?v=1.0.48";
+import { formatBytes } from "../utils/format.js?v=1.0.48";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.48";
+import { translate } from "../config/i18n.js?v=1.0.48";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.48";
 
-const ORBIT_RADII = [".46", ".37", ".28", ".19"];
+const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;
 const CONNECTED_ORBIT_PEER_LIMIT = 6;
 const CONNECTED_ORBIT_RADII = [
-  "calc(var(--orbit-size) * .37)",
-  "calc(var(--orbit-size) * .28)",
-  "calc(var(--orbit-size) * .23)"
+  "calc(var(--orbit-size) * .3478)",
+  "calc(var(--orbit-size) * .2632)",
+  "calc(var(--orbit-size) * .2162)"
 ];
 const ORBIT_LAYOUT_SLOTS = [
   { ringIndex: 0, angle: 0 },

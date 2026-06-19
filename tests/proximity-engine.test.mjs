@@ -5,8 +5,11 @@ import { ProximityEngine, PROXIMITY_SCORE_MINIMUM, proximityScore } from "../js/
 import {
   AcousticProximitySensor,
   analyzeFrequencyBand,
+  createChirpSamples,
   DEFAULT_CHIRP,
-  findBestCorrelation
+  findBestCorrelation,
+  MIN_INAUDIBLE_FREQUENCY_HZ,
+  supportsInaudibleChirp
 } from "../js/services/acoustic-proximity.js";
 import { exceedsTiltThreshold, MotionProximitySensor } from "../js/services/motion-proximity.js";
 
@@ -142,7 +145,7 @@ test("iPhone audio output is unlocked before the delayed ceremony", async () => 
   assert.equal(oscillatorStarts, 1);
 });
 
-test("near-ultrasound band detection tolerates phone speaker distortion", () => {
+test("inaudible ultrasound band detection tolerates phone speaker distortion", () => {
   const sampleRate = 48_000;
   const fftSize = 8192;
   const frequencies = new Float32Array(fftSize / 2).fill(-92);
@@ -153,11 +156,18 @@ test("near-ultrasound band detection tolerates phone speaker distortion", () => 
 
   const evidence = analyzeFrequencyBand(frequencies, { sampleRate, fftSize });
 
-  assert.equal(DEFAULT_CHIRP.startFrequencyHz, 15_800);
-  assert.equal(DEFAULT_CHIRP.endFrequencyHz, 18_000);
+  assert.equal(DEFAULT_CHIRP.startFrequencyHz, 20_200);
+  assert.equal(DEFAULT_CHIRP.endFrequencyHz, 21_200);
+  assert.ok(DEFAULT_CHIRP.startFrequencyHz >= MIN_INAUDIBLE_FREQUENCY_HZ);
   assert.equal(evidence.detected, true);
   assert.ok(evidence.marginDb > 30);
   assert.ok(evidence.confidence > 0.5);
+});
+
+test("chirp emission refuses sample rates that would fold into audible frequencies", () => {
+  assert.equal(supportsInaudibleChirp(48_000), true);
+  assert.equal(supportsInaudibleChirp(44_100), false);
+  assert.equal(createChirpSamples(44_100).every((sample) => sample === 0), true);
 });
 
 test("chirp correlation accepts inverted microphone polarity", () => {
