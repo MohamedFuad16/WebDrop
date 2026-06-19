@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.54";
-import { Emitter } from "../utils/emitter.js?v=1.0.54";
-import { formatBytes } from "../utils/format.js?v=1.0.54";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.54";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.54";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.55";
+import { Emitter } from "../utils/emitter.js?v=1.0.55";
+import { formatBytes } from "../utils/format.js?v=1.0.55";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.55";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.55";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -131,7 +131,7 @@ export class DynamicIsland extends Emitter {
     this.connectionOpenedAt = this.now();
     this.renderPeople(self, {
       name: this.translate("anonymousNearbyPeer"),
-      avatar: anonymousAvatarFor(self.avatar)
+      anonymous: true
     });
     this.resetCeremony();
     this.setState("connecting");
@@ -517,7 +517,8 @@ export class DynamicIsland extends Emitter {
     this.nodes.selfName.textContent = self.name;
     this.nodes.peerName.textContent = peer.name;
     renderAvatar(this.nodes.selfAvatar, self.avatar);
-    renderAvatar(this.nodes.peerAvatar, peer.avatar);
+    if (peer.anonymous) renderAnonymousAvatar(this.nodes.peerAvatar);
+    else renderAvatar(this.nodes.peerAvatar, peer.avatar);
   }
 
   resetCeremony() {
@@ -879,6 +880,7 @@ function waitForVideoReady(video) {
 }
 
 function renderAvatar(node, avatar) {
+  delete node.dataset.anonymous;
   const normalizedAvatar = normalizeAvatarChoice(avatar);
   const src = animatedFramesForAvatar(normalizedAvatar)[0] || normalizedAvatar;
   const image = new Image();
@@ -892,11 +894,13 @@ function renderAvatar(node, avatar) {
   image.decode?.().catch(() => {});
 }
 
-function anonymousAvatarFor(selfAvatar) {
-  const normalized = normalizeAvatarChoice(selfAvatar);
-  return normalized.includes("user-01.png")
-    ? "assets/icons/avatars/user-02.png"
-    : "assets/icons/avatars/user-01.png";
+function renderAnonymousAvatar(node) {
+  node.dataset.anonymous = "true";
+  const mark = document.createElement("span");
+  mark.className = "webdrop-island__anonymous-mark";
+  mark.setAttribute("aria-hidden", "true");
+  mark.textContent = "?";
+  node.replaceChildren(mark);
 }
 
 function escapeHtml(text) {

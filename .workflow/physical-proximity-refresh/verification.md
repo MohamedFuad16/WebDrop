@@ -59,6 +59,9 @@
 - `npx playwright test tests/e2e/app-ui.spec.mjs --project=chromium-desktop --grep 'acoustic slot diagnostics'` passed and proved the visible island text renders as `Detected 2/4 +31dB 20.4-20.6kHz`.
 - Release `1.0.54` also keeps the final acoustic summary after completion/failure, including `Missed 2 slots 20.4-20.9kHz` for failed multi-slot detection.
 - Release `1.0.54` replaces received-file `Open` with explicit `View`/`Download` actions and smooths the Dynamic Island transfer percentage/bar.
+- Release `1.0.55` replaces the pre-match peer avatar with a neutral, image-free anonymous marker so no identity is implied before a verified physical match.
+- `npm run verify:full` passed on `1.0.55`: 18 frontend/unit tests, 21 signaling-server tests, secret audits, package audits, and diff validation.
+- `npm run test:e2e` passed on `1.0.55`: 53 passed and 47 expected project skips, including WebKit island geometry, new-tab receive viewing, live TURN relay, and live signaling.
 - Focused checks passed: `npm run check`, `node --test tests/proximity-engine.test.mjs`, WebKit E2E for received-file new-tab behavior, WebKit transfer-progress E2E, and Chromium transfer-progress E2E.
 - The failed island now exposes translated `Retry` and `Use QR instead` actions; the below-55 E2E keeps the island open for 50 seconds and proves QR remains hidden until explicitly tapped.
 - Anonymous acoustic sessions now add a short late-listen grace pass after the scheduled slots; unit coverage proves a peer signature missed in the normal slot can still be detected before scoring fails.

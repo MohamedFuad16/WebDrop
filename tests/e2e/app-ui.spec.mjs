@@ -463,6 +463,8 @@ test("keeps the expanded mobile island edge-to-edge with a centered Canvas2D wav
     });
   });
   await expect(page.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "connecting");
+  await expect(page.locator("[data-island-peer-avatar]")).toHaveAttribute("data-anonymous", "true");
+  await expect(page.locator("[data-island-peer-avatar] img")).toHaveCount(0);
   await page.waitForTimeout(650);
 
   const geometry = await page.evaluate(() => {

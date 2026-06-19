@@ -324,6 +324,19 @@
   object-fit: cover;
 }
 
+.webdrop-island__avatar[data-anonymous="true"] {
+  border-color: rgba(255, 255, 255, .42);
+  background: radial-gradient(circle at 38% 30%, #3a4556 0, #1d2532 48%, #10151e 100%);
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, .08), 0 12px 28px rgba(0, 0, 0, .28);
+}
+
+.webdrop-island__anonymous-mark {
+  color: rgba(255, 255, 255, .82);
+  font-size: clamp(30px, 8vw, 48px);
+  font-weight: 650;
+  line-height: 1;
+}
+
 .webdrop-island__flow {
   position: relative;
   width: min(100%, 190px);
