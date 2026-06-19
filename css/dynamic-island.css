@@ -268,6 +268,15 @@
   color: var(--island-muted);
 }
 
+.webdrop-island__metrics [data-island-metric="audio"] strong {
+  overflow: visible;
+  font-size: 9px;
+  line-height: 1.08;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .webdrop-island__ceremony-error {
   max-height: 34px;
   overflow: hidden;

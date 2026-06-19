@@ -526,6 +526,17 @@ test("shows acoustic slot diagnostics in the Dynamic Island ceremony", async ({ 
   });
 
   await expect(page.locator("[data-island-audio-value]")).toHaveText("Detected 2/4 +31dB 20.4-20.6kHz");
+  const audioValueStyle = await page.locator("[data-island-audio-value]").evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      whiteSpace: style.whiteSpace,
+      textOverflow: style.textOverflow,
+      height: Math.round(node.getBoundingClientRect().height)
+    };
+  });
+  expect(audioValueStyle.whiteSpace).not.toBe("nowrap");
+  expect(audioValueStyle.textOverflow).not.toBe("ellipsis");
+  expect(audioValueStyle.height).toBeGreaterThan(10);
 });
 
 test("anchors Dynamic Island expansion to the hardware island safe area", async ({ page }) => {
