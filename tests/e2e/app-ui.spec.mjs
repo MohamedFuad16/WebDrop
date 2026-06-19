@@ -676,6 +676,46 @@ test("keeps Japanese failure diagnostics and fallback actions reachable on iPhon
   await expect.poll(failureIsReachable).toBe(true);
 });
 
+test("makes verification failure a focused modal decision and restores focus", async ({ page }) => {
+  await page.goto("/?qa=e2e-island-failure-focus&runtime=mock", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });
+  await page.locator('[data-action="connect-nearby"]').focus();
+
+  await page.evaluate(async () => {
+    const { DynamicIsland } = await import("/js/ui/dynamic-island.js?v=e2e-island-failure-focus");
+    const island = new DynamicIsland(document, (key) => key);
+    island.showAnonymousConnectionProgress({
+      id: "self",
+      name: "WebDrop iPhone",
+      avatar: "assets/icons/avatars/user-01.png"
+    });
+    await island.showVerificationFailure({ score: 22, errors: ["Score too low"] });
+    globalThis.__webdropFailureIsland = island;
+  });
+
+  const island = page.locator("[data-dynamic-island]");
+  await expect(island).toHaveAttribute("role", "alertdialog");
+  await expect(island).toHaveAttribute("aria-modal", "true");
+  await expect(island).toHaveAttribute("aria-describedby", "island-ceremony-error");
+  await expect(page.locator("[data-island-retry]")).toBeFocused();
+  await expect(page.locator(".topbar")).toHaveAttribute("inert", "");
+  await expect(page.locator(".main-stage")).toHaveAttribute("inert", "");
+
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.locator("[data-island-cancel]")).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.locator("[data-island-fallback]")).toBeFocused();
+
+  await page.waitForTimeout(600);
+  const targetHeights = await island.locator("[data-island-cancel], [data-island-retry], [data-island-fallback]")
+    .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
+  expect(targetHeights.every((height) => height >= 44)).toBe(true);
+
+  await page.evaluate(() => globalThis.__webdropFailureIsland.hide());
+  await expect(page.locator('[data-action="connect-nearby"]')).toBeFocused();
+  await expect(page.locator(".topbar")).not.toHaveAttribute("inert", "");
+});
+
 test("anchors Dynamic Island expansion to the hardware island safe area", async ({ page }) => {
   await page.goto("/?qa=e2e-island-safe-area&runtime=mock", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });

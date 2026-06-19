@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.63";
-import { Emitter } from "../utils/emitter.js?v=1.0.63";
-import { formatBytes } from "../utils/format.js?v=1.0.63";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.63";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.63";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.64";
+import { Emitter } from "../utils/emitter.js?v=1.0.64";
+import { formatBytes } from "../utils/format.js?v=1.0.64";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.64";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.64";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -84,12 +84,13 @@ export class DynamicIsland extends Emitter {
     this.nodes.retry?.addEventListener("click", () => this.emit("retry"));
     this.nodes.fallback?.addEventListener("click", () => this.emit("fallback"));
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && this.state.startsWith("qr-")) {
+      const interactive = this.state.startsWith("qr-") || this.state === "verification-failed";
+      if (event.key === "Escape" && interactive) {
         event.preventDefault();
         this.emit("cancel");
         return;
       }
-      if (event.key === "Tab" && this.state.startsWith("qr-")) this.trapFocus(event);
+      if (event.key === "Tab" && interactive) this.trapFocus(event);
     });
     const keepFailureActionsVisible = () => this.scheduleFailureActionsVisibility();
     window.addEventListener("resize", keepFailureActionsVisible, { passive: true });
@@ -261,6 +262,10 @@ export class DynamicIsland extends Emitter {
   }
 
   async showVerificationFailure({ score = 0, errors = [] } = {}) {
+    if (!this.previousFocus || this.root?.contains(this.previousFocus)) {
+      this.previousFocus = this.document.activeElement;
+    }
+    this.setBackgroundInert(true);
     this.setState("verification-failed");
     this.updateCeremony({ phase: "score", state: "failed", score });
     if (this.nodes.ceremonyError) {
@@ -268,11 +273,11 @@ export class DynamicIsland extends Emitter {
       this.nodes.ceremonyError.textContent = errors.filter(Boolean).join(" · ");
     }
     if (this.nodes.failureActions) this.nodes.failureActions.hidden = false;
-    this.scheduleFailureActionsVisibility();
+    this.scheduleFailureActionsVisibility(true);
     return true;
   }
 
-  scheduleFailureActionsVisibility() {
+  scheduleFailureActionsVisibility(focusRetry = false) {
     if (this.state !== "verification-failed" || !this.nodes.failureActions) return;
     if (this.failureScrollFrame) window.cancelAnimationFrame(this.failureScrollFrame);
     this.failureScrollFrame = window.requestAnimationFrame(() => {
@@ -280,6 +285,9 @@ export class DynamicIsland extends Emitter {
         this.failureScrollFrame = 0;
         if (this.state !== "verification-failed") return;
         this.nodes.failureActions.scrollIntoView({ block: "nearest", inline: "nearest" });
+        if (focusRetry && !this.root.contains(this.document.activeElement)) {
+          this.nodes.retry?.focus({ preventScroll: true });
+        }
       });
     });
   }
@@ -339,10 +347,14 @@ export class DynamicIsland extends Emitter {
     this.state = state;
     if (this.root) {
       const concealed = state === "closed" || state === "closing";
+      const qrDialog = state.startsWith("qr-");
+      const failureDialog = state === "verification-failed";
       this.root.dataset.state = state;
       this.root.setAttribute("aria-hidden", String(concealed));
-      this.root.setAttribute("role", state.startsWith("qr-") ? "dialog" : "status");
-      this.root.setAttribute("aria-modal", String(state.startsWith("qr-")));
+      this.root.setAttribute("role", failureDialog ? "alertdialog" : qrDialog ? "dialog" : "status");
+      this.root.setAttribute("aria-modal", String(qrDialog || failureDialog));
+      if (failureDialog) this.root.setAttribute("aria-describedby", "island-ceremony-error");
+      else this.root.removeAttribute("aria-describedby");
       if (state !== "transfer") {
         delete this.root.dataset.transferDirection;
         this.wave?.setDirection(1);
@@ -414,7 +426,11 @@ export class DynamicIsland extends Emitter {
   focusableElements() {
     return [...this.root.querySelectorAll(
       "button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])"
-    )].filter((node) => !node.hidden && node.getAttribute("aria-hidden") !== "true");
+    )].filter((node) => {
+      if (node.hidden || node.getAttribute("aria-hidden") === "true" || !node.getClientRects().length) return false;
+      const style = getComputedStyle(node);
+      return style.display !== "none" && style.visibility !== "hidden";
+    });
   }
 
   trapFocus(event) {
