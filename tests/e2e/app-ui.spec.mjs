@@ -635,6 +635,47 @@ test("shows acoustic slot diagnostics in the Dynamic Island ceremony", async ({ 
   await expect(page.locator("[data-island-audio-value]")).toHaveText("Missed 2 slots 20.4-20.9kHz");
 });
 
+test("keeps Japanese failure diagnostics and fallback actions reachable on iPhone", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "webkit-iphone-15-pro", "Failure-state viewport behavior is validated in iPhone WebKit.");
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/?qa=e2e-island-failure-layout&runtime=mock", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });
+
+  await page.evaluate(async () => {
+    const { DynamicIsland } = await import("/js/ui/dynamic-island.js?v=e2e-island-failure-layout");
+    const island = new DynamicIsland(document, (key) => key);
+    island.showAnonymousConnectionProgress({
+      id: "self",
+      name: "WebDrop iPhone",
+      avatar: "assets/icons/avatars/user-01.png"
+    });
+    await island.showVerificationFailure({
+      score: 22,
+      errors: [
+        "オーディオチャイムを検出できませんでした",
+        "バンプを検出できませんでした",
+        "スコア 22/100 は 55 以上である必要があります"
+      ]
+    });
+  });
+
+  const failureIsReachable = async () => page.locator("[data-dynamic-island]").evaluate((root) => {
+    const actions = root.querySelector("[data-island-failure-actions]").getBoundingClientRect();
+    const error = root.querySelector("[data-island-ceremony-error]");
+    const rootRect = root.getBoundingClientRect();
+    const buttons = [...root.querySelectorAll("[data-island-failure-actions] button")]
+      .map((button) => button.getBoundingClientRect().height);
+    return actions.top >= rootRect.top
+      && actions.bottom <= rootRect.bottom
+      && error.scrollHeight <= error.clientHeight + 1
+      && buttons.every((height) => height >= 44);
+  });
+
+  await expect.poll(failureIsReachable).toBe(true);
+  await page.setViewportSize({ width: 568, height: 320 });
+  await expect.poll(failureIsReachable).toBe(true);
+});
+
 test("anchors Dynamic Island expansion to the hardware island safe area", async ({ page }) => {
   await page.goto("/?qa=e2e-island-safe-area&runtime=mock", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });

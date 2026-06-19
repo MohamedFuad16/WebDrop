@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.62";
-import { Emitter } from "../utils/emitter.js?v=1.0.62";
-import { formatBytes } from "../utils/format.js?v=1.0.62";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.62";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.62";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.63";
+import { Emitter } from "../utils/emitter.js?v=1.0.63";
+import { formatBytes } from "../utils/format.js?v=1.0.63";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.63";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.63";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -23,6 +23,7 @@ export class DynamicIsland extends Emitter {
       canvas: this.root?.querySelector("[data-island-qr-canvas]"),
       video: this.root?.querySelector("[data-island-video]"),
       wave: this.root?.querySelector("[data-island-wave]"),
+      content: this.root?.querySelector(".webdrop-island__content"),
       ceremony: this.root?.querySelector("[data-island-ceremony]"),
       ceremonyStage: this.root?.querySelector("[data-island-ceremony-stage]"),
       ceremonyScore: this.root?.querySelector("[data-island-ceremony-score]"),
@@ -76,6 +77,7 @@ export class DynamicIsland extends Emitter {
     this.transferDisplayRatio = 0;
     this.transferTargetRatio = 0;
     this.transferAnimationFrame = 0;
+    this.failureScrollFrame = 0;
     this.backgroundNodes = [...document.querySelectorAll(".topbar, .main-stage, .connection-tray, [data-backdrop], [data-sheet]")];
     this.nodes.camera?.addEventListener("click", () => this.startCamera());
     this.nodes.cancel?.addEventListener("click", () => this.emit("cancel"));
@@ -89,6 +91,9 @@ export class DynamicIsland extends Emitter {
       }
       if (event.key === "Tab" && this.state.startsWith("qr-")) this.trapFocus(event);
     });
+    const keepFailureActionsVisible = () => this.scheduleFailureActionsVisibility();
+    window.addEventListener("resize", keepFailureActionsVisible, { passive: true });
+    window.visualViewport?.addEventListener("resize", keepFailureActionsVisible, { passive: true });
     window.addEventListener("pagehide", () => this.stopCamera());
   }
 
@@ -263,7 +268,20 @@ export class DynamicIsland extends Emitter {
       this.nodes.ceremonyError.textContent = errors.filter(Boolean).join(" · ");
     }
     if (this.nodes.failureActions) this.nodes.failureActions.hidden = false;
+    this.scheduleFailureActionsVisibility();
     return true;
+  }
+
+  scheduleFailureActionsVisibility() {
+    if (this.state !== "verification-failed" || !this.nodes.failureActions) return;
+    if (this.failureScrollFrame) window.cancelAnimationFrame(this.failureScrollFrame);
+    this.failureScrollFrame = window.requestAnimationFrame(() => {
+      this.failureScrollFrame = window.requestAnimationFrame(() => {
+        this.failureScrollFrame = 0;
+        if (this.state !== "verification-failed") return;
+        this.nodes.failureActions.scrollIntoView({ block: "nearest", inline: "nearest" });
+      });
+    });
   }
 
   close() {

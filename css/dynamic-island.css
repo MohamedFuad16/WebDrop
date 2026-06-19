@@ -84,6 +84,17 @@
   transition: opacity 260ms ease 100ms, transform 420ms var(--ease-out) 80ms;
 }
 
+.webdrop-island[data-state="verification-failed"] .webdrop-island__content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.webdrop-island[data-state="verification-failed"] .webdrop-island__content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 .webdrop-island[data-state="closed"] .webdrop-island__content,
 .webdrop-island[data-state="closing"] .webdrop-island__content {
   opacity: 0;
@@ -288,6 +299,10 @@
   text-align: left;
 }
 
+.webdrop-island[data-state="verification-failed"] .webdrop-island__ceremony-error {
+  max-height: none;
+}
+
 .webdrop-island__failure-actions {
   justify-self: start;
   display: inline-flex;
@@ -297,7 +312,7 @@
 
 .webdrop-island__retry,
 .webdrop-island__fallback {
-  min-height: 34px;
+  min-height: 44px;
   padding: 0 14px;
   border: 0;
   border-radius: 999px;
@@ -612,6 +627,10 @@
     border-left: 0;
     border-radius: 0 0 34px 34px;
     transform: translateX(-50%) translateY(0) scale(1);
+  }
+
+  .webdrop-island[data-state="verification-failed"] {
+    height: min(calc(62dvh + var(--safe-top)), calc(410px + var(--safe-top)));
   }
 
   .webdrop-island[data-state="closed"],
