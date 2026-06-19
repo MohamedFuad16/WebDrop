@@ -89,8 +89,8 @@
   position: absolute;
   top: 14px;
   right: 14px;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border: 0;
@@ -104,8 +104,8 @@
   position: absolute;
   top: 14px;
   left: 14px;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border: 0;
@@ -621,7 +621,7 @@
 }
 
 .nearby-connect {
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 12px;
   border: 0;
   border-radius: 14px;
@@ -1028,20 +1028,36 @@
 
 .ring-choice button {
   position: relative;
-  width: 30px;
-  height: 30px;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
   padding: 0;
-  border: 5px solid var(--panel-solid);
+  border: 0;
   border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+@media (max-width: 380px) {
+  .ring-choice {
+    gap: 8px;
+  }
+}
+
+.ring-choice button::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 5px solid var(--panel-solid);
+  border-radius: inherit;
   background: var(--swatch);
   box-shadow: 0 0 0 1px var(--line-strong), 0 5px 12px color-mix(in srgb, var(--ink) 10%, transparent);
-  cursor: pointer;
 }
 
 .ring-choice button.is-selected::after {
   content: "";
   position: absolute;
-  inset: -7px;
+  inset: 0;
   border: 2px solid var(--blue);
   border-radius: inherit;
 }

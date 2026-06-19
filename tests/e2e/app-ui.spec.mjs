@@ -112,6 +112,36 @@ test("loads the WebDrop shell, receive UI, and deferred storage copy", async ({ 
   expect(consoleProblems).toEqual([]);
 });
 
+test("keeps mobile sheet controls at least 44 CSS pixels", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto("/?qa=e2e-touch-targets&runtime=mock", { waitUntil: "domcontentloaded" });
+
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.locator("[data-settings-sheet]")).toHaveClass(/is-open/);
+  await page.waitForTimeout(400);
+
+  const settingsTargets = page.locator(
+    "[data-settings-sheet] .sheet-close-icon, [data-settings-sheet] .ring-choice button"
+  );
+  await expect(settingsTargets).toHaveCount(6);
+  for (const target of await settingsTargets.all()) {
+    const box = await target.boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(44);
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+  }
+
+  await page.locator('[data-action="open-information"]').click();
+  await expect(page.locator("[data-information-sheet]")).toHaveClass(/is-open/);
+  await page.waitForTimeout(400);
+  for (const target of await page.locator(
+    "[data-information-sheet] .sheet-back-icon, [data-information-sheet] .sheet-close-icon"
+  ).all()) {
+    const box = await target.boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(44);
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+  }
+});
+
 test("renders a branded QR that remains machine-readable", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium-desktop", "QR pixel output is validated once in Chromium.");
   await page.goto("/?qa=e2e-branded-qr&runtime=mock", { waitUntil: "domcontentloaded" });
