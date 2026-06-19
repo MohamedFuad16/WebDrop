@@ -396,6 +396,10 @@
   outline: none;
 }
 
+[data-chat-sheet] .sheet-primary {
+  scroll-margin-bottom: calc(12px + var(--safe-bottom));
+}
+
 @keyframes dockIn {
   from {
     opacity: 0;

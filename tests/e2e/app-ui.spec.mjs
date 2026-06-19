@@ -154,6 +154,23 @@ test("does not steal focus when a sheet finishes opening", async ({ page }) => {
   await expect(page.locator("[data-name-input]")).toBeFocused();
 });
 
+test("keeps the focused chat composer visible above a short iPhone keyboard viewport", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "webkit-iphone-15-pro", "The visual-keyboard viewport path is validated in iPhone WebKit.");
+  await page.goto("/?qa=e2e-chat-keyboard&runtime=mock", { waitUntil: "domcontentloaded" });
+  await page.locator('[data-action="connect-nearby"]').click();
+  await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 10000 });
+
+  await page.locator('[data-action="open-chat-sheet"]').click();
+  await expect(page.locator("[data-chat-input]")).toBeFocused();
+  await page.setViewportSize({ width: 393, height: 320 });
+
+  await expect.poll(async () => page.locator("[data-chat-sheet]").evaluate((sheet) => {
+    const input = sheet.querySelector("[data-chat-input]").getBoundingClientRect();
+    const send = sheet.querySelector('[data-action="send-chat"]').getBoundingClientRect();
+    return input.top >= 0 && input.bottom <= innerHeight && send.top >= 0 && send.bottom <= innerHeight;
+  })).toBe(true);
+});
+
 test("renders a branded QR that remains machine-readable", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium-desktop", "QR pixel output is validated once in Chromium.");
   await page.goto("/?qa=e2e-branded-qr&runtime=mock", { waitUntil: "domcontentloaded" });

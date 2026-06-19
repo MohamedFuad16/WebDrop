@@ -1,8 +1,8 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.60";
-import { formatBytes } from "../utils/format.js?v=1.0.60";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.60";
-import { translate } from "../config/i18n.js?v=1.0.60";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.60";
+import { Emitter } from "../utils/emitter.js?v=1.0.61";
+import { formatBytes } from "../utils/format.js?v=1.0.61";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.61";
+import { translate } from "../config/i18n.js?v=1.0.61";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.61";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;
@@ -74,6 +74,7 @@ export class AppView extends Emitter {
       chatTitle: document.querySelector("[data-chat-title]"),
       chatPanel: document.querySelector("[data-chat-panel]"),
       chatInput: document.querySelector("[data-chat-input]"),
+      chatSend: document.querySelector('[data-action="send-chat"]'),
       friendStrip: document.querySelector("[data-friend-strip]"),
       connectButton: document.querySelector("[data-connect-peer]"),
       sendSwipeControl: document.querySelector("[data-send-swipe-control]"),
@@ -104,6 +105,7 @@ export class AppView extends Emitter {
     this.receivedRenderSignature = "";
     this.chatRenderSignature = "";
     this.lastChatMessageCount = 0;
+    this.chatViewportFrame = 0;
     this.dynamicIsland = new DynamicIsland(document, (key, params) => this.translate(key, params));
     this.dynamicIsland.on("detected", (token) => this.emit("island-qr-detected", token));
     this.dynamicIsland.on("cancel", () => {
@@ -117,6 +119,7 @@ export class AppView extends Emitter {
     this.dynamicIsland.on("fallback", () => this.emit("island-fallback"));
     this.preloadCriticalAssets();
     this.bindEvents();
+    this.bindViewportEvents();
     this.bindSwipeControls();
     store.subscribe((state) => this.render(state));
   }
@@ -177,6 +180,27 @@ export class AppView extends Emitter {
         return;
       }
       if (event.key === "Tab") this.trapSheetFocus(event, sheet);
+    });
+  }
+
+  bindViewportEvents() {
+    const view = this.document.defaultView;
+    if (!view) return;
+    const keepComposerVisible = () => this.scheduleChatComposerVisibility();
+    view.addEventListener("resize", keepComposerVisible, { passive: true });
+    view.visualViewport?.addEventListener("resize", keepComposerVisible, { passive: true });
+  }
+
+  scheduleChatComposerVisibility() {
+    const view = this.document.defaultView;
+    if (!view || !this.isChatSheetOpen() || this.document.activeElement !== this.nodes.chatInput) return;
+    if (this.chatViewportFrame) view.cancelAnimationFrame(this.chatViewportFrame);
+    this.chatViewportFrame = view.requestAnimationFrame(() => {
+      this.chatViewportFrame = view.requestAnimationFrame(() => {
+        this.chatViewportFrame = 0;
+        if (!this.isChatSheetOpen() || this.document.activeElement !== this.nodes.chatInput) return;
+        this.nodes.chatSend?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      });
     });
   }
 
