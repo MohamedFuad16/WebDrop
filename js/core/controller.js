@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.55";
+import { formatBytes } from "../utils/format.js?v=1.0.56";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -525,11 +525,6 @@ export function createController({
     if (connectedPeerId) {
       const connectedPeer = findPeer(connectedPeerId);
       view.toast(view.translate("alreadyConnected", { name: connectedPeer.name }));
-      return;
-    }
-    const hasCandidate = store.getState().peers.some((peer) => peer.online !== false && !peer.connected);
-    if (!hasCandidate && runtime.productionSignaling) {
-      view.toast(view.translate("noNearbyForConnection"));
       return;
     }
     activePeerId = null;

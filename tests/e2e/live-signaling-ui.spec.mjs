@@ -315,8 +315,14 @@ test("proximity failure below 55 shows the score error and offers QR backup", as
     await pageA.waitForTimeout(50_000);
     await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "verification-failed");
     await expect(pageA.locator("[data-qr-sheet]")).toBeHidden();
-    await pageA.locator("[data-island-fallback]").click();
-    await expect(pageA.locator("[data-qr-sheet]")).toBeVisible({ timeout: 10_000 });
+    await pageB.locator("[data-island-fallback]").click();
+    await expect(pageB.locator("[data-qr-sheet]")).toBeVisible({ timeout: 10_000 });
+
+    await pageB.close();
+    await expect(pageA.locator(".peer-node")).toHaveCount(0, { timeout: 10_000 });
+    await pageA.locator("[data-island-retry]").click();
+    await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "connecting", { timeout: 10_000 });
+    await expect(pageA.locator("[data-island-peer-avatar]")).toHaveAttribute("data-anonymous", "true");
   } finally {
     await context.close();
   }

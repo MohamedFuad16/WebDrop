@@ -17,7 +17,7 @@ The deployed site at `https://web-drop-lyart.vercel.app/` may be used as a produ
 As of this pass:
 
 - The active local runnable artifact is `index.html`.
-- The visible app/package/service-worker version is `1.0.55`.
+- The visible app/package/service-worker version is `1.0.56`.
 - The old architecture HTML page was deleted during the corrected rebuild.
 - `js/app.js` boots the modular static app.
 - `js/core/controller.js` owns the state transitions that gate file controls.
