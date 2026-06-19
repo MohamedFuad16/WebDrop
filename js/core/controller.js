@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.49";
+import { formatBytes } from "../utils/format.js?v=1.0.50";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -720,6 +720,9 @@ export function createController({
     if (!startPayload || !isCurrentProximitySession(sessionId)) {
       await failAnonymousVerification({ score: 0, errors: [view.translate("proximityErrorSync")] });
       return;
+    }
+    if (!runtime.realProximityCeremony) {
+      await wait(Math.max(0, Number(startPayload.startAt) - Date.now() + 50));
     }
 
     let result;

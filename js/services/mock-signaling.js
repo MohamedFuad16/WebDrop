@@ -1,5 +1,5 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.49";
-import { AVATAR_OPTIONS } from "../config/avatar-options.js?v=1.0.49";
+import { Emitter } from "../utils/emitter.js?v=1.0.50";
+import { AVATAR_OPTIONS } from "../config/avatar-options.js?v=1.0.50";
 
 const MOCK_PEERS = [
   { id: "peer-aki", name: "Aki iPhone", avatar: AVATAR_OPTIONS[1], ringIndex: 0, angle: -52, deviceFamily: "ios", deviceLabel: "iPhone 15 Pro", distanceBucket: "immediate", proximityScore: 54, connectedBefore: true, capabilities: { platform: { family: "ios", isIOS: true, isIPhone: true, dynamicIslandCapable: true } } },

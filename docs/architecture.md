@@ -105,6 +105,12 @@ Anonymous sessions allocate up to four non-overlapping signatures between
 20.05 and 21.2 kHz. Each device emits only in its assigned slot, reports the
 strongest peer signature it heard, and the server pairs devices only when those
 reports are reciprocal and their bump timestamps are inside the match window.
+The score threshold is necessary but not sufficient: server verification also
+requires explicit ultrasound, bump, and tilt evidence, and rejects bump timing
+outside the server-issued ceremony window.
+If the initial anonymous join window contains only one device, the server keeps
+that identity-hidden session open for one short grace window and starts it
+quickly when a slightly late second device arrives.
 
 ### Dynamic Island ceremony
 

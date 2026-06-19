@@ -24,3 +24,5 @@
 - [x] Keep acoustic signatures above 20 kHz or refuse emission.
 - [x] Require reciprocal per-device acoustic signatures before multi-user matching.
 - [x] Bind proximity telemetry to the nonce issued when the client joined.
+- [x] Require ultrasound, bump, tilt, valid timing, and score >=55 independently.
+- [x] Let a one-device session accept one slightly late partner before failing.

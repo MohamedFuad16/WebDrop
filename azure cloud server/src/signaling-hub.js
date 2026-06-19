@@ -418,6 +418,7 @@ export class SignalingHub {
         createdAt: now,
         expiresAt: now + SESSION_TTL_MS,
         joinUntil: now + SESSION_JOIN_WINDOW_MS,
+        joinExtensions: 0,
         started: false,
         matched: new Set(),
         timer: null,
@@ -436,7 +437,11 @@ export class SignalingHub {
       joinUntil: session.joinUntil,
       participantCount: session.clients.size
     });
-    if (session.clients.size >= MAX_PROXIMITY_SESSION_CLIENTS && !session.started) {
+    if (session.clients.size >= 2 && session.joinExtensions > 0 && !session.started) {
+      clearTimeout(session.timer);
+      session.timer = setTimeout(() => this.startProximitySession(session.id), 300);
+      session.timer.unref?.();
+    } else if (session.clients.size >= MAX_PROXIMITY_SESSION_CLIENTS && !session.started) {
       clearTimeout(session.timer);
       session.timer = setTimeout(() => this.startProximitySession(session.id), 100);
       session.timer.unref?.();
@@ -446,9 +451,15 @@ export class SignalingHub {
   startProximitySession(sessionId) {
     const session = this.proximitySessions.get(sessionId);
     if (!session || session.started) return;
-    session.started = true;
-    if (this.openProximitySessionId === sessionId) this.openProximitySessionId = null;
     if (session.clients.size < 2) {
+      if ((session.joinExtensions || 0) < 1 && session.expiresAt > Date.now()) {
+        session.joinExtensions = (session.joinExtensions || 0) + 1;
+        session.joinUntil = Date.now() + SESSION_JOIN_WINDOW_MS;
+        this.openProximitySessionId = sessionId;
+        session.timer = setTimeout(() => this.startProximitySession(sessionId), SESSION_JOIN_WINDOW_MS);
+        session.timer.unref?.();
+        return;
+      }
       for (const clientId of session.clients) {
         const client = this.clients.get(clientId);
         if (client) this.send(client.socket, "proximity:session:failed", { sessionId, reason: "no_nearby_partner" });
@@ -456,7 +467,11 @@ export class SignalingHub {
       this.proximitySessions.delete(sessionId);
       return;
     }
+    session.started = true;
+    if (this.openProximitySessionId === sessionId) this.openProximitySessionId = null;
     const startAt = Date.now() + SESSION_START_DELAY_MS;
+    session.startAt = startAt;
+    session.endsAt = startAt + SESSION_DURATION_MS;
     const acousticPlan = [...session.clients].map((clientId, index) => {
       const [startFrequencyHz, endFrequencyHz] = ACOUSTIC_SIGNATURE_BANDS[index];
       const signature = {
@@ -498,6 +513,10 @@ export class SignalingHub {
     }
     if (!message.payload.clientNonce || session.nonces.get(sender.id) !== message.payload.clientNonce) {
       this.send(sender.socket, "proximity:session:failed", { sessionId, reason: "session_nonce_mismatch" });
+      return;
+    }
+    if (!hasValidCeremonyTiming(session, message.payload.timing)) {
+      this.send(sender.socket, "proximity:session:failed", { sessionId, reason: "timing_out_of_window" });
       return;
     }
     const analysis = sessionAnalysis(this.proximityAnalyzer, message.payload.metrics || {});
@@ -912,12 +931,36 @@ function sessionAnalysis(analyzer, metrics = {}) {
     ? analyzer.analyze(metrics)
     : fallbackSessionAnalysis(metrics);
   const score = Number(analyzed?.score || 0);
+  const normalized = analyzed?.normalized || fallbackNormalizedMetrics(metrics);
+  const physicalEvidence = {
+    ultrasound: normalized.sound >= 0.5,
+    bump: normalized.bump >= 0.5,
+    tilt: normalized.tilt >= 0.5
+  };
+  const hasRequiredPhysicalEvidence = Object.values(physicalEvidence).every(Boolean);
   return {
     ...analyzed,
     acousticSignatureId: metrics.acousticSignatureId || null,
     heardAcousticSignatureId: metrics.heardAcousticSignatureId || null,
-    decision: score >= SESSION_SCORE_MINIMUM ? "verified" : (analyzed?.decision || "insufficient")
+    physicalEvidence,
+    decision: score >= SESSION_SCORE_MINIMUM && hasRequiredPhysicalEvidence
+      ? "verified"
+      : "insufficient"
   };
+}
+
+function hasValidCeremonyTiming(session, timing = {}) {
+  const startedAt = Number(timing?.startedAt);
+  const bumpAt = Number(timing?.bumpAt);
+  const completedAt = Number(timing?.completedAt);
+  if (![startedAt, bumpAt, completedAt].every(Number.isFinite)) return false;
+  if (!Number.isFinite(session.startAt) || !Number.isFinite(session.endsAt)) return false;
+  if (Date.now() < session.startAt - 250) return false;
+  return Math.abs(startedAt - session.startAt) <= 250
+    && bumpAt >= session.startAt - 250
+    && bumpAt <= session.endsAt + SESSION_MATCH_SLOP_MS
+    && completedAt >= bumpAt
+    && completedAt <= session.endsAt + SESSION_MATCH_SLOP_MS;
 }
 
 function hasReciprocalAcousticEvidence(session, first, second) {
@@ -931,13 +974,26 @@ function hasReciprocalAcousticEvidence(session, first, second) {
 }
 
 function fallbackSessionAnalysis(metrics = {}) {
-  const sound = metricValue(metrics.soundCorrelation ?? metrics.acoustic ?? metrics.audio);
-  const motion = metricValue(metrics.motionCorrelation ?? metrics.motion);
-  const bump = metricValue(metrics.bumpCorrelation ?? metrics.bump);
-  const tilt = metricValue(metrics.tiltMatch ?? metrics.tilt);
-  const qr = metricValue(metrics.qrMatch ?? metrics.qrFallback);
+  const normalized = fallbackNormalizedMetrics(metrics);
+  const { sound, motion, bump, tilt, qr } = normalized;
   const score = sound * 0.34 + motion * 0.26 + bump * 0.2 + tilt * 0.12 + qr * 0.08;
-  return { enabled: false, mode: "fallback", score, decision: score >= SESSION_SCORE_MINIMUM ? "verified" : "insufficient" };
+  return {
+    enabled: false,
+    mode: "fallback",
+    normalized,
+    score,
+    decision: score >= SESSION_SCORE_MINIMUM ? "verified" : "insufficient"
+  };
+}
+
+function fallbackNormalizedMetrics(metrics = {}) {
+  return {
+    sound: metricValue(metrics.soundCorrelation ?? metrics.acoustic ?? metrics.audio),
+    motion: metricValue(metrics.motionCorrelation ?? metrics.motion),
+    bump: metricValue(metrics.bumpCorrelation ?? metrics.bump),
+    tilt: metricValue(metrics.tiltMatch ?? metrics.tilt),
+    qr: metricValue(metrics.qrMatch ?? metrics.qrFallback)
+  };
 }
 
 function metricValue(value) {

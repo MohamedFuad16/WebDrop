@@ -41,6 +41,53 @@ test("proximity session rejects scores below 55", () => {
   hub.close();
 });
 
+test("proximity session rejects a high score without explicit bump and tilt evidence", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  const session = createSession(hub, [clientA, clientB]);
+  const incomplete = {
+    acoustic: true,
+    soundCorrelation: 1,
+    motionCorrelation: 1,
+    bump: false,
+    tilt: false,
+    qrFallback: true
+  };
+
+  hub.recordProximitySessionTelemetry(clientA, sessionMessage(session, clientA, incomplete, 1000, clientB));
+  hub.recordProximitySessionTelemetry(clientB, sessionMessage(session, clientB, incomplete, 1040, clientA));
+
+  assert.equal(session.telemetry.get(clientA.id).analysis.score >= 0.55, true);
+  assert.equal(session.telemetry.get(clientA.id).analysis.decision, "insufficient");
+  assert.deepEqual(session.telemetry.get(clientA.id).analysis.physicalEvidence, {
+    ultrasound: true,
+    bump: false,
+    tilt: false
+  });
+  assert.equal(clientA.pairingId, null);
+  assert.equal(clientB.pairingId, null);
+
+  hub.close();
+});
+
+test("proximity session rejects bump evidence outside the issued ceremony window", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  const session = createSession(hub, [clientA, clientB]);
+
+  hub.recordProximitySessionTelemetry(
+    clientA,
+    sessionMessage(session, clientA, verifiedMetrics(), session.startAt - 1000, clientB)
+  );
+
+  assert.equal(session.telemetry.has(clientA.id), false);
+  assert.equal(messagesOf(clientA, "proximity:session:failed")[0].payload.reason, "timing_out_of_window");
+
+  hub.close();
+});
+
 test("proximity session keeps two simultaneous reciprocal signature pairs separate", () => {
   const hub = createTestHub();
   const clientA = addClient(hub, "client-a");
@@ -97,6 +144,29 @@ test("proximity join window keeps four clients together and rolls a fifth into a
   hub.close();
 });
 
+test("a one-client session extends once and accepts a slightly late partner", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  const session = createSession(hub, [clientA]);
+  session.started = false;
+  session.joinExtensions = 0;
+  hub.openProximitySessionId = session.id;
+
+  hub.startProximitySession(session.id);
+  assert.equal(session.started, false);
+  assert.equal(session.joinExtensions, 1);
+  assert.equal(hub.openProximitySessionId, session.id);
+
+  hub.joinProximitySession(clientB, {
+    payload: { clientNonce: `nonce-${clientB.id}` }
+  });
+  assert.equal(session.clients.has(clientB.id), true);
+  assert.equal(session.clients.size, 2);
+
+  hub.close();
+});
+
 function createTestHub() {
   return new SignalingHub({
     server: { on() {} },
@@ -142,6 +212,8 @@ function createSession(hub, clients) {
     createdAt: Date.now(),
     expiresAt: Date.now() + 120000,
     joinUntil: Date.now(),
+    startAt: 900,
+    endsAt: 5000,
     started: true,
     matched: new Set(),
     timer: null,
@@ -162,7 +234,7 @@ function sessionMessage(session, sender, metrics, bumpAt, heardClient) {
         heardAcousticSignatureId: session.signatures.get(heardClient.id)
       },
       timing: {
-        startedAt: bumpAt - 100,
+        startedAt: session.startAt,
         bumpAt,
         completedAt: bumpAt + 100
       }

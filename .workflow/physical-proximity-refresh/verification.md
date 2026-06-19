@@ -5,7 +5,7 @@
 - `npm run check` passed.
 - `npm test` passed: 16 tests.
 - `npm --prefix "azure cloud server" run check` passed.
-- `npm --prefix "azure cloud server" test` passed: 18 tests.
+- `npm --prefix "azure cloud server" test` passed: 21 tests.
 - `npm run test:e2e` passed: 52 passed, 44 expected project skips.
 - `npm run verify:full` passed, including audits and `git diff --check`.
 - Bidirectional acoustic regression proves both devices emit and detect the peer chirp over a timing-sensitive virtual audio link.
@@ -51,3 +51,6 @@
 - Two simultaneous pairs with nearly identical bump times stay correctly separated; crossed timing alone cannot pair them.
 - Session telemetry with a nonce that does not match the join nonce is rejected.
 - The four-participant join window remains open long enough to collect the room; a fifth participant rolls into a new session.
+- A score above 55 is rejected when ultrasound, bump, or tilt evidence is missing.
+- Telemetry outside the server-issued ceremony time window is rejected.
+- A one-device session gets one short grace window so a slightly late partner does not trigger a false sync failure.
