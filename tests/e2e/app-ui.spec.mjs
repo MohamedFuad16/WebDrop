@@ -488,6 +488,46 @@ test("keeps the expanded mobile island edge-to-edge with a centered Canvas2D wav
   expect(geometry.radius).toBe("0px 0px 34px 34px");
 });
 
+test("shows acoustic slot diagnostics in the Dynamic Island ceremony", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-desktop", "Slot diagnostic text is covered once in Chromium.");
+  await page.goto("/?qa=e2e-acoustic-diagnostics&runtime=mock", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });
+
+  await page.evaluate(async () => {
+    const { DynamicIsland } = await import("/js/ui/dynamic-island.js?v=e2e-acoustic-diagnostics");
+    const messages = {
+      ceremonyAudioEmitting: "Emitting",
+      ceremonyAudioEmitted: "Emitted",
+      ceremonyAudioEmitFailed: "Emit failed",
+      ceremonyAudioListening: "Listening",
+      ceremonyDetected: "Detected",
+      ceremonyMissed: "Missed",
+      ceremonyAudioSending: "Listening"
+    };
+    const island = new DynamicIsland(document, (key) => messages[key] || key);
+    island.showAnonymousConnectionProgress({
+      id: "self",
+      name: "WebDrop Device",
+      avatar: "assets/icons/avatars/user-01.png"
+    });
+    island.updateCeremony({
+      phase: "audio",
+      state: "active",
+      acoustic: {
+        mode: "detected",
+        detected: true,
+        slot: 2,
+        slotCount: 4,
+        marginDb: 31,
+        startFrequencyHz: 20350,
+        endFrequencyHz: 20580
+      }
+    });
+  });
+
+  await expect(page.locator("[data-island-audio-value]")).toHaveText("Detected 2/4 +31dB 20.4-20.6kHz");
+});
+
 test("anchors Dynamic Island expansion to the hardware island safe area", async ({ page }) => {
   await page.goto("/?qa=e2e-island-safe-area&runtime=mock", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });

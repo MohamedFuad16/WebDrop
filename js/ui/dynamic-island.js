@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.50";
-import { Emitter } from "../utils/emitter.js?v=1.0.50";
-import { formatBytes } from "../utils/format.js?v=1.0.50";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.50";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.50";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.51";
+import { Emitter } from "../utils/emitter.js?v=1.0.51";
+import { formatBytes } from "../utils/format.js?v=1.0.51";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.51";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.51";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -231,11 +231,14 @@ export class DynamicIsland extends Emitter {
       const detected = Boolean(acoustic?.detected);
       this.setMetricState(this.nodes.audioMetric, state === "active" ? "active" : detected ? "complete" : "failed");
       if (this.nodes.audioValue) {
-        this.nodes.audioValue.textContent = state === "active"
-          ? this.translate("ceremonyAudioSending")
-          : detected
-            ? this.translate("ceremonyDetected")
-            : this.translate("ceremonyMissed");
+        this.nodes.audioValue.textContent = formatAcousticStatus(acoustic, {
+          fallback: state === "active"
+            ? this.translate("ceremonyAudioSending")
+            : detected
+              ? this.translate("ceremonyDetected")
+              : this.translate("ceremonyMissed"),
+          translate: this.translate.bind(this)
+        });
       }
     }
     if (motion) this.renderMotionMetrics(motion);
@@ -842,6 +845,38 @@ function escapeHtml(text) {
     '"': "&quot;",
     "'": "&#039;"
   }[character]));
+}
+
+function formatAcousticStatus(acoustic = {}, { fallback, translate }) {
+  const mode = acoustic?.mode;
+  const slot = Number(acoustic?.slot);
+  const slotCount = Number(acoustic?.slotCount);
+  const slotLabel = Number.isFinite(slot) && Number.isFinite(slotCount)
+    ? ` ${slot}/${slotCount}`
+    : "";
+  const band = formatFrequencyBand(acoustic);
+  const margin = Number(acoustic?.marginDb);
+  const marginLabel = Number.isFinite(margin) && margin > 0 ? ` +${Math.round(margin)}dB` : "";
+  const emittedCount = Number(acoustic?.emittedCount);
+  const countLabel = Number.isFinite(emittedCount) && emittedCount > 0 ? ` x${emittedCount}` : "";
+  const keyByMode = {
+    emit: "ceremonyAudioEmitting",
+    emitted: "ceremonyAudioEmitted",
+    "emit-failed": "ceremonyAudioEmitFailed",
+    listen: "ceremonyAudioListening",
+    detected: "ceremonyDetected",
+    missed: "ceremonyMissed"
+  };
+  const key = keyByMode[mode];
+  if (!key) return fallback;
+  return `${translate(key)}${slotLabel}${countLabel}${marginLabel}${band}`;
+}
+
+function formatFrequencyBand(acoustic = {}) {
+  const start = Number(acoustic?.startFrequencyHz);
+  const end = Number(acoustic?.endFrequencyHz);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return "";
+  return ` ${Math.round(start / 100) / 10}-${Math.round(end / 100) / 10}kHz`;
 }
 
 function qrFinderColor(row, column, count, colors) {

@@ -6,7 +6,7 @@
 - `npm test` passed: 16 tests.
 - `npm --prefix "azure cloud server" run check` passed.
 - `npm --prefix "azure cloud server" test` passed: 21 tests.
-- `npm run test:e2e` passed: 52 passed, 44 expected project skips.
+- `npm run test:e2e` passed on `1.0.51`: 53 passed, 47 expected project skips.
 - `npm run verify:full` passed, including audits and `git diff --check`.
 - Bidirectional acoustic regression proves both devices emit and detect the peer chirp over a timing-sensitive virtual audio link.
 - Chromium Web Audio loopback passed: the sender emitted a 72ms chirp at 48kHz and a second `AcousticProximitySensor` detected it at 0.9988 correlation with 48.2dB band margin.
@@ -54,3 +54,6 @@
 - A score above 55 is rejected when ultrasound, bump, or tilt evidence is missing.
 - Telemetry outside the server-issued ceremony time window is rejected.
 - A one-device session gets one short grace window so a slightly late partner does not trigger a false sync failure.
+- Release `1.0.51` adds live acoustic slot diagnostics to the Dynamic Island: emitting/listening/detected/missed slot, emitted count, margin, and frequency band are now surfaced during the physical ceremony.
+- `node --test tests/proximity-engine.test.mjs` passed after adding progress-event coverage for emitted and detected anonymous acoustic signature slots.
+- `npx playwright test tests/e2e/app-ui.spec.mjs --project=chromium-desktop --grep 'acoustic slot diagnostics'` passed and proved the visible island text renders as `Detected 2/4 +31dB 20.4-20.6kHz`.

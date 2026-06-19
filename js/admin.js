@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.50";
+const APP_VERSION = "1.0.51";
 const CHUNK_SIZE = 256 * 1024;
 
 const readinessItems = [
@@ -64,12 +64,12 @@ const readinessItems = [
   },
   {
     title: "Proximity ceremony",
-    status: "Ready, disabled",
-    score: 55,
+    status: "Ready, live",
+    score: 82,
     checks: [
-      "QR token flow and scanner UI",
-      "Web Audio chirp and motion capture modules",
-      "Server policy can gate RTC and transfer metadata"
+      "Peerless QR token flow and scanner UI",
+      "Above-20 kHz acoustic slot diagnostics",
+      "Server policy gates RTC and transfer metadata"
     ]
   },
   {

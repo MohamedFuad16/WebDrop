@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.50";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.50";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.50";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.51";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.51";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.51";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 
@@ -101,7 +101,8 @@ export class ProximityEngine {
           ownSignatureId: acousticSignatureId,
           options: acousticOptions,
           startAt,
-          durationMs: ceremonyDurationMs
+          durationMs: ceremonyDurationMs,
+          onProgress
         })
         : await exchangeChirps(this.acoustic, {
           role: acousticRole,
@@ -169,7 +170,8 @@ async function exchangeSignatureChirps(acoustic, {
   ownSignatureId,
   options = {},
   startAt,
-  durationMs = 3600
+  durationMs = 3600,
+  onProgress = () => {}
 }) {
   const signatures = normalizeAcousticPlan(plan);
   const slotDurationMs = Math.max(420, Math.floor(durationMs / Math.max(1, signatures.length)));
@@ -185,10 +187,49 @@ async function exchangeSignatureChirps(acoustic, {
       endFrequencyHz: signature.endFrequencyHz
     };
     if (signature.id === ownSignatureId) {
+      onProgress({
+        phase: "audio",
+        state: "active",
+        acoustic: {
+          mode: "emit",
+          slot: index + 1,
+          slotCount: signatures.length,
+          ownSignatureId,
+          startFrequencyHz: signature.startFrequencyHz,
+          endFrequencyHz: signature.endFrequencyHz
+        }
+      });
       const emitted = await emitChirpSequence(acoustic, signatureOptions, slotDurationMs - 80);
       emittedCount += emitted.emittedCount || 0;
+      onProgress({
+        phase: "audio",
+        state: "active",
+        acoustic: {
+          mode: emitted.emitted ? "emitted" : "emit-failed",
+          slot: index + 1,
+          slotCount: signatures.length,
+          ownSignatureId,
+          emittedCount: emitted.emittedCount || 0,
+          reason: emitted.reason || null,
+          sampleRate: emitted.sampleRate || null,
+          startFrequencyHz: signature.startFrequencyHz,
+          endFrequencyHz: signature.endFrequencyHz
+        }
+      });
       continue;
     }
+    onProgress({
+      phase: "audio",
+      state: "active",
+      acoustic: {
+        mode: "listen",
+        slot: index + 1,
+        slotCount: signatures.length,
+        targetSignatureId: signature.id,
+        startFrequencyHz: signature.startFrequencyHz,
+        endFrequencyHz: signature.endFrequencyHz
+      }
+    });
     const detected = await acoustic.detectChirp({
       ...signatureOptions,
       timeoutMs: slotDurationMs - 80
@@ -200,6 +241,22 @@ async function exchangeSignatureChirps(acoustic, {
         marginDb: detected.band?.marginDb || 0
       });
     }
+    onProgress({
+      phase: "audio",
+      state: "active",
+      acoustic: {
+        mode: detected.detected ? "detected" : "missed",
+        slot: index + 1,
+        slotCount: signatures.length,
+        targetSignatureId: signature.id,
+        detected: Boolean(detected.detected),
+        correlation: detected.correlation || 0,
+        marginDb: detected.band?.marginDb || 0,
+        reason: detected.reason || null,
+        startFrequencyHz: signature.startFrequencyHz,
+        endFrequencyHz: signature.endFrequencyHz
+      }
+    });
   }
 
   detections.sort((a, b) => b.marginDb - a.marginDb || b.correlation - a.correlation);

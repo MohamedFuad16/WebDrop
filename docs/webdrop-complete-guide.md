@@ -1,6 +1,6 @@
 # WebDrop Complete Technical Guide
 
-Version: WebDrop v2 production-readiness handoff for app version 1.0.34
+Version: WebDrop v2 production-readiness handoff for app version 1.0.51
 Scope: `/Users/mfuad16/Documents/web_drop_v2`
 Primary app entrypoint: `index.html` and `js/app.js`
 
@@ -10,16 +10,16 @@ Primary app entrypoint: `index.html` and `js/app.js`
 
 This guide is written for product, engineering, QA, and production handoff work. It separates the production-configured browser runtime from the explicit local mock mode used for deterministic UI testing.
 
-The current repository ships a static browser application plus an Azure signaling-server package. The default app is configured for the Japan East production signaling URL and real WebRTC transfer. Localhost can opt into deterministic mock peers with `?runtime=mock`. Microphone, motion, and camera ceremonies remain disabled until physical-device calibration is complete. The code includes production WebSocket signaling, one-time QR token routing, real WebRTC offer/answer/ICE handling, separate control/file data channels, transfer manifests, sender hashing, receiver ACK/cancel/retry semantics, deferred IndexedDB receives with StreamSaver export on Save, iPhone/iPad Blob fallback, and Cloudflare TURN credential proxying. The core product boundaries remain: discovery and trust happen before file controls appear; signaling carries metadata; file bytes belong on an `RTCDataChannel`; and receiving bytes must not trigger an unsolicited download.
+The current repository ships a static browser application plus an Azure signaling-server package. The default app is configured for the Japan East production signaling URL, real physical-proximity ceremony, peerless QR pairing, and real WebRTC transfer. Localhost can opt into deterministic mock peers with `?runtime=mock`. Microphone and motion are requested only after Connect, and camera is requested only after the explicit Scan QR action. The code includes production WebSocket signaling, one-time QR token routing, real WebRTC offer/answer/ICE handling, separate control/file data channels, transfer manifests, sender hashing, receiver ACK/cancel/retry semantics, deferred IndexedDB receives with StreamSaver export on Save, iPhone/iPad Blob fallback, and Cloudflare TURN credential proxying. The core product boundaries remain: discovery and trust happen before file controls appear; signaling carries metadata; file bytes belong on an `RTCDataChannel`; and receiving bytes must not trigger an unsolicited download.
 
 ### Production readiness status
 
-- App/package/service-worker version: `1.0.34`.
-- Default frontend runtime: production signaling and real transfer are enabled for `webdrop-wss-0617.japaneast.cloudapp.azure.com`; the UI reports the service unavailable when the endpoint cannot be reached.
+- App/package/service-worker version: `1.0.51`.
+- Default frontend runtime: production signaling, real proximity, peerless QR, and real transfer are enabled for `webdrop-wss-0618.japaneast.cloudapp.azure.com`.
 - Effective feature gating: `js/config/runtime-flags.js` refuses to enable real proximity, real transfer, or QR pairing unless production signaling is enabled with a valid WSS URL.
 - Backend package: `azure cloud server/` contains the Node WebSocket signaling service, QR token provider, TURN credential proxy, nginx/systemd/deploy assets, and load-test assets.
-- Verified locally on June 18, 2026: production-origin WebSocket pairing, bidirectional chat, authenticated Cloudflare TURN credential issuance, simultaneous bidirectional DataChannel file transfer, and a forced TURN relay transfer using 256 KiB chunks.
-- Still external: restoring the unreachable Azure VM endpoint, physical-device proximity calibration, public end-to-end transfer proof, load testing, and any horizontal-scaling state store.
+- Verified on June 19, 2026: public `/readyz`, public WSS anonymous proximity sessions, reciprocal acoustic signature matching among four clients, rejection of high-score telemetry without bump/tilt evidence, peerless QR, WebKit iPhone UI/permission regressions, authenticated Cloudflare TURN credential issuance, simultaneous bidirectional DataChannel file transfer, and forced TURN relay transfer using 256 KiB chunks.
+- Still external: physical-device over-air proximity calibration, physical-device direct/TURN file-transfer testing near the 500 MB cap, load testing, and any horizontal-scaling state store.
 
 The production roadmap sections describe the backend and browser-work needed to turn those boundaries into a real multi-device transfer system.
 
@@ -419,16 +419,16 @@ When real proximity is disabled, `js/services/proximity-engine.js` uses a simple
 | `lowRttHint` | Always true in prototype | 6 |
 | `qrFallback` | True when mic or motion missing | 30 |
 
-The pass threshold is `58`.
+The production pass threshold is `55`.
 
-This demo score is useful because it demonstrates how multiple evidence signals become one decision, but it must not be treated as security. The production-gated path binds QR, acoustic, and motion evidence to short-lived pairing sessions issued by the backend. Server enforcement remains disabled by default with `ENABLE_PROXIMITY_ANALYSIS=false` until calibration is complete.
+This demo score is useful because it demonstrates how multiple evidence signals become one decision, but it must not be treated as security. The production-gated path binds QR, acoustic, and motion evidence to short-lived pairing sessions issued by the backend. The live server currently reports `ENABLE_PROXIMITY_ANALYSIS=true`; keep QR fallback available and disable enforcement again if physical-device calibration shows false positives or false negatives.
 
 ### Production ceremony model
 
 A robust ceremony can combine several paths:
 
 - QR code: receiver displays or scans a short-lived token.
-- Acoustic nonce: one device plays a short encoded tone, the other listens and validates freshness.
+- Acoustic nonce: each device emits an anonymous above-20 kHz signature in its assigned slot and listens for every other slot; the Dynamic Island shows emitted/listening/detected/missed slot diagnostics, margin, and frequency band during the ceremony.
 - Motion correlation: both devices ask the user to perform a gesture and compare timing/shape.
 - Explicit accept: receiver confirms the invite.
 - Network hint: server observes coarse IP/network match, but this must never be sufficient alone.
@@ -444,7 +444,7 @@ QR should remain the universal fallback because it works when microphone permiss
 
 WebDrop has two signaling adapters:
 
-- `MockSignalingAdapter` for the default static demo.
+- `MockSignalingAdapter` for explicit local QA with `?runtime=mock`.
 - `WebSocketSignalingAdapter` for the production Azure signaling endpoint.
 
 The mock adapter emits demo peers and accepts invite-style method calls for local QA. The WebSocket adapter is active in the default runtime and reports a bounded connection failure when its endpoint is unreachable. It remains safe when no URL is supplied:

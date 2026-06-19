@@ -12,7 +12,7 @@ Use this order whenever the live endpoint or feature flags are changed.
 4. Keep `ENABLE_PROXIMITY_ANALYSIS=false` for the first signaling-only smoke test.
 5. Verify the frontend URLs in `js/config/runtime-config.js`.
 6. Keep production signaling and real transfer enabled only while the endpoint health checks pass; enable the real proximity ceremony afterward.
-7. Enable `ENABLE_PROXIMITY_ANALYSIS=true` only after two-device telemetry is visible and calibrated.
+7. Keep `ENABLE_PROXIMITY_ANALYSIS=true` only while live telemetry, failure persistence, QR fallback, and two-device calibration remain healthy.
 
 Use [deployment-sizing.md](deployment-sizing.md) before selecting an Azure VM size. A burstable 1-vCPU VM is suitable for smoke testing, not the documented 10,000-client goal. Start serious single-node load testing with at least 2 vCPUs and 8 GiB of memory, then select the final Azure VM size from measured CPU, memory, file-descriptor, and network results.
 
@@ -69,19 +69,22 @@ Use two physical HTTPS-capable devices. Test:
 - Successful bump and tilt, denied permissions, and QR fallback behavior.
 - Small files, multiple files, files larger than memory fallback, cancellation, retry, and receiver storage exhaustion.
 
-Real-device acoustic thresholds and timing may require tuning after measurements. Keep production enforcement disabled until false-positive and false-negative behavior is understood.
+Real-device acoustic thresholds and timing may require tuning after measurements. If false-positive or false-negative behavior appears on physical devices, disable enforcement, keep QR available, and re-enable only after telemetry proves the adjusted threshold.
 
-## Verified locally on June 18, 2026
+## Verified on June 19, 2026
 
-- Production-mode server startup and `/readyz`.
-- Exact Vercel-origin CORS and WebSocket admission.
-- Authenticated Cloudflare TURN credential issuance with STUN fallback disabled.
-- Two-page invite/accept, simultaneous bidirectional file transfer, and disconnect.
-- Forced TURN relay carrying bidirectional DataChannel bytes in Chromium.
+- Pre-patch production Vercel served app version `1.0.50`; this changeset advances the app/cache key to `1.0.51` for deployment verification.
+- Japan East `/readyz` reported production healthy with `proximityAnalysisEnabled:true`.
+- Azure `signaling-hub.js` matched the local source hash.
+- Public WSS assigned unique anonymous acoustic signatures for four clients and matched only reciprocal pairs.
+- Public WSS rejected high-score telemetry when ultrasound was present but bump and tilt evidence were missing.
+- `npm run verify:full` passed.
+- `npm run test:e2e` passed with 52 passing tests and 44 expected project skips.
+- WebKit iPhone E2E covered one-gesture motion/microphone permission, QR camera permission from Scan, nonblank Canvas2D Siri wave, edge-to-edge Dynamic Island geometry, and received-file new-tab behavior.
 
 ## Launch blockers
 
-- Restore the currently unreachable Japan East Azure VM and repeat the local proofs through the public TLS endpoint.
 - Keep the validated long-term Cloudflare token only in `/etc/webdrop/signaling.env` on the VM.
+- Complete physical two-device over-air calibration before treating proximity enforcement as fully production-proven.
 - Signaling load tests should start below 10,000 clients and ramp while watching nginx, Node, file descriptors, memory, CPU, and network throughput.
 - Do not horizontally scale the signaling service until presence/session state is moved to shared storage such as Redis or traffic is routed sticky by session.

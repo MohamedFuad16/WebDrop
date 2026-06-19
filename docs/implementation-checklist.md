@@ -1,7 +1,7 @@
 # WebDrop Production Implementation Checklist
 
-Updated: June 16, 2026
-App version: 1.0.34
+Updated: June 19, 2026
+App version: 1.0.51
 
 This is the source of truth for the production-readiness package. `Ready, live` means the implementation is active in the current runtime. `Ready, disabled` means the implementation is wired to the frontend but cannot become effective unless its runtime flag and infrastructure are enabled. `Ready, unconfigured` means the code exists but requires deployment secrets or infrastructure. `External verification` means the code is ready but requires Azure, Cloudflare, or physical devices.
 
@@ -9,18 +9,19 @@ This is the source of truth for the production-readiness package. `Ready, live` 
 
 | Requirement | Status | Evidence |
 |---|---|---|
-| Real microphone permission request | Ready, disabled | `js/services/acoustic-proximity.js`, `js/core/controller.js` |
-| Real Web Audio chirp generation | Ready, disabled | `js/services/acoustic-proximity.js` |
-| Real chirp detection and normalized correlation | Ready, disabled | `js/services/acoustic-proximity.js` |
-| Coordinated two-peer chirp exchange | Ready, disabled | `js/services/proximity-engine.js`, `proximity:ready` / `proximity:start` in Azure signaling |
-| Real tilt and bump capture | Ready, disabled | `js/services/motion-proximity.js` |
-| Permission ceremony from explicit swipe gesture | Ready, disabled | `js/core/controller.js` |
-| Reset old motion evidence and stop microphone/motion after ceremony | Ready, disabled | `js/services/proximity-engine.js`, `js/core/controller.js` |
-| Send real proximity telemetry to Azure signaling | Ready, disabled | `js/services/websocket-signaling.js`, `js/core/controller.js` |
-| Enforce proximity before RTC, chat, path metrics, or transfer metadata | Ready, disabled | `azure cloud server/src/signaling-hub.js` |
-| Backend QR one-time-token logic | Ready, disabled | `azure cloud server/src/qr-token-provider.js`, `azure cloud server/src/signaling-hub.js` |
-| QR frontend UI and scanner | Ready, disabled | `js/ui/dynamic-island.js`, `js/core/controller.js`, `js/services/websocket-signaling.js` |
-| Two-device threshold calibration | External verification | Requires physical iOS/Android devices |
+| Real microphone permission request | Ready, live | `js/services/acoustic-proximity.js`, `js/core/controller.js`, `tests/proximity-engine.test.mjs` |
+| Real Web Audio chirp generation | Ready, live | `js/services/acoustic-proximity.js`, `tests/proximity-engine.test.mjs` |
+| Real chirp detection and normalized correlation | Ready, live | `js/services/acoustic-proximity.js`, `tests/proximity-engine.test.mjs` |
+| Coordinated peerless chirp exchange | Ready, live | `js/services/proximity-engine.js`, `proximity:session:*` in Azure signaling |
+| Live acoustic ceremony diagnostics | Ready, live | `js/services/proximity-engine.js`, `js/ui/dynamic-island.js`, `tests/proximity-engine.test.mjs` |
+| Real tilt and bump capture | Ready, live | `js/services/motion-proximity.js`, `js/core/controller.js` |
+| Permission ceremony from explicit Connect/Scan gesture | Ready, live | `js/core/controller.js`, `tests/e2e/app-ui.spec.mjs` |
+| Reset old motion evidence and stop analyzer capture after ceremony | Ready, live | `js/services/proximity-engine.js`, `js/core/controller.js` |
+| Send real proximity telemetry to Azure signaling | Ready, live | `js/services/websocket-signaling.js`, `js/core/controller.js` |
+| Enforce proximity before RTC, chat, path metrics, or transfer metadata | Ready, live | `azure cloud server/src/signaling-hub.js`, `azure cloud server/tests/signaling-hub-proximity-session.test.mjs` |
+| Backend QR one-time-token logic | Ready, live | `azure cloud server/src/qr-token-provider.js`, `azure cloud server/src/signaling-hub.js`, backend tests |
+| QR frontend UI and scanner | Ready, live | `js/ui/dynamic-island.js`, `js/core/controller.js`, `tests/e2e/live-signaling-ui.spec.mjs` |
+| Two-device over-air threshold calibration | External verification | Requires physical iOS/Android devices in quiet, ordinary, and noisy rooms |
 
 ## Client transfer
 
@@ -40,7 +41,7 @@ This is the source of truth for the production-readiness package. `Ready, live` 
 | Completion waits for receiver byte-count verification | Ready, live | `js/services/transfer-engine.js`, `js/services/data-channel-transfer-protocol.js`, `js/storage/storage-client.js` |
 | Failure and retry-range controls | Ready, live | `js/services/data-channel-transfer-protocol.js` |
 | Direct/relay path classification | Ready, live | `js/services/webrtc-transport.js` |
-| Two-browser direct and TURN transfer | External verification | Requires deployed WSS/TURN and two browsers |
+| Two-browser direct and TURN transfer | Ready, live | `tests/e2e/live-relay.spec.mjs`, live public WSS/TURN proof |
 
 ## Receive storage
 
@@ -65,38 +66,36 @@ This is the source of truth for the production-readiness package. `Ready, live` 
 | Strict RTC, chat, transfer, proximity, and path schemas | Ready | `azure cloud server/src/message-schema.js` |
 | Origin and rate-limit policy | Ready | `azure cloud server/src/server.js`, `azure cloud server/src/signaling-hub.js` |
 | Ephemeral invites and pairing sessions | Ready | `azure cloud server/src/signaling-hub.js` |
-| Coordinated proximity start and enforced verified state | Ready, disabled | `azure cloud server/src/signaling-hub.js`, `ENABLE_PROXIMITY_ANALYSIS=false` |
+| Coordinated proximity start and enforced verified state | Ready, live | `azure cloud server/src/signaling-hub.js`, `ENABLE_PROXIMITY_ANALYSIS=true` on live readiness |
 | Server-issued QR one-time tokens | Ready | `azure cloud server/src/qr-token-provider.js` |
-| Cloudflare temporary TURN credentials | Ready, external verification | `azure cloud server/src/turn-provider.js`, `azure cloud server/tests/turn-provider.test.mjs` |
-| Direct/relay path metrics | Ready, disabled | `azure cloud server/src/metrics.js`, `azure cloud server/src/signaling-hub.js` |
-| Payload-safe observability | Ready, disabled | `azure cloud server/src/logger.js`, protected metrics endpoint |
+| Cloudflare temporary TURN credentials | Ready, live | `azure cloud server/src/turn-provider.js`, `azure cloud server/tests/turn-provider.test.mjs`, live relay E2E |
+| Direct/relay path metrics | Ready, live | `azure cloud server/src/metrics.js`, `azure cloud server/src/signaling-hub.js` |
+| Payload-safe observability | Ready, live | `azure cloud server/src/logger.js`, protected metrics endpoint |
 | nginx, Certbot, systemd, Azure VM scripts, and load-test assets | Ready, unconfigured | `azure cloud server/nginx/`, `systemd/`, `scripts/`, `load/` |
 
 ## Runtime activation state
 
 - `js/config/runtime-config.js` currently points at the live Japan East WSS/TURN endpoints.
 - `js/config/runtime-flags.js` refuses to enable proximity, transfer, or QR unless production signaling is enabled with a valid production signaling URL.
-- `azure cloud server/.env.example` ships with `ENABLE_PROXIMITY_ANALYSIS=false`.
-- The deployed frontend selects `WebSocketSignalingAdapter` and real transfer because production signaling is enabled. Local QA can explicitly select mock mode with `?runtime=mock`.
-- Microphone, motion, and QR remain disabled and are not requested by default.
+- `azure cloud server/.env.example` remains conservative, but the live `/readyz` reports `proximityAnalysisEnabled:true`.
+- The deployed frontend selects `WebSocketSignalingAdapter`, real proximity, real transfer, and peerless QR because production signaling is enabled. Local QA can explicitly select mock mode with `?runtime=mock`.
+- Microphone, motion, and QR are requested only from explicit user actions: Connect, Use QR, or Scan QR.
 
 ## Verification evidence
 
 - Root static check: `npm run check`
-- Root test command: `npm test` — covers receive storage and concurrent WebRTC responder setup
+- Root test command: `npm test` — covers acoustic chirps, receive storage, and concurrent WebRTC responder setup
 - Azure backend static check: `npm run check`
 - Azure backend test command: `npm test` — covers strict message schemas, production environment validation, and the Cloudflare TURN credential provider
-- Playwright command: `npm run test:e2e` — covers responsive UI, localization, accessibility-relevant interactions, local signaling, bidirectional transfer, and forced relay behavior
+- Playwright command: `npm run test:e2e` — covers responsive UI, QR, WebKit iPhone permission flows, Dynamic Island geometry, acoustic sensor recognition, live signaling, bidirectional transfer, and forced relay behavior
 - `git diff --check` — passing
-- Browser smoke: desktop and 393x852 mobile app load, seven mock peers render, connection tray stays hidden before connection, peer sheet opens, and console warnings/errors are empty.
+- Browser smoke: production and local mobile app load, 393x852 viewport has no horizontal overflow, QR is machine-readable, Dynamic Island expands edge-to-edge from the top, and console warnings/errors are empty.
 
 ## Remaining before production launch
 
-1. Restore and continuously verify the configured Japan East health, WSS, and ICE endpoints; they were unreachable during the June 18 audit.
-2. Copy the locally validated Cloudflare TURN Server credentials only to the Azure VM environment file and repeat the proven forced-relay session through the public endpoint.
-3. Verify production allowed origins, protected metrics access, TLS renewal, systemd restart behavior, and firewall rules on the live VM.
-4. Enable proximity flags only in the staged order documented in `docs/production-activation.md`.
-5. Run two-physical-device proximity calibration and direct/TURN file-transfer tests with representative files below and near the 500 MB cap.
-6. Load-test signaling toward the documented 10,000-client target.
-7. Add stronger client identity authentication and shared state before horizontally scaling beyond one signaling instance.
-8. Keep the regenerated English and Japanese screenshot inventories and PDF guides aligned with the current app version.
+1. Run two-physical-device over-air proximity calibration with representative iPhones and Android devices; record emitted/listening/detected slot text, margin, bump, tilt, score, and false-positive/false-negative outcomes.
+2. Verify direct and TURN file-transfer behavior on physical devices with representative files below and near the 500 MB cap.
+3. Continue monitoring Japan East health, WSS, ICE, allowed origins, protected metrics access, TLS renewal, systemd restart behavior, and firewall rules on the live VM.
+4. Load-test signaling toward the documented 10,000-client target.
+5. Add stronger client identity authentication and shared state before horizontally scaling beyond one signaling instance.
+6. Keep the regenerated English and Japanese screenshot inventories and PDF guides aligned with the current app version.

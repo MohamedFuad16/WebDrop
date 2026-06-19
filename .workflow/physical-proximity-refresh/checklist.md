@@ -26,3 +26,4 @@
 - [x] Bind proximity telemetry to the nonce issued when the client joined.
 - [x] Require ultrasound, bump, tilt, valid timing, and score >=55 independently.
 - [x] Let a one-device session accept one slightly late partner before failing.
+- [x] Surface live acoustic slot diagnostics in the Dynamic Island for physical iPhone testing.

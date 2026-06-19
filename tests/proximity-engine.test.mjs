@@ -224,6 +224,7 @@ test("two devices emit and receive chirps in separate synchronized slots", async
 test("anonymous acoustic plans emit the assigned signature and report the strongest peer signature", async () => {
   const emittedBands = [];
   const detectedBands = [];
+  const progressEvents = [];
   const acoustic = {
     async emitChirp(options) {
       emittedBands.push([options.startFrequencyHz, options.endFrequencyHz]);
@@ -255,11 +256,60 @@ test("anonymous acoustic plans emit the assigned signature and report the strong
     acousticSignatureId: "self-signature",
     acousticOptions: { intervalMs: 500 },
     startAt: Date.now() + 5,
-    ceremonyDurationMs: 840
+    ceremonyDurationMs: 840,
+    onProgress(event) {
+      progressEvents.push(event);
+    }
   });
 
   assert.deepEqual(emittedBands, [[20050, 20280]]);
   assert.deepEqual(detectedBands, [[20350, 20580]]);
+  assert.deepEqual(
+    progressEvents
+      .filter((event) => event.phase === "audio" && event.acoustic?.mode)
+      .map((event) => ({
+        mode: event.acoustic?.mode,
+        slot: event.acoustic?.slot,
+        slotCount: event.acoustic?.slotCount,
+        startFrequencyHz: event.acoustic?.startFrequencyHz,
+        endFrequencyHz: event.acoustic?.endFrequencyHz,
+        marginDb: event.acoustic?.marginDb
+      })),
+    [
+      {
+        mode: "emit",
+        slot: 1,
+        slotCount: 2,
+        startFrequencyHz: 20050,
+        endFrequencyHz: 20280,
+        marginDb: undefined
+      },
+      {
+        mode: "emitted",
+        slot: 1,
+        slotCount: 2,
+        startFrequencyHz: 20050,
+        endFrequencyHz: 20280,
+        marginDb: undefined
+      },
+      {
+        mode: "listen",
+        slot: 2,
+        slotCount: 2,
+        startFrequencyHz: 20350,
+        endFrequencyHz: 20580,
+        marginDb: undefined
+      },
+      {
+        mode: "detected",
+        slot: 2,
+        slotCount: 2,
+        startFrequencyHz: 20350,
+        endFrequencyHz: 20580,
+        marginDb: 31
+      }
+    ]
+  );
   assert.equal(result.metrics.acousticSignatureId, "self-signature");
   assert.equal(result.metrics.heardAcousticSignatureId, "peer-signature");
   assert.equal(result.evidence.acoustic.detected, true);
