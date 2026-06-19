@@ -181,6 +181,11 @@ export class SignalingHub {
     };
     this.clients.set(client.id, client);
     this.socketToClient.set(socket, client);
+    this.metrics?.recordEvent("client:joined", {
+      clientId: client.id,
+      deviceName: client.deviceName,
+      deviceFamily: client.deviceFamily
+    });
     this.send(socket, "connected", {
       mode: "wss",
       id: client.id,
@@ -414,6 +419,7 @@ export class SignalingHub {
         clients: new Set(),
         nonces: new Map(),
         signatures: new Map(),
+        signatureDetails: new Map(),
         telemetry: new Map(),
         createdAt: now,
         expiresAt: now + SESSION_TTL_MS,
@@ -431,6 +437,11 @@ export class SignalingHub {
     }
     session.clients.add(sender.id);
     session.nonces.set(sender.id, message.payload.clientNonce);
+    this.metrics?.recordEvent("proximity:session:joined", {
+      sessionId: session.id,
+      clientId: sender.id,
+      participantCount: session.clients.size
+    });
     this.send(sender.socket, "proximity:session:joined", {
       sessionId: session.id,
       clientNonce: message.payload.clientNonce,
@@ -480,6 +491,10 @@ export class SignalingHub {
         endFrequencyHz
       };
       session.signatures.set(clientId, signature.id);
+      session.signatureDetails.set(clientId, {
+        slot: index + 1,
+        ...signature
+      });
       return signature;
     });
     let slot = 0;
@@ -497,6 +512,12 @@ export class SignalingHub {
       });
       slot += 1;
     }
+    this.metrics?.recordEvent("proximity:session:started", {
+      sessionId,
+      participantCount: session.clients.size,
+      startAt,
+      durationMs: SESSION_DURATION_MS
+    });
     session.failTimer = setTimeout(
       () => this.failUnmatchedProximitySession(sessionId),
       SESSION_START_DELAY_MS + SESSION_DURATION_MS + SESSION_MATCH_SLOP_MS
@@ -523,8 +544,19 @@ export class SignalingHub {
     session.telemetry.set(sender.id, {
       clientId: sender.id,
       analysis,
+      acoustic: acousticDiagnostics(message.payload.metrics),
       timing: message.payload.timing || {},
       receivedAt: Date.now()
+    });
+    this.metrics?.recordEvent("proximity:session:telemetry", {
+      sessionId,
+      clientId: sender.id,
+      score: analysis.score,
+      decision: analysis.decision,
+      acousticEmitted: Boolean(message.payload.metrics?.acousticEmitted),
+      acousticDetected: Boolean(message.payload.metrics?.acousticDetected),
+      acousticSlot: Number(message.payload.metrics?.acousticSlot || 0),
+      acousticMarginDb: Number(message.payload.metrics?.acousticMarginDb || 0)
     });
     this.tryMatchProximitySession(session);
   }
@@ -569,6 +601,12 @@ export class SignalingHub {
       peer: publicPeer(first),
       score: best.b.analysis.score
     });
+    this.metrics?.recordEvent("proximity:session:matched", {
+      sessionId: session.id,
+      pairingId,
+      clientIds: [first.id, second.id],
+      score: Math.min(best.a.analysis.score, best.b.analysis.score)
+    });
     this.broadcast("peers", this.peerList());
     if ([...session.clients].every((clientId) => session.matched.has(clientId))) {
       clearTimeout(session.timer);
@@ -590,6 +628,12 @@ export class SignalingHub {
         reason: "score_too_low",
         score: entry?.analysis?.score ?? null,
         analysis: entry?.analysis || null
+      });
+      this.metrics?.recordEvent("proximity:session:failed", {
+        sessionId,
+        clientId,
+        reason: "score_too_low",
+        score: entry?.analysis?.score ?? null
       });
     }
     clearTimeout(session.timer);
@@ -813,6 +857,57 @@ export class SignalingHub {
       .map(publicPeer);
   }
 
+  diagnosticsSnapshot() {
+    const now = Date.now();
+    return {
+      clients: [...this.clients.values()].map((client) => ({
+        id: client.id,
+        deviceName: client.deviceName,
+        deviceFamily: client.deviceFamily,
+        deviceLabel: client.deviceLabel,
+        joinedAt: client.joinedAt,
+        lastSeenMsAgo: Math.max(0, now - Number(client.lastSeenAt || now)),
+        pairingId: client.pairingId || null,
+        capabilities: {
+          microphone: Boolean(client.capabilities?.microphone),
+          motion: Boolean(client.capabilities?.motion),
+          webRtc: Boolean(client.capabilities?.webRtc),
+          admin: Boolean(client.capabilities?.admin)
+        }
+      })),
+      pairs: [...this.activePairs.entries()].map(([pairingId, pair]) => ({
+        pairingId,
+        clientIds: [...pair],
+        expiresInMs: Math.max(0, Number(pair.expiresAt || now) - now)
+      })),
+      proximitySessions: [...this.proximitySessions.values()].map((session) => ({
+        id: session.id,
+        phase: session.started ? "running" : "joining",
+        participantCount: session.clients.size,
+        createdAt: new Date(session.createdAt).toISOString(),
+        startAt: session.startAt || null,
+        endsAt: session.endsAt || null,
+        participants: [...session.clients].map((clientId) => {
+          const client = this.clients.get(clientId);
+          const telemetry = session.telemetry.get(clientId);
+          return {
+            clientId,
+            deviceName: client?.deviceName || clientId,
+            signature: session.signatureDetails?.get(clientId) || null,
+            telemetry: telemetry ? {
+              receivedAt: new Date(telemetry.receivedAt).toISOString(),
+              score: telemetry.analysis?.score ?? null,
+              decision: telemetry.analysis?.decision || null,
+              physicalEvidence: telemetry.analysis?.physicalEvidence || null,
+              acoustic: telemetry.acoustic || null,
+              timing: { ...telemetry.timing }
+            } : null
+          };
+        })
+      }))
+    };
+  }
+
   broadcast(type, payload, { exceptId } = {}) {
     for (const client of this.clients.values()) {
       if (client.id !== exceptId) this.send(client.socket, type, payload);
@@ -828,6 +923,11 @@ export class SignalingHub {
     }
     this.clients.delete(client.id);
     this.socketToClient.delete(socket);
+    this.metrics?.recordEvent("client:left", {
+      clientId: client.id,
+      deviceName: client.deviceName,
+      reason
+    });
     this.logger?.info("Client left signaling.", { id: client.id, reason });
     for (const [sessionId, session] of this.proximitySessions) {
       if (!session.clients.delete(client.id)) continue;
@@ -1000,4 +1100,24 @@ function metricValue(value) {
   if (typeof value === "boolean") return value ? 1 : 0;
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : 0;
+}
+
+function acousticDiagnostics(metrics = {}) {
+  return {
+    emitted: Boolean(metrics.acousticEmitted),
+    detected: Boolean(metrics.acousticDetected),
+    mode: metrics.acousticMode || null,
+    slot: Number(metrics.acousticSlot || 0),
+    slotCount: Number(metrics.acousticSlotCount || 0),
+    startFrequencyHz: finiteOrNull(metrics.acousticStartFrequencyHz),
+    endFrequencyHz: finiteOrNull(metrics.acousticEndFrequencyHz),
+    marginDb: finiteOrNull(metrics.acousticMarginDb),
+    sampleRate: finiteOrNull(metrics.acousticSampleRate),
+    reason: metrics.acousticReason || null
+  };
+}
+
+function finiteOrNull(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }

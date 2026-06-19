@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateServerEnvironment } from "../src/server.js";
+import { createWebDropServer, validateServerEnvironment } from "../src/server.js";
 
 const productionEnv = {
   NODE_ENV: "production",
@@ -51,4 +51,38 @@ test("enabled metrics require a non-placeholder token", () => {
     }),
     /non-placeholder METRICS_API_TOKEN/
   );
+});
+
+test("diagnostics snapshot requires metrics authorization", async () => {
+  const { server, hub } = createWebDropServer({
+    env: {
+      NODE_ENV: "test",
+      ENABLE_METRICS_ENDPOINT: "true",
+      METRICS_API_TOKEN: "test-observability-token",
+      REQUIRE_TURN_AUTH: "false"
+    },
+    logger: { info() {}, warn() {}, error() {} }
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const base = `http://127.0.0.1:${address.port}`;
+  try {
+    const unauthorized = await fetch(`${base}/api/diagnostics-snapshot`);
+    assert.equal(unauthorized.status, 401);
+
+    const authorized = await fetch(`${base}/api/diagnostics-snapshot`, {
+      headers: { Authorization: "Bearer test-observability-token" }
+    });
+    assert.equal(authorized.status, 200);
+    const body = await authorized.json();
+    assert.deepEqual(body.signaling, {
+      clients: [],
+      pairs: [],
+      proximitySessions: []
+    });
+    assert.ok(Array.isArray(body.metrics.recentEvents));
+  } finally {
+    hub.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
 });

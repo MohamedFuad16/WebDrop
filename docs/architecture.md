@@ -5,10 +5,12 @@
 This checkout now contains a first-run static, modular WebDrop v2 app plus architecture notes.
 
 - `index.html` is the active static app shell.
-- The current app/package/service-worker version is `1.0.57`.
+- The current app/package/service-worker version is `1.0.58`.
 - The earlier `proximity_architecture_monkeytype_v2.html` page was removed during the corrected rebuild.
 - `docs/implementation-checklist.md` is the current production-readiness source of truth.
 - `js/` contains the app state machine, controller, adapters, proximity, transport, transfer, storage client, and UI renderer.
+- `js/admin/` contains the readiness console and the dedicated diagnostics modules for protected server snapshots and local acoustic testing.
+- `admin/diagnostics.html` is the operational view for signaling clients, active pairs, proximity sessions, bounded acoustic telemetry, and same-browser chirp checks.
 - `js/storage/storage-client.js` contains the active receive-side storage ladder: deferred IndexedDB chunks with StreamSaver export on Download, iPhone/iPad Blob fallback, direct-stream compatibility fallback, and a 500 MB receive-session cap.
 - `azure cloud server/` contains the deployable signaling backend package for WSS metadata, QR token issuance, TURN credential proxying, and enforcement policy.
 - `graphify-out/` exists, but the current index may be stale or unrelated. Follow `AGENTS.md`: try graph traversal first, record stale results when encountered, then keep any direct reads scoped to the task.
@@ -53,6 +55,11 @@ The WebSocket lane owns:
 - TURN credential minting policy, if needed.
 
 It must reject binary payloads, cap message sizes, validate origin/session tokens, and rate-limit pairing attempts.
+
+The protected `/api/diagnostics-snapshot` endpoint is metadata-only and requires
+the same metrics bearer token as `/api/metrics-summary`. It exposes bounded
+client/session state and recent event summaries, never TURN credentials, QR
+tokens, raw microphone samples, or transferred file bytes.
 
 ### Data lane
 

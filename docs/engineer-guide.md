@@ -17,9 +17,11 @@ The deployed site at `https://web-drop-lyart.vercel.app/` may be used as a produ
 As of this pass:
 
 - The active local runnable artifact is `index.html`.
-- The visible app/package/service-worker version is `1.0.57`.
+- The visible app/package/service-worker version is `1.0.58`.
 - The old architecture HTML page was deleted during the corrected rebuild.
 - `js/app.js` boots the modular static app.
+- `js/admin/readiness.js` boots the production-readiness console.
+- `js/admin/diagnostics.js`, `diagnostics-api.js`, and `acoustic-lab.js` own the live diagnostics page without coupling it to the main app controller.
 - `js/core/controller.js` owns the state transitions that gate file controls.
 - `js/storage/storage-client.js` owns deferred IndexedDB receive chunks, byte-count checks, StreamSaver export on Save, iPhone/iPad Blob fallback, cleanup, and the 500 MB receive-session cap.
 - `azure cloud server/` owns the deployable signaling backend package; it coordinates metadata only and must not carry file bytes.
@@ -102,3 +104,4 @@ For future runtime edits, verify:
 - Configure long-lived Cloudflare TURN credentials only in the Azure VM environment file.
 - Run physical iOS/Android calibration before enabling proximity enforcement server-side.
 - Keep any WebSocket message additions schema-validated and metadata-only.
+- Keep `/api/diagnostics-snapshot` behind `METRICS_API_TOKEN`; the browser acoustic lab must never upload raw microphone audio.

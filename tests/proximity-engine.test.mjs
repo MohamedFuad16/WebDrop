@@ -164,6 +164,63 @@ test("inaudible ultrasound band detection tolerates phone speaker distortion", (
   assert.ok(evidence.confidence > 0.5);
 });
 
+test("diagnostics sample the live ultrasonic band without releasing the warm microphone", async () => {
+  const sampleRate = 48_000;
+  const stream = {
+    active: true,
+    getAudioTracks() {
+      return [{}];
+    }
+  };
+  const analyser = {
+    fftSize: 4096,
+    smoothingTimeConstant: 0,
+    get frequencyBinCount() {
+      return this.fftSize / 2;
+    },
+    getFloatFrequencyData(values) {
+      values.fill(-94);
+      const hzPerBin = sampleRate / this.fftSize;
+      for (let frequency = DEFAULT_CHIRP.startFrequencyHz; frequency <= DEFAULT_CHIRP.endFrequencyHz; frequency += hzPerBin) {
+        values[Math.round(frequency / hzPerBin)] = -48;
+      }
+    },
+    disconnect() {}
+  };
+  const context = {
+    state: "running",
+    sampleRate,
+    createMediaStreamSource() {
+      return { connect() {}, disconnect() {} };
+    },
+    createAnalyser() {
+      return analyser;
+    }
+  };
+  const sensor = new AcousticProximitySensor({
+    audioContextFactory: () => context,
+    mediaDevices: {
+      async getUserMedia() {
+        return stream;
+      }
+    }
+  });
+
+  await sensor.requestMicrophonePermission();
+  const sample = await sensor.sampleFrequencyBand(DEFAULT_CHIRP);
+
+  assert.equal(sample.available, true);
+  assert.equal(sample.detected, true);
+  assert.equal(sample.sampleRate, sampleRate);
+  assert.ok(sample.marginDb > 30);
+  assert.deepEqual(sensor.getStatus(), {
+    streamActive: true,
+    contextState: "running",
+    sampleRate,
+    inputTracks: 1
+  });
+});
+
 test("chirp emission refuses sample rates that would fold into audible frequencies", () => {
   assert.equal(supportsInaudibleChirp(48_000), true);
   assert.equal(supportsInaudibleChirp(44_100), false);

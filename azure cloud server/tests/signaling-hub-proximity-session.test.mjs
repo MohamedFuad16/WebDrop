@@ -167,6 +167,51 @@ test("a one-client session extends once and accepts a slightly late partner", ()
   hub.close();
 });
 
+test("diagnostics snapshot exposes safe live proximity and acoustic state", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  const session = createSession(hub, [clientA, clientB]);
+  session.signatureDetails = new Map([
+    [clientA.id, { id: "signature-0", slot: 1, startFrequencyHz: 20050, endFrequencyHz: 20280 }],
+    [clientB.id, { id: "signature-1", slot: 2, startFrequencyHz: 20350, endFrequencyHz: 20580 }]
+  ]);
+  const message = sessionMessage(session, clientA, verifiedMetrics(), 1000, clientB);
+  Object.assign(message.payload.metrics, {
+    acousticEmitted: true,
+    acousticDetected: true,
+    acousticMode: "detected",
+    acousticSlot: 2,
+    acousticSlotCount: 2,
+    acousticStartFrequencyHz: 20350,
+    acousticEndFrequencyHz: 20580,
+    acousticMarginDb: 24,
+    acousticSampleRate: 48000
+  });
+
+  hub.recordProximitySessionTelemetry(clientA, message);
+  const snapshot = hub.diagnosticsSnapshot();
+
+  assert.equal(snapshot.clients.length, 2);
+  assert.equal(snapshot.proximitySessions.length, 1);
+  assert.equal(snapshot.proximitySessions[0].participants[0].signature.slot, 1);
+  assert.deepEqual(snapshot.proximitySessions[0].participants[0].telemetry.acoustic, {
+    emitted: true,
+    detected: true,
+    mode: "detected",
+    slot: 2,
+    slotCount: 2,
+    startFrequencyHz: 20350,
+    endFrequencyHz: 20580,
+    marginDb: 24,
+    sampleRate: 48000,
+    reason: null
+  });
+  assert.equal("turnAccessToken" in snapshot.clients[0], false);
+
+  hub.close();
+});
+
 function createTestHub() {
   return new SignalingHub({
     server: { on() {} },

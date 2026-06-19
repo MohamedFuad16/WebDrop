@@ -136,6 +136,29 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
         return;
       }
 
+      if (request.method === "GET" && url.pathname === "/api/diagnostics-snapshot" && env.ENABLE_METRICS_ENDPOINT === "true") {
+        if (!hasMetricsAuthorization(request, env.METRICS_API_TOKEN)) {
+          sendJson(response, 401, { error: "unauthorized" }, corsHeaders || {});
+          return;
+        }
+        sendJson(response, 200, {
+          generatedAt: new Date().toISOString(),
+          metrics: metrics.summary({
+            activeClients: hub?.clients.size || 0,
+            activePairs: hub?.activePairs.size || 0
+          }),
+          signaling: hub?.diagnosticsSnapshot?.() || {
+            clients: [],
+            pairs: [],
+            proximitySessions: []
+          }
+        }, {
+          "Cache-Control": "no-store",
+          ...(corsHeaders || {})
+        });
+        return;
+      }
+
       sendJson(response, 404, {
         error: "not_found"
       }, url.pathname.startsWith("/api/") ? corsHeaders || {} : {});

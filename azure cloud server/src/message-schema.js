@@ -376,7 +376,17 @@ function validateProximityMetrics(metrics) {
     tokenFresh: Boolean(metrics.tokenFresh),
     lowRttHint: Boolean(metrics.lowRttHint),
     acousticSignatureId: cleanString(metrics.acousticSignatureId, 80) || null,
-    heardAcousticSignatureId: cleanString(metrics.heardAcousticSignatureId, 80) || null
+    heardAcousticSignatureId: cleanString(metrics.heardAcousticSignatureId, 80) || null,
+    acousticEmitted: Boolean(metrics.acousticEmitted),
+    acousticDetected: Boolean(metrics.acousticDetected ?? metrics.acoustic),
+    acousticMode: cleanString(metrics.acousticMode, 24) || null,
+    acousticSlot: safeInteger(metrics.acousticSlot, 0),
+    acousticSlotCount: safeInteger(metrics.acousticSlotCount, 0),
+    acousticStartFrequencyHz: safeNumber(metrics.acousticStartFrequencyHz),
+    acousticEndFrequencyHz: safeNumber(metrics.acousticEndFrequencyHz),
+    acousticMarginDb: safeNumber(metrics.acousticMarginDb),
+    acousticSampleRate: safeNumber(metrics.acousticSampleRate),
+    acousticReason: cleanString(metrics.acousticReason, 100) || null
   };
 }
 

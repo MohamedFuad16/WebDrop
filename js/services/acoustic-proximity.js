@@ -183,6 +183,44 @@ export class AcousticProximitySensor {
     return { detected: false, ...best, threshold, reason: "timeout" };
   }
 
+  async sampleFrequencyBand(options = {}) {
+    if (!this.stream?.active) {
+      return { available: false, reason: "microphone-not-granted" };
+    }
+    const contextResult = await this.#getContextResult();
+    if (!contextResult.context) {
+      return {
+        available: false,
+        reason: contextResult.reason,
+        error: contextResult.error
+      };
+    }
+    const context = contextResult.context;
+    this.#ensureAnalyser(context);
+    this.analyser.fftSize = 4096;
+    const frequencies = new Float32Array(this.analyser.frequencyBinCount);
+    this.analyser.getFloatFrequencyData(frequencies);
+    return {
+      available: true,
+      sampleRate: context.sampleRate,
+      contextState: context.state,
+      ...analyzeFrequencyBand(frequencies, {
+        sampleRate: context.sampleRate,
+        fftSize: this.analyser.fftSize,
+        ...options
+      })
+    };
+  }
+
+  getStatus() {
+    return {
+      streamActive: Boolean(this.stream?.active),
+      contextState: this.context?.state || "uninitialized",
+      sampleRate: this.context?.sampleRate || null,
+      inputTracks: this.stream?.getAudioTracks?.().length || 0
+    };
+  }
+
   stopCapture({ releaseStream = false } = {}) {
     this.source?.disconnect();
     this.analyser?.disconnect();

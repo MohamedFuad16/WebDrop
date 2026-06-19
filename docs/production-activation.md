@@ -18,6 +18,14 @@ Use [deployment-sizing.md](deployment-sizing.md) before selecting an Azure VM si
 
 ## Frontend configuration
 
+## Diagnostics
+
+- Enable `ENABLE_METRICS_ENDPOINT=true` on the signaling server.
+- Set a strong, non-placeholder `METRICS_API_TOKEN`.
+- Open `/admin/diagnostics.html`, enter the signaling HTTP base and metrics token, and keep the token browser-session-only.
+- The page can verify `/readyz` without a token. Device, pairing, proximity-session, event, and acoustic telemetry requires the protected diagnostics endpoint.
+- The local ultrasonic lab uses the production chirp implementation and never uploads raw microphone samples.
+
 Edit only `js/config/runtime-config.js`:
 
 ```js
@@ -73,7 +81,7 @@ Real-device acoustic thresholds and timing may require tuning after measurements
 
 ## Verified on June 19, 2026
 
-- Pre-patch production Vercel served app version `1.0.50`; this changeset advances the app/cache key to `1.0.57` for deployment verification.
+- Pre-patch production Vercel served app version `1.0.50`; this changeset advances the app/cache key to `1.0.58` for deployment verification.
 - Japan East `/readyz` reported production healthy with `proximityAnalysisEnabled:true`.
 - Azure `signaling-hub.js` matched the local source hash.
 - Public WSS assigned unique anonymous acoustic signatures for four clients and matched only reciprocal pairs.

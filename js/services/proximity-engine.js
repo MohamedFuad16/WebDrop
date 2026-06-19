@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.57";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.57";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.57";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.58";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.58";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.58";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 const ACOUSTIC_SLOT_GUARD_MS = 80;
@@ -126,6 +126,16 @@ export class ProximityEngine {
       acousticCorrelation: acousticResult.correlation || 0,
       acousticSignatureId: acousticResult.ownSignatureId || null,
       heardAcousticSignatureId: acousticResult.heardSignatureId || null,
+      acousticEmitted: Boolean(acousticResult.emitted),
+      acousticDetected: Boolean(acousticResult.detected),
+      acousticMode: acousticResult.mode || null,
+      acousticSlot: acousticResult.slot || 0,
+      acousticSlotCount: acousticResult.slotCount || 0,
+      acousticStartFrequencyHz: acousticResult.startFrequencyHz || null,
+      acousticEndFrequencyHz: acousticResult.endFrequencyHz || null,
+      acousticMarginDb: acousticResult.marginDb || 0,
+      acousticSampleRate: acousticResult.sampleRate || null,
+      acousticReason: acousticResult.reason || null,
       motionCorrelation: motion.bump && motion.tilted ? 1 : motion.samples > 0 ? 0.4 : 0,
       tilt: motion.tilted,
       bump: motion.bump,

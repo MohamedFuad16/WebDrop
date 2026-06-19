@@ -70,3 +70,7 @@
 - Focused checks passed: `npm run check`, `node --test tests/proximity-engine.test.mjs`, WebKit E2E for received-file new-tab behavior, WebKit transfer-progress E2E, and Chromium transfer-progress E2E.
 - The failed island now exposes translated `Retry` and `Use QR instead` actions; the below-55 E2E keeps the island open for 50 seconds and proves QR remains hidden until explicitly tapped.
 - Anonymous acoustic sessions now add a short late-listen grace pass after the scheduled slots; unit coverage proves a peer signature missed in the normal slot can still be detected before scoring fails.
+- Release `1.0.58` adds `/admin/diagnostics.html`, a protected signaling snapshot endpoint, bounded connection-event history, live proximity/acoustic telemetry, and a local production-chirp microphone lab.
+- `npm run verify:full` passed on `1.0.58`: 19 frontend/unit tests, 24 signaling-server tests, secret audits, package audits, and diff validation.
+- `npm run test:e2e` passed on `1.0.58`: 54 passed and 50 expected project skips, including the diagnostics dashboard, Web Audio loopback, WebKit receive/new-tab behavior, live TURN relay, and live signaling.
+- In-app browser QA passed at desktop and 393px mobile widths with no console errors or horizontal page overflow; the protected-endpoint error is inline and does not cover the acoustic controls.
