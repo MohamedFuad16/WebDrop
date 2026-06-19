@@ -221,6 +221,50 @@ test("two devices emit and receive chirps in separate synchronized slots", async
   assert.ok(medium.detections.has("detect-device<-emit-device"));
 });
 
+test("anonymous acoustic plans emit the assigned signature and report the strongest peer signature", async () => {
+  const emittedBands = [];
+  const detectedBands = [];
+  const acoustic = {
+    async emitChirp(options) {
+      emittedBands.push([options.startFrequencyHz, options.endFrequencyHz]);
+      return { emitted: true };
+    },
+    async detectChirp(options) {
+      detectedBands.push([options.startFrequencyHz, options.endFrequencyHz]);
+      return {
+        detected: true,
+        correlation: 0.84,
+        band: { marginDb: 31 }
+      };
+    }
+  };
+  const motion = {
+    getSnapshot() {
+      return { bump: true, tilted: true, samples: 4 };
+    },
+    stopCapture() {}
+  };
+  const engine = new ProximityEngine({ enabled: true, acoustic, motion });
+  const plan = [
+    { id: "self-signature", startFrequencyHz: 20050, endFrequencyHz: 20280 },
+    { id: "peer-signature", startFrequencyHz: 20350, endFrequencyHz: 20580 }
+  ];
+
+  const result = await engine.runRealCeremony({
+    acousticPlan: plan,
+    acousticSignatureId: "self-signature",
+    acousticOptions: { intervalMs: 500 },
+    startAt: Date.now() + 5,
+    ceremonyDurationMs: 840
+  });
+
+  assert.deepEqual(emittedBands, [[20050, 20280]]);
+  assert.deepEqual(detectedBands, [[20350, 20580]]);
+  assert.equal(result.metrics.acousticSignatureId, "self-signature");
+  assert.equal(result.metrics.heardAcousticSignatureId, "peer-signature");
+  assert.equal(result.evidence.acoustic.detected, true);
+});
+
 function createVirtualAcousticMedium() {
   const pulses = new Map();
   const detections = new Set();

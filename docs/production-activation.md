@@ -1,6 +1,6 @@
 # Production Activation Guide
 
-WebDrop's production signaling and real transfer paths are enabled in the current static app configuration. Proximity ceremony and QR pairing remain disabled, so the default app does not request microphone, motion, or camera permission. Local QA can still select the mock adapter explicitly with `?runtime=mock`.
+WebDrop's production signaling, real transfer, proximity ceremony, and QR pairing paths are enabled in the current static app configuration. The default app requests microphone and motion only after the user taps Connect, and camera only after the user explicitly chooses Scan QR. Local QA can still select the mock adapter explicitly with `?runtime=mock`.
 
 ## Activation order
 
@@ -46,14 +46,15 @@ When enabled, a peer swipe triggers permission calls while the user gesture is s
 
 1. Request microphone and motion permission.
 2. Reset prior motion evidence and begin device-motion capture.
-3. Send `proximity:ready` to the signaling server.
-4. Receive the same future `proximity:start` timestamp.
-5. Exchange chirps in opposite time slots and measure real Web Audio correlation.
-   The shipped signature stays between 20.2 and 21.2 kHz; contexts that cannot
+3. Join a peerless proximity session using a one-time client nonce.
+4. Receive the same future ceremony timestamp plus an anonymous acoustic slot and signature.
+5. Emit the assigned signature in its slot and listen for every other anonymous signature.
+   The assigned bands stay between 20.05 and 21.2 kHz; contexts that cannot
    preserve that inaudible band must fail closed and offer QR.
 6. Capture actual bump and tilt evidence during the shared ceremony window.
-7. Stop motion capture and microphone tracks.
-8. Send normalized telemetry to the server.
+7. Stop motion and analyzer capture while keeping the granted microphone stream warm for retry.
+8. Send normalized telemetry, nonce, own signature, strongest heard signature, and timing to the server.
+9. Reveal peer identity only after reciprocal signatures, bump timing, and score are verified.
 
 With `ENABLE_PROXIMITY_ANALYSIS=true`, the server blocks RTC signaling, chat, path metrics, and transfer metadata until both peers receive a `verified` proximity decision. File bytes never pass through WebSocket.
 

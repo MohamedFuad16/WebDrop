@@ -22,3 +22,5 @@
 - [x] Center and standardize the Siri wave on Canvas2D across browsers.
 - [x] Place peer avatar centers on the visible SVG ring paths.
 - [x] Keep acoustic signatures above 20 kHz or refuse emission.
+- [x] Require reciprocal per-device acoustic signatures before multi-user matching.
+- [x] Bind proximity telemetry to the nonce issued when the client joined.

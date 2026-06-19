@@ -101,6 +101,10 @@ QR should remain the reliable fallback when microphone, motion, or audio playbac
 Acoustic verification uses a 20.2-21.2 kHz, 72ms signature with a 19.5 kHz
 high-pass filter. WebDrop refuses to emit when the active sample rate cannot
 keep the complete signature above 20 kHz, then relies on the explicit QR path.
+Anonymous sessions allocate up to four non-overlapping signatures between
+20.05 and 21.2 kHz. Each device emits only in its assigned slot, reports the
+strongest peer signature it heard, and the server pairs devices only when those
+reports are reciprocal and their bump timestamps are inside the match window.
 
 ### Dynamic Island ceremony
 

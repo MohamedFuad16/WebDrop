@@ -54,3 +54,22 @@ test("proximity sessions and peerless QR do not require a preselected target", (
   assert.equal(qrVerify.targetId, null);
   assert.equal(qrVerify.payload.token, "abc123");
 });
+
+test("proximity session telemetry preserves bounded reciprocal acoustic signatures", () => {
+  const telemetry = validateRoutedMessage({
+    type: "proximity:session:telemetry",
+    payload: {
+      sessionId: "session-a",
+      clientNonce: "nonce-a",
+      metrics: {
+        soundCorrelation: 0.84,
+        acousticSignatureId: "signature-self",
+        heardAcousticSignatureId: "signature-peer"
+      }
+    }
+  });
+
+  assert.equal(telemetry.payload.metrics.acousticSignatureId, "signature-self");
+  assert.equal(telemetry.payload.metrics.heardAcousticSignatureId, "signature-peer");
+  assert.equal(telemetry.payload.metrics.soundCorrelation, 0.84);
+});

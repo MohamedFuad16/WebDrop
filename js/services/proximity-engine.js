@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.48";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.48";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.48";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.49";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.49";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.49";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 
@@ -78,6 +78,8 @@ export class ProximityEngine {
   async runRealCeremony({
     acoustic = true,
     acousticRole = "detect",
+    acousticPlan = null,
+    acousticSignatureId = null,
     acousticOptions,
     startAt = Date.now(),
     ceremonyDurationMs = 3000,
@@ -93,11 +95,19 @@ export class ProximityEngine {
     await waitUntil(startAt);
     onProgress({ phase: "audio", state: acoustic ? "active" : "unavailable" });
     const acousticResult = acoustic
-      ? await exchangeChirps(this.acoustic, {
-        role: acousticRole,
-        options: acousticOptions,
-        durationMs: ceremonyDurationMs
-      })
+      ? acousticPlan?.length && acousticSignatureId
+        ? await exchangeSignatureChirps(this.acoustic, {
+          plan: acousticPlan,
+          ownSignatureId: acousticSignatureId,
+          options: acousticOptions,
+          startAt,
+          durationMs: ceremonyDurationMs
+        })
+        : await exchangeChirps(this.acoustic, {
+          role: acousticRole,
+          options: acousticOptions,
+          durationMs: ceremonyDurationMs
+        })
       : { detected: false, reason: "skipped" };
     const motion = this.motion.getSnapshot();
     onProgress({ phase: "audio", state: acousticResult.detected ? "complete" : "failed", acoustic: acousticResult });
@@ -110,6 +120,8 @@ export class ProximityEngine {
       acoustic: acousticResult.detected,
       soundCorrelation: acousticResult.detected ? 1 : 0,
       acousticCorrelation: acousticResult.correlation || 0,
+      acousticSignatureId: acousticResult.ownSignatureId || null,
+      heardAcousticSignatureId: acousticResult.heardSignatureId || null,
       motionCorrelation: motion.bump && motion.tilted ? 1 : motion.samples > 0 ? 0.4 : 0,
       tilt: motion.tilted,
       bump: motion.bump,
@@ -150,6 +162,69 @@ export class ProximityEngine {
     this.motion.stopCapture();
     await this.acoustic.close();
   }
+}
+
+async function exchangeSignatureChirps(acoustic, {
+  plan,
+  ownSignatureId,
+  options = {},
+  startAt,
+  durationMs = 3600
+}) {
+  const signatures = normalizeAcousticPlan(plan);
+  const slotDurationMs = Math.max(420, Math.floor(durationMs / Math.max(1, signatures.length)));
+  const detections = [];
+  let emittedCount = 0;
+
+  for (let index = 0; index < signatures.length; index += 1) {
+    const signature = signatures[index];
+    await waitUntil(Number(startAt) + index * slotDurationMs);
+    const signatureOptions = {
+      ...options,
+      startFrequencyHz: signature.startFrequencyHz,
+      endFrequencyHz: signature.endFrequencyHz
+    };
+    if (signature.id === ownSignatureId) {
+      const emitted = await emitChirpSequence(acoustic, signatureOptions, slotDurationMs - 80);
+      emittedCount += emitted.emittedCount || 0;
+      continue;
+    }
+    const detected = await acoustic.detectChirp({
+      ...signatureOptions,
+      timeoutMs: slotDurationMs - 80
+    });
+    if (detected.detected) {
+      detections.push({
+        signatureId: signature.id,
+        correlation: detected.correlation || 0,
+        marginDb: detected.band?.marginDb || 0
+      });
+    }
+  }
+
+  detections.sort((a, b) => b.marginDb - a.marginDb || b.correlation - a.correlation);
+  const strongest = detections[0] || null;
+  return {
+    emitted: emittedCount > 0,
+    emittedCount,
+    detected: Boolean(strongest),
+    correlation: strongest?.correlation || 0,
+    ownSignatureId,
+    heardSignatureId: strongest?.signatureId || null,
+    detections
+  };
+}
+
+function normalizeAcousticPlan(plan) {
+  return (Array.isArray(plan) ? plan : []).map((entry) => ({
+    id: String(entry?.id || "").slice(0, 80),
+    startFrequencyHz: Number(entry?.startFrequencyHz),
+    endFrequencyHz: Number(entry?.endFrequencyHz)
+  })).filter((entry) => entry.id
+    && Number.isFinite(entry.startFrequencyHz)
+    && Number.isFinite(entry.endFrequencyHz)
+    && entry.startFrequencyHz >= 20_000
+    && entry.endFrequencyHz > entry.startFrequencyHz);
 }
 
 async function exchangeChirps(acoustic, { role, options = {}, durationMs = 3000 }) {

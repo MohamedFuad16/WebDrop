@@ -374,7 +374,9 @@ function validateProximityMetrics(metrics) {
     tiltMatch: scoreMetric(metrics.tiltMatch ?? metrics.tilt),
     qrMatch: scoreMetric(metrics.qrMatch ?? metrics.qrFallback),
     tokenFresh: Boolean(metrics.tokenFresh),
-    lowRttHint: Boolean(metrics.lowRttHint)
+    lowRttHint: Boolean(metrics.lowRttHint),
+    acousticSignatureId: cleanString(metrics.acousticSignatureId, 80) || null,
+    heardAcousticSignatureId: cleanString(metrics.heardAcousticSignatureId, 80) || null
   };
 }
 

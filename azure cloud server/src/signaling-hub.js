@@ -33,6 +33,13 @@ const SESSION_DURATION_MS = 3600;
 const SESSION_TTL_MS = 15000;
 const SESSION_MATCH_SLOP_MS = 900;
 const SESSION_SCORE_MINIMUM = 0.55;
+const MAX_PROXIMITY_SESSION_CLIENTS = 4;
+const ACOUSTIC_SIGNATURE_BANDS = Object.freeze([
+  [20050, 20280],
+  [20350, 20580],
+  [20650, 20880],
+  [20950, 21200]
+]);
 
 export class SignalingHub {
   constructor({ server, path = "/ws", logger, maxJsonBytes = 131072, heartbeatIntervalMs = 25000, sessionTtlMs = 900000, pairingTtlMs = 120000, proximityAnalyzer, qrTokenProvider, metrics } = {}) {
@@ -401,11 +408,12 @@ export class SignalingHub {
     }
     const now = Date.now();
     let session = this.openProximitySessionId ? this.proximitySessions.get(this.openProximitySessionId) : null;
-    if (!session || session.started || session.expiresAt <= now) {
+    if (!session || session.started || session.expiresAt <= now || session.clients.size >= MAX_PROXIMITY_SESSION_CLIENTS) {
       session = {
         id: `prox-${randomUUID()}`,
         clients: new Set(),
         nonces: new Map(),
+        signatures: new Map(),
         telemetry: new Map(),
         createdAt: now,
         expiresAt: now + SESSION_TTL_MS,
@@ -428,9 +436,9 @@ export class SignalingHub {
       joinUntil: session.joinUntil,
       participantCount: session.clients.size
     });
-    if (session.clients.size >= 2 && !session.started && Date.now() >= session.createdAt + 250) {
+    if (session.clients.size >= MAX_PROXIMITY_SESSION_CLIENTS && !session.started) {
       clearTimeout(session.timer);
-      session.timer = setTimeout(() => this.startProximitySession(session.id), 250);
+      session.timer = setTimeout(() => this.startProximitySession(session.id), 100);
       session.timer.unref?.();
     }
   }
@@ -449,6 +457,16 @@ export class SignalingHub {
       return;
     }
     const startAt = Date.now() + SESSION_START_DELAY_MS;
+    const acousticPlan = [...session.clients].map((clientId, index) => {
+      const [startFrequencyHz, endFrequencyHz] = ACOUSTIC_SIGNATURE_BANDS[index];
+      const signature = {
+        id: `sig-${randomUUID()}`,
+        startFrequencyHz,
+        endFrequencyHz
+      };
+      session.signatures.set(clientId, signature.id);
+      return signature;
+    });
     let slot = 0;
     for (const clientId of session.clients) {
       const client = this.clients.get(clientId);
@@ -457,9 +475,12 @@ export class SignalingHub {
         sessionId,
         startAt,
         durationMs: SESSION_DURATION_MS,
-        acousticSlot: slot++,
+        acousticSlot: slot,
+        acousticSignatureId: acousticPlan[slot]?.id,
+        acousticPlan,
         participantCount: session.clients.size
       });
+      slot += 1;
     }
     session.failTimer = setTimeout(
       () => this.failUnmatchedProximitySession(sessionId),
@@ -473,6 +494,10 @@ export class SignalingHub {
     const session = this.proximitySessions.get(sessionId);
     if (!session || !session.clients.has(sender.id) || session.expiresAt <= Date.now()) {
       this.send(sender.socket, "proximity:session:failed", { sessionId, reason: "session_not_available" });
+      return;
+    }
+    if (!message.payload.clientNonce || session.nonces.get(sender.id) !== message.payload.clientNonce) {
+      this.send(sender.socket, "proximity:session:failed", { sessionId, reason: "session_nonce_mismatch" });
       return;
     }
     const analysis = sessionAnalysis(this.proximityAnalyzer, message.payload.metrics || {});
@@ -495,7 +520,7 @@ export class SignalingHub {
         const a = candidates[i];
         const b = candidates[j];
         const delta = Math.abs(Number(a.timing?.bumpAt || a.receivedAt) - Number(b.timing?.bumpAt || b.receivedAt));
-        if (delta > SESSION_MATCH_SLOP_MS) continue;
+        if (delta > SESSION_MATCH_SLOP_MS || !hasReciprocalAcousticEvidence(session, a, b)) continue;
         if (!best || delta < best.delta) best = { a, b, delta };
       }
     }
@@ -889,8 +914,20 @@ function sessionAnalysis(analyzer, metrics = {}) {
   const score = Number(analyzed?.score || 0);
   return {
     ...analyzed,
+    acousticSignatureId: metrics.acousticSignatureId || null,
+    heardAcousticSignatureId: metrics.heardAcousticSignatureId || null,
     decision: score >= SESSION_SCORE_MINIMUM ? "verified" : (analyzed?.decision || "insufficient")
   };
+}
+
+function hasReciprocalAcousticEvidence(session, first, second) {
+  const firstSignature = session.signatures?.get(first.clientId);
+  const secondSignature = session.signatures?.get(second.clientId);
+  return Boolean(firstSignature && secondSignature
+    && first.analysis?.acousticSignatureId === firstSignature
+    && second.analysis?.acousticSignatureId === secondSignature
+    && first.analysis?.heardAcousticSignatureId === secondSignature
+    && second.analysis?.heardAcousticSignatureId === firstSignature);
 }
 
 function fallbackSessionAnalysis(metrics = {}) {

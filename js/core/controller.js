@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.48";
+import { formatBytes } from "../utils/format.js?v=1.0.49";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -734,6 +734,10 @@ export function createController({
             method: "mock-physical-session",
             acoustic: true,
             soundCorrelation: 1,
+            acousticSignatureId: startPayload.acousticSignatureId || null,
+            heardAcousticSignatureId: startPayload.acousticPlan?.find(
+              (signature) => signature.id !== startPayload.acousticSignatureId
+            )?.id || null,
             motionCorrelation: 1,
             bump: true,
             tilt: true,
@@ -1280,6 +1284,8 @@ export function createController({
       const result = await proximity.runRealCeremony({
         acoustic: microphonePermission.granted && audioOutputPermission.granted,
         acousticRole: Number(startPayload.acousticSlot || 0) % 2 === 0 ? "emit" : "detect",
+        acousticPlan: startPayload.acousticPlan,
+        acousticSignatureId: startPayload.acousticSignatureId,
         startAt: startPayload.startAt,
         ceremonyDurationMs: startPayload.durationMs,
         tokenFresh: Boolean(startPayload.sessionId),

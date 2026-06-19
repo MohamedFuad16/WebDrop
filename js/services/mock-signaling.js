@@ -1,5 +1,5 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.48";
-import { AVATAR_OPTIONS } from "../config/avatar-options.js?v=1.0.48";
+import { Emitter } from "../utils/emitter.js?v=1.0.49";
+import { AVATAR_OPTIONS } from "../config/avatar-options.js?v=1.0.49";
 
 const MOCK_PEERS = [
   { id: "peer-aki", name: "Aki iPhone", avatar: AVATAR_OPTIONS[1], ringIndex: 0, angle: -52, deviceFamily: "ios", deviceLabel: "iPhone 15 Pro", distanceBucket: "immediate", proximityScore: 54, connectedBefore: true, capabilities: { platform: { family: "ios", isIOS: true, isIPhone: true, dynamicIslandCapable: true } } },
@@ -74,11 +74,17 @@ export class MockSignalingAdapter extends Emitter {
         joinUntil: Date.now() + 1200
       });
       setTimeout(() => {
+        const acousticPlan = [
+          { id: "mock-self", startFrequencyHz: 20050, endFrequencyHz: 20280 },
+          { id: "mock-peer", startFrequencyHz: 20350, endFrequencyHz: 20580 }
+        ];
         this.emit("proximity:session:start", {
           sessionId,
           startAt: Date.now() + 700,
           durationMs: 2600,
           acousticSlot: 0,
+          acousticSignatureId: acousticPlan[0].id,
+          acousticPlan,
           participantCount: 2
         });
       }, 0);

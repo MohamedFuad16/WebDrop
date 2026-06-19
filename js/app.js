@@ -1,16 +1,16 @@
-import { createStore } from "./core/state.js?v=1.0.48";
-import { createController } from "./core/controller.js?v=1.0.48";
-import { detectCapabilities } from "./services/capabilities.js?v=1.0.48";
-import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.48";
-import { WebSocketSignalingAdapter } from "./services/websocket-signaling.js?v=1.0.48";
-import { TurnConfigProvider } from "./services/turn-config.js?v=1.0.48";
-import { ProximityEngine } from "./services/proximity-engine.js?v=1.0.48";
-import { WebRtcTransport } from "./services/webrtc-transport.js?v=1.0.48";
-import { TransferEngine } from "./services/transfer-engine.js?v=1.0.48";
-import { StorageClient } from "./storage/storage-client.js?v=1.0.48";
-import { AppView } from "./ui/app-view.js?v=1.0.48";
-import { randomAvatarChoice, normalizeAvatarChoice } from "./config/avatar-options.js?v=1.0.48";
-import { getRuntimeFlags } from "./config/runtime-flags.js?v=1.0.48";
+import { createStore } from "./core/state.js?v=1.0.49";
+import { createController } from "./core/controller.js?v=1.0.49";
+import { detectCapabilities } from "./services/capabilities.js?v=1.0.49";
+import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.49";
+import { WebSocketSignalingAdapter } from "./services/websocket-signaling.js?v=1.0.49";
+import { TurnConfigProvider } from "./services/turn-config.js?v=1.0.49";
+import { ProximityEngine } from "./services/proximity-engine.js?v=1.0.49";
+import { WebRtcTransport } from "./services/webrtc-transport.js?v=1.0.49";
+import { TransferEngine } from "./services/transfer-engine.js?v=1.0.49";
+import { StorageClient } from "./storage/storage-client.js?v=1.0.49";
+import { AppView } from "./ui/app-view.js?v=1.0.49";
+import { randomAvatarChoice, normalizeAvatarChoice } from "./config/avatar-options.js?v=1.0.49";
+import { getRuntimeFlags } from "./config/runtime-flags.js?v=1.0.49";
 
 function browserLocale() {
   const storedLocale = localStorage.getItem("webdrop.locale");

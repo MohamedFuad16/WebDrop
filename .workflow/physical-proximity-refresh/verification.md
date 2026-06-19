@@ -3,9 +3,9 @@
 ## Completed
 
 - `npm run check` passed.
-- `npm test` passed: 15 tests.
+- `npm test` passed: 16 tests.
 - `npm --prefix "azure cloud server" run check` passed.
-- `npm --prefix "azure cloud server" test` passed: 14 tests.
+- `npm --prefix "azure cloud server" test` passed: 18 tests.
 - `npm run test:e2e` passed: 52 passed, 44 expected project skips.
 - `npm run verify:full` passed, including audits and `git diff --check`.
 - Bidirectional acoustic regression proves both devices emit and detect the peer chirp over a timing-sensitive virtual audio link.
@@ -47,3 +47,7 @@
 - The default 72ms acoustic signature now sweeps from 20.2 to 21.2 kHz through a 19.5 kHz high-pass filter.
 - Ten consecutive Chromium Web Audio loopback runs proved the inaudible-band signature was emitted and detected with more than 20dB spectral margin.
 - 44.1 kHz contexts refuse emission instead of folding the signature below 20 kHz.
+- Four-client sessions now use unique anonymous acoustic signatures and require reciprocal strongest-signature reports before matching.
+- Two simultaneous pairs with nearly identical bump times stay correctly separated; crossed timing alone cannot pair them.
+- Session telemetry with a nonce that does not match the join nonce is rejected.
+- The four-participant join window remains open long enough to collect the room; a fifth participant rolls into a new session.
