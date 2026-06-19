@@ -142,6 +142,18 @@ test("keeps mobile sheet controls at least 44 CSS pixels", async ({ page }) => {
   }
 });
 
+test("does not steal focus when a sheet finishes opening", async ({ page }) => {
+  await page.goto("/?qa=e2e-sheet-focus&runtime=mock", { waitUntil: "domcontentloaded" });
+
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.waitForTimeout(40);
+  await page.keyboard.press("Tab");
+  await expect(page.locator("[data-name-input]")).toBeFocused();
+
+  await page.waitForTimeout(500);
+  await expect(page.locator("[data-name-input]")).toBeFocused();
+});
+
 test("renders a branded QR that remains machine-readable", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium-desktop", "QR pixel output is validated once in Chromium.");
   await page.goto("/?qa=e2e-branded-qr&runtime=mock", { waitUntil: "domcontentloaded" });
