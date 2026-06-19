@@ -320,6 +320,7 @@ test("proximity failure below 55 shows the score error and offers QR backup", as
 
     await pageB.close();
     await expect(pageA.locator(".peer-node")).toHaveCount(0, { timeout: 10_000 });
+    await expect(pageA.locator("[data-connect-nearby]")).toBeEnabled();
     await pageA.locator("[data-island-retry]").click();
     await expect(pageA.locator("[data-dynamic-island]")).toHaveAttribute("data-state", "connecting", { timeout: 10_000 });
     await expect(pageA.locator("[data-island-peer-avatar]")).toHaveAttribute("data-anonymous", "true");

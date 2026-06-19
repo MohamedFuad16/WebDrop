@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.56";
+import { formatBytes } from "../utils/format.js?v=1.0.57";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -1027,6 +1027,20 @@ export function createController({
       return;
     }
     if (!isActiveConnection(connectedPeerId, pairingId)) return;
+    cancelPendingTransferPatch();
+    const completedTransfer = store.getState().transfer;
+    if (completedTransfer?.direction === "send") {
+      store.patch({
+        transfer: {
+          ...completedTransfer,
+          stage: "complete",
+          ratio: 1,
+          transferredBytes: completedTransfer.totalBytes || totalBytes
+        }
+      });
+      await wait(1200);
+      if (!isActiveConnection(connectedPeerId, pairingId)) return;
+    }
     if (runtime.realTransfer) {
       const currentTransfer = store.getState().transfer;
       store.patch({

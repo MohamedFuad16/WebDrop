@@ -1,6 +1,6 @@
 # WebDrop Complete Technical Guide
 
-Version: WebDrop v2 production-readiness handoff for app version 1.0.56
+Version: WebDrop v2 production-readiness handoff for app version 1.0.57
 Scope: `/Users/mfuad16/Documents/web_drop_v2`
 Primary app entrypoint: `index.html` and `js/app.js`
 
@@ -14,7 +14,7 @@ The current repository ships a static browser application plus an Azure signalin
 
 ### Production readiness status
 
-- App/package/service-worker version: `1.0.56`.
+- App/package/service-worker version: `1.0.57`.
 - Default frontend runtime: production signaling, real proximity, peerless QR, and real transfer are enabled for `webdrop-wss-0618.japaneast.cloudapp.azure.com`.
 - Effective feature gating: `js/config/runtime-flags.js` refuses to enable real proximity, real transfer, or QR pairing unless production signaling is enabled with a valid WSS URL.
 - Backend package: `azure cloud server/` contains the Node WebSocket signaling service, QR token provider, TURN credential proxy, nginx/systemd/deploy assets, and load-test assets.

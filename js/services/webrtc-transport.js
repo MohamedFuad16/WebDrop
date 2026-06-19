@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.56";
+import { Emitter } from "../utils/emitter.js?v=1.0.57";
 import {
   DATA_CHANNEL_LABELS,
   DataChannelTransferProtocol

@@ -1,8 +1,8 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.56";
-import { formatBytes } from "../utils/format.js?v=1.0.56";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.56";
-import { translate } from "../config/i18n.js?v=1.0.56";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.56";
+import { Emitter } from "../utils/emitter.js?v=1.0.57";
+import { formatBytes } from "../utils/format.js?v=1.0.57";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.57";
+import { translate } from "../config/i18n.js?v=1.0.57";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.57";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;
@@ -594,7 +594,6 @@ export class AppView extends Emitter {
     const incomingPeer = incoming ? state.peers.find((peer) => peer.id === incoming.peerId) : null;
     const connected = state.mode === "connected" || state.mode === "disconnecting";
     const verifying = state.mode === "verifying";
-    const hasCandidate = Boolean(incomingPeer || state.peers.some((peer) => peer.online !== false && !peer.connected));
     const labelKey = verifying
       ? "verifying"
       : incomingPeer
@@ -602,7 +601,7 @@ export class AppView extends Emitter {
         : "connectNearby";
     const label = this.translate(labelKey, { name: incomingPeer?.name || "" });
     this.nodes.connectNearby.hidden = connected;
-    this.nodes.connectNearby.disabled = verifying || state.signalingStatus === "offline" || !hasCandidate;
+    this.nodes.connectNearby.disabled = verifying || state.signalingStatus === "offline";
     this.nodes.connectNearby.textContent = label;
     this.nodes.connectNearby.setAttribute("aria-label", label);
   }
