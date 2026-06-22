@@ -14,3 +14,15 @@
 - QR is a manual fallback or manual connection path.
 - Peer identity may be shown only after the server returns a verified match.
 
+## BumpBurst V2 Audit
+
+- The anonymous flow is time-slotted, but microphone detection currently starts
+  and stops for each peer slot instead of retaining one ceremony recording.
+- The server allocates only four fixed bands between 20.05 and 21.2 kHz, so a
+  fifth participant is forced into another session and 44.1 kHz devices cannot
+  reproduce the upper signatures safely.
+- A single strongest signature is reported without a runner-up confidence
+  margin, which is insufficient for rejecting ambiguous five-device rooms.
+- The replacement uses continuous capture, guarded time-division transmission,
+  shared-band coded signatures, offline matched filtering, and reciprocal graph
+  matching. It does not use simultaneous unscheduled transmission.

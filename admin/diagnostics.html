@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f5f7fa">
   <title>WebDrop Diagnostics</title>
-  <link rel="stylesheet" href="../css/diagnostics.css?v=1.0.64">
+  <link rel="stylesheet" href="../css/diagnostics.css?v=1.0.65">
 </head>
 <body>
   <header class="diagnostics-header">
@@ -112,7 +112,7 @@
           <div><span>Microphone</span><strong data-acoustic-mic>Not requested</strong></div>
           <div><span>Audio context</span><strong data-acoustic-context>Not started</strong></div>
           <div><span>Sample rate</span><strong data-acoustic-rate>Unknown</strong></div>
-          <div><span>20-21.2 kHz margin</span><strong data-acoustic-margin>Unknown</strong></div>
+          <div><span>20.05-20.95 kHz margin</span><strong data-acoustic-margin>Unknown</strong></div>
         </div>
         <div class="button-row">
           <button type="button" data-action="acoustic-enable">Enable microphone</button>
@@ -122,7 +122,7 @@
           <button type="button" data-action="acoustic-stop">Stop</button>
         </div>
         <p class="acoustic-note">
-          Uses WebDrop's production 20.2-21.2 kHz chirp. Raw microphone audio never leaves this page.
+          Uses WebDrop's production 20.05-20.95 kHz coded chirp and continuous ceremony recorder. Raw microphone audio never leaves this page.
           The server receives only bounded detection metrics.
         </p>
         <pre class="result-log" data-acoustic-output>Choose Enable microphone from a user gesture.</pre>
@@ -144,7 +144,7 @@
 
   </main>
 
-  <script src="../js/config/runtime-config.js?v=1.0.64"></script>
-  <script src="../js/admin/diagnostics.js?v=1.0.64" type="module"></script>
+  <script src="../js/config/runtime-config.js?v=1.0.65"></script>
+  <script src="../js/admin/diagnostics.js?v=1.0.65" type="module"></script>
 </body>
 </html>

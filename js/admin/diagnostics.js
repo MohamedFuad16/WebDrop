@@ -1,12 +1,12 @@
-import { AcousticLab } from "./acoustic-lab.js?v=1.0.64";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.64";
+import { AcousticLab } from "./acoustic-lab.js?v=1.0.65";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.65";
 import {
   apiBaseFrom,
   escapeHtml,
   formatAge,
   formatFrequency,
   formatNumber
-} from "./shared.js?v=1.0.64";
+} from "./shared.js?v=1.0.65";
 
 const runtime = globalThis.WEBDROP_RUNTIME_CONFIG || {};
 const nodes = {
@@ -158,10 +158,10 @@ function renderParticipant(participant) {
   const acoustic = telemetry?.acoustic;
   const stateClass = acoustic?.detected ? "telemetry-good" : telemetry ? "telemetry-bad" : "";
   const signatureText = signature
-    ? `slot ${signature.slot} · ${formatFrequency(signature.startFrequencyHz, signature.endFrequencyHz)}`
+    ? `slot ${signature.slot} · code ${signature.code ?? 0} · ${formatFrequency(signature.startFrequencyHz, signature.endFrequencyHz)}`
     : "waiting for slot";
   const telemetryText = telemetry
-    ? `${telemetry.decision} · ${Math.round(Number(telemetry.score || 0) * 100)}% · emitted ${acoustic?.emitted ? "yes" : "no"} · detected ${acoustic?.detected ? "yes" : "no"} · ${formatNumber(acoustic?.marginDb)} dB`
+    ? `${telemetry.decision} · ${Math.round(Number(telemetry.score || 0) * 100)}% · emitted ${acoustic?.emitted ? "yes" : "no"} · detected ${acoustic?.detected ? "yes" : "no"} · ${formatNumber(acoustic?.marginDb)} dB · winner +${formatNumber(acoustic?.confidenceMargin)} · runner-up ${formatNumber(acoustic?.runnerUpCorrelation)}`
     : "waiting for telemetry";
   return `
     <div class="participant-row">

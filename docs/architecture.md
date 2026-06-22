@@ -5,7 +5,7 @@
 This checkout now contains a first-run static, modular WebDrop v2 app plus architecture notes.
 
 - `index.html` is the active static app shell.
-- The current app/package/service-worker version is `1.0.64`.
+- The current app/package/service-worker version is `1.0.65`.
 - The earlier `proximity_architecture_monkeytype_v2.html` page was removed during the corrected rebuild.
 - `docs/implementation-checklist.md` is the current production-readiness source of truth.
 - `js/` contains the app state machine, controller, adapters, proximity, transport, transfer, storage client, and UI renderer.
@@ -105,13 +105,15 @@ Supported evidence can include:
 
 QR should remain the reliable fallback when microphone, motion, or audio playback permissions fail.
 
-Acoustic verification uses a 20.2-21.2 kHz, 72ms signature with a 19.5 kHz
-high-pass filter. WebDrop refuses to emit when the active sample rate cannot
-keep the complete signature above 20 kHz, then relies on the explicit QR path.
-Anonymous sessions allocate up to four non-overlapping signatures between
-20.05 and 21.2 kHz. Each device emits only in its assigned slot, reports the
-strongest peer signature it heard, and the server pairs devices only when those
-reports are reciprocal and their bump timestamps are inside the match window.
+Acoustic verification uses a 20.05-20.95 kHz, 96ms windowed coded chirp with a
+19.5 kHz high-pass filter. WebDrop refuses to emit when the active sample rate
+cannot keep the complete signature above 20 kHz, then relies on the explicit QR
+path. Anonymous sessions continuously record one ceremony buffer and allocate
+up to six guarded transmit slots in one shared band. Each participant receives
+a distinct chirp code, emits only in its slot, and decodes all peer slots after
+the frame. The server pairs devices only when strongest-signature reports are
+reciprocal, winner confidence is unambiguous, and bump timestamps are inside the
+match window.
 The score threshold is necessary but not sufficient: server verification also
 requires explicit ultrasound, bump, and tilt evidence, and rejects bump timing
 outside the server-issued ceremony window.

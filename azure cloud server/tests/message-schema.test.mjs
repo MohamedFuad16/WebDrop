@@ -36,10 +36,11 @@ test("rtc:signal SDP preserves line boundaries and avoids truncation", () => {
 test("proximity sessions and peerless QR do not require a preselected target", () => {
   const joined = validateRoutedMessage({
     type: "proximity:session:join",
-    payload: { clientNonce: "nonce-a" }
+    payload: { clientNonce: "nonce-a", acousticCapabilities: { sampleRate: 48000, strictInaudible: true } }
   });
   assert.equal(joined.targetId, null);
   assert.equal(joined.payload.clientNonce, "nonce-a");
+  assert.equal(joined.payload.acousticCapabilities.sampleRate, 48000);
 
   const qrIssue = validateRoutedMessage({
     type: "proximity:qr:issue",

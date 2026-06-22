@@ -202,7 +202,11 @@ export function validateRoutedMessage(message) {
     return {
       ...base,
       payload: {
-        clientNonce: cleanString(payload.clientNonce, 120) || cryptoRandomId("nonce")
+        clientNonce: cleanString(payload.clientNonce, 120) || cryptoRandomId("nonce"),
+        acousticCapabilities: {
+          sampleRate: safeNumber(payload.acousticCapabilities?.sampleRate),
+          strictInaudible: payload.acousticCapabilities?.strictInaudible !== false
+        }
       }
     };
   }
@@ -386,7 +390,18 @@ function validateProximityMetrics(metrics) {
     acousticEndFrequencyHz: safeNumber(metrics.acousticEndFrequencyHz),
     acousticMarginDb: safeNumber(metrics.acousticMarginDb),
     acousticSampleRate: safeNumber(metrics.acousticSampleRate),
-    acousticReason: cleanString(metrics.acousticReason, 100) || null
+    acousticReason: cleanString(metrics.acousticReason, 100) || null,
+    acousticConfidenceMargin: scoreMetric(metrics.acousticConfidenceMargin),
+    acousticRunnerUpCorrelation: scoreMetric(metrics.acousticRunnerUpCorrelation),
+    acousticDetections: (Array.isArray(metrics.acousticDetections) ? metrics.acousticDetections : [])
+      .slice(0, 8)
+      .map((entry) => ({
+        signatureId: cleanString(entry?.signatureId, 80) || null,
+        correlation: scoreMetric(entry?.correlation),
+        marginDb: safeNumber(entry?.marginDb),
+        sampleOffset: safeNumber(entry?.sampleOffset)
+      }))
+      .filter((entry) => entry.signatureId)
   };
 }
 

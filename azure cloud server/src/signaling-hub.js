@@ -33,13 +33,11 @@ const SESSION_DURATION_MS = 3600;
 const SESSION_TTL_MS = 15000;
 const SESSION_MATCH_SLOP_MS = 900;
 const SESSION_SCORE_MINIMUM = 0.55;
-const MAX_PROXIMITY_SESSION_CLIENTS = 4;
-const ACOUSTIC_SIGNATURE_BANDS = Object.freeze([
-  [20050, 20280],
-  [20350, 20580],
-  [20650, 20880],
-  [20950, 21200]
-]);
+const MAX_PROXIMITY_SESSION_CLIENTS = 6;
+const ACOUSTIC_BAND_START_HZ = 20_050;
+const ACOUSTIC_BAND_END_HZ = 20_950;
+const ACOUSTIC_MIN_BANDWIDTH_HZ = 500;
+const ACOUSTIC_WINNER_MARGIN = 0.04;
 
 export class SignalingHub {
   constructor({ server, path = "/ws", logger, maxJsonBytes = 131072, heartbeatIntervalMs = 25000, sessionTtlMs = 900000, pairingTtlMs = 120000, proximityAnalyzer, qrTokenProvider, metrics } = {}) {
@@ -418,6 +416,7 @@ export class SignalingHub {
         id: `prox-${randomUUID()}`,
         clients: new Set(),
         nonces: new Map(),
+        acousticCapabilities: new Map(),
         signatures: new Map(),
         signatureDetails: new Map(),
         telemetry: new Map(),
@@ -437,6 +436,8 @@ export class SignalingHub {
     }
     session.clients.add(sender.id);
     session.nonces.set(sender.id, message.payload.clientNonce);
+    session.acousticCapabilities ||= new Map();
+    session.acousticCapabilities.set(sender.id, message.payload.acousticCapabilities || {});
     this.metrics?.recordEvent("proximity:session:joined", {
       sessionId: session.id,
       clientId: sender.id,
@@ -483,12 +484,13 @@ export class SignalingHub {
     const startAt = Date.now() + SESSION_START_DELAY_MS;
     session.startAt = startAt;
     session.endsAt = startAt + SESSION_DURATION_MS;
+    const acousticBand = selectSharedAcousticBand(session);
     const acousticPlan = [...session.clients].map((clientId, index) => {
-      const [startFrequencyHz, endFrequencyHz] = ACOUSTIC_SIGNATURE_BANDS[index];
       const signature = {
         id: `sig-${randomUUID()}`,
-        startFrequencyHz,
-        endFrequencyHz
+        startFrequencyHz: acousticBand.startFrequencyHz,
+        endFrequencyHz: acousticBand.endFrequencyHz,
+        code: index
       };
       session.signatures.set(clientId, signature.id);
       session.signatureDetails.set(clientId, {
@@ -508,6 +510,7 @@ export class SignalingHub {
         acousticSlot: slot,
         acousticSignatureId: acousticPlan[slot]?.id,
         acousticPlan,
+        acousticAvailable: acousticBand.available,
         participantCount: session.clients.size
       });
       slot += 1;
@@ -1042,6 +1045,10 @@ function sessionAnalysis(analyzer, metrics = {}) {
     ...analyzed,
     acousticSignatureId: metrics.acousticSignatureId || null,
     heardAcousticSignatureId: metrics.heardAcousticSignatureId || null,
+    acousticConfidenceMargin: metrics.acousticConfidenceMargin == null
+      ? null
+      : Number(metrics.acousticConfidenceMargin),
+    acousticDetections: Array.isArray(metrics.acousticDetections) ? metrics.acousticDetections : [],
     physicalEvidence,
     decision: score >= SESSION_SCORE_MINIMUM && hasRequiredPhysicalEvidence
       ? "verified"
@@ -1066,11 +1073,39 @@ function hasValidCeremonyTiming(session, timing = {}) {
 function hasReciprocalAcousticEvidence(session, first, second) {
   const firstSignature = session.signatures?.get(first.clientId);
   const secondSignature = session.signatures?.get(second.clientId);
+  const firstDetection = acousticDetectionFor(first.analysis, secondSignature);
+  const secondDetection = acousticDetectionFor(second.analysis, firstSignature);
   return Boolean(firstSignature && secondSignature
     && first.analysis?.acousticSignatureId === firstSignature
     && second.analysis?.acousticSignatureId === secondSignature
     && first.analysis?.heardAcousticSignatureId === secondSignature
-    && second.analysis?.heardAcousticSignatureId === firstSignature);
+    && second.analysis?.heardAcousticSignatureId === firstSignature
+    && firstDetection.correlation >= 0.32
+    && secondDetection.correlation >= 0.32
+    && Number(first.analysis?.acousticConfidenceMargin ?? 1) >= ACOUSTIC_WINNER_MARGIN
+    && Number(second.analysis?.acousticConfidenceMargin ?? 1) >= ACOUSTIC_WINNER_MARGIN);
+}
+
+function acousticDetectionFor(analysis, signatureId) {
+  const detections = Array.isArray(analysis?.acousticDetections) ? analysis.acousticDetections : [];
+  return detections.find((entry) => entry.signatureId === signatureId)
+    || { correlation: analysis?.heardAcousticSignatureId === signatureId ? 1 : 0 };
+}
+
+function selectSharedAcousticBand(session) {
+  const sampleRates = [...(session.acousticCapabilities?.values() || [])]
+    .map((capability) => Number(capability?.sampleRate))
+    .filter((sampleRate) => Number.isFinite(sampleRate) && sampleRate > 0);
+  const safeMaximum = sampleRates.length
+    ? Math.min(...sampleRates.map((sampleRate) => sampleRate * 0.45 - 100))
+    : ACOUSTIC_BAND_END_HZ;
+  const endFrequencyHz = Math.min(ACOUSTIC_BAND_END_HZ, Math.floor(safeMaximum));
+  const available = endFrequencyHz - ACOUSTIC_BAND_START_HZ >= ACOUSTIC_MIN_BANDWIDTH_HZ;
+  return {
+    available,
+    startFrequencyHz: ACOUSTIC_BAND_START_HZ,
+    endFrequencyHz: available ? endFrequencyHz : ACOUSTIC_BAND_START_HZ + ACOUSTIC_MIN_BANDWIDTH_HZ
+  };
 }
 
 function fallbackSessionAnalysis(metrics = {}) {
@@ -1113,6 +1148,11 @@ function acousticDiagnostics(metrics = {}) {
     endFrequencyHz: finiteOrNull(metrics.acousticEndFrequencyHz),
     marginDb: finiteOrNull(metrics.acousticMarginDb),
     sampleRate: finiteOrNull(metrics.acousticSampleRate),
+    confidenceMargin: finiteOrNull(metrics.acousticConfidenceMargin),
+    runnerUpCorrelation: finiteOrNull(metrics.acousticRunnerUpCorrelation),
+    detections: Array.isArray(metrics.acousticDetections)
+      ? metrics.acousticDetections.slice(0, MAX_PROXIMITY_SESSION_CLIENTS)
+      : [],
     reason: metrics.acousticReason || null
   };
 }

@@ -126,7 +126,7 @@ test("proximity session rejects telemetry with the wrong join nonce", () => {
   hub.close();
 });
 
-test("proximity join window keeps four clients together and rolls a fifth into a new session", () => {
+test("proximity join window keeps five nearby clients in one coded session", () => {
   const hub = createTestHub();
   const clients = Array.from({ length: 5 }, (_, index) => addClient(hub, `client-${index}`));
 
@@ -137,10 +137,31 @@ test("proximity join window keeps four clients together and rolls a fifth into a
   }
 
   const sessions = [...hub.proximitySessions.values()];
-  assert.equal(sessions.length, 2);
-  assert.equal(sessions[0].clients.size, 4);
-  assert.equal(sessions[1].clients.size, 1);
+  assert.equal(sessions.length, 1);
+  assert.equal(sessions[0].clients.size, 5);
 
+  hub.startProximitySession(sessions[0].id);
+  const starts = clients.map((client) => messagesOf(client, "proximity:session:start")[0]);
+  assert.equal(starts.every(Boolean), true);
+  assert.equal(new Set(starts[0].payload.acousticPlan.map((signature) => signature.code)).size, 5);
+  assert.equal(new Set(starts[0].payload.acousticPlan.map((signature) => `${signature.startFrequencyHz}-${signature.endFrequencyHz}`)).size, 1);
+
+  hub.close();
+});
+
+test("proximity session rejects reciprocal signatures with an ambiguous winner margin", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  const session = createSession(hub, [clientA, clientB]);
+  const ambiguous = { ...verifiedMetrics(), acousticConfidenceMargin: 0.01 };
+
+  hub.recordProximitySessionTelemetry(clientA, sessionMessage(session, clientA, ambiguous, 1000, clientB));
+  hub.recordProximitySessionTelemetry(clientB, sessionMessage(session, clientB, ambiguous, 1020, clientA));
+
+  assert.equal(clientA.pairingId, null);
+  assert.equal(clientB.pairingId, null);
+  assert.equal(messagesOf(clientA, "proximity:match").length, 0);
   hub.close();
 });
 
@@ -186,7 +207,10 @@ test("diagnostics snapshot exposes safe live proximity and acoustic state", () =
     acousticStartFrequencyHz: 20350,
     acousticEndFrequencyHz: 20580,
     acousticMarginDb: 24,
-    acousticSampleRate: 48000
+    acousticSampleRate: 48000,
+    acousticConfidenceMargin: 0.44,
+    acousticRunnerUpCorrelation: 0.31,
+    acousticDetections: [{ signatureId: "signature-1", correlation: 0.75, marginDb: 24 }]
   });
 
   hub.recordProximitySessionTelemetry(clientA, message);
@@ -205,6 +229,9 @@ test("diagnostics snapshot exposes safe live proximity and acoustic state", () =
     endFrequencyHz: 20580,
     marginDb: 24,
     sampleRate: 48000,
+    confidenceMargin: 0.44,
+    runnerUpCorrelation: 0.31,
+    detections: [{ signatureId: "signature-1", correlation: 0.75, marginDb: 24 }],
     reason: null
   });
   assert.equal("turnAccessToken" in snapshot.clients[0], false);
@@ -253,6 +280,7 @@ function createSession(hub, clients) {
     clients: new Set(clients.map((client) => client.id)),
     nonces: new Map(clients.map((client) => [client.id, `nonce-${client.id}`])),
     signatures: new Map(clients.map((client, index) => [client.id, `signature-${index}`])),
+    acousticCapabilities: new Map(),
     telemetry: new Map(),
     createdAt: Date.now(),
     expiresAt: Date.now() + 120000,

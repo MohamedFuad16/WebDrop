@@ -74,3 +74,16 @@
 - `npm run verify:full` passed on `1.0.58`: 19 frontend/unit tests, 24 signaling-server tests, secret audits, package audits, and diff validation.
 - `npm run test:e2e` passed on `1.0.58`: 54 passed and 50 expected project skips, including the diagnostics dashboard, Web Audio loopback, WebKit receive/new-tab behavior, live TURN relay, and live signaling.
 - In-app browser QA passed at desktop and 393px mobile widths with no console errors or horizontal page overflow; the protected-endpoint error is inline and does not cover the acoustic controls.
+
+## BumpBurst V2 Evidence
+
+- Release `1.0.65` replaces per-slot microphone polling for anonymous sessions with one continuous ceremony capture and offline coded-signature decoding.
+- Anonymous sessions now support up to six participants in one cohort and assign shared-band signature codes instead of consuming one fixed frequency band per device.
+- Production chirps now use a strict inaudible 20.05-20.95 kHz, 96ms coded waveform; unsupported sample rates still refuse emission rather than falling below 20 kHz.
+- Client telemetry now reports acoustic detections, confidence margin, runner-up correlation, sample offsets, sample rate, and permission status.
+- Server matching now rejects ambiguous reciprocal reports when the strongest signature does not beat the runner-up by the configured margin.
+- Five-client session coverage proves nearby bystanders can stay in the same cohort without forcing QR or a second session.
+- In-app Browser mobile QA at `http://127.0.0.1:4178/?qa=bumpburst-v2&runtime=mock` passed after the `1.0.65` cache bump: app loaded at 393x852, Connect entered the Dynamic Island ceremony, visible score reached `100 / 100`, and console warnings/errors were empty.
+- In-app Browser diagnostics QA at `http://127.0.0.1:4178/admin/diagnostics.html?qa=bumpburst-v2` passed layout/content checks and showed the updated continuous coded 20.05-20.95 kHz lab copy with no console errors. The local in-app host did not grant a real microphone stream, so physical airborne emission/receipt remains a real-device validation step.
+- `npm run verify:full` passed on `1.0.65`: 21 frontend/unit tests, 25 signaling-server tests, secret audits, package audits, and `git diff --check`.
+- `npm run test:e2e` passed on `1.0.65`: 72 passed, 56 expected project skips, including coded chirp browser loopback, live anonymous signaling, live TURN relay, WebKit iPhone permission checks, received-file new-tab behavior, Siri wave fallback, and edge-to-edge Dynamic Island geometry.

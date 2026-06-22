@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.64";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.64";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.64";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.65";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.65";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.65";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 const ACOUSTIC_SLOT_GUARD_MS = 80;
@@ -78,6 +78,15 @@ export class ProximityEngine {
     };
   }
 
+  getAcousticStatus() {
+    return this.acoustic.getStatus?.() || {
+      streamActive: false,
+      contextState: "unsupported",
+      sampleRate: null,
+      inputTracks: 0
+    };
+  }
+
   async runRealCeremony({
     acoustic = true,
     acousticRole = "detect",
@@ -136,6 +145,14 @@ export class ProximityEngine {
       acousticMarginDb: acousticResult.marginDb || 0,
       acousticSampleRate: acousticResult.sampleRate || null,
       acousticReason: acousticResult.reason || null,
+      acousticConfidenceMargin: acousticResult.confidenceMargin || 0,
+      acousticRunnerUpCorrelation: acousticResult.runnerUpCorrelation || 0,
+      acousticDetections: (acousticResult.detections || []).map((detection) => ({
+        signatureId: detection.signatureId,
+        correlation: detection.correlation || 0,
+        marginDb: detection.marginDb || 0,
+        sampleOffset: detection.sampleOffset ?? null
+      })),
       motionCorrelation: motion.bump && motion.tilted ? 1 : motion.samples > 0 ? 0.4 : 0,
       tilt: motion.tilted,
       bump: motion.bump,
@@ -188,6 +205,11 @@ async function exchangeSignatureChirps(acoustic, {
 }) {
   const signatures = normalizeAcousticPlan(plan);
   const slotDurationMs = Math.max(ACOUSTIC_MIN_SLOT_MS, Math.floor(durationMs / Math.max(1, signatures.length)));
+  if (typeof acoustic.startCeremonyCapture === "function" && typeof acoustic.decodeCeremonyCapture === "function") {
+    return exchangeCapturedSignatureChirps(acoustic, {
+      signatures, ownSignatureId, options, startAt, durationMs, slotDurationMs, onProgress
+    });
+  }
   const detections = [];
   const listenedSlots = [];
   let emittedCount = 0;
@@ -315,6 +337,89 @@ async function exchangeSignatureChirps(acoustic, {
   };
 }
 
+async function exchangeCapturedSignatureChirps(acoustic, {
+  signatures, ownSignatureId, options, startAt, durationMs, slotDurationMs, onProgress
+}) {
+  const capture = await acoustic.startCeremonyCapture({ maximumDurationMs: durationMs + 600 });
+  if (!capture?.started) {
+    return { detected: false, emitted: false, mode: "missed", reason: capture?.reason || "capture-failed" };
+  }
+  let emittedCount = 0;
+  for (let index = 0; index < signatures.length; index += 1) {
+    const signature = signatures[index];
+    await waitUntil(Number(startAt) + index * slotDurationMs);
+    const ownSlot = signature.id === ownSignatureId;
+    onProgress({
+      phase: "audio",
+      state: "active",
+      acoustic: {
+        mode: ownSlot ? "emit" : "listen",
+        continuous: true,
+        slot: index + 1,
+        slotCount: signatures.length,
+        targetSignatureId: ownSlot ? null : signature.id,
+        ownSignatureId,
+        code: signature.code,
+        startFrequencyHz: signature.startFrequencyHz,
+        endFrequencyHz: signature.endFrequencyHz
+      }
+    });
+    if (ownSlot) {
+      const emitted = await emitChirpSequence(acoustic, { ...options, ...signature }, slotDurationMs - ACOUSTIC_SLOT_GUARD_MS);
+      emittedCount += emitted.emittedCount || 0;
+    }
+  }
+  await waitUntil(Number(startAt) + durationMs);
+  const recording = acoustic.stopCeremonyCapture();
+  const detections = acoustic.decodeCeremonyCapture(recording, signatures, {
+    ownSignatureId,
+    slotDurationMs,
+    slotGuardMs: ACOUSTIC_SLOT_GUARD_MS
+  });
+  for (const detection of detections) {
+    onProgress({
+      phase: "audio",
+      state: "active",
+      acoustic: {
+        mode: detection.detected ? "detected" : "missed",
+        continuous: true,
+        ...detection,
+        targetSignatureId: detection.signatureId
+      }
+    });
+  }
+  const heard = detections
+    .filter((detection) => detection.detected)
+    .sort((a, b) => b.correlation - a.correlation || b.marginDb - a.marginDb);
+  const strongest = heard[0] || null;
+  const runnerUp = heard[1] || null;
+  const confidenceMargin = strongest
+    ? Math.max(0, strongest.correlation - (runnerUp?.correlation || 0))
+    : 0;
+  return {
+    emitted: emittedCount > 0,
+    emittedCount,
+    detected: Boolean(strongest),
+    correlation: strongest?.correlation || 0,
+    confidenceMargin,
+    runnerUpCorrelation: runnerUp?.correlation || 0,
+    ownSignatureId,
+    heardSignatureId: strongest?.signatureId || null,
+    detections,
+    sampleRate: recording.sampleRate,
+    recordingDurationMs: recording.durationMs,
+    ...(strongest ? {
+      mode: "detected",
+      slot: strongest.slot,
+      slotCount: strongest.slotCount,
+      marginDb: strongest.marginDb,
+      targetSignatureId: strongest.signatureId,
+      startFrequencyHz: strongest.startFrequencyHz,
+      endFrequencyHz: strongest.endFrequencyHz
+    } : acousticMissSummary(detections, signatures.length))
+  };
+}
+
 function acousticMissSummary(listenedSlots, slotCount) {
   const slots = listenedSlots.filter(Boolean);
   if (!slots.length) return { mode: "missed", slotCount };
@@ -387,7 +492,8 @@ function normalizeAcousticPlan(plan) {
   return (Array.isArray(plan) ? plan : []).map((entry) => ({
     id: String(entry?.id || "").slice(0, 80),
     startFrequencyHz: Number(entry?.startFrequencyHz),
-    endFrequencyHz: Number(entry?.endFrequencyHz)
+    endFrequencyHz: Number(entry?.endFrequencyHz),
+    code: Math.max(0, Math.floor(Number(entry?.code || 0)))
   })).filter((entry) => entry.id
     && Number.isFinite(entry.startFrequencyHz)
     && Number.isFinite(entry.endFrequencyHz)

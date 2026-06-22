@@ -75,7 +75,7 @@ test("emitted chirp reaches and is recognized by a second acoustic sensor", asyn
   });
 
   expect(result.permission).toBe(true);
-  expect(result.emitted).toMatchObject({ emitted: true, durationMs: 72, sampleRate: 48_000 });
+  expect(result.emitted).toMatchObject({ emitted: true, durationMs: 96, sampleRate: 48_000 });
   expect(result.emitted.startFrequencyHz).toBeGreaterThanOrEqual(20_000);
   expect(result.emitted.endFrequencyHz).toBeGreaterThan(result.emitted.startFrequencyHz);
   expect(result.detected.detected).toBe(true);

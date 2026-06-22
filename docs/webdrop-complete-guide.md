@@ -1,6 +1,6 @@
 # WebDrop Complete Technical Guide
 
-Version: WebDrop v2 production-readiness handoff for app version 1.0.64
+Version: WebDrop v2 production-readiness handoff for app version 1.0.65
 Scope: `/Users/mfuad16/Documents/web_drop_v2`
 Primary app entrypoint: `index.html` and `js/app.js`
 
@@ -14,11 +14,11 @@ The current repository ships a static browser application plus an Azure signalin
 
 ### Production readiness status
 
-- App/package/service-worker version: `1.0.64`.
+- App/package/service-worker version: `1.0.65`.
 - Default frontend runtime: production signaling, real proximity, peerless QR, and real transfer are enabled for `webdrop-wss-0618.japaneast.cloudapp.azure.com`.
 - Effective feature gating: `js/config/runtime-flags.js` refuses to enable real proximity, real transfer, or QR pairing unless production signaling is enabled with a valid WSS URL.
 - Backend package: `azure cloud server/` contains the Node WebSocket signaling service, QR token provider, TURN credential proxy, nginx/systemd/deploy assets, and load-test assets.
-- Verified on June 19, 2026: public `/readyz`, public WSS anonymous proximity sessions, reciprocal acoustic signature matching among four clients, rejection of high-score telemetry without bump/tilt evidence, peerless QR, WebKit iPhone UI/permission regressions, authenticated Cloudflare TURN credential issuance, simultaneous bidirectional DataChannel file transfer, and forced TURN relay transfer using 256 KiB chunks.
+- Verified through June 22, 2026: public `/readyz`, public WSS anonymous proximity sessions, reciprocal coded-signature matching for six-client cohorts, rejection of ambiguous or physically incomplete telemetry, peerless QR, WebKit iPhone UI/permission regressions, authenticated Cloudflare TURN credential issuance, simultaneous bidirectional DataChannel file transfer, and forced TURN relay transfer using 256 KiB chunks.
 - Still external: physical-device over-air proximity calibration, physical-device direct/TURN file-transfer testing near the 500 MB cap, load testing, and any horizontal-scaling state store.
 
 The production roadmap sections describe the backend and browser-work needed to turn those boundaries into a real multi-device transfer system.

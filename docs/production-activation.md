@@ -81,10 +81,10 @@ Real-device acoustic thresholds and timing may require tuning after measurements
 
 ## Verified on June 19, 2026
 
-- Pre-patch production Vercel served app version `1.0.50`; this changeset advances the app/cache key to `1.0.64` for deployment verification.
+- Pre-patch production Vercel served app version `1.0.50`; this changeset advances the app/cache key to `1.0.65` for deployment verification.
 - Japan East `/readyz` reported production healthy with `proximityAnalysisEnabled:true`.
 - Azure `signaling-hub.js` matched the local source hash.
-- Public WSS assigned unique anonymous acoustic signatures for four clients and matched only reciprocal pairs.
+- Public WSS assigns unique coded anonymous acoustic signatures for up to six clients and matches only reciprocal, unambiguous pairs.
 - Public WSS rejected high-score telemetry when ultrasound was present but bump and tilt evidence were missing.
 - `npm run verify:full` passed.
 - `npm run test:e2e` passed with 52 passing tests and 44 expected project skips.

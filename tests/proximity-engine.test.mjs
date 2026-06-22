@@ -156,8 +156,8 @@ test("inaudible ultrasound band detection tolerates phone speaker distortion", (
 
   const evidence = analyzeFrequencyBand(frequencies, { sampleRate, fftSize });
 
-  assert.equal(DEFAULT_CHIRP.startFrequencyHz, 20_200);
-  assert.equal(DEFAULT_CHIRP.endFrequencyHz, 21_200);
+  assert.equal(DEFAULT_CHIRP.startFrequencyHz, 20_050);
+  assert.equal(DEFAULT_CHIRP.endFrequencyHz, 20_950);
   assert.ok(DEFAULT_CHIRP.startFrequencyHz >= MIN_INAUDIBLE_FREQUENCY_HZ);
   assert.equal(evidence.detected, true);
   assert.ok(evidence.marginDb > 30);
@@ -233,6 +233,73 @@ test("chirp correlation accepts inverted microphone polarity", () => {
   const result = findBestCorrelation(samples, template);
   assert.equal(result.correlation, 1);
   assert.equal(result.offset, 0);
+});
+
+test("coded inaudible chirps remain distinguishable inside one shared band", () => {
+  const codeOne = createChirpSamples(48_000, { ...DEFAULT_CHIRP, code: 1 });
+  const codeFive = createChirpSamples(48_000, { ...DEFAULT_CHIRP, code: 5 });
+  const same = findBestCorrelation(codeOne, codeOne, { step: 1 });
+  const different = findBestCorrelation(codeOne, codeFive, { step: 1 });
+
+  assert.equal(same.correlation, 1);
+  assert.ok(different.correlation < 0.8);
+});
+
+test("anonymous ceremony records continuously and decodes after every transmit slot", async () => {
+  const calls = [];
+  const acoustic = {
+    async startCeremonyCapture() {
+      calls.push("capture:start");
+      return { started: true, sampleRate: 48_000 };
+    },
+    async emitChirp(options) {
+      calls.push(`emit:${options.code}`);
+      return { emitted: true, sampleRate: 48_000 };
+    },
+    stopCeremonyCapture() {
+      calls.push("capture:stop");
+      return { samples: new Float32Array(48), sampleRate: 48_000, durationMs: 1 };
+    },
+    decodeCeremonyCapture(_recording, plan) {
+      calls.push("capture:decode");
+      return plan.slice(1).map((signature, index) => ({
+        signatureId: signature.id,
+        slot: index + 2,
+        slotCount: plan.length,
+        startFrequencyHz: signature.startFrequencyHz,
+        endFrequencyHz: signature.endFrequencyHz,
+        detected: true,
+        correlation: index ? 0.52 : 0.91,
+        marginDb: index ? 8 : 24,
+        sampleOffset: 100 + index
+      }));
+    },
+    close() {}
+  };
+  const motion = {
+    getSnapshot() { return { bump: true, tilted: true, samples: 4 }; },
+    stopCapture() {}
+  };
+  const engine = new ProximityEngine({ enabled: true, acoustic, motion });
+  const plan = Array.from({ length: 5 }, (_, index) => ({
+    id: `signature-${index}`,
+    startFrequencyHz: 20_050,
+    endFrequencyHz: 20_950,
+    code: index
+  }));
+
+  const result = await engine.runRealCeremony({
+    acousticPlan: plan,
+    acousticSignatureId: plan[0].id,
+    acousticOptions: { intervalMs: 1000 },
+    startAt: Date.now(),
+    ceremonyDurationMs: 80
+  });
+
+  assert.deepEqual(calls, ["capture:start", "emit:0", "capture:stop", "capture:decode"]);
+  assert.equal(result.metrics.heardAcousticSignatureId, "signature-1");
+  assert.equal(result.metrics.acousticDetections.length, 4);
+  assert.equal(result.metrics.acousticConfidenceMargin, 0.39);
 });
 
 test("two devices emit and receive chirps in separate synchronized slots", async () => {

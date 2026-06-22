@@ -31,3 +31,15 @@
 - [x] Smooth the Dynamic Island transfer percentage and progress bar animation.
 - [x] Add Retry inside the failed Dynamic Island so users can restart bump without hunting for the page button.
 - [x] Keep listening briefly for late peer ultrasonic signatures before declaring audio failure.
+
+## BumpBurst V2
+
+- [x] Record one continuous microphone buffer across the complete ceremony.
+- [x] Decode every scheduled peer signature from that buffer after transmission.
+- [x] Replace four fixed frequency bands with shared-band coded signatures.
+- [x] Support at least six participants in one proximity session.
+- [x] Negotiate a strict inaudible band from client audio capabilities.
+- [x] Report acoustic confidence, margin, sample offset, and ambiguity telemetry.
+- [x] Require reciprocal evidence and a clear winning-pair margin.
+- [x] Add five-device and ambiguous-room server regressions.
+- [x] Run unit, server, full verification, E2E, and browser QA.

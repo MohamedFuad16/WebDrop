@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.64";
+import { formatBytes } from "../utils/format.js?v=1.0.65";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -712,9 +712,17 @@ export function createController({
     view.showIslandAnonymousConnectionProgress({ self: initialState.self });
     view.toast(view.translate("findingNearbyPeer"));
 
+    if (permissionPromise) await permissionPromise.catch(() => null);
+    const acousticStatus = proximity.getAcousticStatus?.() || {};
     const clientNonce = crypto.randomUUID?.() || `nonce-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const joined = waitForProximitySessionJoined(10000);
-    await signaling.joinProximitySession?.({ clientNonce });
+    await signaling.joinProximitySession?.({
+      clientNonce,
+      acousticCapabilities: {
+        sampleRate: acousticStatus.sampleRate || null,
+        strictInaudible: true
+      }
+    });
     const joinedPayload = await joined;
     const sessionId = joinedPayload?.sessionId;
     if (!sessionId || !isCurrentAnonymousVerification()) {
@@ -747,6 +755,17 @@ export function createController({
             heardAcousticSignatureId: startPayload.acousticPlan?.find(
               (signature) => signature.id !== startPayload.acousticSignatureId
             )?.id || null,
+            acousticConfidenceMargin: 1,
+            acousticRunnerUpCorrelation: 0,
+            acousticDetections: startPayload.acousticPlan
+              ?.filter((signature) => signature.id !== startPayload.acousticSignatureId)
+              .slice(0, 1)
+              .map((signature) => ({
+                signatureId: signature.id,
+                correlation: 1,
+                marginDb: 30,
+                sampleOffset: 1
+              })) || [],
             motionCorrelation: 1,
             bump: true,
             tilt: true,

@@ -1,8 +1,8 @@
 import {
   AcousticProximitySensor,
   DEFAULT_CHIRP
-} from "../services/acoustic-proximity.js?v=1.0.64";
-import { formatFrequency, formatNumber } from "./shared.js?v=1.0.64";
+} from "../services/acoustic-proximity.js?v=1.0.65";
+import { formatFrequency, formatNumber } from "./shared.js?v=1.0.65";
 
 export class AcousticLab {
   constructor(document) {
@@ -50,20 +50,35 @@ export class AcousticLab {
   async runLoopback() {
     if (!(await this.ensureReady())) return;
     this.setStatus("Loopback running");
-    const detectPromise = this.sensor.detectChirp({
-      timeoutMs: 1800,
-      ...DEFAULT_CHIRP
-    });
-    await wait(180);
-    const emitted = await this.sensor.emitChirp(DEFAULT_CHIRP);
-    const detected = await detectPromise;
+    const signature = { id: "diagnostic-loopback", ...DEFAULT_CHIRP, code: 3 };
+    const capture = await this.sensor.startCeremonyCapture({ maximumDurationMs: 1400 });
+    let emitted;
+    let detected;
+    if (capture.started) {
+      await wait(180);
+      emitted = await this.sensor.emitChirp(signature);
+      await wait(360);
+      const recording = this.sensor.stopCeremonyCapture();
+      [detected] = this.sensor.decodeCeremonyCapture(recording, [signature], {
+        ownSignatureId: null,
+        slotDurationMs: 1200,
+        threshold: 0.28
+      });
+      detected = { ...detected, continuous: true, recordingDurationMs: recording.durationMs };
+    } else {
+      const detectPromise = this.sensor.detectChirp({ timeoutMs: 1800, ...signature });
+      await wait(180);
+      emitted = await this.sensor.emitChirp(signature);
+      detected = await detectPromise;
+    }
     this.write({
-      test: "same-device speaker-to-microphone loopback",
+      test: "continuous coded speaker-to-microphone loopback",
       band: formatFrequency(DEFAULT_CHIRP.startFrequencyHz, DEFAULT_CHIRP.endFrequencyHz),
       emitted,
-      detected: summarizeDetection(detected)
+      capture,
+      detected: detected?.continuous ? detected : summarizeDetection(detected)
     });
-    this.setStatus(detected.detected ? "Detected" : emitted.emitted ? "Emitted, not detected" : "Emission failed");
+    this.setStatus(detected?.detected ? "Detected" : emitted?.emitted ? "Emitted, not detected" : "Emission failed");
   }
 
   async emitOnly() {

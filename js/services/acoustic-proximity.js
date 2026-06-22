@@ -1,7 +1,8 @@
 export const DEFAULT_CHIRP = Object.freeze({
-  durationMs: 72,
-  startFrequencyHz: 20200,
-  endFrequencyHz: 21200,
+  durationMs: 96,
+  startFrequencyHz: 20050,
+  endFrequencyHz: 20950,
+  code: 0,
   gain: 0.1
 });
 
@@ -18,6 +19,11 @@ export class AcousticProximitySensor {
     this.stream = null;
     this.source = null;
     this.analyser = null;
+    this.captureNode = null;
+    this.captureSink = null;
+    this.captureChunks = [];
+    this.captureSampleCount = 0;
+    this.captureMaximumSamples = 0;
   }
 
   async requestMicrophonePermission(constraints = {
@@ -212,6 +218,89 @@ export class AcousticProximitySensor {
     };
   }
 
+  async startCeremonyCapture({ maximumDurationMs = 6000, bufferSize = 2048 } = {}) {
+    if (!this.stream?.active) return { started: false, reason: "microphone-not-granted" };
+    const contextResult = await this.#getContextResult();
+    if (!contextResult.context) return { started: false, reason: contextResult.reason };
+    const context = contextResult.context;
+    if (typeof context.createScriptProcessor !== "function") {
+      return { started: false, reason: "continuous-capture-unsupported" };
+    }
+    this.stopCeremonyCapture();
+    this.#ensureAnalyser(context);
+    this.captureChunks = [];
+    this.captureSampleCount = 0;
+    this.captureMaximumSamples = Math.ceil(context.sampleRate * maximumDurationMs / 1000);
+    this.captureNode = context.createScriptProcessor(bufferSize, 1, 1);
+    this.captureSink = context.createGain();
+    this.captureSink.gain.value = 0;
+    this.captureNode.onaudioprocess = (event) => {
+      const input = event.inputBuffer?.getChannelData?.(0);
+      if (!input?.length || this.captureSampleCount >= this.captureMaximumSamples) return;
+      const remaining = this.captureMaximumSamples - this.captureSampleCount;
+      const chunk = Float32Array.from(input.subarray(0, remaining));
+      this.captureChunks.push(chunk);
+      this.captureSampleCount += chunk.length;
+    };
+    this.source.connect(this.captureNode);
+    this.captureNode.connect(this.captureSink);
+    this.captureSink.connect(context.destination);
+    return { started: true, sampleRate: context.sampleRate };
+  }
+
+  stopCeremonyCapture() {
+    this.captureNode?.disconnect();
+    this.captureSink?.disconnect();
+    if (this.captureNode) this.captureNode.onaudioprocess = null;
+    this.captureNode = null;
+    this.captureSink = null;
+    const samples = concatenateSamples(this.captureChunks, this.captureSampleCount);
+    const sampleRate = this.context?.sampleRate || null;
+    this.captureChunks = [];
+    this.captureSampleCount = 0;
+    this.captureMaximumSamples = 0;
+    return {
+      samples,
+      sampleRate,
+      durationMs: sampleRate ? samples.length / sampleRate * 1000 : 0
+    };
+  }
+
+  decodeCeremonyCapture(recording, plan, {
+    ownSignatureId,
+    slotDurationMs,
+    threshold = 0.32,
+    slotGuardMs = 90
+  } = {}) {
+    const sampleRate = Number(recording?.sampleRate);
+    const samples = recording?.samples;
+    if (!samples?.length || !Number.isFinite(sampleRate)) return [];
+    return plan
+      .map((signature, index) => {
+        if (signature.id === ownSignatureId) return null;
+        const template = createChirpSamples(sampleRate, signature);
+        const guardSamples = Math.round(sampleRate * slotGuardMs / 1000);
+        const slotStart = Math.max(0, Math.round(sampleRate * index * slotDurationMs / 1000) - guardSamples);
+        const slotEnd = Math.min(samples.length, Math.round(sampleRate * (index + 1) * slotDurationMs / 1000) + guardSamples);
+        const window = samples.subarray(slotStart, slotEnd);
+        const match = findBestCorrelation(window, template, { step: 4 });
+        const marginDb = correlationMarginDb(window, template, match.offset);
+        return {
+          signatureId: signature.id,
+          slot: index + 1,
+          slotCount: plan.length,
+          code: Number(signature.code || 0),
+          startFrequencyHz: signature.startFrequencyHz,
+          endFrequencyHz: signature.endFrequencyHz,
+          detected: match.correlation >= threshold && marginDb >= 3,
+          correlation: roundMetric(match.correlation),
+          marginDb: roundMetric(marginDb),
+          sampleOffset: match.offset < 0 ? null : slotStart + match.offset
+        };
+      })
+      .filter(Boolean);
+  }
+
   getStatus() {
     return {
       streamActive: Boolean(this.stream?.active),
@@ -222,6 +311,7 @@ export class AcousticProximitySensor {
   }
 
   stopCapture({ releaseStream = false } = {}) {
+    this.stopCeremonyCapture();
     this.source?.disconnect();
     this.analyser?.disconnect();
     this.source = null;
@@ -279,7 +369,8 @@ export class AcousticProximitySensor {
 export function createChirpSamples(sampleRate, {
   durationMs = DEFAULT_CHIRP.durationMs,
   startFrequencyHz = DEFAULT_CHIRP.startFrequencyHz,
-  endFrequencyHz = DEFAULT_CHIRP.endFrequencyHz
+  endFrequencyHz = DEFAULT_CHIRP.endFrequencyHz,
+  code = DEFAULT_CHIRP.code
 } = {}) {
   const length = Math.max(1, Math.round(sampleRate * durationMs / 1000));
   const samples = new Float32Array(length);
@@ -294,10 +385,15 @@ export function createChirpSamples(sampleRate, {
   const safeEndFrequencyHz = clamp(endFrequencyHz, 1, maximumFrequencyHz);
   const safeStartFrequencyHz = clamp(startFrequencyHz, 1, safeEndFrequencyHz);
   const sweepRate = (safeEndFrequencyHz - safeStartFrequencyHz) / durationSeconds;
+  const codeCycles = Math.max(1, Math.min(8, Math.floor(Number(code) || 0) + 1));
+  const wobbleHz = (safeEndFrequencyHz - safeStartFrequencyHz) * 0.08;
 
   for (let index = 0; index < length; index += 1) {
     const time = index / sampleRate;
-    const phase = 2 * Math.PI * (safeStartFrequencyHz * time + sweepRate * time * time / 2);
+    const normalizedTime = time / durationSeconds;
+    const codedPhase = wobbleHz * durationSeconds / (2 * Math.PI * codeCycles)
+      * (1 - Math.cos(2 * Math.PI * codeCycles * normalizedTime));
+    const phase = 2 * Math.PI * (safeStartFrequencyHz * time + sweepRate * time * time / 2 + codedPhase);
     const envelope = Math.sin(Math.PI * index / Math.max(1, length - 1)) ** 2;
     samples[index] = Math.sin(phase) * envelope;
   }
@@ -443,4 +539,33 @@ function ended(source, fallbackSeconds) {
       resolve();
     }, { once: true });
   });
+}
+
+function concatenateSamples(chunks, length) {
+  const result = new Float32Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result;
+}
+
+function correlationMarginDb(samples, template, offset) {
+  if (offset < 0) return 0;
+  let signalEnergy = 0;
+  for (let index = 0; index < template.length && offset + index < samples.length; index += 1) {
+    signalEnergy += samples[offset + index] ** 2;
+  }
+  const signalRms = Math.sqrt(signalEnergy / Math.max(1, template.length));
+  let totalEnergy = 0;
+  for (const sample of samples) totalEnergy += sample ** 2;
+  const noiseEnergy = Math.max(1e-12, totalEnergy - signalEnergy);
+  const noiseSamples = Math.max(1, samples.length - template.length);
+  const noiseRms = Math.sqrt(noiseEnergy / noiseSamples);
+  return Math.max(0, 20 * Math.log10((signalRms + 1e-9) / (noiseRms + 1e-9)));
+}
+
+function roundMetric(value) {
+  return Math.round(Number(value || 0) * 1000) / 1000;
 }
