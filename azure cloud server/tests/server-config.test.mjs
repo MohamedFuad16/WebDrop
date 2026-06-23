@@ -96,3 +96,27 @@ test("diagnostics snapshot keeps private auth and exposes safe public status", a
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test("public diagnostics remain available when private metrics are disabled", async () => {
+  const { server, hub } = createWebDropServer({
+    env: {
+      NODE_ENV: "test",
+      ENABLE_METRICS_ENDPOINT: "false",
+      REQUIRE_TURN_AUTH: "false"
+    },
+    logger: { info() {}, warn() {}, error() {} }
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const base = `http://127.0.0.1:${address.port}`;
+  try {
+    const publicSnapshot = await fetch(`${base}/api/diagnostics-public`);
+    assert.equal(publicSnapshot.status, 200);
+
+    const privateSnapshot = await fetch(`${base}/api/diagnostics-snapshot`);
+    assert.equal(privateSnapshot.status, 404);
+  } finally {
+    hub.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

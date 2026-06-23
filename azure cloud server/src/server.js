@@ -136,7 +136,7 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
         return;
       }
 
-      if (request.method === "GET" && url.pathname === "/api/diagnostics-public" && env.ENABLE_METRICS_ENDPOINT === "true") {
+      if (request.method === "GET" && url.pathname === "/api/diagnostics-public") {
         sendJson(response, 200, diagnosticsPayload({ hub, metrics }), {
           "Cache-Control": "no-store",
           ...(corsHeaders || {})
