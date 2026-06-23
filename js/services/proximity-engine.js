@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.66";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.66";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.66";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.67";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.67";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.67";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 const ACOUSTIC_SLOT_GUARD_MS = 80;
@@ -144,6 +144,9 @@ export class ProximityEngine {
       acousticEndFrequencyHz: acousticResult.endFrequencyHz || null,
       acousticMarginDb: acousticResult.marginDb || 0,
       acousticSampleRate: acousticResult.sampleRate || null,
+      acousticRecordingDurationMs: acousticResult.recordingDurationMs || 0,
+      acousticRecordingRms: acousticResult.recordingRms || 0,
+      acousticRecordingPeak: acousticResult.recordingPeak || 0,
       acousticReason: acousticResult.reason || null,
       acousticConfidenceMargin: acousticResult.confidenceMargin || 0,
       acousticRunnerUpCorrelation: acousticResult.runnerUpCorrelation || 0,
@@ -392,6 +395,8 @@ async function exchangeCapturedSignatureChirps(acoustic, {
     .filter((detection) => detection.detected)
     .sort((a, b) => b.correlation - a.correlation || b.marginDb - a.marginDb);
   const strongest = heard[0] || null;
+  const bestAttempt = [...detections]
+    .sort((a, b) => b.correlation - a.correlation || b.marginDb - a.marginDb)[0] || null;
   const runnerUp = heard[1] || null;
   const confidenceMargin = strongest
     ? Math.max(0, strongest.correlation - (runnerUp?.correlation || 0))
@@ -400,7 +405,8 @@ async function exchangeCapturedSignatureChirps(acoustic, {
     emitted: emittedCount > 0,
     emittedCount,
     detected: Boolean(strongest),
-    correlation: strongest?.correlation || 0,
+    correlation: strongest?.correlation || bestAttempt?.correlation || 0,
+    marginDb: strongest?.marginDb || bestAttempt?.marginDb || 0,
     confidenceMargin,
     runnerUpCorrelation: runnerUp?.correlation || 0,
     ownSignatureId,
@@ -408,6 +414,8 @@ async function exchangeCapturedSignatureChirps(acoustic, {
     detections,
     sampleRate: recording.sampleRate,
     recordingDurationMs: recording.durationMs,
+    recordingRms: recording.rms || 0,
+    recordingPeak: recording.peak || 0,
     ...(strongest ? {
       mode: "detected",
       slot: strongest.slot,

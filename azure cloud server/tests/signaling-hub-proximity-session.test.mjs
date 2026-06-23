@@ -41,6 +41,28 @@ test("proximity session rejects scores below 55", () => {
   hub.close();
 });
 
+test("proximity failure reports missing acoustics when motion score is already 58", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  const session = createSession(hub, [clientA, clientB]);
+  const missingAcoustic = {
+    ...verifiedMetrics(),
+    acoustic: false,
+    soundCorrelation: 0
+  };
+
+  hub.recordProximitySessionTelemetry(clientA, sessionMessage(session, clientA, missingAcoustic, 1000, clientB));
+  hub.recordProximitySessionTelemetry(clientB, sessionMessage(session, clientB, missingAcoustic, 1040, clientA));
+  hub.failUnmatchedProximitySession(session.id);
+
+  const failure = messagesOf(clientA, "proximity:session:failed")[0];
+  assert.ok(Math.abs(failure.payload.score - 0.58) < 0.000001);
+  assert.equal(failure.payload.reason, "acoustic_not_detected");
+
+  hub.close();
+});
+
 test("proximity session rejects a high score without explicit bump and tilt evidence", () => {
   const hub = createTestHub();
   const clientA = addClient(hub, "client-a");
@@ -228,6 +250,9 @@ test("diagnostics snapshot exposes safe live proximity and acoustic state", () =
     acousticEndFrequencyHz: 19240,
     acousticMarginDb: 24,
     acousticSampleRate: 48000,
+    acousticRecordingDurationMs: 3600,
+    acousticRecordingRms: 0.012,
+    acousticRecordingPeak: 0.08,
     acousticConfidenceMargin: 0.44,
     acousticRunnerUpCorrelation: 0.31,
     acousticDetections: [{ signatureId: "signature-1", correlation: 0.75, marginDb: 24 }]
@@ -249,6 +274,9 @@ test("diagnostics snapshot exposes safe live proximity and acoustic state", () =
     endFrequencyHz: 19240,
     marginDb: 24,
     sampleRate: 48000,
+    recordingDurationMs: 3600,
+    recordingRms: 0.012,
+    recordingPeak: 0.08,
     confidenceMargin: 0.44,
     runnerUpCorrelation: 0.31,
     detections: [{ signatureId: "signature-1", correlation: 0.75, marginDb: 24 }],

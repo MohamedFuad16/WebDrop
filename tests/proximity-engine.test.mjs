@@ -145,6 +145,53 @@ test("iPhone audio output is unlocked before the delayed ceremony", async () => 
   assert.equal(oscillatorStarts, 1);
 });
 
+test("chirp output does not filter out its own frequency band", async () => {
+  let outputConnected = false;
+  let filterCreated = false;
+  const source = {
+    buffer: null,
+    connect(node) {
+      outputConnected = Boolean(node?.gain);
+    },
+    disconnect() {},
+    start() {},
+    addEventListener(_type, callback) {
+      callback();
+    }
+  };
+  const context = {
+    state: "running",
+    sampleRate: 48_000,
+    currentTime: 0,
+    destination: {},
+    createBuffer(_channels, length, sampleRate) {
+      return {
+        length,
+        sampleRate,
+        copyToChannel() {}
+      };
+    },
+    createBufferSource() {
+      return source;
+    },
+    createGain() {
+      return { gain: { value: 1 }, connect() {}, disconnect() {} };
+    },
+    createBiquadFilter() {
+      filterCreated = true;
+      throw new Error("The chirp must not be filtered above its own band.");
+    }
+  };
+  const sensor = new AcousticProximitySensor({ audioContextFactory: () => context });
+
+  const result = await sensor.emitChirp();
+
+  assert.equal(result.emitted, true);
+  assert.equal(result.gain, DEFAULT_CHIRP.gain);
+  assert.equal(outputConnected, true);
+  assert.equal(filterCreated, false);
+});
+
 test("inaudible ultrasound band detection tolerates phone speaker distortion", () => {
   const sampleRate = 48_000;
   const fftSize = 8192;
@@ -284,7 +331,13 @@ test("anonymous ceremony records continuously and decodes after every transmit s
     },
     stopCeremonyCapture() {
       calls.push("capture:stop");
-      return { samples: new Float32Array(48), sampleRate: 48_000, durationMs: 1 };
+      return {
+        samples: new Float32Array(48),
+        sampleRate: 48_000,
+        durationMs: 1,
+        rms: 0.012,
+        peak: 0.08
+      };
     },
     decodeCeremonyCapture(_recording, plan) {
       calls.push("capture:decode");
@@ -326,6 +379,8 @@ test("anonymous ceremony records continuously and decodes after every transmit s
   assert.equal(result.metrics.heardAcousticSignatureId, "signature-1");
   assert.equal(result.metrics.acousticDetections.length, 4);
   assert.equal(result.metrics.acousticConfidenceMargin, 0.39);
+  assert.equal(result.metrics.acousticRecordingRms, 0.012);
+  assert.equal(result.metrics.acousticRecordingPeak, 0.08);
 });
 
 test("two devices emit and receive chirps in separate synchronized slots", async () => {

@@ -65,7 +65,10 @@ test("proximity session telemetry preserves bounded reciprocal acoustic signatur
       metrics: {
         soundCorrelation: 0.84,
         acousticSignatureId: "signature-self",
-        heardAcousticSignatureId: "signature-peer"
+        heardAcousticSignatureId: "signature-peer",
+        acousticRecordingDurationMs: 3600,
+        acousticRecordingRms: 0.012,
+        acousticRecordingPeak: 0.08
       }
     }
   });
@@ -73,4 +76,7 @@ test("proximity session telemetry preserves bounded reciprocal acoustic signatur
   assert.equal(telemetry.payload.metrics.acousticSignatureId, "signature-self");
   assert.equal(telemetry.payload.metrics.heardAcousticSignatureId, "signature-peer");
   assert.equal(telemetry.payload.metrics.soundCorrelation, 0.84);
+  assert.equal(telemetry.payload.metrics.acousticRecordingDurationMs, 3600);
+  assert.equal(telemetry.payload.metrics.acousticRecordingRms, 0.012);
+  assert.equal(telemetry.payload.metrics.acousticRecordingPeak, 0.08);
 });

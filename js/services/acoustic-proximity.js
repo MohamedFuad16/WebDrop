@@ -94,29 +94,20 @@ export class AcousticProximitySensor {
 
     const source = context.createBufferSource();
     const gain = context.createGain();
-    const highpass = context.createBiquadFilter?.() || null;
     source.buffer = buffer;
     gain.gain.value = chirp.gain;
-    if (highpass) {
-      highpass.type = "highpass";
-      highpass.frequency.value = 19_500;
-      highpass.Q.value = .7;
-      source.connect(highpass);
-      highpass.connect(gain);
-    } else {
-      source.connect(gain);
-    }
+    source.connect(gain);
     gain.connect(context.destination);
     source.start();
 
     await ended(source, samples.length / context.sampleRate);
     source.disconnect();
-    highpass?.disconnect();
     gain.disconnect();
 
     return {
       emitted: true,
       durationMs: chirp.durationMs,
+      gain: chirp.gain,
       sampleRate: context.sampleRate,
       startFrequencyHz: chirp.startFrequencyHz,
       endFrequencyHz: chirp.endFrequencyHz
@@ -259,10 +250,13 @@ export class AcousticProximitySensor {
     this.captureChunks = [];
     this.captureSampleCount = 0;
     this.captureMaximumSamples = 0;
+    const signal = sampleEnergy(samples);
     return {
       samples,
       sampleRate,
-      durationMs: sampleRate ? samples.length / sampleRate * 1000 : 0
+      durationMs: sampleRate ? samples.length / sampleRate * 1000 : 0,
+      rms: signal.rms,
+      peak: signal.peak
     };
   }
 
@@ -590,6 +584,21 @@ function scoreCaptureWindow(samples, template, start, end, { step = 8 } = {}) {
 function chooseBestCaptureScore(primary, expanded) {
   if (primary.correlation >= expanded.correlation) return primary;
   return expanded;
+}
+
+function sampleEnergy(samples) {
+  if (!samples?.length) return { rms: 0, peak: 0 };
+  let sumSquares = 0;
+  let peak = 0;
+  for (const sample of samples) {
+    const magnitude = Math.abs(sample);
+    sumSquares += sample * sample;
+    if (magnitude > peak) peak = magnitude;
+  }
+  return {
+    rms: roundMetric(Math.sqrt(sumSquares / samples.length)),
+    peak: roundMetric(peak)
+  };
 }
 
 function roundMetric(value) {

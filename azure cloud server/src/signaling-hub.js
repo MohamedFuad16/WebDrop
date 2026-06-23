@@ -610,7 +610,13 @@ export class SignalingHub {
       acousticEmitted: Boolean(message.payload.metrics?.acousticEmitted),
       acousticDetected: Boolean(message.payload.metrics?.acousticDetected),
       acousticSlot: Number(message.payload.metrics?.acousticSlot || 0),
-      acousticMarginDb: Number(message.payload.metrics?.acousticMarginDb || 0)
+      acousticMarginDb: Number(message.payload.metrics?.acousticMarginDb || 0),
+      acousticCorrelation: Number(message.payload.metrics?.acousticCorrelation || 0),
+      acousticSampleRate: Number(message.payload.metrics?.acousticSampleRate || 0),
+      acousticRecordingDurationMs: Number(message.payload.metrics?.acousticRecordingDurationMs || 0),
+      acousticRecordingRms: Number(message.payload.metrics?.acousticRecordingRms || 0),
+      acousticRecordingPeak: Number(message.payload.metrics?.acousticRecordingPeak || 0),
+      acousticReason: message.payload.metrics?.acousticReason || null
     });
     this.tryMatchProximitySession(session);
   }
@@ -679,14 +685,14 @@ export class SignalingHub {
       if (!client || client.pairingId) continue;
       this.send(client.socket, "proximity:session:failed", {
         sessionId,
-        reason: "score_too_low",
+        reason: proximityFailureReason(entry?.analysis),
         score: entry?.analysis?.score ?? null,
         analysis: entry?.analysis || null
       });
       this.metrics?.recordEvent("proximity:session:failed", {
         sessionId,
         clientId,
-        reason: "score_too_low",
+        reason: proximityFailureReason(entry?.analysis),
         score: entry?.analysis?.score ?? null
       });
     }
@@ -1199,6 +1205,9 @@ function acousticDiagnostics(metrics = {}) {
     endFrequencyHz: finiteOrNull(metrics.acousticEndFrequencyHz),
     marginDb: finiteOrNull(metrics.acousticMarginDb),
     sampleRate: finiteOrNull(metrics.acousticSampleRate),
+    recordingDurationMs: finiteOrNull(metrics.acousticRecordingDurationMs),
+    recordingRms: finiteOrNull(metrics.acousticRecordingRms),
+    recordingPeak: finiteOrNull(metrics.acousticRecordingPeak),
     confidenceMargin: finiteOrNull(metrics.acousticConfidenceMargin),
     runnerUpCorrelation: finiteOrNull(metrics.acousticRunnerUpCorrelation),
     detections: Array.isArray(metrics.acousticDetections)
@@ -1206,6 +1215,15 @@ function acousticDiagnostics(metrics = {}) {
       : [],
     reason: metrics.acousticReason || null
   };
+}
+
+function proximityFailureReason(analysis) {
+  if (!analysis) return "telemetry_missing";
+  if (!analysis.physicalEvidence?.ultrasound) return "acoustic_not_detected";
+  if (!analysis.physicalEvidence?.bump) return "bump_not_detected";
+  if (!analysis.physicalEvidence?.tilt) return "tilt_not_detected";
+  if (Number(analysis.score || 0) < SESSION_SCORE_MINIMUM) return "score_too_low";
+  return "ambiguous_or_nonreciprocal_match";
 }
 
 function finiteOrNull(value) {
