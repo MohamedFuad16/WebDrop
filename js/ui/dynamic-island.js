@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.67";
-import { Emitter } from "../utils/emitter.js?v=1.0.67";
-import { formatBytes } from "../utils/format.js?v=1.0.67";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.67";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.67";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.68";
+import { Emitter } from "../utils/emitter.js?v=1.0.68";
+import { formatBytes } from "../utils/format.js?v=1.0.68";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.68";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.68";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -964,9 +964,10 @@ function formatAcousticStatus(acoustic = {}, { fallback, translate }) {
     "emit-failed": "ceremonyAudioEmitFailed",
     listen: "ceremonyAudioListening",
     detected: "ceremonyDetected",
+    "energy-assisted": "ceremonyEnergyHeard",
     missed: "ceremonyMissed"
   };
-  const key = keyByMode[mode];
+  const key = acoustic?.energyAssisted ? "ceremonyEnergyHeard" : keyByMode[mode];
   if (!key) return fallback;
   return `${translate(key)}${slotLabel}${countLabel}${marginLabel}${band}`;
 }

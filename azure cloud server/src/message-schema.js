@@ -390,6 +390,7 @@ function validateProximityMetrics(metrics) {
     acousticStartFrequencyHz: safeNumber(metrics.acousticStartFrequencyHz),
     acousticEndFrequencyHz: safeNumber(metrics.acousticEndFrequencyHz),
     acousticMarginDb: safeNumber(metrics.acousticMarginDb),
+    acousticDetectionMethod: cleanString(metrics.acousticDetectionMethod, 32) || null,
     acousticSampleRate: safeNumber(metrics.acousticSampleRate),
     acousticRecordingDurationMs: safeNumber(metrics.acousticRecordingDurationMs),
     acousticRecordingRms: safeNumber(metrics.acousticRecordingRms),
@@ -403,6 +404,8 @@ function validateProximityMetrics(metrics) {
         signatureId: cleanString(entry?.signatureId, 80) || null,
         correlation: scoreMetric(entry?.correlation),
         marginDb: safeNumber(entry?.marginDb),
+        detectionMethod: cleanString(entry?.detectionMethod, 32) || null,
+        energyAssisted: Boolean(entry?.energyAssisted),
         sampleOffset: safeNumber(entry?.sampleOffset)
       }))
       .filter((entry) => entry.signatureId)

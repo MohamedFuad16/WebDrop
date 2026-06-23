@@ -581,6 +581,7 @@ test("shows acoustic slot diagnostics in the Dynamic Island ceremony", async ({ 
       ceremonyAudioEmitFailed: "Emit failed",
       ceremonyAudioListening: "Listening",
       ceremonyDetected: "Detected",
+      ceremonyEnergyHeard: "Energy heard",
       ceremonyMissed: "Missed",
       ceremonyAudioSending: "Listening"
     };
@@ -634,6 +635,24 @@ test("shows acoustic slot diagnostics in the Dynamic Island ceremony", async ({ 
     });
   });
   await expect(page.locator("[data-island-audio-value]")).toHaveText("Missed 2 slots 19-19.4kHz");
+
+  await page.evaluate(() => {
+    globalThis.__webdropDiagnosticIsland.updateCeremony({
+      phase: "audio",
+      state: "active",
+      acoustic: {
+        mode: "detected",
+        detected: true,
+        energyAssisted: true,
+        slot: 2,
+        slotCount: 4,
+        marginDb: 5,
+        startFrequencyHz: 18600,
+        endFrequencyHz: 19400
+      }
+    });
+  });
+  await expect(page.locator("[data-island-audio-value]")).toHaveText("Energy heard 2/4 +5dB 18.6-19.4kHz");
 });
 
 test("keeps Japanese failure diagnostics and fallback actions reachable on iPhone", async ({ page }, testInfo) => {

@@ -24,6 +24,29 @@ test("proximity session matches the intended pair while a third client is nearby
   hub.close();
 });
 
+test("proximity session accepts reciprocal energy-assisted acoustic detections", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  const session = createSession(hub, [clientA, clientB]);
+
+  hub.recordProximitySessionTelemetry(
+    clientA,
+    sessionMessage(session, clientA, energyAssistedMetrics(session, clientB), 1000, clientB)
+  );
+  hub.recordProximitySessionTelemetry(
+    clientB,
+    sessionMessage(session, clientB, energyAssistedMetrics(session, clientA), 1040, clientA)
+  );
+
+  assert.equal(clientA.pairingId, clientB.pairingId);
+  assert.ok(clientA.pairingId);
+  assert.equal(messagesOf(clientA, "proximity:match")[0].payload.peerId, "client-b");
+  assert.equal(messagesOf(clientB, "proximity:match")[0].payload.peerId, "client-a");
+
+  hub.close();
+});
+
 test("proximity session rejects scores below 55", () => {
   const hub = createTestHub();
   const clientA = addClient(hub, "client-a");
@@ -273,6 +296,7 @@ test("diagnostics snapshot exposes safe live proximity and acoustic state", () =
     startFrequencyHz: 19020,
     endFrequencyHz: 19240,
     marginDb: 24,
+    detectionMethod: null,
     sampleRate: 48000,
     recordingDurationMs: 3600,
     recordingRms: 0.012,
@@ -370,6 +394,25 @@ function verifiedMetrics() {
     motionCorrelation: 1,
     bump: true,
     tilt: true
+  };
+}
+
+function energyAssistedMetrics(session, heardClient) {
+  const heardSignature = session.signatures.get(heardClient.id);
+  return {
+    ...verifiedMetrics(),
+    acousticDetected: true,
+    acousticCorrelation: 0.21,
+    acousticMarginDb: 4.8,
+    acousticDetectionMethod: "energy-assisted",
+    acousticConfidenceMargin: 0.21,
+    acousticDetections: [{
+      signatureId: heardSignature,
+      correlation: 0.21,
+      marginDb: 4.8,
+      detectionMethod: "energy-assisted",
+      energyAssisted: true
+    }]
   };
 }
 

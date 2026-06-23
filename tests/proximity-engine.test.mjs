@@ -318,6 +318,41 @@ test("continuous decoder tolerates iPhone output and microphone slot drift", () 
   assert.equal(detection.sampleOffset, lateOffset);
 });
 
+test("continuous decoder accepts weak iPhone waveform correlation when slot energy is clear", () => {
+  const sampleRate = 48_000;
+  const slotDurationMs = 720;
+  const plan = [
+    { id: "self-signature", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 0 },
+    { id: "peer-signature", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 1 }
+  ];
+  const peerTemplate = createChirpSamples(sampleRate, plan[1]);
+  const samples = new Float32Array(Math.round(sampleRate * 3));
+  for (let index = 0; index < samples.length; index += 1) {
+    samples[index] = 0.3 * Math.sin(2 * Math.PI * 3300 * index / sampleRate + 0.2)
+      + 0.18 * Math.sin(2 * Math.PI * 7400 * index / sampleRate + 1.1);
+  }
+  const offset = Math.round(sampleRate * 1.4);
+  for (let index = 0; index < peerTemplate.length; index += 1) {
+    const envelope = Math.sin(Math.PI * index / Math.max(1, peerTemplate.length - 1)) ** 2;
+    samples[offset + index] += 0.08 * peerTemplate[index]
+      + 0.8 * Math.sin(2 * Math.PI * 19100 * index / sampleRate + 0.7) * envelope;
+  }
+  const sensor = new AcousticProximitySensor();
+
+  const [detection] = sensor.decodeCeremonyCapture(
+    { samples, sampleRate },
+    plan,
+    { ownSignatureId: "self-signature", slotDurationMs }
+  );
+
+  assert.equal(detection.detected, true);
+  assert.equal(detection.detectionMethod, "energy-assisted");
+  assert.equal(detection.energyAssisted, true);
+  assert.ok(detection.correlation >= 0.16);
+  assert.ok(detection.correlation < 0.3);
+  assert.ok(detection.marginDb >= 4.5);
+});
+
 test("anonymous ceremony records continuously and decodes after every transmit slot", async () => {
   const calls = [];
   const acoustic = {

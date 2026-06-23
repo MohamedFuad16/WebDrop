@@ -7,6 +7,8 @@ export const DEFAULT_CHIRP = Object.freeze({
 });
 
 export const MIN_INAUDIBLE_FREQUENCY_HZ = 18500;
+export const ENERGY_ASSISTED_CORRELATION_MINIMUM = 0.16;
+export const ENERGY_ASSISTED_MARGIN_DB_MINIMUM = 4.5;
 
 export class AcousticProximitySensor {
   constructor({
@@ -266,7 +268,9 @@ export class AcousticProximitySensor {
     threshold = 0.3,
     slotGuardMs = 260,
     driftGuardMs = 760,
-    minimumMarginDb = 1.5
+    minimumMarginDb = 1.5,
+    energyAssistedCorrelation = ENERGY_ASSISTED_CORRELATION_MINIMUM,
+    energyAssistedMarginDb = ENERGY_ASSISTED_MARGIN_DB_MINIMUM
   } = {}) {
     const sampleRate = Number(recording?.sampleRate);
     const samples = recording?.samples;
@@ -286,6 +290,10 @@ export class AcousticProximitySensor {
         const expandedEnd = Math.min(samples.length, nominalEnd + driftSamples);
         const expanded = scoreCaptureWindow(samples, template, expandedStart, expandedEnd, { step: 10 });
         const scored = chooseBestCaptureScore(primary, expanded);
+        const correlationDetected = scored.correlation >= threshold && scored.marginDb >= minimumMarginDb;
+        const energyAssisted = !correlationDetected
+          && scored.correlation >= energyAssistedCorrelation
+          && scored.marginDb >= energyAssistedMarginDb;
         return {
           signatureId: signature.id,
           slot: index + 1,
@@ -293,7 +301,9 @@ export class AcousticProximitySensor {
           code: Number(signature.code || 0),
           startFrequencyHz: signature.startFrequencyHz,
           endFrequencyHz: signature.endFrequencyHz,
-          detected: scored.correlation >= threshold && scored.marginDb >= minimumMarginDb,
+          detected: correlationDetected || energyAssisted,
+          detectionMethod: correlationDetected ? "correlation" : energyAssisted ? "energy-assisted" : "missed",
+          energyAssisted,
           correlation: roundMetric(scored.correlation),
           marginDb: roundMetric(scored.marginDb),
           sampleOffset: scored.offset < 0 ? null : scored.offset,

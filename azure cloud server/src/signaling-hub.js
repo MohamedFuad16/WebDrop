@@ -39,6 +39,8 @@ const ACOUSTIC_BAND_END_HZ = 19_400;
 const ACOUSTIC_MIN_BANDWIDTH_HZ = 420;
 const ACOUSTIC_WINNER_MARGIN = 0.04;
 const ACOUSTIC_MIN_CORRELATION = 0.3;
+const ACOUSTIC_ENERGY_ASSISTED_MIN_CORRELATION = 0.16;
+const ACOUSTIC_ENERGY_ASSISTED_MIN_MARGIN_DB = 4.5;
 
 export class SignalingHub {
   constructor({ server, path = "/ws", logger, maxJsonBytes = 131072, heartbeatIntervalMs = 25000, sessionTtlMs = 900000, pairingTtlMs = 120000, proximityAnalyzer, qrTokenProvider, metrics } = {}) {
@@ -612,6 +614,7 @@ export class SignalingHub {
       acousticSlot: Number(message.payload.metrics?.acousticSlot || 0),
       acousticMarginDb: Number(message.payload.metrics?.acousticMarginDb || 0),
       acousticCorrelation: Number(message.payload.metrics?.acousticCorrelation || 0),
+      acousticDetectionMethod: message.payload.metrics?.acousticDetectionMethod || null,
       acousticSampleRate: Number(message.payload.metrics?.acousticSampleRate || 0),
       acousticRecordingDurationMs: Number(message.payload.metrics?.acousticRecordingDurationMs || 0),
       acousticRecordingRms: Number(message.payload.metrics?.acousticRecordingRms || 0),
@@ -1137,8 +1140,8 @@ function hasReciprocalAcousticEvidence(session, first, second) {
     && second.analysis?.acousticSignatureId === secondSignature
     && first.analysis?.heardAcousticSignatureId === secondSignature
     && second.analysis?.heardAcousticSignatureId === firstSignature
-    && firstDetection.correlation >= ACOUSTIC_MIN_CORRELATION
-    && secondDetection.correlation >= ACOUSTIC_MIN_CORRELATION
+    && hasUsableAcousticDetection(firstDetection)
+    && hasUsableAcousticDetection(secondDetection)
     && Number(first.analysis?.acousticConfidenceMargin ?? 1) >= ACOUSTIC_WINNER_MARGIN
     && Number(second.analysis?.acousticConfidenceMargin ?? 1) >= ACOUSTIC_WINNER_MARGIN);
 }
@@ -1147,6 +1150,15 @@ function acousticDetectionFor(analysis, signatureId) {
   const detections = Array.isArray(analysis?.acousticDetections) ? analysis.acousticDetections : [];
   return detections.find((entry) => entry.signatureId === signatureId)
     || { correlation: analysis?.heardAcousticSignatureId === signatureId ? 1 : 0 };
+}
+
+function hasUsableAcousticDetection(detection) {
+  const correlation = Number(detection?.correlation || 0);
+  const marginDb = Number(detection?.marginDb || 0);
+  if (correlation >= ACOUSTIC_MIN_CORRELATION) return true;
+  return Boolean(detection?.energyAssisted || detection?.detectionMethod === "energy-assisted")
+    && correlation >= ACOUSTIC_ENERGY_ASSISTED_MIN_CORRELATION
+    && marginDb >= ACOUSTIC_ENERGY_ASSISTED_MIN_MARGIN_DB;
 }
 
 function selectSharedAcousticBand(session) {
@@ -1204,6 +1216,7 @@ function acousticDiagnostics(metrics = {}) {
     startFrequencyHz: finiteOrNull(metrics.acousticStartFrequencyHz),
     endFrequencyHz: finiteOrNull(metrics.acousticEndFrequencyHz),
     marginDb: finiteOrNull(metrics.acousticMarginDb),
+    detectionMethod: metrics.acousticDetectionMethod || null,
     sampleRate: finiteOrNull(metrics.acousticSampleRate),
     recordingDurationMs: finiteOrNull(metrics.acousticRecordingDurationMs),
     recordingRms: finiteOrNull(metrics.acousticRecordingRms),

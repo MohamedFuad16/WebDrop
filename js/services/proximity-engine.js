@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.67";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.67";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.67";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.68";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.68";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.68";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 const ACOUSTIC_SLOT_GUARD_MS = 80;
@@ -143,6 +143,7 @@ export class ProximityEngine {
       acousticStartFrequencyHz: acousticResult.startFrequencyHz || null,
       acousticEndFrequencyHz: acousticResult.endFrequencyHz || null,
       acousticMarginDb: acousticResult.marginDb || 0,
+      acousticDetectionMethod: acousticResult.detectionMethod || null,
       acousticSampleRate: acousticResult.sampleRate || null,
       acousticRecordingDurationMs: acousticResult.recordingDurationMs || 0,
       acousticRecordingRms: acousticResult.recordingRms || 0,
@@ -154,6 +155,8 @@ export class ProximityEngine {
         signatureId: detection.signatureId,
         correlation: detection.correlation || 0,
         marginDb: detection.marginDb || 0,
+        detectionMethod: detection.detectionMethod || null,
+        energyAssisted: Boolean(detection.energyAssisted),
         sampleOffset: detection.sampleOffset ?? null
       })),
       motionCorrelation: motion.bump && motion.tilted ? 1 : motion.samples > 0 ? 0.4 : 0,
@@ -281,7 +284,9 @@ async function exchangeSignatureChirps(acoustic, {
       endFrequencyHz: signature.endFrequencyHz,
       detected: Boolean(detected.detected),
       correlation: detected.correlation || 0,
-      marginDb: detected.band?.marginDb || 0
+      marginDb: detected.band?.marginDb || 0,
+      detectionMethod: detected.detectionMethod || null,
+      energyAssisted: Boolean(detected.energyAssisted)
     };
     listenedSlots.push(slotResult);
     if (detected.detected) {
@@ -298,6 +303,8 @@ async function exchangeSignatureChirps(acoustic, {
         detected: Boolean(detected.detected),
         correlation: detected.correlation || 0,
         marginDb: detected.band?.marginDb || 0,
+        detectionMethod: detected.detectionMethod || null,
+        energyAssisted: Boolean(detected.energyAssisted),
         reason: detected.reason || null,
         startFrequencyHz: signature.startFrequencyHz,
         endFrequencyHz: signature.endFrequencyHz
@@ -323,6 +330,8 @@ async function exchangeSignatureChirps(acoustic, {
       slotCount: strongest.slotCount,
       marginDb: strongest.marginDb,
       correlation: strongest.correlation,
+      detectionMethod: strongest.detectionMethod || null,
+      energyAssisted: Boolean(strongest.energyAssisted),
       targetSignatureId: strongest.signatureId,
       startFrequencyHz: strongest.startFrequencyHz,
       endFrequencyHz: strongest.endFrequencyHz
@@ -421,6 +430,8 @@ async function exchangeCapturedSignatureChirps(acoustic, {
       slot: strongest.slot,
       slotCount: strongest.slotCount,
       marginDb: strongest.marginDb,
+      detectionMethod: strongest.detectionMethod || null,
+      energyAssisted: Boolean(strongest.energyAssisted),
       targetSignatureId: strongest.signatureId,
       startFrequencyHz: strongest.startFrequencyHz,
       endFrequencyHz: strongest.endFrequencyHz
