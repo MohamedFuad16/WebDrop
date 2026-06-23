@@ -53,7 +53,7 @@ test("enabled metrics require a non-placeholder token", () => {
   );
 });
 
-test("diagnostics snapshot requires metrics authorization", async () => {
+test("diagnostics snapshot keeps private auth and exposes safe public status", async () => {
   const { server, hub } = createWebDropServer({
     env: {
       NODE_ENV: "test",
@@ -67,6 +67,16 @@ test("diagnostics snapshot requires metrics authorization", async () => {
   const address = server.address();
   const base = `http://127.0.0.1:${address.port}`;
   try {
+    const publicSnapshot = await fetch(`${base}/api/diagnostics-public`);
+    assert.equal(publicSnapshot.status, 200);
+    const publicBody = await publicSnapshot.json();
+    assert.deepEqual(publicBody.signaling, {
+      clients: [],
+      pairs: [],
+      proximitySessions: []
+    });
+    assert.ok(Array.isArray(publicBody.metrics.recentEvents));
+
     const unauthorized = await fetch(`${base}/api/diagnostics-snapshot`);
     assert.equal(unauthorized.status, 401);
 

@@ -1,8 +1,8 @@
 import {
   AcousticProximitySensor,
   DEFAULT_CHIRP
-} from "../services/acoustic-proximity.js?v=1.0.68";
-import { formatFrequency, formatNumber } from "./shared.js?v=1.0.68";
+} from "../services/acoustic-proximity.js?v=1.0.69";
+import { formatFrequency, formatNumber } from "./shared.js?v=1.0.69";
 
 export class AcousticLab {
   constructor(document) {

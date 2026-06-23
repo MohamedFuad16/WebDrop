@@ -5,58 +5,61 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f5f7fa">
   <title>WebDrop Diagnostics</title>
-  <link rel="stylesheet" href="../css/diagnostics.css?v=1.0.68">
+  <link rel="stylesheet" href="../css/diagnostics.css?v=1.0.69">
 </head>
 <body>
   <header class="diagnostics-header">
     <div>
       <p class="eyebrow">WebDrop operations</p>
-      <h1>Live proximity diagnostics</h1>
+      <h1 data-i18n="pageTitle">Live proximity diagnostics</h1>
     </div>
     <nav aria-label="Diagnostics navigation">
-      <a href="../">App</a>
-      <a href="./">Admin</a>
+      <a href="../" data-i18n="appLink">App</a>
+      <a href="./" data-i18n="adminLink">Admin</a>
     </nav>
   </header>
 
   <main class="diagnostics-shell">
     <section class="control-bar" aria-label="Diagnostics connection controls">
+      <div class="source-chip">
+        <span data-i18n="sourceLabel">Live source</span>
+        <strong data-diagnostics-base-label>Production signaling</strong>
+      </div>
       <label>
-        <span>Signaling HTTP base</span>
-        <input data-diagnostics-base type="url" autocomplete="url" placeholder="https://signal.example.com">
+        <span data-i18n="languageLabel">Language</span>
+        <select data-diagnostics-language>
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+        </select>
       </label>
-      <label>
-        <span>Metrics token</span>
-        <input data-diagnostics-token type="password" autocomplete="off" placeholder="Required for live details">
-      </label>
-      <button type="button" data-action="diagnostics-refresh">Refresh now</button>
+      <button type="button" data-action="diagnostics-refresh" data-i18n="refresh">Refresh now</button>
       <label class="poll-toggle">
         <input data-diagnostics-poll type="checkbox" checked>
-        <span>Live polling</span>
+        <span data-i18n="livePolling">Live polling</span>
       </label>
     </section>
     <p class="page-error" data-diagnostics-error hidden></p>
 
     <section class="status-grid" aria-label="Signaling status">
       <article>
-        <span>Server</span>
+        <span data-i18n="server">Server</span>
         <strong data-server-status>Checking</strong>
         <small data-server-detail>Waiting for readiness</small>
       </article>
       <article>
-        <span>Devices</span>
+        <span data-i18n="devices">Devices</span>
         <strong data-device-count>0</strong>
-        <small>Active signaling clients</small>
+        <small data-i18n="devicesHelp">Active signaling clients</small>
       </article>
       <article>
-        <span>Pairings</span>
+        <span data-i18n="pairings">Pairings</span>
         <strong data-pair-count>0</strong>
-        <small>Verified active pairs</small>
+        <small data-i18n="pairingsHelp">Verified active pairs</small>
       </article>
       <article>
-        <span>Proximity</span>
+        <span data-i18n="proximity">Proximity</span>
         <strong data-session-count>0</strong>
-        <small>Joining or running sessions</small>
+        <small data-i18n="proximityHelp">Joining or running sessions</small>
       </article>
     </section>
 
@@ -64,8 +67,8 @@
       <section class="diagnostics-panel span-2" aria-labelledby="devices-title">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Signaling presence</p>
-            <h2 id="devices-title">Connected devices</h2>
+            <p class="eyebrow" data-i18n="presenceKicker">Signaling presence</p>
+            <h2 id="devices-title" data-i18n="connectedDevices">Connected devices</h2>
           </div>
           <span class="status-pill" data-snapshot-time>Not loaded</span>
         </div>
@@ -73,15 +76,15 @@
           <table>
             <thead>
               <tr>
-                <th>Device</th>
-                <th>Platform</th>
-                <th>Capabilities</th>
-                <th>Pairing</th>
-                <th>Last seen</th>
+                <th data-i18n="device">Device</th>
+                <th data-i18n="platform">Platform</th>
+                <th data-i18n="capabilities">Capabilities</th>
+                <th data-i18n="pairing">Pairing</th>
+                <th data-i18n="lastSeen">Last seen</th>
               </tr>
             </thead>
             <tbody data-device-rows>
-              <tr><td colspan="5" class="empty-cell">No diagnostics snapshot yet.</td></tr>
+              <tr><td colspan="5" class="empty-cell" data-i18n="noSnapshot">No diagnostics snapshot yet.</td></tr>
             </tbody>
           </table>
         </div>
@@ -90,61 +93,50 @@
       <section class="diagnostics-panel" aria-labelledby="sessions-title">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Physical matching</p>
-            <h2 id="sessions-title">Proximity sessions</h2>
+            <p class="eyebrow" data-i18n="matchingKicker">Physical matching</p>
+            <h2 id="sessions-title" data-i18n="proximitySessions">Proximity sessions</h2>
           </div>
         </div>
         <div class="session-list" data-session-list>
-          <p class="empty-state">No active proximity sessions.</p>
+          <p class="empty-state" data-i18n="noSessions">No active proximity sessions.</p>
         </div>
       </section>
 
-      <section class="diagnostics-panel acoustic-panel" aria-labelledby="acoustic-title">
+      <section class="diagnostics-panel acoustic-panel span-3" aria-labelledby="acoustic-title">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">This browser</p>
-            <h2 id="acoustic-title">Ultrasonic audio lab</h2>
+            <p class="eyebrow" data-i18n="acousticKicker">Device telemetry</p>
+            <h2 id="acoustic-title" data-i18n="acousticTitle">Live ultrasonic channels</h2>
           </div>
-          <span class="status-pill" data-acoustic-status>Idle</span>
+          <span class="status-pill" data-channel-count>0 channels</span>
         </div>
-        <canvas data-acoustic-canvas width="720" height="180" aria-label="Live ultrasonic input level"></canvas>
-        <div class="acoustic-facts">
-          <div><span>Microphone</span><strong data-acoustic-mic>Not requested</strong></div>
-          <div><span>Audio context</span><strong data-acoustic-context>Not started</strong></div>
-          <div><span>Sample rate</span><strong data-acoustic-rate>Unknown</strong></div>
-          <div><span>20.05-20.95 kHz margin</span><strong data-acoustic-margin>Unknown</strong></div>
+        <div class="channel-grid" data-channel-list>
+          <p class="empty-state" data-i18n="noChannels">No acoustic telemetry yet. Tap Connect on two devices to stream channel data.</p>
         </div>
-        <div class="button-row">
-          <button type="button" data-action="acoustic-enable">Enable microphone</button>
-          <button type="button" data-action="acoustic-loopback">Run loopback</button>
-          <button type="button" data-action="acoustic-emit">Emit only</button>
-          <button type="button" data-action="acoustic-listen">Listen only</button>
-          <button type="button" data-action="acoustic-stop">Stop</button>
+        <div class="frequency-strip" data-frequency-strip aria-label="Observed ultrasonic frequencies">
         </div>
-        <p class="acoustic-note">
-          Uses WebDrop's production 20.05-20.95 kHz coded chirp and continuous ceremony recorder. Raw microphone audio never leaves this page.
-          The server receives only bounded detection metrics.
+        <p class="ops-note" data-i18n="acousticNote">
+          Shows server-observed acoustic evidence from connected devices. Raw microphone audio stays on each device; this dashboard receives bounded telemetry only.
         </p>
-        <pre class="result-log" data-acoustic-output>Choose Enable microphone from a user gesture.</pre>
       </section>
 
       <section class="diagnostics-panel span-2" aria-labelledby="events-title">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">Server timeline</p>
-            <h2 id="events-title">Connection attempts and telemetry</h2>
+            <p class="eyebrow" data-i18n="timelineKicker">Server timeline</p>
+            <h2 id="events-title" data-i18n="timelineTitle">Connection attempts and telemetry</h2>
           </div>
-          <button class="secondary-button" type="button" data-action="events-clear">Clear local view</button>
+          <button class="secondary-button" type="button" data-action="events-clear" data-i18n="clearLocal">Clear local view</button>
         </div>
         <div class="event-stream" data-event-stream>
-          <p class="empty-state">No server events loaded.</p>
+          <p class="empty-state" data-i18n="noEvents">No server events loaded.</p>
         </div>
       </section>
     </div>
 
   </main>
 
-  <script src="../js/config/runtime-config.js?v=1.0.68"></script>
-  <script src="../js/admin/diagnostics.js?v=1.0.68" type="module"></script>
+  <script src="../js/config/runtime-config.js?v=1.0.69"></script>
+  <script src="../js/admin/diagnostics.js?v=1.0.69" type="module"></script>
 </body>
 </html>

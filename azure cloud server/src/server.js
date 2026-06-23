@@ -136,23 +136,20 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
         return;
       }
 
+      if (request.method === "GET" && url.pathname === "/api/diagnostics-public" && env.ENABLE_METRICS_ENDPOINT === "true") {
+        sendJson(response, 200, diagnosticsPayload({ hub, metrics }), {
+          "Cache-Control": "no-store",
+          ...(corsHeaders || {})
+        });
+        return;
+      }
+
       if (request.method === "GET" && url.pathname === "/api/diagnostics-snapshot" && env.ENABLE_METRICS_ENDPOINT === "true") {
         if (!hasMetricsAuthorization(request, env.METRICS_API_TOKEN)) {
           sendJson(response, 401, { error: "unauthorized" }, corsHeaders || {});
           return;
         }
-        sendJson(response, 200, {
-          generatedAt: new Date().toISOString(),
-          metrics: metrics.summary({
-            activeClients: hub?.clients.size || 0,
-            activePairs: hub?.activePairs.size || 0
-          }),
-          signaling: hub?.diagnosticsSnapshot?.() || {
-            clients: [],
-            pairs: [],
-            proximitySessions: []
-          }
-        }, {
+        sendJson(response, 200, diagnosticsPayload({ hub, metrics }), {
           "Cache-Control": "no-store",
           ...(corsHeaders || {})
         });
@@ -220,6 +217,21 @@ function sendJson(response, statusCode, body, headers = {}) {
     ...headers
   });
   response.end(JSON.stringify(body));
+}
+
+function diagnosticsPayload({ hub, metrics }) {
+  return {
+    generatedAt: new Date().toISOString(),
+    metrics: metrics.summary({
+      activeClients: hub?.clients.size || 0,
+      activePairs: hub?.activePairs.size || 0
+    }),
+    signaling: hub?.diagnosticsSnapshot?.() || {
+      clients: [],
+      pairs: [],
+      proximitySessions: []
+    }
+  };
 }
 
 function parsePositiveInt(value, fallback) {

@@ -19,7 +19,12 @@ export class DiagnosticsApi {
   }
 
   async snapshot() {
-    return this.request("/api/diagnostics-snapshot", { authenticated: true });
+    try {
+      return await this.request("/api/diagnostics-public", { authenticated: false });
+    } catch (error) {
+      if (error.message !== "not_found") throw error;
+      return this.request("/api/diagnostics-snapshot", { authenticated: true });
+    }
   }
 
   async request(path, { authenticated = false } = {}) {
