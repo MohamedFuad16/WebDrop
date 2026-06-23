@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.65";
-import { Emitter } from "../utils/emitter.js?v=1.0.65";
-import { formatBytes } from "../utils/format.js?v=1.0.65";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.65";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.65";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.66";
+import { Emitter } from "../utils/emitter.js?v=1.0.66";
+import { formatBytes } from "../utils/format.js?v=1.0.66";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.66";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.66";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -268,6 +268,9 @@ export class DynamicIsland extends Emitter {
     this.setBackgroundInert(true);
     this.setState("verification-failed");
     this.updateCeremony({ phase: "score", state: "failed", score });
+    if (score >= 55 && this.nodes.ceremonyStage && errors.find(Boolean)) {
+      this.nodes.ceremonyStage.textContent = errors.find(Boolean);
+    }
     if (this.nodes.ceremonyError) {
       this.nodes.ceremonyError.hidden = false;
       this.nodes.ceremonyError.textContent = errors.filter(Boolean).join(" · ");

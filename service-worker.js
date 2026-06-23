@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.65";
+const APP_VERSION = "1.0.66";
 const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [

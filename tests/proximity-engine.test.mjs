@@ -156,8 +156,8 @@ test("inaudible ultrasound band detection tolerates phone speaker distortion", (
 
   const evidence = analyzeFrequencyBand(frequencies, { sampleRate, fftSize });
 
-  assert.equal(DEFAULT_CHIRP.startFrequencyHz, 20_050);
-  assert.equal(DEFAULT_CHIRP.endFrequencyHz, 20_950);
+  assert.equal(DEFAULT_CHIRP.startFrequencyHz, 18_600);
+  assert.equal(DEFAULT_CHIRP.endFrequencyHz, 19_400);
   assert.ok(DEFAULT_CHIRP.startFrequencyHz >= MIN_INAUDIBLE_FREQUENCY_HZ);
   assert.equal(evidence.detected, true);
   assert.ok(evidence.marginDb > 30);
@@ -221,10 +221,10 @@ test("diagnostics sample the live ultrasonic band without releasing the warm mic
   });
 });
 
-test("chirp emission refuses sample rates that would fold into audible frequencies", () => {
+test("chirp emission supports common mobile sample rates without folding", () => {
   assert.equal(supportsInaudibleChirp(48_000), true);
-  assert.equal(supportsInaudibleChirp(44_100), false);
-  assert.equal(createChirpSamples(44_100).every((sample) => sample === 0), true);
+  assert.equal(supportsInaudibleChirp(44_100), true);
+  assert.equal(createChirpSamples(44_100).some((sample) => sample !== 0), true);
 });
 
 test("chirp correlation accepts inverted microphone polarity", () => {
@@ -243,6 +243,32 @@ test("coded inaudible chirps remain distinguishable inside one shared band", () 
 
   assert.equal(same.correlation, 1);
   assert.ok(different.correlation < 0.8);
+});
+
+test("continuous decoder tolerates iPhone output and microphone slot drift", () => {
+  const sampleRate = 48_000;
+  const slotDurationMs = 720;
+  const plan = [
+    { id: "self-signature", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 0 },
+    { id: "peer-signature", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 1 }
+  ];
+  const peerTemplate = createChirpSamples(sampleRate, plan[1]);
+  const samples = new Float32Array(Math.round(sampleRate * 3));
+  const lateOffset = Math.round(sampleRate * 1.82);
+  samples.set(peerTemplate, lateOffset);
+  const sensor = new AcousticProximitySensor();
+
+  const [detection] = sensor.decodeCeremonyCapture(
+    { samples, sampleRate },
+    plan,
+    { ownSignatureId: "self-signature", slotDurationMs }
+  );
+
+  assert.equal(detection.detected, true);
+  assert.equal(detection.signatureId, "peer-signature");
+  assert.equal(detection.window, "expanded");
+  assert.ok(detection.correlation >= 0.3);
+  assert.equal(detection.sampleOffset, lateOffset);
 });
 
 test("anonymous ceremony records continuously and decodes after every transmit slot", async () => {
@@ -283,8 +309,8 @@ test("anonymous ceremony records continuously and decodes after every transmit s
   const engine = new ProximityEngine({ enabled: true, acoustic, motion });
   const plan = Array.from({ length: 5 }, (_, index) => ({
     id: `signature-${index}`,
-    startFrequencyHz: 20_050,
-    endFrequencyHz: 20_950,
+    startFrequencyHz: 18_600,
+    endFrequencyHz: 19_400,
     code: index
   }));
 
@@ -371,8 +397,8 @@ test("anonymous acoustic plans emit the assigned signature and report the strong
   };
   const engine = new ProximityEngine({ enabled: true, acoustic, motion });
   const plan = [
-    { id: "self-signature", startFrequencyHz: 20050, endFrequencyHz: 20280 },
-    { id: "peer-signature", startFrequencyHz: 20350, endFrequencyHz: 20580 }
+    { id: "self-signature", startFrequencyHz: 18600, endFrequencyHz: 18820 },
+    { id: "peer-signature", startFrequencyHz: 19020, endFrequencyHz: 19240 }
   ];
 
   const result = await engine.runRealCeremony({
@@ -386,8 +412,8 @@ test("anonymous acoustic plans emit the assigned signature and report the strong
     }
   });
 
-  assert.deepEqual(emittedBands, [[20050, 20280]]);
-  assert.deepEqual(detectedBands, [[20350, 20580]]);
+  assert.deepEqual(emittedBands, [[18600, 18820]]);
+  assert.deepEqual(detectedBands, [[19020, 19240]]);
   assert.deepEqual(
     progressEvents
       .filter((event) => event.phase === "audio" && event.state === "active" && event.acoustic?.mode)
@@ -404,32 +430,32 @@ test("anonymous acoustic plans emit the assigned signature and report the strong
         mode: "emit",
         slot: 1,
         slotCount: 2,
-        startFrequencyHz: 20050,
-        endFrequencyHz: 20280,
+        startFrequencyHz: 18600,
+        endFrequencyHz: 18820,
         marginDb: undefined
       },
       {
         mode: "emitted",
         slot: 1,
         slotCount: 2,
-        startFrequencyHz: 20050,
-        endFrequencyHz: 20280,
+        startFrequencyHz: 18600,
+        endFrequencyHz: 18820,
         marginDb: undefined
       },
       {
         mode: "listen",
         slot: 2,
         slotCount: 2,
-        startFrequencyHz: 20350,
-        endFrequencyHz: 20580,
+        startFrequencyHz: 19020,
+        endFrequencyHz: 19240,
         marginDb: undefined
       },
       {
         mode: "detected",
         slot: 2,
         slotCount: 2,
-        startFrequencyHz: 20350,
-        endFrequencyHz: 20580,
+        startFrequencyHz: 19020,
+        endFrequencyHz: 19240,
         marginDb: 31
       }
     ]
@@ -441,8 +467,8 @@ test("anonymous acoustic plans emit the assigned signature and report the strong
   assert.equal(result.evidence.acoustic.slot, 2);
   assert.equal(result.evidence.acoustic.slotCount, 2);
   assert.equal(result.evidence.acoustic.marginDb, 31);
-  assert.equal(result.evidence.acoustic.startFrequencyHz, 20350);
-  assert.equal(result.evidence.acoustic.endFrequencyHz, 20580);
+  assert.equal(result.evidence.acoustic.startFrequencyHz, 19020);
+  assert.equal(result.evidence.acoustic.endFrequencyHz, 19240);
 });
 
 test("anonymous acoustic plans keep a final missed-slot summary for failed physical tests", async () => {
@@ -466,9 +492,9 @@ test("anonymous acoustic plans keep a final missed-slot summary for failed physi
   };
   const engine = new ProximityEngine({ enabled: true, acoustic, motion });
   const plan = [
-    { id: "self-signature", startFrequencyHz: 20050, endFrequencyHz: 20280 },
-    { id: "peer-one", startFrequencyHz: 20350, endFrequencyHz: 20580 },
-    { id: "peer-two", startFrequencyHz: 20650, endFrequencyHz: 20880 }
+    { id: "self-signature", startFrequencyHz: 18600, endFrequencyHz: 18820 },
+    { id: "peer-one", startFrequencyHz: 19020, endFrequencyHz: 19240 },
+    { id: "peer-two", startFrequencyHz: 19300, endFrequencyHz: 19400 }
   ];
 
   const result = await engine.runRealCeremony({
@@ -483,8 +509,8 @@ test("anonymous acoustic plans keep a final missed-slot summary for failed physi
   assert.equal(result.evidence.acoustic.mode, "missed");
   assert.equal(result.evidence.acoustic.missedCount, 2);
   assert.equal(result.evidence.acoustic.slotCount, 3);
-  assert.equal(result.evidence.acoustic.startFrequencyHz, 20350);
-  assert.equal(result.evidence.acoustic.endFrequencyHz, 20880);
+  assert.equal(result.evidence.acoustic.startFrequencyHz, 19020);
+  assert.equal(result.evidence.acoustic.endFrequencyHz, 19400);
 });
 
 test("anonymous acoustic plans keep listening briefly for a late peer signature", async () => {
@@ -519,8 +545,8 @@ test("anonymous acoustic plans keep listening briefly for a late peer signature"
 
   const result = await engine.runRealCeremony({
     acousticPlan: [
-      { id: "self-signature", startFrequencyHz: 20050, endFrequencyHz: 20280 },
-      { id: "late-peer", startFrequencyHz: 20350, endFrequencyHz: 20580 }
+      { id: "self-signature", startFrequencyHz: 18600, endFrequencyHz: 18820 },
+      { id: "late-peer", startFrequencyHz: 19020, endFrequencyHz: 19240 }
     ],
     acousticSignatureId: "self-signature",
     acousticOptions: { intervalMs: 500 },

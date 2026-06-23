@@ -34,10 +34,11 @@ const SESSION_TTL_MS = 15000;
 const SESSION_MATCH_SLOP_MS = 900;
 const SESSION_SCORE_MINIMUM = 0.55;
 const MAX_PROXIMITY_SESSION_CLIENTS = 6;
-const ACOUSTIC_BAND_START_HZ = 20_050;
-const ACOUSTIC_BAND_END_HZ = 20_950;
-const ACOUSTIC_MIN_BANDWIDTH_HZ = 500;
+const ACOUSTIC_BAND_START_HZ = 18_600;
+const ACOUSTIC_BAND_END_HZ = 19_400;
+const ACOUSTIC_MIN_BANDWIDTH_HZ = 420;
 const ACOUSTIC_WINNER_MARGIN = 0.04;
+const ACOUSTIC_MIN_CORRELATION = 0.3;
 
 export class SignalingHub {
   constructor({ server, path = "/ws", logger, maxJsonBytes = 131072, heartbeatIntervalMs = 25000, sessionTtlMs = 900000, pairingTtlMs = 120000, proximityAnalyzer, qrTokenProvider, metrics } = {}) {
@@ -163,6 +164,22 @@ export class SignalingHub {
       this.logger?.warn("Replacing stale signaling session with the same client id.", { id: hello.id });
       this.removeClient(existing.socket, "replaced_by_new_connection");
       existing.socket.close(4001, "replaced_by_new_connection");
+    }
+    for (const candidate of this.clients.values()) {
+      if (
+        candidate.id !== hello.id
+        && candidate.deviceId
+        && hello.deviceId
+        && candidate.deviceId === hello.deviceId
+        && ![WebSocket.CLOSING, WebSocket.CLOSED].includes(candidate.socket.readyState)
+      ) {
+        this.logger?.warn("Replacing stale signaling session with the same physical device id.", {
+          id: candidate.id,
+          replacementId: hello.id
+        });
+        this.removeClient(candidate.socket, "replaced_by_new_device_session");
+        candidate.socket.close(4001, "replaced_by_new_device_session");
+      }
     }
     if (existing) {
       this.clients.delete(hello.id);
@@ -463,6 +480,7 @@ export class SignalingHub {
   startProximitySession(sessionId) {
     const session = this.proximitySessions.get(sessionId);
     if (!session || session.started) return;
+    this.pruneProximitySessionClients(session);
     if (session.clients.size < 2) {
       if ((session.joinExtensions || 0) < 1 && session.expiresAt > Date.now()) {
         session.joinExtensions = (session.joinExtensions || 0) + 1;
@@ -526,6 +544,39 @@ export class SignalingHub {
       SESSION_START_DELAY_MS + SESSION_DURATION_MS + SESSION_MATCH_SLOP_MS
     );
     session.failTimer.unref?.();
+  }
+
+  pruneProximitySessionClients(session) {
+    const seenDeviceIds = new Map();
+    for (const clientId of [...session.clients]) {
+      const client = this.clients.get(clientId);
+      const socketOpen = client?.socket?.readyState === WebSocket.OPEN;
+      if (!client || !socketOpen) {
+        session.clients.delete(clientId);
+        session.nonces.delete(clientId);
+        session.acousticCapabilities?.delete(clientId);
+        session.telemetry.delete(clientId);
+        session.matched.delete(clientId);
+        continue;
+      }
+      const deviceKey = client.deviceId || client.id;
+      const previousId = seenDeviceIds.get(deviceKey);
+      if (!previousId) {
+        seenDeviceIds.set(deviceKey, clientId);
+        continue;
+      }
+      const previous = this.clients.get(previousId);
+      const previousSeen = Number(previous?.lastSeenAt || 0);
+      const currentSeen = Number(client.lastSeenAt || 0);
+      const removeId = currentSeen >= previousSeen ? previousId : clientId;
+      const keepId = removeId === previousId ? clientId : previousId;
+      seenDeviceIds.set(deviceKey, keepId);
+      session.clients.delete(removeId);
+      session.nonces.delete(removeId);
+      session.acousticCapabilities?.delete(removeId);
+      session.telemetry.delete(removeId);
+      session.matched.delete(removeId);
+    }
   }
 
   recordProximitySessionTelemetry(sender, message) {
@@ -1080,8 +1131,8 @@ function hasReciprocalAcousticEvidence(session, first, second) {
     && second.analysis?.acousticSignatureId === secondSignature
     && first.analysis?.heardAcousticSignatureId === secondSignature
     && second.analysis?.heardAcousticSignatureId === firstSignature
-    && firstDetection.correlation >= 0.32
-    && secondDetection.correlation >= 0.32
+    && firstDetection.correlation >= ACOUSTIC_MIN_CORRELATION
+    && secondDetection.correlation >= ACOUSTIC_MIN_CORRELATION
     && Number(first.analysis?.acousticConfidenceMargin ?? 1) >= ACOUSTIC_WINNER_MARGIN
     && Number(second.analysis?.acousticConfidenceMargin ?? 1) >= ACOUSTIC_WINNER_MARGIN);
 }

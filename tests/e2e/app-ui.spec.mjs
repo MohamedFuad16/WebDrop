@@ -52,7 +52,8 @@ test("emitted chirp reaches and is recognized by a second acoustic sensor", asyn
       resume: () => context.resume(),
       createBuffer: (...args) => context.createBuffer(...args),
       createBufferSource: () => context.createBufferSource(),
-      createGain: () => context.createGain()
+      createGain: () => context.createGain(),
+      createBiquadFilter: () => context.createBiquadFilter()
     };
     const sender = new AcousticProximitySensor({ audioContextFactory: () => outputContext });
     const receiver = new AcousticProximitySensor({
@@ -76,7 +77,7 @@ test("emitted chirp reaches and is recognized by a second acoustic sensor", asyn
 
   expect(result.permission).toBe(true);
   expect(result.emitted).toMatchObject({ emitted: true, durationMs: 96, sampleRate: 48_000 });
-  expect(result.emitted.startFrequencyHz).toBeGreaterThanOrEqual(20_000);
+  expect(result.emitted.startFrequencyHz).toBeGreaterThanOrEqual(18_500);
   expect(result.emitted.endFrequencyHz).toBeGreaterThan(result.emitted.startFrequencyHz);
   expect(result.detected.detected).toBe(true);
   expect(result.detected.correlation).toBeGreaterThan(0.3);
@@ -599,13 +600,13 @@ test("shows acoustic slot diagnostics in the Dynamic Island ceremony", async ({ 
         slot: 2,
         slotCount: 4,
         marginDb: 31,
-        startFrequencyHz: 20350,
-        endFrequencyHz: 20580
+        startFrequencyHz: 19020,
+        endFrequencyHz: 19240
       }
     });
   });
 
-  await expect(page.locator("[data-island-audio-value]")).toHaveText("Detected 2/4 +31dB 20.4-20.6kHz");
+  await expect(page.locator("[data-island-audio-value]")).toHaveText("Detected 2/4 +31dB 19-19.2kHz");
   const audioValueStyle = await page.locator("[data-island-audio-value]").evaluate((node) => {
     const style = getComputedStyle(node);
     return {
@@ -627,12 +628,12 @@ test("shows acoustic slot diagnostics in the Dynamic Island ceremony", async ({ 
         detected: false,
         missedCount: 2,
         slotCount: 3,
-        startFrequencyHz: 20350,
-        endFrequencyHz: 20880
+        startFrequencyHz: 19020,
+        endFrequencyHz: 19400
       }
     });
   });
-  await expect(page.locator("[data-island-audio-value]")).toHaveText("Missed 2 slots 20.4-20.9kHz");
+  await expect(page.locator("[data-island-audio-value]")).toHaveText("Missed 2 slots 19-19.4kHz");
 });
 
 test("keeps Japanese failure diagnostics and fallback actions reachable on iPhone", async ({ page }, testInfo) => {
@@ -714,6 +715,26 @@ test("makes verification failure a focused modal decision and restores focus", a
   await page.evaluate(() => globalThis.__webdropFailureIsland.hide());
   await expect(page.locator('[data-action="connect-nearby"]')).toBeFocused();
   await expect(page.locator(".topbar")).not.toHaveAttribute("inert", "");
+});
+
+test("shows the blocking audio failure when score clears the numeric threshold", async ({ page }) => {
+  await page.goto("/?qa=e2e-island-acoustic-failure-title&runtime=mock", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });
+
+  await page.evaluate(async () => {
+    const { DynamicIsland } = await import("/js/ui/dynamic-island.js?v=e2e-island-acoustic-failure-title");
+    const island = new DynamicIsland(document, (key) => key);
+    island.showAnonymousConnectionProgress({
+      id: "self",
+      name: "WebDrop iPhone",
+      avatar: "assets/icons/avatars/user-01.png"
+    });
+    await island.showVerificationFailure({ score: 58, errors: ["Audio chime was not detected"] });
+  });
+
+  await expect(page.locator("[data-island-ceremony-stage]")).toHaveText("Audio chime was not detected");
+  await expect(page.locator("[data-island-ceremony-score]")).toHaveText("58 / 100");
+  await expect(page.locator("[data-island-ceremony-score]")).toHaveAttribute("data-passed", "true");
 });
 
 test("anchors Dynamic Island expansion to the hardware island safe area", async ({ page }) => {

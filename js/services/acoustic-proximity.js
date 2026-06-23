@@ -1,12 +1,12 @@
 export const DEFAULT_CHIRP = Object.freeze({
   durationMs: 96,
-  startFrequencyHz: 20050,
-  endFrequencyHz: 20950,
+  startFrequencyHz: 18600,
+  endFrequencyHz: 19400,
   code: 0,
-  gain: 0.1
+  gain: 0.12
 });
 
-export const MIN_INAUDIBLE_FREQUENCY_HZ = 20000;
+export const MIN_INAUDIBLE_FREQUENCY_HZ = 18500;
 
 export class AcousticProximitySensor {
   constructor({
@@ -269,8 +269,10 @@ export class AcousticProximitySensor {
   decodeCeremonyCapture(recording, plan, {
     ownSignatureId,
     slotDurationMs,
-    threshold = 0.32,
-    slotGuardMs = 90
+    threshold = 0.3,
+    slotGuardMs = 260,
+    driftGuardMs = 760,
+    minimumMarginDb = 1.5
   } = {}) {
     const sampleRate = Number(recording?.sampleRate);
     const samples = recording?.samples;
@@ -280,11 +282,16 @@ export class AcousticProximitySensor {
         if (signature.id === ownSignatureId) return null;
         const template = createChirpSamples(sampleRate, signature);
         const guardSamples = Math.round(sampleRate * slotGuardMs / 1000);
-        const slotStart = Math.max(0, Math.round(sampleRate * index * slotDurationMs / 1000) - guardSamples);
-        const slotEnd = Math.min(samples.length, Math.round(sampleRate * (index + 1) * slotDurationMs / 1000) + guardSamples);
-        const window = samples.subarray(slotStart, slotEnd);
-        const match = findBestCorrelation(window, template, { step: 4 });
-        const marginDb = correlationMarginDb(window, template, match.offset);
+        const driftSamples = Math.round(sampleRate * driftGuardMs / 1000);
+        const nominalStart = Math.round(sampleRate * index * slotDurationMs / 1000);
+        const nominalEnd = Math.round(sampleRate * (index + 1) * slotDurationMs / 1000);
+        const slotStart = Math.max(0, nominalStart - guardSamples);
+        const slotEnd = Math.min(samples.length, nominalEnd + guardSamples);
+        const primary = scoreCaptureWindow(samples, template, slotStart, slotEnd, { step: 4 });
+        const expandedStart = Math.max(0, nominalStart - driftSamples);
+        const expandedEnd = Math.min(samples.length, nominalEnd + driftSamples);
+        const expanded = scoreCaptureWindow(samples, template, expandedStart, expandedEnd, { step: 10 });
+        const scored = chooseBestCaptureScore(primary, expanded);
         return {
           signatureId: signature.id,
           slot: index + 1,
@@ -292,10 +299,11 @@ export class AcousticProximitySensor {
           code: Number(signature.code || 0),
           startFrequencyHz: signature.startFrequencyHz,
           endFrequencyHz: signature.endFrequencyHz,
-          detected: match.correlation >= threshold && marginDb >= 3,
-          correlation: roundMetric(match.correlation),
-          marginDb: roundMetric(marginDb),
-          sampleOffset: match.offset < 0 ? null : slotStart + match.offset
+          detected: scored.correlation >= threshold && scored.marginDb >= minimumMarginDb,
+          correlation: roundMetric(scored.correlation),
+          marginDb: roundMetric(scored.marginDb),
+          sampleOffset: scored.offset < 0 ? null : scored.offset,
+          window: scored.window
         };
       })
       .filter(Boolean);
@@ -564,6 +572,24 @@ function correlationMarginDb(samples, template, offset) {
   const noiseSamples = Math.max(1, samples.length - template.length);
   const noiseRms = Math.sqrt(noiseEnergy / noiseSamples);
   return Math.max(0, 20 * Math.log10((signalRms + 1e-9) / (noiseRms + 1e-9)));
+}
+
+function scoreCaptureWindow(samples, template, start, end, { step = 8 } = {}) {
+  const safeStart = Math.max(0, Math.min(samples.length, Math.floor(start)));
+  const safeEnd = Math.max(safeStart, Math.min(samples.length, Math.ceil(end)));
+  const window = samples.subarray(safeStart, safeEnd);
+  const match = findBestCorrelation(window, template, { step });
+  return {
+    correlation: match.correlation,
+    marginDb: correlationMarginDb(window, template, match.offset),
+    offset: match.offset < 0 ? -1 : safeStart + match.offset,
+    window: step <= 4 ? "slot" : "expanded"
+  };
+}
+
+function chooseBestCaptureScore(primary, expanded) {
+  if (primary.correlation >= expanded.correlation) return primary;
+  return expanded;
 }
 
 function roundMetric(value) {

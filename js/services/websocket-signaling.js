@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.65";
+import { Emitter } from "../utils/emitter.js?v=1.0.66";
 
 export class WebSocketSignalingAdapter extends Emitter {
   constructor({

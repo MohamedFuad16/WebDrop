@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.65";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.65";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.65";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.66";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.66";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.66";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 const ACOUSTIC_SLOT_GUARD_MS = 80;
@@ -497,7 +497,7 @@ function normalizeAcousticPlan(plan) {
   })).filter((entry) => entry.id
     && Number.isFinite(entry.startFrequencyHz)
     && Number.isFinite(entry.endFrequencyHz)
-    && entry.startFrequencyHz >= 20_000
+    && entry.startFrequencyHz >= 18_500
     && entry.endFrequencyHz > entry.startFrequencyHz);
 }
 

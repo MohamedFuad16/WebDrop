@@ -66,8 +66,8 @@ test("renders live signaling and ultrasonic diagnostics", async ({ page }, testI
               deviceName: "Fuad iPhone",
               signature: {
                 slot: 1,
-                startFrequencyHz: 20050,
-                endFrequencyHz: 20280
+                startFrequencyHz: 18600,
+                endFrequencyHz: 18820
               },
               telemetry: {
                 score: 0.46,

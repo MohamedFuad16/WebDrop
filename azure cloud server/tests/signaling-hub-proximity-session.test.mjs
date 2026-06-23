@@ -188,14 +188,34 @@ test("a one-client session extends once and accepts a slightly late partner", ()
   hub.close();
 });
 
+test("proximity session keeps only the newest connection for one physical device", () => {
+  const hub = createTestHub();
+  const staleClient = addClient(hub, "client-a-stale");
+  const currentClient = addClient(hub, "client-a-current");
+  const peer = addClient(hub, "client-b");
+  staleClient.deviceId = "device-a";
+  currentClient.deviceId = "device-a";
+  staleClient.lastSeenAt = 1000;
+  currentClient.lastSeenAt = 2000;
+  const session = createSession(hub, [staleClient, currentClient, peer]);
+
+  hub.pruneProximitySessionClients(session);
+
+  assert.deepEqual([...session.clients].sort(), ["client-a-current", "client-b"]);
+  assert.equal(session.nonces.has(staleClient.id), false);
+  assert.equal(session.nonces.has(currentClient.id), true);
+
+  hub.close();
+});
+
 test("diagnostics snapshot exposes safe live proximity and acoustic state", () => {
   const hub = createTestHub();
   const clientA = addClient(hub, "client-a");
   const clientB = addClient(hub, "client-b");
   const session = createSession(hub, [clientA, clientB]);
   session.signatureDetails = new Map([
-    [clientA.id, { id: "signature-0", slot: 1, startFrequencyHz: 20050, endFrequencyHz: 20280 }],
-    [clientB.id, { id: "signature-1", slot: 2, startFrequencyHz: 20350, endFrequencyHz: 20580 }]
+    [clientA.id, { id: "signature-0", slot: 1, startFrequencyHz: 18600, endFrequencyHz: 18820 }],
+    [clientB.id, { id: "signature-1", slot: 2, startFrequencyHz: 19020, endFrequencyHz: 19240 }]
   ]);
   const message = sessionMessage(session, clientA, verifiedMetrics(), 1000, clientB);
   Object.assign(message.payload.metrics, {
@@ -204,8 +224,8 @@ test("diagnostics snapshot exposes safe live proximity and acoustic state", () =
     acousticMode: "detected",
     acousticSlot: 2,
     acousticSlotCount: 2,
-    acousticStartFrequencyHz: 20350,
-    acousticEndFrequencyHz: 20580,
+    acousticStartFrequencyHz: 19020,
+    acousticEndFrequencyHz: 19240,
     acousticMarginDb: 24,
     acousticSampleRate: 48000,
     acousticConfidenceMargin: 0.44,
@@ -225,8 +245,8 @@ test("diagnostics snapshot exposes safe live proximity and acoustic state", () =
     mode: "detected",
     slot: 2,
     slotCount: 2,
-    startFrequencyHz: 20350,
-    endFrequencyHz: 20580,
+    startFrequencyHz: 19020,
+    endFrequencyHz: 19240,
     marginDb: 24,
     sampleRate: 48000,
     confidenceMargin: 0.44,

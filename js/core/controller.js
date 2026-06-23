@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.65";
+import { formatBytes } from "../utils/format.js?v=1.0.66";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
