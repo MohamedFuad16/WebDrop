@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.72";
-import { Emitter } from "../utils/emitter.js?v=1.0.72";
-import { formatBytes } from "../utils/format.js?v=1.0.72";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.72";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.72";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.73";
+import { Emitter } from "../utils/emitter.js?v=1.0.73";
+import { formatBytes } from "../utils/format.js?v=1.0.73";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.73";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.73";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {

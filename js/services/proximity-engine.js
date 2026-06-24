@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.72";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.72";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.72";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.73";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.73";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.73";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 const ACOUSTIC_SLOT_GUARD_MS = 80;
@@ -381,12 +381,43 @@ async function exchangeCapturedSignatureChirps(acoustic, {
       emittedCount += emitted.emittedCount || 0;
     }
   }
+  onProgress({
+    phase: "audio",
+    state: "active",
+    acoustic: {
+      mode: "decode-wait",
+      continuous: true,
+      slotCount: signatures.length
+    }
+  });
   await waitUntil(Number(startAt) + durationMs);
+  onProgress({
+    phase: "audio",
+    state: "active",
+    acoustic: {
+      mode: "decode-start",
+      continuous: true,
+      slotCount: signatures.length
+    }
+  });
   const recording = acoustic.stopCeremonyCapture();
   const detections = acoustic.decodeCeremonyCapture(recording, signatures, {
     ownSignatureId,
     slotDurationMs,
     slotGuardMs: ACOUSTIC_SLOT_GUARD_MS
+  });
+  onProgress({
+    phase: "audio",
+    state: "active",
+    acoustic: {
+      mode: "decode-done",
+      continuous: true,
+      slotCount: signatures.length,
+      sampleRate: recording.sampleRate,
+      recordingDurationMs: recording.durationMs,
+      rms: recording.rms || 0,
+      peak: recording.peak || 0
+    }
   });
   for (const detection of detections) {
     onProgress({

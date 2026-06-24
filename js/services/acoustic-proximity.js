@@ -10,6 +10,8 @@ export const MIN_INAUDIBLE_FREQUENCY_HZ = 18500;
 export const ENERGY_ASSISTED_CORRELATION_MINIMUM = 0.16;
 export const ENERGY_ASSISTED_MARGIN_DB_MINIMUM = 4.5;
 export const SLOT_CORRELATION_MINIMUM = 0.2;
+export const CAPTURE_PRIMARY_CORRELATION_STEP = 16;
+export const CAPTURE_EXPANDED_CORRELATION_STEP = 32;
 
 export class AcousticProximitySensor {
   constructor({
@@ -268,7 +270,7 @@ export class AcousticProximitySensor {
     slotDurationMs,
     threshold = 0.3,
     slotGuardMs = 260,
-    driftGuardMs = 760,
+    driftGuardMs = 520,
     minimumMarginDb = 1.5,
     energyAssistedCorrelation = ENERGY_ASSISTED_CORRELATION_MINIMUM,
     energyAssistedMarginDb = ENERGY_ASSISTED_MARGIN_DB_MINIMUM,
@@ -287,10 +289,16 @@ export class AcousticProximitySensor {
         const nominalEnd = Math.round(sampleRate * (index + 1) * slotDurationMs / 1000);
         const slotStart = Math.max(0, nominalStart - guardSamples);
         const slotEnd = Math.min(samples.length, nominalEnd + guardSamples);
-        const primary = scoreCaptureWindow(samples, template, slotStart, slotEnd, { step: 4 });
+        const primary = scoreCaptureWindow(samples, template, slotStart, slotEnd, {
+          step: CAPTURE_PRIMARY_CORRELATION_STEP,
+          label: "slot"
+        });
         const expandedStart = Math.max(0, nominalStart - driftSamples);
         const expandedEnd = Math.min(samples.length, nominalEnd + driftSamples);
-        const expanded = scoreCaptureWindow(samples, template, expandedStart, expandedEnd, { step: 10 });
+        const expanded = scoreCaptureWindow(samples, template, expandedStart, expandedEnd, {
+          step: CAPTURE_EXPANDED_CORRELATION_STEP,
+          label: "expanded"
+        });
         const scored = chooseBestCaptureScore(primary, expanded);
         const correlationDetected = scored.correlation >= threshold && scored.marginDb >= minimumMarginDb;
         const energyAssisted = !correlationDetected
@@ -589,7 +597,7 @@ function correlationMarginDb(samples, template, offset) {
   return Math.max(0, 20 * Math.log10((signalRms + 1e-9) / (noiseRms + 1e-9)));
 }
 
-function scoreCaptureWindow(samples, template, start, end, { step = 8 } = {}) {
+function scoreCaptureWindow(samples, template, start, end, { step = 8, label = "window" } = {}) {
   const safeStart = Math.max(0, Math.min(samples.length, Math.floor(start)));
   const safeEnd = Math.max(safeStart, Math.min(samples.length, Math.ceil(end)));
   const window = samples.subarray(safeStart, safeEnd);
@@ -598,7 +606,7 @@ function scoreCaptureWindow(samples, template, start, end, { step = 8 } = {}) {
     correlation: match.correlation,
     marginDb: correlationMarginDb(window, template, match.offset),
     offset: match.offset < 0 ? -1 : safeStart + match.offset,
-    window: step <= 4 ? "slot" : "expanded"
+    window: label
   };
 }
 
