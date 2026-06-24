@@ -1,5 +1,5 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.71";
-import { AVATAR_OPTIONS } from "../config/avatar-options.js?v=1.0.71";
+import { Emitter } from "../utils/emitter.js?v=1.0.72";
+import { AVATAR_OPTIONS } from "../config/avatar-options.js?v=1.0.72";
 
 const MOCK_PEERS = [
   { id: "peer-aki", name: "Aki iPhone", avatar: AVATAR_OPTIONS[1], ringIndex: 0, angle: -52, deviceFamily: "ios", deviceLabel: "iPhone 15 Pro", distanceBucket: "immediate", proximityScore: 54, connectedBefore: true, capabilities: { platform: { family: "ios", isIOS: true, isIPhone: true, dynamicIslandCapable: true } } },
@@ -110,6 +110,10 @@ export class MockSignalingAdapter extends Emitter {
         this.emit("proximity:session:failed", { sessionId, reason: "score_too_low" });
       }
     });
+    return true;
+  }
+
+  async sendProximitySessionDiagnostic() {
     return true;
   }
 

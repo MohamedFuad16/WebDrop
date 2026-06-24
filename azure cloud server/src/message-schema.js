@@ -15,6 +15,7 @@ const ROUTED_TYPES = new Set([
   "proximity:ready",
   "proximity:telemetry",
   "proximity:session:join",
+  "proximity:session:diagnostic",
   "proximity:session:telemetry",
   "proximity:session:cancel",
   "proximity:qr:issue",
@@ -223,6 +224,48 @@ export function validateRoutedMessage(message) {
           bumpAt: safeNumber(payload.timing?.bumpAt ?? payload.bumpAt),
           completedAt: safeNumber(payload.timing?.completedAt ?? payload.completedAt),
           startedAt: safeNumber(payload.timing?.startedAt ?? payload.startedAt)
+        }
+      }
+    };
+  }
+
+  if (message.type === "proximity:session:diagnostic") {
+    const payload = objectPayload(message.payload);
+    const acoustic = objectPayload(payload.acoustic || {});
+    const motion = objectPayload(payload.motion || {});
+    return {
+      ...base,
+      payload: {
+        sessionId: cleanString(payload.sessionId || message.sessionId, 160) || null,
+        clientNonce: cleanString(payload.clientNonce, 120) || null,
+        phase: cleanString(payload.phase, 80) || "unknown",
+        state: cleanString(payload.state, 80) || null,
+        reason: cleanString(payload.reason, 240) || null,
+        message: cleanString(payload.message, 300) || null,
+        acoustic: {
+          mode: cleanString(acoustic.mode, 40) || null,
+          slot: safeInteger(acoustic.slot, 0),
+          slotCount: safeInteger(acoustic.slotCount, 0),
+          code: safeInteger(acoustic.code, 0),
+          targetSignatureId: cleanString(acoustic.targetSignatureId, 160) || null,
+          ownSignatureId: cleanString(acoustic.ownSignatureId, 160) || null,
+          signatureId: cleanString(acoustic.signatureId, 160) || null,
+          detectionMethod: cleanString(acoustic.detectionMethod, 80) || null,
+          correlation: safeNumber(acoustic.correlation),
+          marginDb: safeNumber(acoustic.marginDb),
+          startFrequencyHz: safeNumber(acoustic.startFrequencyHz),
+          endFrequencyHz: safeNumber(acoustic.endFrequencyHz)
+        },
+        motion: {
+          bump: Boolean(motion.bump),
+          tilted: Boolean(motion.tilted),
+          maxTiltDeg: safeNumber(motion.maxTiltDeg),
+          samples: safeInteger(motion.samples, 0)
+        },
+        timing: {
+          at: safeNumber(payload.timing?.at ?? Date.now()),
+          startAt: safeNumber(payload.timing?.startAt),
+          completedAt: safeNumber(payload.timing?.completedAt)
         }
       }
     };

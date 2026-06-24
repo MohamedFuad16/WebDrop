@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.71";
+import { Emitter } from "../utils/emitter.js?v=1.0.72";
 
 export class WebSocketSignalingAdapter extends Emitter {
   constructor({
@@ -162,6 +162,10 @@ export class WebSocketSignalingAdapter extends Emitter {
 
   async sendProximitySessionTelemetry(payload = {}) {
     return this.send({ type: "proximity:session:telemetry", payload });
+  }
+
+  async sendProximitySessionDiagnostic(payload = {}) {
+    return this.send({ type: "proximity:session:diagnostic", payload });
   }
 
   async cancelProximitySession(sessionId) {

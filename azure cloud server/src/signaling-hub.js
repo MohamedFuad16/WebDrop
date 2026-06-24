@@ -220,6 +220,10 @@ export class SignalingHub {
       this.joinProximitySession(sender, message);
       return;
     }
+    if (message.type === "proximity:session:diagnostic") {
+      this.recordProximitySessionDiagnostic(sender, message);
+      return;
+    }
     if (message.type === "proximity:session:telemetry") {
       this.recordProximitySessionTelemetry(sender, message);
       return;
@@ -635,6 +639,33 @@ export class SignalingHub {
       acousticReason: message.payload.metrics?.acousticReason || null
     });
     this.tryMatchProximitySession(session);
+  }
+
+  recordProximitySessionDiagnostic(sender, message) {
+    const payload = message.payload || {};
+    const sessionId = payload.sessionId || null;
+    const session = this.proximitySessions.get(sessionId);
+    const inSession = Boolean(session && session.clients.has(sender.id));
+    const nonceMatches = Boolean(
+      session &&
+      payload.clientNonce &&
+      session.nonces.get(sender.id) === payload.clientNonce
+    );
+    this.metrics?.recordEvent("proximity:session:diagnostic", {
+      sessionId,
+      clientId: sender.id,
+      deviceName: sender.deviceName,
+      deviceFamily: sender.deviceFamily,
+      inSession,
+      nonceMatches,
+      phase: payload.phase || "unknown",
+      state: payload.state || null,
+      reason: payload.reason || null,
+      message: payload.message || null,
+      acoustic: payload.acoustic || {},
+      motion: payload.motion || {},
+      timing: payload.timing || {}
+    });
   }
 
   tryMatchProximitySession(session) {

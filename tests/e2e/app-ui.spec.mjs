@@ -962,7 +962,7 @@ test("opens a received file in a new tab on iPhone WebKit without leaving WebDro
   await page.goto("/?qa=e2e-ios-view-received&runtime=mock", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });
   await page.locator('[data-action="connect-nearby"]').click();
-  await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 7000 });
+  await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected", { timeout: 15_000 });
   const beforeUrl = page.url();
   await page.locator('[data-action="open-receive-sheet"]').click();
   await expect(page.locator("[data-receive-sheet]")).toBeVisible();

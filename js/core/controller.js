@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.71";
+import { formatBytes } from "../utils/format.js?v=1.0.72";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -751,7 +751,9 @@ export function createController({
     let result;
     try {
       result = runtime.realProximityCeremony
-        ? await runRealProximitySessionCeremony(startPayload, permissionPromise)
+        ? await runRealProximitySessionCeremony(startPayload, permissionPromise, (phase, detail) => (
+          sendProximitySessionDiagnostic(startPayload, phase, { ...detail, clientNonce })
+        ))
         : {
           passed: true,
           score: 100,
@@ -783,7 +785,13 @@ export function createController({
           evidence: { motion: { bumpAt: Date.now(), bump: true, tilted: true } },
           reason: "mock-physical-session"
         };
-    } catch {
+    } catch (error) {
+      sendProximitySessionDiagnostic(startPayload, "ceremony:exception", {
+        clientNonce,
+        state: "failed",
+        reason: error?.name || "exception",
+        message: error?.message || "Ceremony failed before telemetry."
+      });
       const motion = proximity.getSnapshot?.().motion || {};
       result = {
         passed: false,
@@ -814,6 +822,22 @@ export function createController({
     }
     if (!isCurrentProximitySession(sessionId)) return;
     const match = waitForProximityMatch(sessionId, 30000);
+    sendProximitySessionDiagnostic(startPayload, "ceremony:before-telemetry", {
+      clientNonce,
+      state: result.passed ? "passed" : "failed",
+      reason: result.reason,
+      acoustic: {
+        mode: result.metrics?.acousticDetectionMethod || result.metrics?.acousticReason || null,
+        slot: result.metrics?.acousticSlot,
+        slotCount: result.metrics?.acousticSlotCount,
+        signatureId: result.metrics?.heardAcousticSignatureId,
+        correlation: result.metrics?.acousticCorrelation || result.metrics?.soundCorrelation,
+        marginDb: result.metrics?.acousticMarginDb,
+        startFrequencyHz: result.metrics?.acousticStartFrequencyHz,
+        endFrequencyHz: result.metrics?.acousticEndFrequencyHz
+      },
+      motion: result.evidence?.motion
+    });
     await signaling.sendProximitySessionTelemetry?.({
       sessionId,
       clientNonce,
@@ -1327,8 +1351,9 @@ export function createController({
     }
   }
 
-  async function runRealProximitySessionCeremony(startPayload, permissionPromise) {
+  async function runRealProximitySessionCeremony(startPayload, permissionPromise, emitDiagnostic = () => {}) {
     view.updateIslandCeremony({ phase: "permissions", state: "active" });
+    emitDiagnostic("permissions:request", { state: "active" });
     const {
       microphone: microphonePermission,
       motion: motionPermission,
@@ -1345,11 +1370,25 @@ export function createController({
         audioOutput: audioOutputPermission
       }
     });
+    emitDiagnostic("permissions:complete", {
+      state: microphonePermission.granted && motionPermission.granted && audioOutputPermission.granted ? "complete" : "failed",
+      reason: [
+        microphonePermission.granted ? null : `microphone:${microphonePermission.reason || "denied"}`,
+        motionPermission.granted ? null : `motion:${motionPermission.reason || "denied"}`,
+        audioOutputPermission.granted ? null : `audioOutput:${audioOutputPermission.reason || "denied"}`
+      ].filter(Boolean).join(",") || null
+    });
     proximity.resetMotionCapture();
     if (motionPermission.granted) proximity.startMotionCapture();
     let motionTimer = 0;
     try {
       view.updateIslandCeremony({ phase: "sync", state: "active" });
+      emitDiagnostic("ceremony:sync", {
+        state: "active",
+        timing: {
+          startAt: startPayload.startAt
+        }
+      });
       motionTimer = globalThis.setInterval(() => {
         view.updateIslandCeremony({
           phase: "motion",
@@ -1365,7 +1404,30 @@ export function createController({
         startAt: startPayload.startAt,
         ceremonyDurationMs: startPayload.durationMs,
         tokenFresh: Boolean(startPayload.sessionId),
-        onProgress: (progress) => view.updateIslandCeremony(progress)
+        onProgress: (progress) => {
+          view.updateIslandCeremony(progress);
+          if (progress?.phase === "audio") {
+            emitDiagnostic(`audio:${progress.acoustic?.mode || "progress"}`, {
+              state: progress.state || "active",
+              acoustic: progress.acoustic
+            });
+          }
+        }
+      });
+      emitDiagnostic("ceremony:complete", {
+        state: result.passed ? "passed" : "failed",
+        reason: result.reason,
+        acoustic: {
+          mode: result.metrics?.acousticDetectionMethod || result.metrics?.acousticReason || null,
+          slot: result.metrics?.acousticSlot,
+          slotCount: result.metrics?.acousticSlotCount,
+          signatureId: result.metrics?.heardAcousticSignatureId,
+          correlation: result.metrics?.acousticCorrelation || result.metrics?.soundCorrelation,
+          marginDb: result.metrics?.acousticMarginDb,
+          startFrequencyHz: result.metrics?.acousticStartFrequencyHz,
+          endFrequencyHz: result.metrics?.acousticEndFrequencyHz
+        },
+        motion: result.evidence?.motion
       });
       return {
         ...result,
@@ -1382,6 +1444,26 @@ export function createController({
       globalThis.clearInterval(motionTimer);
       stopProximitySensors();
     }
+  }
+
+  function sendProximitySessionDiagnostic(startPayload = {}, phase, detail = {}) {
+    const sessionId = startPayload.sessionId || proximitySessionId;
+    if (!sessionId || !phase) return false;
+    return signaling.sendProximitySessionDiagnostic?.({
+      sessionId,
+      clientNonce: detail.clientNonce || startPayload.clientNonce || null,
+      phase,
+      state: detail.state || null,
+      reason: detail.reason || null,
+      message: detail.message || null,
+      acoustic: detail.acoustic || null,
+      motion: detail.motion || null,
+      timing: {
+        ...(detail.timing || {}),
+        at: Date.now(),
+        startAt: startPayload.startAt || detail.timing?.startAt || null
+      }
+    });
   }
 
   async function failAnonymousVerification({ score = 0, errors = [] } = {}) {
