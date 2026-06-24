@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.75";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.75";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.75";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.76";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.76";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.76";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 const ACOUSTIC_SLOT_GUARD_MS = 80;
@@ -579,7 +579,7 @@ async function exchangeChirps(acoustic, { role, options = {}, durationMs = 3000 
 }
 
 async function emitChirpSequence(acoustic, options = {}, durationMs = 1400) {
-  const intervalMs = Math.max(180, options.intervalMs || 420);
+  const intervalMs = Math.max(180, options.intervalMs || 220);
   const startedAt = Date.now();
   let emittedCount = 0;
   let latest = { emitted: false, reason: "not-started" };

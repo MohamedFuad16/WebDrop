@@ -3,7 +3,7 @@ export const DEFAULT_CHIRP = Object.freeze({
   startFrequencyHz: 18600,
   endFrequencyHz: 19400,
   code: 0,
-  gain: 0.12
+  gain: 0.16
 });
 
 export const MIN_INAUDIBLE_FREQUENCY_HZ = 18500;
