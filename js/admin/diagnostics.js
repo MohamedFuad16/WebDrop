@@ -1,26 +1,36 @@
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.69";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.70";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.70";
 import {
   apiBaseFrom,
   escapeHtml,
   formatAge,
   formatFrequency,
   formatNumber
-} from "./shared.js?v=1.0.69";
+} from "./shared.js?v=1.0.70";
 
+const APP_VERSION = "1.0.70";
 const runtime = globalThis.WEBDROP_RUNTIME_CONFIG || {};
 const DEFAULT_BASE_URL = apiBaseFrom(runtime.turnConfigUrl || runtime.signalingUrl || "")
   || "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
-const LANGUAGE_KEY = "webdrop.diagnosticsLanguage";
+const DISPLAY_BAND_START_HZ = 18_000;
+const DISPLAY_BAND_END_HZ = 21_000;
+
 const MESSAGES = {
   en: {
+    documentTitle: "WebDrop Live Diagnostics",
+    diagnosticsNavigation: "Diagnostics navigation",
+    operationsKicker: "WebDrop operations",
     pageTitle: "Live proximity diagnostics",
-    appLink: "App",
-    adminLink: "Admin",
-    sourceLabel: "Live source",
+    pageCopy: "A live control room for signaling presence, physical matching, ultrasonic evidence, and failure analysis.",
+    appLink: "Back to app",
+    adminLink: "Readiness and testing",
     languageLabel: "Language",
+    appVersion: "app version",
+    lastSnapshot: "last snapshot",
+    sourceLabel: "Live source",
     refresh: "Refresh now",
     livePolling: "Live polling",
-    server: "Server",
+    server: "server",
     devices: "Devices",
     devicesHelp: "Active signaling clients",
     pairings: "Pairings",
@@ -42,6 +52,9 @@ const MESSAGES = {
     acousticTitle: "Live ultrasonic channels",
     noChannels: "No acoustic telemetry yet. Tap Connect on two devices to stream channel data.",
     acousticNote: "Shows server-observed acoustic evidence from connected devices. Raw microphone audio stays on each device; this dashboard receives bounded telemetry only.",
+    analysisKicker: "Debug analysis",
+    analysisTitle: "Ceremony health and failure reasons",
+    noAnalysis: "No ceremony evidence has arrived yet.",
     timelineKicker: "Server timeline",
     timelineTitle: "Connection attempts and telemetry",
     clearLocal: "Clear local view",
@@ -52,33 +65,65 @@ const MESSAGES = {
     offline: "Offline",
     production: "Production signaling",
     channels: "channels",
+    online: "online",
     noClients: "No active signaling clients.",
     unpaired: "unpaired",
     noneReported: "none reported",
     waitingTelemetry: "waiting for telemetry",
     waitingSlot: "waiting for slot",
-    emitted: "emitted",
-    detected: "detected",
-    listened: "listened",
-    reason: "reason",
-    yes: "yes",
-    no: "no",
-    method: "method",
-    sampleRate: "sample rate",
-    recording: "recording",
-    margin: "margin",
-    correlation: "correlation",
-    band: "band",
-    slot: "slot",
-    score: "score",
-    decision: "decision"
+    emitted: "Emitted",
+    detected: "Detected",
+    listened: "Listening",
+    reason: "Reason",
+    yes: "Yes",
+    no: "No",
+    method: "Method",
+    sampleRate: "Sample rate",
+    capture: "Capture",
+    margin: "Energy margin",
+    correlation: "Correlation",
+    confidenceMargin: "Winner margin",
+    runnerUp: "Runner-up",
+    band: "Band",
+    slot: "Slot",
+    score: "Score",
+    decision: "Decision",
+    strictInaudible: "Strict inaudible",
+    inputRate: "Input rate",
+    starts: "Starts",
+    ends: "Ends",
+    age: "Age",
+    rawDetail: "Raw event detail",
+    healthy: "Receiving acoustic evidence",
+    attention: "Acoustic evidence is missing",
+    waiting: "Waiting for a ceremony",
+    detectedChannels: "Detected channels",
+    missedChannels: "Missed channels",
+    averageMargin: "Average energy margin",
+    protocolBand: "Protocol band",
+    failureLeader: "Most common failure",
+    eventVolume: "Timeline events",
+    noFailure: "No failure reported",
+    candidates: "Detection candidates",
+    readinessFalse: "Readiness returned false",
+    turnReady: "TURN ready",
+    turnMissing: "TURN missing",
+    diagnosticsProtected: "Diagnostics are still protected on this server. Deploy the public diagnostics route.",
+    diagnosticsMissing: "The signaling server does not have the diagnostics route deployed yet.",
+    diagnosticsUnreachable: "The signaling server is healthy, but this page could not reach diagnostics. Check allowed origins and deployment."
   },
   ja: {
+    documentTitle: "WebDrop ライブ診断",
+    diagnosticsNavigation: "診断ナビゲーション",
+    operationsKicker: "WebDrop オペレーション",
     pageTitle: "近接ライブ診断",
-    appLink: "アプリ",
-    adminLink: "管理",
-    sourceLabel: "ライブ接続先",
+    pageCopy: "シグナリング、物理マッチング、超音波証拠、失敗理由をリアルタイムで確認するコントロールルームです。",
+    appLink: "アプリに戻る",
+    adminLink: "準備状況とテスト",
     languageLabel: "言語",
+    appVersion: "アプリバージョン",
+    lastSnapshot: "最終スナップショット",
+    sourceLabel: "ライブ接続先",
     refresh: "今すぐ更新",
     livePolling: "ライブ更新",
     server: "サーバー",
@@ -103,6 +148,9 @@ const MESSAGES = {
     acousticTitle: "超音波ライブチャンネル",
     noChannels: "音響テレメトリはまだありません。2台で接続を押すとチャンネル情報が流れます。",
     acousticNote: "接続中端末からサーバーに届いた音響証拠を表示します。生のマイク音声は端末内に残り、この画面には範囲を限定したテレメトリだけが届きます。",
+    analysisKicker: "デバッグ分析",
+    analysisTitle: "セレモニー状態と失敗理由",
+    noAnalysis: "セレモニー証拠はまだ届いていません。",
     timelineKicker: "サーバータイムライン",
     timelineTitle: "接続試行とテレメトリ",
     clearLocal: "表示をクリア",
@@ -113,6 +161,7 @@ const MESSAGES = {
     offline: "オフライン",
     production: "本番シグナリング",
     channels: "チャンネル",
+    online: "オンライン",
     noClients: "接続中の端末はありません。",
     unpaired: "未接続",
     noneReported: "未報告",
@@ -125,66 +174,98 @@ const MESSAGES = {
     yes: "はい",
     no: "いいえ",
     method: "方式",
-    sampleRate: "サンプル",
-    recording: "録音",
-    margin: "マージン",
+    sampleRate: "サンプルレート",
+    capture: "録音時間",
+    margin: "エネルギーマージン",
     correlation: "相関",
+    confidenceMargin: "勝者マージン",
+    runnerUp: "次点相関",
     band: "帯域",
     slot: "スロット",
     score: "スコア",
-    decision: "判定"
+    decision: "判定",
+    strictInaudible: "非可聴を厳守",
+    inputRate: "入力レート",
+    starts: "開始",
+    ends: "終了",
+    age: "経過",
+    rawDetail: "イベント詳細",
+    healthy: "音響証拠を受信中",
+    attention: "音響証拠が不足",
+    waiting: "セレモニー待ち",
+    detectedChannels: "検出チャンネル",
+    missedChannels: "未検出チャンネル",
+    averageMargin: "平均エネルギーマージン",
+    protocolBand: "プロトコル帯域",
+    failureLeader: "最多の失敗理由",
+    eventVolume: "タイムラインイベント",
+    noFailure: "失敗報告なし",
+    candidates: "検出候補",
+    readinessFalse: "Readiness が false を返しました",
+    turnReady: "TURN 準備済み",
+    turnMissing: "TURN 未設定",
+    diagnosticsProtected: "このサーバーでは診断が保護されています。公開診断ルートをデプロイしてください。",
+    diagnosticsMissing: "シグナリングサーバーに診断ルートがまだありません。",
+    diagnosticsUnreachable: "サーバーは稼働していますが診断に到達できません。許可オリジンとデプロイを確認してください。"
   }
 };
 
 const nodes = {
-  language: document.querySelector("[data-diagnostics-language]"),
   polling: document.querySelector("[data-diagnostics-poll]"),
   baseLabel: document.querySelector("[data-diagnostics-base-label]"),
+  version: document.querySelector("[data-diagnostics-version]"),
   serverStatus: document.querySelector("[data-server-status]"),
+  serverStatusCard: document.querySelector("[data-server-status-card]"),
   serverDetail: document.querySelector("[data-server-detail]"),
   deviceCount: document.querySelector("[data-device-count]"),
   pairCount: document.querySelector("[data-pair-count]"),
   sessionCount: document.querySelector("[data-session-count]"),
   snapshotTime: document.querySelector("[data-snapshot-time]"),
+  deviceSummary: document.querySelector("[data-device-summary]"),
   deviceRows: document.querySelector("[data-device-rows]"),
   sessionList: document.querySelector("[data-session-list]"),
   channelCount: document.querySelector("[data-channel-count]"),
   channelList: document.querySelector("[data-channel-list]"),
   frequencyStrip: document.querySelector("[data-frequency-strip]"),
+  analysisStatus: document.querySelector("[data-analysis-status]"),
+  analysisGrid: document.querySelector("[data-analysis-grid]"),
   eventStream: document.querySelector("[data-event-stream]"),
   error: document.querySelector("[data-diagnostics-error]")
 };
+
 const state = {
   pollTimer: 0,
   eventsClearedAt: 0,
   refreshing: false,
-  language: preferredLanguage(),
-  lastSnapshot: null
+  lastSnapshot: null,
+  lastReadiness: null
 };
 const api = new DiagnosticsApi({ baseUrl: DEFAULT_BASE_URL });
+const i18n = createOperationsI18n(MESSAGES, {
+  onChange: () => {
+    renderSourceLabel();
+    renderReadiness(state.lastReadiness);
+    if (state.lastSnapshot) renderSnapshot(state.lastSnapshot);
+  }
+});
 
 init();
 
 function init() {
-  nodes.baseLabel.textContent = `${t("production")} · ${DEFAULT_BASE_URL.replace(/^https?:\/\//, "")}`;
-  nodes.language.value = state.language;
-  document.documentElement.lang = state.language;
-  applyTranslations();
+  nodes.version.textContent = APP_VERSION;
+  renderSourceLabel();
   document.querySelector("[data-action='diagnostics-refresh']")?.addEventListener("click", refresh);
   document.querySelector("[data-action='events-clear']")?.addEventListener("click", () => {
     state.eventsClearedAt = Date.now();
     renderEvents([]);
   });
   nodes.polling.addEventListener("change", syncPolling);
-  nodes.language.addEventListener("change", () => {
-    state.language = nodes.language.value === "ja" ? "ja" : "en";
-    localStorage.setItem(LANGUAGE_KEY, state.language);
-    document.documentElement.lang = state.language;
-    applyTranslations();
-    if (state.lastSnapshot) renderSnapshot(state.lastSnapshot);
-  });
   refresh();
   syncPolling();
+}
+
+function renderSourceLabel() {
+  nodes.baseLabel.textContent = `${i18n.t("production")} · ${DEFAULT_BASE_URL.replace(/^https?:\/\//, "")}`;
 }
 
 async function refresh() {
@@ -193,28 +274,37 @@ async function refresh() {
   api.configure({ baseUrl: DEFAULT_BASE_URL, token: "" });
   hideError();
   try {
-    await refreshReadiness();
-    const snapshot = await api.snapshot();
+    const [readiness, snapshot] = await Promise.all([
+      api.readiness().catch((error) => ({ error })),
+      api.snapshot()
+    ]);
+    state.lastReadiness = readiness;
     state.lastSnapshot = snapshot;
+    renderReadiness(readiness);
     renderSnapshot(snapshot);
   } catch (error) {
+    renderReadiness({ error });
     showError(diagnosticsErrorMessage(error));
   } finally {
     state.refreshing = false;
   }
 }
 
-async function refreshReadiness() {
-  try {
-    const readiness = await api.readiness();
-    nodes.serverStatus.textContent = readiness.ok ? t("connected") : t("unavailable");
-    nodes.serverDetail.textContent = readiness.ok
-      ? `${readiness.environment || "unknown"} · TURN ${readiness.turnConfigured ? "ready" : "missing"}`
-      : "Readiness returned false";
-  } catch (error) {
-    nodes.serverStatus.textContent = t("offline");
-    nodes.serverDetail.textContent = error.message;
+function renderReadiness(readiness) {
+  let status = i18n.t("checking");
+  let detail = i18n.t("checking");
+  if (readiness?.error) {
+    status = i18n.t("offline");
+    detail = readiness.error.message;
+  } else if (readiness) {
+    status = readiness.ok ? i18n.t("connected") : i18n.t("unavailable");
+    detail = readiness.ok
+      ? `${readiness.environment || "unknown"} · ${readiness.turnConfigured ? i18n.t("turnReady") : i18n.t("turnMissing")}`
+      : i18n.t("readinessFalse");
   }
+  nodes.serverStatus.textContent = status;
+  nodes.serverStatusCard.textContent = status;
+  nodes.serverDetail.textContent = detail;
 }
 
 function syncPolling() {
@@ -228,41 +318,45 @@ function syncPolling() {
 function renderSnapshot(snapshot = {}) {
   const signaling = snapshot.signaling || {};
   const metrics = snapshot.metrics || {};
+  const protocol = signaling.protocol || {};
   const clients = Array.isArray(signaling.clients) ? signaling.clients : [];
   const pairs = Array.isArray(signaling.pairs) ? signaling.pairs : [];
   const sessions = Array.isArray(signaling.proximitySessions) ? signaling.proximitySessions : [];
   const events = (metrics.recentEvents || []).filter((event) => {
     return !state.eventsClearedAt || Date.parse(event.at) > state.eventsClearedAt;
   });
+  const channels = extractChannels({ sessions, events, clients });
   nodes.deviceCount.textContent = String(clients.length);
   nodes.pairCount.textContent = String(pairs.length);
   nodes.sessionCount.textContent = String(sessions.length);
+  nodes.deviceSummary.textContent = `${clients.length} ${i18n.t("online")}`;
   nodes.snapshotTime.textContent = snapshot.generatedAt
-    ? new Date(snapshot.generatedAt).toLocaleTimeString()
-    : "Just now";
+    ? new Date(snapshot.generatedAt).toLocaleTimeString(i18n.locale)
+    : i18n.t("checking");
   renderDevices(clients);
   renderSessions(sessions);
-  renderChannels(extractChannels({ sessions, events }));
+  renderChannels(channels);
+  renderAnalysis({ channels, sessions, events, protocol });
   renderEvents(events);
 }
 
 function renderDevices(clients) {
   if (!clients.length) {
-    nodes.deviceRows.innerHTML = `<tr><td colspan="5" class="empty-cell">${escapeHtml(t("noClients"))}</td></tr>`;
+    nodes.deviceRows.innerHTML = `<tr><td colspan="5" class="empty-cell">${escapeHtml(i18n.t("noClients"))}</td></tr>`;
     return;
   }
   nodes.deviceRows.innerHTML = clients.map((client) => {
     const capabilities = Object.entries(client.capabilities || {})
       .filter(([, enabled]) => enabled)
       .map(([name]) => name)
-      .join(", ") || t("noneReported");
+      .join(", ") || i18n.t("noneReported");
     return `
       <tr>
         <td><strong>${escapeHtml(client.deviceName || client.id)}</strong><small>${escapeHtml(client.id)}</small></td>
         <td>${escapeHtml(client.deviceLabel || client.deviceFamily || "unknown")}</td>
         <td>${escapeHtml(capabilities)}</td>
-        <td>${escapeHtml(client.pairingId || t("unpaired"))}</td>
-        <td>${escapeHtml(formatAge(client.lastSeenMsAgo))}</td>
+        <td>${escapeHtml(client.pairingId || i18n.t("unpaired"))}</td>
+        <td>${escapeHtml(formatAge(client.lastSeenMsAgo, i18n.locale))}</td>
       </tr>
     `;
   }).join("");
@@ -270,7 +364,7 @@ function renderDevices(clients) {
 
 function renderSessions(sessions) {
   if (!sessions.length) {
-    nodes.sessionList.innerHTML = `<p class="empty-state">${escapeHtml(t("noSessions"))}</p>`;
+    nodes.sessionList.innerHTML = `<p class="empty-state">${escapeHtml(i18n.t("noSessions"))}</p>`;
     return;
   }
   nodes.sessionList.innerHTML = sessions.map((session) => `
@@ -278,6 +372,11 @@ function renderSessions(sessions) {
       <div class="session-head">
         <strong class="session-id">${escapeHtml(session.id)}</strong>
         <span class="status-pill">${escapeHtml(session.phase)} · ${session.participantCount}</span>
+      </div>
+      <div class="session-timing">
+        <span>${i18n.t("age")}: ${escapeHtml(formatAge(Date.now() - Date.parse(session.createdAt || Date.now()), i18n.locale))}</span>
+        <span>${i18n.t("starts")}: ${escapeHtml(formatTimestamp(session.startAt))}</span>
+        <span>${i18n.t("ends")}: ${escapeHtml(formatTimestamp(session.endsAt))}</span>
       </div>
       ${(session.participants || []).map(renderParticipant).join("")}
     </article>
@@ -288,18 +387,23 @@ function renderParticipant(participant) {
   const signature = participant.signature;
   const telemetry = participant.telemetry;
   const acoustic = telemetry?.acoustic;
+  const capabilities = participant.acousticCapabilities || {};
   const stateClass = acoustic?.detected ? "telemetry-good" : telemetry ? "telemetry-bad" : "";
   const signatureText = signature
-    ? `${t("slot")} ${signature.slot} · code ${signature.code ?? 0} · ${formatFrequency(signature.startFrequencyHz, signature.endFrequencyHz)}`
-    : t("waitingSlot");
+    ? `${i18n.t("slot")} ${signature.slot} · code ${signature.code ?? 0} · ${formatFrequency(signature.startFrequencyHz, signature.endFrequencyHz)}`
+    : i18n.t("waitingSlot");
   const telemetryText = telemetry
-    ? `${t("decision")} ${telemetry.decision} · ${t("score")} ${Math.round(Number(telemetry.score || 0) * 100)}% · ${t("emitted")} ${yesNo(acoustic?.emitted)} · ${t("detected")} ${yesNo(acoustic?.detected)} · ${formatNumber(acoustic?.marginDb)} dB`
-    : t("waitingTelemetry");
+    ? `${i18n.t("decision")} ${telemetry.decision} · ${i18n.t("score")} ${Math.round(Number(telemetry.score || 0) * 100)}% · ${i18n.t("emitted")} ${yesNo(acoustic?.emitted)} · ${i18n.t("detected")} ${yesNo(acoustic?.detected)} · ${formatNumber(acoustic?.marginDb)} dB`
+    : i18n.t("waitingTelemetry");
+  const capabilityText = capabilities.sampleRate
+    ? `${i18n.t("inputRate")} ${capabilities.sampleRate} Hz · ${i18n.t("strictInaudible")} ${yesNo(capabilities.strictInaudible)}`
+    : i18n.t("noneReported");
   return `
     <div class="participant-row">
       <div>
         <strong>${escapeHtml(participant.deviceName || participant.clientId)}</strong>
         <small>${escapeHtml(signatureText)}</small>
+        <small>${escapeHtml(capabilityText)}</small>
       </div>
       <small class="${stateClass}">${escapeHtml(telemetryText)}</small>
     </div>
@@ -307,9 +411,9 @@ function renderParticipant(participant) {
 }
 
 function renderChannels(channels) {
-  nodes.channelCount.textContent = `${channels.length} ${t("channels")}`;
+  nodes.channelCount.textContent = `${channels.length} ${i18n.t("channels")}`;
   if (!channels.length) {
-    nodes.channelList.innerHTML = `<p class="empty-state">${escapeHtml(t("noChannels"))}</p>`;
+    nodes.channelList.innerHTML = `<p class="empty-state">${escapeHtml(i18n.t("noChannels"))}</p>`;
     nodes.frequencyStrip.innerHTML = "";
     return;
   }
@@ -318,7 +422,7 @@ function renderChannels(channels) {
       <div class="channel-head">
         <div>
           <strong>${escapeHtml(channel.deviceName || channel.clientId || "Unknown device")}</strong>
-          <small>${escapeHtml(channel.sessionId || "latest telemetry")}</small>
+          <small>${escapeHtml(channel.sessionId || "latest telemetry")} · ${escapeHtml(formatAge(Date.now() - Date.parse(channel.at || Date.now()), i18n.locale))}</small>
         </div>
         <span>${escapeHtml(channel.slotLabel)}</span>
       </div>
@@ -327,15 +431,19 @@ function renderChannels(channels) {
         <i style="--start:${channel.startPercent};--width:${channel.widthPercent}"></i>
       </div>
       <dl>
-        <div><dt>${t("emitted")}</dt><dd>${yesNo(channel.emitted)}</dd></div>
-        <div><dt>${t("detected")}</dt><dd>${yesNo(channel.detected)}</dd></div>
-        <div><dt>${t("margin")}</dt><dd>${formatNumber(channel.marginDb)} dB</dd></div>
-        <div><dt>${t("correlation")}</dt><dd>${formatNumber(channel.correlation, 2)}</dd></div>
-        <div><dt>${t("method")}</dt><dd>${escapeHtml(channel.method || "n/a")}</dd></div>
-        <div><dt>${t("sampleRate")}</dt><dd>${channel.sampleRate ? `${channel.sampleRate} Hz` : "n/a"}</dd></div>
+        <div><dt>${i18n.t("emitted")}</dt><dd>${yesNo(channel.emitted)}</dd></div>
+        <div><dt>${i18n.t("detected")}</dt><dd>${yesNo(channel.detected)}</dd></div>
+        <div><dt>${i18n.t("margin")}</dt><dd>${formatNumber(channel.marginDb)} dB</dd></div>
+        <div><dt>${i18n.t("correlation")}</dt><dd>${formatNumber(channel.correlation, 2)}</dd></div>
+        <div><dt>${i18n.t("confidenceMargin")}</dt><dd>${formatNumber(channel.confidenceMargin, 2)}</dd></div>
+        <div><dt>${i18n.t("runnerUp")}</dt><dd>${formatNumber(channel.runnerUpCorrelation, 2)}</dd></div>
+        <div><dt>${i18n.t("method")}</dt><dd>${escapeHtml(channel.method || "n/a")}</dd></div>
+        <div><dt>${i18n.t("sampleRate")}</dt><dd>${channel.sampleRate ? `${channel.sampleRate} Hz` : "n/a"}</dd></div>
+        <div><dt>${i18n.t("capture")}</dt><dd>${channel.recordingDurationMs ? `${channel.recordingDurationMs} ms` : "n/a"}</dd></div>
         <div><dt>RMS / Peak</dt><dd>${formatNumber(channel.rms, 3)} / ${formatNumber(channel.peak, 3)}</dd></div>
-        <div><dt>${t("reason")}</dt><dd>${escapeHtml(channel.reason || "none")}</dd></div>
+        <div><dt>${i18n.t("reason")}</dt><dd>${escapeHtml(channel.reason || "none")}</dd></div>
       </dl>
+      ${renderDetections(channel.detections)}
     </article>
   `).join("");
   nodes.frequencyStrip.innerHTML = channels.slice(0, 18).map((channel) => `
@@ -343,30 +451,86 @@ function renderChannels(channels) {
   `).join("");
 }
 
+function renderDetections(detections) {
+  if (!Array.isArray(detections) || !detections.length) return "";
+  return `
+    <div>
+      <p class="eyebrow">${escapeHtml(i18n.t("candidates"))}</p>
+      <ul class="detection-list">
+        ${detections.slice(0, 6).map((detection) => `
+          <li>
+            <span>${escapeHtml(detection.signatureId || "unknown")}</span>
+            <span>${formatNumber(detection.correlation, 2)} · ${formatNumber(detection.marginDb)} dB</span>
+          </li>
+        `).join("")}
+      </ul>
+    </div>
+  `;
+}
+
+function renderAnalysis({ channels, sessions, events, protocol }) {
+  if (!channels.length && !sessions.length && !events.length) {
+    nodes.analysisStatus.textContent = i18n.t("waiting");
+    nodes.analysisGrid.innerHTML = `<p class="empty-state">${escapeHtml(i18n.t("noAnalysis"))}</p>`;
+    return;
+  }
+  const detected = channels.filter((channel) => channel.detected).length;
+  const missed = channels.filter((channel) => channel.emitted && !channel.detected).length;
+  const margins = channels.map((channel) => Number(channel.marginDb)).filter(Number.isFinite);
+  const reasons = failureReasons(channels, events);
+  const topFailure = reasons[0] || [i18n.t("noFailure"), 0];
+  const protocolBand = formatFrequency(protocol.acousticBandStartHz, protocol.acousticBandEndHz);
+  nodes.analysisStatus.textContent = detected ? i18n.t("healthy") : channels.length ? i18n.t("attention") : i18n.t("waiting");
+  nodes.analysisGrid.innerHTML = [
+    analysisCard(i18n.t("detectedChannels"), detected, `${channels.length} ${i18n.t("channels")}`),
+    analysisCard(i18n.t("missedChannels"), missed, missed ? topFailure[0] : i18n.t("noFailure")),
+    analysisCard(i18n.t("averageMargin"), margins.length ? `${formatNumber(average(margins))} dB` : "n/a", `min ${formatNumber(protocol.energyAssistedMinMarginDb)} dB`),
+    analysisCard(i18n.t("protocolBand"), protocolBand, `${protocol.maxClients || 0} max · ${protocol.sessionDurationMs || 0} ms`),
+    analysisCard(i18n.t("failureLeader"), topFailure[0], `${topFailure[1]} events`),
+    analysisCard(i18n.t("eventVolume"), events.length, `${sessions.length} sessions`)
+  ].join("");
+}
+
+function analysisCard(label, value, detail) {
+  return `
+    <article class="analysis-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <small>${escapeHtml(detail)}</small>
+    </article>
+  `;
+}
+
 function renderEvents(events) {
   if (!events.length) {
-    nodes.eventStream.innerHTML = `<p class="empty-state">${escapeHtml(t("noEvents"))}</p>`;
+    nodes.eventStream.innerHTML = `<p class="empty-state">${escapeHtml(i18n.t("noEvents"))}</p>`;
     return;
   }
   nodes.eventStream.innerHTML = events.slice(0, 120).map((event) => `
     <article class="event-item" data-event-kind="${escapeHtml(event.type || "")}">
       <div class="event-head">
         <strong class="event-type">${escapeHtml(event.type)}</strong>
-        <small>${escapeHtml(new Date(event.at).toLocaleTimeString())}</small>
+        <small>${escapeHtml(new Date(event.at).toLocaleTimeString(i18n.locale))}</small>
       </div>
-      ${event.detail ? `<p>${escapeHtml(JSON.stringify(event.detail))}</p>` : ""}
+      ${event.detail ? `
+        <details>
+          <summary>${escapeHtml(i18n.t("rawDetail"))}</summary>
+          <pre>${escapeHtml(JSON.stringify(event.detail, null, 2))}</pre>
+        </details>
+      ` : ""}
     </article>
   `).join("");
 }
 
-function extractChannels({ sessions, events }) {
-  const channels = [];
+function extractChannels({ sessions, events, clients }) {
+  const clientNames = new Map(clients.map((client) => [client.id, client.deviceName]));
+  const channelMap = new Map();
   for (const session of sessions) {
     for (const participant of session.participants || []) {
       const acoustic = participant.telemetry?.acoustic;
       const signature = participant.signature;
       if (!acoustic && !signature) continue;
-      channels.push(normalizeChannel({
+      const channel = normalizeChannel({
         at: participant.telemetry?.receivedAt,
         sessionId: session.id,
         clientId: participant.clientId,
@@ -378,37 +542,50 @@ function extractChannels({ sessions, events }) {
         emitted: acoustic?.emitted,
         detected: acoustic?.detected,
         marginDb: acoustic?.marginDb,
-        correlation: firstFinite(acoustic?.detections?.[0]?.correlation, participant.telemetry?.analysis?.normalized?.sound),
+        correlation: firstFinite(acoustic?.detections?.[0]?.correlation),
+        confidenceMargin: acoustic?.confidenceMargin,
+        runnerUpCorrelation: acoustic?.runnerUpCorrelation,
+        detections: acoustic?.detections,
         method: acoustic?.detectionMethod,
         sampleRate: acoustic?.sampleRate,
+        recordingDurationMs: acoustic?.recordingDurationMs,
         rms: acoustic?.recordingRms,
         peak: acoustic?.recordingPeak,
         reason: acoustic?.reason
-      }));
+      });
+      channelMap.set(channelKey(channel), channel);
     }
   }
   for (const event of events || []) {
     if (event.type !== "proximity:session:telemetry") continue;
     const detail = event.detail || {};
-    channels.push(normalizeChannel({
+    const channel = normalizeChannel({
       at: event.at,
       sessionId: detail.sessionId,
       clientId: detail.clientId,
+      deviceName: clientNames.get(detail.clientId),
       slot: detail.acousticSlot,
+      slotCount: detail.acousticSlotCount,
       startFrequencyHz: detail.acousticStartFrequencyHz,
       endFrequencyHz: detail.acousticEndFrequencyHz,
       emitted: detail.acousticEmitted,
       detected: detail.acousticDetected,
       marginDb: detail.acousticMarginDb,
       correlation: detail.acousticCorrelation,
+      confidenceMargin: detail.acousticConfidenceMargin,
+      runnerUpCorrelation: detail.acousticRunnerUpCorrelation,
+      detections: detail.acousticDetections,
       method: detail.acousticDetectionMethod,
       sampleRate: detail.acousticSampleRate,
+      recordingDurationMs: detail.acousticRecordingDurationMs,
       rms: detail.acousticRecordingRms,
       peak: detail.acousticRecordingPeak,
       reason: detail.acousticReason
-    }));
+    });
+    const key = channelKey(channel);
+    if (!channelMap.has(key)) channelMap.set(key, channel);
   }
-  return dedupeChannels(channels.filter(Boolean));
+  return [...channelMap.values()].sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0));
 }
 
 function normalizeChannel(raw) {
@@ -416,44 +593,43 @@ function normalizeChannel(raw) {
   const end = Number(raw.endFrequencyHz);
   const slot = Number(raw.slot || 0);
   const slotCount = Number(raw.slotCount || 0);
-  const bandLabel = Number.isFinite(start) && Number.isFinite(end)
-    ? formatFrequency(start, end)
-    : "unknown band";
-  const startPercent = Number.isFinite(start) ? clamp((start - 18000) / 2400 * 100, 0, 100) : 0;
+  const range = DISPLAY_BAND_END_HZ - DISPLAY_BAND_START_HZ;
+  const startPercent = Number.isFinite(start) ? clamp((start - DISPLAY_BAND_START_HZ) / range * 100, 0, 100) : 0;
   const widthPercent = Number.isFinite(start) && Number.isFinite(end)
-    ? clamp((end - start) / 2400 * 100, 4, 100 - startPercent)
-    : 10;
+    ? clamp((end - start) / range * 100, 3, 100 - startPercent)
+    : 8;
   return {
     ...raw,
-    slotLabel: slot ? `${t("slot")} ${slot}${slotCount ? `/${slotCount}` : ""}` : t("listened"),
-    bandLabel,
+    slot,
+    slotCount,
+    slotLabel: slot ? `${i18n.t("slot")} ${slot}${slotCount ? `/${slotCount}` : ""}` : i18n.t("listened"),
+    bandLabel: Number.isFinite(start) && Number.isFinite(end) ? formatFrequency(start, end) : "unknown band",
     startPercent: `${startPercent}%`,
     widthPercent: `${widthPercent}%`
   };
 }
 
-function dedupeChannels(channels) {
-  const seen = new Set();
-  return channels
-    .sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0))
-    .filter((channel) => {
-      const key = [channel.sessionId, channel.clientId, channel.slot, channel.bandLabel, channel.at].join(":");
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+function channelKey(channel) {
+  return [channel.sessionId || "event", channel.clientId || "unknown", channel.slot || 0].join(":");
 }
 
-function applyTranslations() {
-  for (const node of document.querySelectorAll("[data-i18n]")) {
-    node.textContent = t(node.dataset.i18n);
+function failureReasons(channels, events) {
+  const counts = new Map();
+  for (const channel of channels) {
+    if (channel.detected || !channel.reason) continue;
+    counts.set(channel.reason, (counts.get(channel.reason) || 0) + 1);
   }
+  for (const event of events) {
+    if (event.type !== "proximity:session:failed" || !event.detail?.reason) continue;
+    counts.set(event.detail.reason, (counts.get(event.detail.reason) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
 }
 
 function diagnosticsErrorMessage(error) {
-  if (error.message === "unauthorized") return "Diagnostics are still protected on this server. Deploy the public diagnostics route.";
-  if (error.message === "not_found") return "The signaling server does not have the diagnostics route deployed yet.";
-  if (error.message === "Failed to fetch") return "The signaling server is healthy, but this page could not reach diagnostics. Check ALLOWED_ORIGINS and deployment.";
+  if (error.message === "unauthorized") return i18n.t("diagnosticsProtected");
+  if (error.message === "not_found") return i18n.t("diagnosticsMissing");
+  if (error.message === "Failed to fetch") return i18n.t("diagnosticsUnreachable");
   return error.message;
 }
 
@@ -467,18 +643,14 @@ function hideError() {
   nodes.error.textContent = "";
 }
 
-function preferredLanguage() {
-  const saved = localStorage.getItem(LANGUAGE_KEY);
-  if (saved === "en" || saved === "ja") return saved;
-  return /^ja\b/i.test(navigator.language || "") ? "ja" : "en";
-}
-
-function t(key) {
-  return MESSAGES[state.language]?.[key] || MESSAGES.en[key] || key;
-}
-
 function yesNo(value) {
-  return value ? t("yes") : t("no");
+  return value ? i18n.t("yes") : i18n.t("no");
+}
+
+function formatTimestamp(value) {
+  const milliseconds = Number(value);
+  if (!Number.isFinite(milliseconds) || milliseconds <= 0) return "n/a";
+  return new Date(milliseconds).toLocaleTimeString(i18n.locale);
 }
 
 function firstFinite(...values) {
@@ -487,6 +659,10 @@ function firstFinite(...values) {
     if (Number.isFinite(number)) return number;
   }
   return null;
+}
+
+function average(values) {
+  return values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
 }
 
 function clamp(value, minimum, maximum) {

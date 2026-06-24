@@ -1,7 +1,7 @@
 # WebDrop Production Implementation Checklist
 
-Updated: June 19, 2026
-App version: 1.0.67
+Updated: June 24, 2026
+App version: 1.0.70
 
 This is the source of truth for the production-readiness package. `Ready, live` means the implementation is active in the current runtime. `Ready, disabled` means the implementation is wired to the frontend but cannot become effective unless its runtime flag and infrastructure are enabled. `Ready, unconfigured` means the code exists but requires deployment secrets or infrastructure. `External verification` means the code is ready but requires Azure, Cloudflare, or physical devices.
 
@@ -71,6 +71,8 @@ This is the source of truth for the production-readiness package. `Ready, live` 
 | Cloudflare temporary TURN credentials | Ready, live | `azure cloud server/src/turn-provider.js`, `azure cloud server/tests/turn-provider.test.mjs`, live relay E2E |
 | Direct/relay path metrics | Ready, live | `azure cloud server/src/metrics.js`, `azure cloud server/src/signaling-hub.js` |
 | Payload-safe observability | Ready, live | `azure cloud server/src/logger.js`, protected metrics endpoint |
+| Public bounded operations diagnostics | Ready, live | `/api/diagnostics-public`, `admin/diagnostics.html`, `js/admin/diagnostics.js` |
+| Shared English/Japanese operations UI | Ready, live | `css/operations.css`, `js/admin/operations-i18n.js`, admin E2E coverage |
 | nginx, Certbot, systemd, Azure VM scripts, and load-test assets | Ready, unconfigured | `azure cloud server/nginx/`, `systemd/`, `scripts/`, `load/` |
 
 ## Runtime activation state
@@ -90,6 +92,7 @@ This is the source of truth for the production-readiness package. `Ready, live` 
 - Playwright command: `npm run test:e2e` — covers responsive UI, QR, WebKit iPhone permission flows, Dynamic Island geometry, acoustic sensor recognition, live signaling, bidirectional transfer, and forced relay behavior
 - `git diff --check` — passing
 - Browser smoke: production and local mobile app load, 393x852 viewport has no horizontal overflow, QR is machine-readable, Dynamic Island expands edge-to-edge from the top, and console warnings/errors are empty.
+- Operations smoke: readiness, live testing, and diagnostics share one dark control-room shell; English/Japanese switching updates static and dynamic content; live diagnostics renders one deduplicated channel per device/session/slot plus protocol, capture, confidence, and failure evidence.
 
 ## Remaining before production launch
 

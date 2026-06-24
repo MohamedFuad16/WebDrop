@@ -5,12 +5,13 @@
 This checkout now contains a first-run static, modular WebDrop v2 app plus architecture notes.
 
 - `index.html` is the active static app shell.
-- The current app/package/service-worker version is `1.0.67`.
+- The current app/package/service-worker version is `1.0.70`.
 - The earlier `proximity_architecture_monkeytype_v2.html` page was removed during the corrected rebuild.
 - `docs/implementation-checklist.md` is the current production-readiness source of truth.
 - `js/` contains the app state machine, controller, adapters, proximity, transport, transfer, storage client, and UI renderer.
-- `js/admin/` contains the readiness console and the dedicated diagnostics modules for protected server snapshots and local acoustic testing.
-- `admin/diagnostics.html` is the operational view for signaling clients, active pairs, proximity sessions, bounded acoustic telemetry, and same-browser chirp checks.
+- `js/admin/` contains the readiness console, shared operations localization, and the dedicated live diagnostics renderer.
+- `admin/diagnostics.html` is the public operational view for signaling clients, active pairs, proximity sessions, protocol thresholds, bounded device acoustic telemetry, and failure analysis. It does not request this browser's microphone or run a local loopback lab.
+- `css/operations.css` and `js/admin/operations-i18n.js` are the shared visual and English/Japanese foundation for both admin pages.
 - `js/storage/storage-client.js` contains the active receive-side storage ladder: deferred IndexedDB chunks with StreamSaver export on Download, iPhone/iPad Blob fallback, direct-stream compatibility fallback, and a 500 MB receive-session cap.
 - `azure cloud server/` contains the deployable signaling backend package for WSS metadata, QR token issuance, TURN credential proxying, and enforcement policy.
 - `graphify-out/` exists, but the current index may be stale or unrelated. Follow `AGENTS.md`: try graph traversal first, record stale results when encountered, then keep any direct reads scoped to the task.
@@ -58,7 +59,8 @@ It must reject binary payloads, cap message sizes, validate origin/session token
 
 The public `/api/diagnostics-public` endpoint powers the operations dashboard
 with bounded metadata only: connected-client summaries, proximity-session
-state, and recent event summaries. The protected `/api/diagnostics-snapshot`
+state, acoustic capabilities and decoded evidence, protocol thresholds, and
+recent event summaries. The protected `/api/diagnostics-snapshot`
 endpoint keeps the same metadata shape behind the metrics bearer token used by
 `/api/metrics-summary`. Neither endpoint exposes TURN credentials, QR tokens,
 raw microphone samples, or transferred file bytes.
@@ -107,15 +109,14 @@ Supported evidence can include:
 
 QR should remain the reliable fallback when microphone, motion, or audio playback permissions fail.
 
-Acoustic verification uses a 20.05-20.95 kHz, 96ms windowed coded chirp with a
-19.5 kHz high-pass filter. WebDrop refuses to emit when the active sample rate
-cannot keep the complete signature above 20 kHz, then relies on the explicit QR
-path. Anonymous sessions continuously record one ceremony buffer and allocate
-up to six guarded transmit slots in one shared band. Each participant receives
-a distinct chirp code, emits only in its slot, and decodes all peer slots after
-the frame. The server pairs devices only when strongest-signature reports are
-reciprocal, winner confidence is unambiguous, and bump timestamps are inside the
-match window.
+Acoustic verification uses a coded, device-negotiated high-frequency band. The
+current server policy allocates the `18.6-19.4 kHz` range for physical iPhone
+testing, with guarded transmit slots and per-device chirp codes. Anonymous
+sessions continuously record one ceremony buffer and allocate up to six
+transmit slots in the shared band. Each participant emits only in its slot and
+decodes all peer slots after the frame. The server pairs devices only when
+strongest-signature reports are reciprocal, winner confidence is unambiguous,
+and bump timestamps are inside the match window.
 The score threshold is necessary but not sufficient: server verification also
 requires explicit ultrasound, bump, and tilt evidence, and rejects bump timing
 outside the server-issued ceremony window.

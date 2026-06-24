@@ -3,84 +3,94 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f7f8fb">
+  <meta name="theme-color" content="#151616">
   <title>WebDrop Admin</title>
-  <link rel="stylesheet" href="../css/admin.css">
+  <link rel="stylesheet" href="../css/operations.css?v=1.0.70">
+  <link rel="stylesheet" href="../css/admin.css?v=1.0.70">
 </head>
 <body>
-  <main class="admin-shell">
-    <header class="admin-hero">
-      <div class="button-row">
-        <a class="admin-back" href="../">Back to app</a>
-        <a class="admin-back" href="./diagnostics.html">Open live diagnostics</a>
+  <main class="operations-shell admin-shell">
+    <header class="operations-hero admin-hero">
+      <div class="operations-toolbar">
+        <div class="operations-links">
+          <a class="operations-link" href="../" data-i18n="backToApp">Back to app</a>
+          <a class="operations-link" href="./diagnostics.html" data-i18n="openDiagnostics">Open live diagnostics</a>
+        </div>
+        <label class="operations-language">
+          <span data-i18n="language">Language</span>
+          <select data-operations-language>
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+          </select>
+        </label>
       </div>
-      <p class="eyebrow">WebDrop Admin</p>
-      <h1>Production readiness and live testing</h1>
-      <p class="hero-copy">A focused control room for launch status, device sessions, ICE paths, transfer manifests, and server checks.</p>
-      <div class="hero-status" aria-label="Admin status summary">
-        <span><strong data-admin-version>1.0.34</strong> app version</span>
-        <span><strong data-admin-mode>Mock</strong> runtime mode</span>
-        <span><strong data-admin-score>0%</strong> launch readiness</span>
+      <p class="eyebrow" data-i18n="adminKicker">WebDrop Admin</p>
+      <h1 data-i18n="heroTitle">Production readiness and live testing</h1>
+      <p class="operations-hero-copy" data-i18n="heroCopy">A focused control room for launch status, device sessions, ICE paths, transfer manifests, and server checks.</p>
+      <div class="operations-status" data-i18n-aria="adminStatusSummary">
+        <span><strong data-admin-version>1.0.70</strong> <span data-i18n="appVersion">app version</span></span>
+        <span><strong data-admin-mode>Mock</strong> <span data-i18n="runtimeMode">runtime mode</span></span>
+        <span><strong data-admin-score>0%</strong> <span data-i18n="launchReadiness">launch readiness</span></span>
       </div>
     </header>
 
-    <nav class="admin-tabs" aria-label="Admin sections">
-      <button class="is-active" type="button" data-admin-tab="readiness">Readiness</button>
-      <button type="button" data-admin-tab="live">Live testing</button>
+    <nav class="operations-tabs admin-tabs" data-i18n-aria="adminSections">
+      <button class="is-active" type="button" data-admin-tab="readiness" data-i18n="readiness">Readiness</button>
+      <button type="button" data-admin-tab="live" data-i18n="liveTesting">Live testing</button>
     </nav>
 
     <section class="admin-panel is-active" data-admin-panel="readiness" aria-labelledby="readiness-title">
-      <div class="section-heading">
-        <p class="eyebrow">What is done</p>
-        <h2 id="readiness-title">Launch map</h2>
+      <div class="operations-section-heading section-heading">
+        <p class="eyebrow" data-i18n="doneKicker">What is done</p>
+        <h2 id="readiness-title" data-i18n="launchMap">Launch map</h2>
       </div>
       <div class="readiness-grid" data-readiness-grid></div>
-      <div class="section-heading">
-        <p class="eyebrow">What is left</p>
-        <h2>Production blockers</h2>
+      <div class="operations-section-heading section-heading">
+        <p class="eyebrow" data-i18n="leftKicker">What is left</p>
+        <h2 data-i18n="productionBlockers">Production blockers</h2>
       </div>
       <div class="blocker-list" data-blocker-list></div>
     </section>
 
     <section class="admin-panel" data-admin-panel="live" aria-labelledby="live-title">
-      <div class="section-heading">
-        <p class="eyebrow">Live tracking</p>
-        <h2 id="live-title">Devices, transfer, ICE, and server probes</h2>
+      <div class="operations-section-heading section-heading">
+        <p class="eyebrow" data-i18n="liveTracking">Live tracking</p>
+        <h2 id="live-title" data-i18n="liveTitle">Devices, transfer, ICE, and server probes</h2>
       </div>
 
       <div class="live-grid">
-        <article class="admin-card span-2">
+        <article class="operations-panel admin-card span-2">
           <div class="card-head">
             <div>
-              <p class="eyebrow">Signaling</p>
-              <h3>WebSocket session monitor</h3>
+              <p class="eyebrow" data-i18n="signaling">Signaling</p>
+              <h3 data-i18n="websocketMonitor">WebSocket session monitor</h3>
             </div>
             <span class="status-pill" data-ws-status>Disconnected</span>
           </div>
-          <label class="admin-field">
-            <span>WSS endpoint</span>
+          <label class="operations-field admin-field">
+            <span data-i18n="wssEndpoint">WSS endpoint</span>
             <input data-ws-url type="url" placeholder="wss://signal.example.com/ws">
           </label>
-          <label class="admin-field">
-            <span>Client name</span>
+          <label class="operations-field admin-field">
+            <span data-i18n="clientName">Client name</span>
             <input data-client-name type="text" maxlength="60" value="Admin Test Device">
           </label>
           <div class="button-row">
-            <button type="button" data-action="ws-connect">Connect</button>
-            <button type="button" data-action="ws-ping">Ping</button>
-            <button type="button" data-action="ws-disconnect">Disconnect</button>
+            <button class="primary-button" type="button" data-action="ws-connect" data-i18n="connect">Connect</button>
+            <button type="button" data-action="ws-ping" data-i18n="ping">Ping</button>
+            <button type="button" data-action="ws-disconnect" data-i18n="disconnect">Disconnect</button>
           </div>
           <dl class="session-facts" data-session-facts>
             <div>
-              <dt>Client id</dt>
+              <dt data-i18n="clientId">Client id</dt>
               <dd data-session-client>Not connected</dd>
             </div>
             <div>
-              <dt>Session id</dt>
+              <dt data-i18n="sessionId">Session id</dt>
               <dd data-session-id>Not connected</dd>
             </div>
             <div>
-              <dt>TURN access token</dt>
+              <dt data-i18n="turnAccessToken">TURN access token</dt>
               <dd data-session-turn-token>Not issued</dd>
             </div>
           </dl>
@@ -90,64 +100,64 @@
           <pre class="event-log" data-ws-log aria-live="polite"></pre>
         </article>
 
-        <article class="admin-card">
+        <article class="operations-panel admin-card">
           <div class="card-head">
             <div>
-              <p class="eyebrow">Server</p>
-              <h3>API probes</h3>
+              <p class="eyebrow" data-i18n="server">Server</p>
+              <h3 data-i18n="apiProbes">API probes</h3>
             </div>
           </div>
-          <label class="admin-field">
-            <span>HTTP base</span>
+          <label class="operations-field admin-field">
+            <span data-i18n="httpBase">HTTP base</span>
             <input data-http-base type="url" placeholder="https://signal.example.com">
           </label>
-          <label class="admin-field">
-            <span>Bearer token</span>
+          <label class="operations-field admin-field">
+            <span data-i18n="bearerToken">Bearer token</span>
             <input data-bearer-token type="password" placeholder="optional">
           </label>
           <div class="button-row">
-            <button type="button" data-action="probe-health">Health</button>
-            <button type="button" data-action="probe-ready">Readiness</button>
-            <button type="button" data-action="probe-ice">ICE servers</button>
-            <button type="button" data-action="probe-metrics">Metrics</button>
+            <button class="primary-button" type="button" data-action="probe-health" data-i18n="health">Health</button>
+            <button type="button" data-action="probe-ready" data-i18n="readiness">Readiness</button>
+            <button type="button" data-action="probe-ice" data-i18n="iceServers">ICE servers</button>
+            <button type="button" data-action="probe-metrics" data-i18n="metrics">Metrics</button>
           </div>
           <pre class="event-log compact" data-api-output></pre>
         </article>
 
-        <article class="admin-card">
+        <article class="operations-panel admin-card">
           <div class="card-head">
             <div>
               <p class="eyebrow">ICE</p>
-              <h3>Candidate lab</h3>
+              <h3 data-i18n="candidateLab">Candidate lab</h3>
             </div>
             <span class="status-pill" data-ice-status>Idle</span>
           </div>
-          <label class="admin-field">
-            <span>ICE server URL</span>
+          <label class="operations-field admin-field">
+            <span data-i18n="iceServerUrl">ICE server URL</span>
             <input data-ice-url type="text" value="stun:stun.l.google.com:19302">
           </label>
-          <button type="button" data-action="ice-gather">Gather candidates</button>
+          <button class="primary-button" type="button" data-action="ice-gather" data-i18n="gatherCandidates">Gather candidates</button>
           <div class="candidate-list" data-candidate-list>
             <p class="empty-note">Candidate type, protocol, IP family, and relay/direct hints appear here.</p>
           </div>
         </article>
 
-        <article class="admin-card span-2">
+        <article class="operations-panel admin-card span-2">
           <div class="card-head">
             <div>
-              <p class="eyebrow">Transfer</p>
-              <h3>File manifest and speed simulator</h3>
+              <p class="eyebrow" data-i18n="transfer">Transfer</p>
+              <h3 data-i18n="transferSimulator">File manifest and speed simulator</h3>
             </div>
             <span class="status-pill" data-transfer-status>Idle</span>
           </div>
           <label class="file-drop">
             <input data-file-input type="file" multiple>
-            <span>Select test files</span>
-            <small>Builds the same kind of manifest WebDrop sends before DataChannel chunks.</small>
+            <span data-i18n="selectTestFiles">Select test files</span>
+            <small data-i18n="selectTestFilesHelp">Builds the same kind of manifest WebDrop sends before DataChannel chunks.</small>
           </label>
           <div class="button-row">
-            <button type="button" data-action="simulate-transfer">Simulate transfer</button>
-            <button type="button" data-action="reset-transfer">Reset</button>
+            <button class="primary-button" type="button" data-action="simulate-transfer" data-i18n="simulateTransfer">Simulate transfer</button>
+            <button type="button" data-action="reset-transfer" data-i18n="reset">Reset</button>
           </div>
           <div class="transfer-meter">
             <span data-transfer-bar></span>
@@ -158,7 +168,7 @@
     </section>
   </main>
 
-  <script src="../js/config/runtime-config.js?v=1.0.34"></script>
-  <script src="../js/admin/readiness.js?v=1.0.69" type="module"></script>
+  <script src="../js/config/runtime-config.js?v=1.0.70"></script>
+  <script src="../js/admin/readiness.js?v=1.0.70" type="module"></script>
 </body>
 </html>

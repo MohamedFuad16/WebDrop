@@ -2,6 +2,11 @@
 
 ## Completed
 
+- `1.0.70` operations refresh: readiness, live testing, and diagnostics now share one dark control-room shell and one `webdrop.locale` English/Japanese preference.
+- Diagnostics no longer runs a browser-local microphone lab. It displays bounded device-originated telemetry, protocol thresholds, participant acoustic capabilities, slot timing, capture duration, confidence margin, runner-up correlation, and failure summaries.
+- The duplicate-channel bug was fixed by keying telemetry by proximity session, client, and assigned slot instead of rendering both session and timeline copies.
+- Chromium operations E2E passed for English/Japanese switching, live-testing tab state, channel deduplication, expanded acoustic evidence, and console health.
+- In-app Browser QA passed at desktop and `393x852`: no horizontal overflow, no console warnings/errors, and both admin surfaces switched locale without reload.
 - `npm run check` passed.
 - `npm test` passed: 18 tests.
 - `npm --prefix "azure cloud server" run check` passed.

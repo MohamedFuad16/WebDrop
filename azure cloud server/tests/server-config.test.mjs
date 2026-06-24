@@ -70,11 +70,11 @@ test("diagnostics snapshot keeps private auth and exposes safe public status", a
     const publicSnapshot = await fetch(`${base}/api/diagnostics-public`);
     assert.equal(publicSnapshot.status, 200);
     const publicBody = await publicSnapshot.json();
-    assert.deepEqual(publicBody.signaling, {
-      clients: [],
-      pairs: [],
-      proximitySessions: []
-    });
+    assert.deepEqual(publicBody.signaling.clients, []);
+    assert.deepEqual(publicBody.signaling.pairs, []);
+    assert.deepEqual(publicBody.signaling.proximitySessions, []);
+    assert.equal(publicBody.signaling.protocol.scoreMinimum, 0.55);
+    assert.equal(publicBody.signaling.protocol.maxClients, 6);
     assert.ok(Array.isArray(publicBody.metrics.recentEvents));
 
     const unauthorized = await fetch(`${base}/api/diagnostics-snapshot`);
@@ -85,11 +85,11 @@ test("diagnostics snapshot keeps private auth and exposes safe public status", a
     });
     assert.equal(authorized.status, 200);
     const body = await authorized.json();
-    assert.deepEqual(body.signaling, {
-      clients: [],
-      pairs: [],
-      proximitySessions: []
-    });
+    assert.deepEqual(body.signaling.clients, []);
+    assert.deepEqual(body.signaling.pairs, []);
+    assert.deepEqual(body.signaling.proximitySessions, []);
+    assert.equal(body.signaling.protocol.acousticBandStartHz, 18600);
+    assert.equal(body.signaling.protocol.acousticBandEndHz, 19400);
     assert.ok(Array.isArray(body.metrics.recentEvents));
   } finally {
     hub.close();

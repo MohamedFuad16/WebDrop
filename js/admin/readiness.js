@@ -1,97 +1,200 @@
-const APP_VERSION = "1.0.69";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.70";
+
+const APP_VERSION = "1.0.70";
 const CHUNK_SIZE = 256 * 1024;
 
-const readinessItems = [
-  {
-    title: "Mobile UI and orbit UX",
-    status: "Done",
-    score: 92,
-    checks: [
-      "Orbital presence map and nearby overflow sheet",
-      "Connected Venn avatar state and bottom actions",
-      "Dynamic Island QR and connection ceremony UI"
+const ADMIN_MESSAGES = {
+  en: {
+    documentTitle: "WebDrop Admin",
+    backToApp: "Back to app",
+    openDiagnostics: "Open live diagnostics",
+    language: "Language",
+    adminKicker: "WebDrop Admin",
+    heroTitle: "Production readiness and live testing",
+    heroCopy: "A focused control room for launch status, device sessions, ICE paths, transfer manifests, and server checks.",
+    adminStatusSummary: "Admin status summary",
+    appVersion: "app version",
+    runtimeMode: "runtime mode",
+    launchReadiness: "launch readiness",
+    adminSections: "Admin sections",
+    readiness: "Readiness",
+    liveTesting: "Live testing",
+    doneKicker: "What is done",
+    launchMap: "Launch map",
+    leftKicker: "What is left",
+    productionBlockers: "Production blockers",
+    liveTracking: "Live tracking",
+    liveTitle: "Devices, transfer, ICE, and server probes",
+    signaling: "Signaling",
+    websocketMonitor: "WebSocket session monitor",
+    wssEndpoint: "WSS endpoint",
+    clientName: "Client name",
+    connect: "Connect",
+    ping: "Ping",
+    disconnect: "Disconnect",
+    clientId: "Client id",
+    sessionId: "Session id",
+    turnAccessToken: "TURN access token",
+    server: "Server",
+    apiProbes: "API probes",
+    httpBase: "HTTP base",
+    bearerToken: "Bearer token",
+    health: "Health",
+    iceServers: "ICE servers",
+    metrics: "Metrics",
+    candidateLab: "Candidate lab",
+    iceServerUrl: "ICE server URL",
+    gatherCandidates: "Gather candidates",
+    transfer: "Transfer",
+    transferSimulator: "File manifest and speed simulator",
+    selectTestFiles: "Select test files",
+    selectTestFilesHelp: "Builds the same kind of manifest WebDrop sends before DataChannel chunks.",
+    simulateTransfer: "Simulate transfer",
+    reset: "Reset",
+    production: "Production",
+    mock: "Mock",
+    done: "Done",
+    readyCheck: "Ready, endpoint check required",
+    readyExternal: "Ready, external verification",
+    readyLive: "Ready, live",
+    externalVerification: "External verification",
+    high: "High",
+    medium: "Medium",
+    disconnected: "Disconnected",
+    connecting: "Connecting",
+    connected: "Connected",
+    invalidUrl: "Invalid URL",
+    error: "Error",
+    gathering: "Gathering",
+    failed: "Failed",
+    idle: "Idle",
+    running: "Running",
+    complete: "Complete",
+    notConnected: "Not connected",
+    notIssued: "Not issued",
+    noPeers: "No live signaling peers yet.",
+    noCandidates: "No candidates yet. Browsers may hide host IPs behind mDNS.",
+    gatheringCandidates: "Gathering ICE candidates...",
+    noFiles: "No files selected yet.",
+    selectFilesFirst: "Select files first.",
+    online: "Online",
+    offline: "Offline",
+    none: "None",
+    items: [
+      ["Mobile UI and orbit UX", "done", 92, ["Orbital presence map and nearby overflow sheet", "Connected Venn avatar state and bottom actions", "Dynamic Island QR and connection ceremony UI"]],
+      ["Static frontend architecture", "done", 88, ["Vanilla HTML/CSS/JS modules", "Japanese and English locale support", "Service worker cache versioning"]],
+      ["Production signaling code", "readyCheck", 82, ["Azure WebSocket server package and local integration tests pass", "Presence, invites, RTC, chat and transfer metadata schemas", "nginx, Certbot, systemd and load-test assets"]],
+      ["TURN credential path", "readyExternal", 76, ["Server-side Cloudflare TURN credential endpoint", "Frontend adapter requests temporary iceServers", "Long-lived TURN token stays off the frontend"]],
+      ["WebRTC transfer engine", "readyLive", 82, ["DataChannel control and file channels", "256 KiB chunks and backpressure model", "Path stats classify direct, relay or failed"]],
+      ["Deferred receive storage", "readyLive", 84, ["500 MB send and receive session caps", "IndexedDB keeps desktop chunks pending until Save", "iPhone and iPad Blob fallback waits for explicit Save"]],
+      ["Proximity ceremony", "readyLive", 82, ["Peerless QR token flow and scanner UI", "Inaudible acoustic slot diagnostics", "Server policy gates RTC and transfer metadata"]],
+      ["Production proof", "externalVerification", 42, ["Configured WSS/TURN endpoint must remain reachable and healthy", "Needs physical iOS/Android calibration", "Needs direct and relay transfer proof"]]
+    ],
+    blockers: [
+      ["Verify Azure signaling availability", "The configured Japan East health, WSS and ICE endpoints must pass from the public app before launch.", "high"],
+      ["Verify TURN credentials", "Confirm the server can issue temporary Cloudflare TURN credentials without exposing the long-lived token.", "high"],
+      ["Calibrate proximity", "Test QR, microphone chirps, tilt and bump on physical iOS and Android devices.", "high"],
+      ["Prove real transfer", "Run direct and TURN file transfers with cancellation, retry and storage exhaustion cases.", "high"],
+      ["Load test signaling", "Ramp WebSocket load toward the 10,000-client target while watching nginx and Node limits.", "medium"],
+      ["Plan horizontal scale", "Add shared state such as Redis or sticky session routing before multi-node signaling.", "medium"]
     ]
   },
-  {
-    title: "Static frontend architecture",
-    status: "Done",
-    score: 88,
-    checks: [
-      "Vanilla HTML/CSS/JS modules",
-      "Japanese and English locale support",
-      "Service worker cache versioning"
-    ]
-  },
-  {
-    title: "Production signaling code",
-    status: "Ready, endpoint check required",
-    score: 82,
-    checks: [
-      "Azure WebSocket server package and local integration tests pass",
-      "Presence, invites, RTC, chat and transfer metadata schemas",
-      "nginx, Certbot, systemd and load-test assets"
-    ]
-  },
-  {
-    title: "TURN credential path",
-    status: "Ready, external verification",
-    score: 76,
-    checks: [
-      "Server-side Cloudflare TURN credential endpoint",
-      "Frontend adapter requests temporary iceServers",
-      "Long-lived TURN token stays off the frontend"
-    ]
-  },
-  {
-    title: "WebRTC transfer engine",
-    status: "Ready, live",
-    score: 82,
-    checks: [
-      "DataChannel control and file channels",
-      "256 KiB chunks and backpressure model",
-      "Path stats classify direct, relay or failed"
-    ]
-  },
-  {
-    title: "Deferred receive storage",
-    status: "Ready, live",
-    score: 84,
-    checks: [
-      "500 MB send and receive session caps",
-      "IndexedDB keeps desktop chunks pending until Save",
-      "iPhone and iPad Blob fallback waits for explicit Save"
-    ]
-  },
-  {
-    title: "Proximity ceremony",
-    status: "Ready, live",
-    score: 82,
-    checks: [
-      "Peerless QR token flow and scanner UI",
-      "Above-20 kHz acoustic slot diagnostics",
-      "Server policy gates RTC and transfer metadata"
-    ]
-  },
-  {
-    title: "Production proof",
-    status: "External verification",
-    score: 42,
-    checks: [
-      "Configured WSS/TURN endpoint must remain reachable and healthy",
-      "Needs physical iOS/Android calibration",
-      "Needs direct and relay transfer proof"
+  ja: {
+    documentTitle: "WebDrop 管理",
+    backToApp: "アプリに戻る",
+    openDiagnostics: "ライブ診断を開く",
+    language: "言語",
+    adminKicker: "WebDrop 管理",
+    heroTitle: "本番準備とライブテスト",
+    heroCopy: "リリース状況、端末セッション、ICE 経路、転送マニフェスト、サーバー状態を確認するコントロールルームです。",
+    adminStatusSummary: "管理ステータス概要",
+    appVersion: "アプリバージョン",
+    runtimeMode: "実行モード",
+    launchReadiness: "リリース準備度",
+    adminSections: "管理セクション",
+    readiness: "準備状況",
+    liveTesting: "ライブテスト",
+    doneKicker: "完了済み",
+    launchMap: "リリースマップ",
+    leftKicker: "残りの項目",
+    productionBlockers: "本番ブロッカー",
+    liveTracking: "ライブ追跡",
+    liveTitle: "端末、転送、ICE、サーバープローブ",
+    signaling: "シグナリング",
+    websocketMonitor: "WebSocket セッションモニター",
+    wssEndpoint: "WSS エンドポイント",
+    clientName: "クライアント名",
+    connect: "接続",
+    ping: "Ping",
+    disconnect: "切断",
+    clientId: "クライアント ID",
+    sessionId: "セッション ID",
+    turnAccessToken: "TURN アクセストークン",
+    server: "サーバー",
+    apiProbes: "API プローブ",
+    httpBase: "HTTP ベース",
+    bearerToken: "Bearer トークン",
+    health: "ヘルス",
+    iceServers: "ICE サーバー",
+    metrics: "メトリクス",
+    candidateLab: "候補経路ラボ",
+    iceServerUrl: "ICE サーバー URL",
+    gatherCandidates: "候補を収集",
+    transfer: "転送",
+    transferSimulator: "ファイルマニフェストと速度シミュレーター",
+    selectTestFiles: "テストファイルを選択",
+    selectTestFilesHelp: "DataChannel のチャンク送信前に WebDrop が作る形式と同じマニフェストを生成します。",
+    simulateTransfer: "転送をシミュレート",
+    reset: "リセット",
+    production: "本番",
+    mock: "モック",
+    done: "完了",
+    readyCheck: "準備済み、接続先確認が必要",
+    readyExternal: "準備済み、外部確認が必要",
+    readyLive: "準備済み、稼働中",
+    externalVerification: "外部確認",
+    high: "高",
+    medium: "中",
+    disconnected: "未接続",
+    connecting: "接続中",
+    connected: "接続済み",
+    invalidUrl: "URL が無効",
+    error: "エラー",
+    gathering: "収集中",
+    failed: "失敗",
+    idle: "待機中",
+    running: "実行中",
+    complete: "完了",
+    notConnected: "未接続",
+    notIssued: "未発行",
+    noPeers: "接続中のシグナリング端末はありません。",
+    noCandidates: "候補はまだありません。ブラウザがホスト IP を mDNS で隠す場合があります。",
+    gatheringCandidates: "ICE 候補を収集中...",
+    noFiles: "ファイルはまだ選択されていません。",
+    selectFilesFirst: "先にファイルを選択してください。",
+    online: "オンライン",
+    offline: "オフライン",
+    none: "なし",
+    items: [
+      ["モバイル UI とオービット UX", "done", 92, ["オービット型の在席マップと近接端末一覧", "接続時の重なりアバターと下部アクション", "Dynamic Island の QR と接続セレモニー UI"]],
+      ["静的フロントエンド構成", "done", 88, ["Vanilla HTML/CSS/JS モジュール", "日本語と英語の切り替え", "Service Worker のキャッシュバージョン管理"]],
+      ["本番シグナリング", "readyCheck", 82, ["Azure WebSocket サーバーとローカル統合テスト", "在席、RTC、チャット、転送メタデータのスキーマ", "nginx、Certbot、systemd、負荷試験アセット"]],
+      ["TURN 認証経路", "readyExternal", 76, ["サーバー側 Cloudflare TURN 認証エンドポイント", "フロントエンドが一時的な iceServers を取得", "長期 TURN トークンをフロントエンドに置かない"]],
+      ["WebRTC 転送エンジン", "readyLive", 82, ["DataChannel の制御・ファイルチャンネル", "256 KiB チャンクとバックプレッシャー", "直接・リレー・失敗の経路分類"]],
+      ["遅延受信ストレージ", "readyLive", 84, ["送受信セッション上限 500 MB", "保存まで IndexedDB にデスクトップチャンクを保持", "iPhone/iPad は明示的な保存まで Blob を保持"]],
+      ["近接セレモニー", "readyLive", 82, ["相手未選択の QR トークンとスキャナー", "非可聴帯域の音響スロット診断", "サーバーポリシーで RTC と転送を制御"]],
+      ["本番実証", "externalVerification", 42, ["WSS/TURN エンドポイントの継続的な到達性確認", "実機 iOS/Android の調整", "直接転送と TURN 転送の実証"]]
+    ],
+    blockers: [
+      ["Azure シグナリングを確認", "Japan East のヘルス、WSS、ICE エンドポイントを公開アプリから確認します。", "high"],
+      ["TURN 認証情報を確認", "長期トークンを公開せず、一時的な Cloudflare TURN 認証を発行できることを確認します。", "high"],
+      ["近接検出を調整", "実機 iOS/Android で QR、マイクチャープ、傾き、バンプを検証します。", "high"],
+      ["実転送を実証", "直接・TURN 転送でキャンセル、再試行、容量不足ケースを実行します。", "high"],
+      ["シグナリング負荷試験", "nginx と Node の制限を監視しながら 10,000 クライアント目標へ段階的に増やします。", "medium"],
+      ["水平スケールを計画", "複数ノード化の前に Redis などの共有状態またはスティッキーセッションを追加します。", "medium"]
     ]
   }
-];
-
-const blockers = [
-  ["Verify Azure signaling availability", "The configured Japan East health, WSS and ICE endpoints must pass from the public app before launch.", "High"],
-  ["Verify TURN credentials", "Confirm the server can issue temporary Cloudflare TURN credentials without exposing the long-lived token.", "High"],
-  ["Calibrate proximity", "Test QR, microphone chirps, tilt and bump on physical iOS and Android devices.", "High"],
-  ["Prove real transfer", "Run direct and TURN file transfers with cancellation, retry and storage exhaustion cases.", "High"],
-  ["Load test signaling", "Ramp WebSocket load toward the 10,000-client target while watching nginx and Node limits.", "Medium"],
-  ["Plan horizontal scale", "Add shared state such as Redis or sticky session routing before multi-node signaling.", "Medium"]
-];
+};
 
 let socket = null;
 let transferTimer = 0;
@@ -106,13 +209,25 @@ const adminState = {
   transfer: null,
   session: null
 };
+const i18n = createOperationsI18n(ADMIN_MESSAGES, {
+  onChange: () => {
+    renderReadiness();
+    renderBlockers();
+    renderDevices();
+    renderSessionFacts();
+    renderTransferSummary();
+    if (!socket || socket.readyState !== WebSocket.OPEN) updateWsStatus(i18n.t("disconnected"));
+    if (!transferTimer) $("[data-transfer-status]").textContent = i18n.t("idle");
+    if (!$("[data-candidate-list] .candidate-row")) $("[data-ice-status]").textContent = i18n.t("idle");
+  }
+});
 
 init();
 
 function init() {
   $("[data-admin-version]").textContent = APP_VERSION;
-  $("[data-admin-mode]").textContent = runtime.productionSignaling ? "Production" : "Mock";
-  $("[data-admin-score]").textContent = `${Math.round(average(readinessItems.map((item) => item.score)))}%`;
+  $("[data-admin-mode]").textContent = runtime.productionSignaling ? i18n.t("production") : i18n.t("mock");
+  $("[data-admin-score]").textContent = `${Math.round(average(i18n.t("items").map((item) => item[2])))}%`;
 
   const wsUrl = $("[data-ws-url]");
   const httpBase = $("[data-http-base]");
@@ -124,6 +239,9 @@ function init() {
   renderDevices();
   renderSessionFacts();
   renderTransferSummary();
+  updateWsStatus(i18n.t("disconnected"));
+  $("[data-ice-status]").textContent = i18n.t("idle");
+  $("[data-transfer-status]").textContent = i18n.t("idle");
   bindEvents();
 }
 
@@ -158,30 +276,30 @@ function activateTab(name) {
 }
 
 function renderReadiness() {
-  $("[data-readiness-grid]").innerHTML = readinessItems.map((item) => `
+  $("[data-readiness-grid]").innerHTML = i18n.t("items").map(([title, status, score, checks]) => `
     <article class="admin-card">
       <div class="card-head">
-        <h3>${escapeHtml(item.title)}</h3>
-        <span class="item-status">${escapeHtml(item.status)}</span>
+        <h3>${escapeHtml(title)}</h3>
+        <span class="item-status">${escapeHtml(i18n.t(status))}</span>
       </div>
-      <div class="readiness-meter" aria-label="${escapeHtml(item.title)} ${item.score}% ready">
-        <span style="width: ${item.score}%"></span>
+      <div class="readiness-meter" aria-label="${escapeHtml(title)} ${score}%">
+        <span style="width: ${score}%"></span>
       </div>
       <ul class="check-list">
-        ${item.checks.map((check) => `<li>${escapeHtml(check)}</li>`).join("")}
+        ${checks.map((check) => `<li>${escapeHtml(check)}</li>`).join("")}
       </ul>
     </article>
   `).join("");
 }
 
 function renderBlockers() {
-  $("[data-blocker-list]").innerHTML = blockers.map(([title, copy, priority]) => `
+  $("[data-blocker-list]").innerHTML = i18n.t("blockers").map(([title, copy, priority]) => `
     <article class="blocker-card">
       <div>
         <h3>${escapeHtml(title)}</h3>
         <p>${escapeHtml(copy)}</p>
       </div>
-      <span class="item-status">${escapeHtml(priority)}</span>
+      <span class="item-status">${escapeHtml(i18n.t(priority))}</span>
     </article>
   `).join("");
 }
@@ -193,17 +311,17 @@ function connectWebSocket() {
     return;
   }
   disconnectWebSocket();
-  updateWsStatus("Connecting");
+  updateWsStatus(i18n.t("connecting"));
   const clientId = `admin-${safeRandomId()}`;
   try {
     socket = new WebSocket(url);
   } catch (error) {
-    updateWsStatus("Invalid URL");
+    updateWsStatus(i18n.t("invalidUrl"));
     appendLog(error.message);
     return;
   }
   socket.addEventListener("open", () => {
-    updateWsStatus("Connected");
+    updateWsStatus(i18n.t("connected"));
     appendLog(`open ${url}`);
     socket.send(JSON.stringify({
       type: "client:hello",
@@ -232,13 +350,13 @@ function connectWebSocket() {
   });
   socket.addEventListener("message", (event) => handleSocketMessage(event.data));
   socket.addEventListener("close", (event) => {
-    updateWsStatus("Disconnected");
+    updateWsStatus(i18n.t("disconnected"));
     adminState.session = null;
     renderSessionFacts();
     appendLog(`close ${event.code || 1000} ${event.reason || ""}`.trim());
   });
   socket.addEventListener("error", () => {
-    updateWsStatus("Error");
+    updateWsStatus(i18n.t("error"));
     appendLog("websocket error");
   });
 }
@@ -257,7 +375,7 @@ function disconnectWebSocket() {
   socket = null;
   adminState.session = null;
   renderSessionFacts();
-  updateWsStatus("Disconnected");
+  updateWsStatus(i18n.t("disconnected"));
 }
 
 function handleSocketMessage(raw) {
@@ -316,8 +434,8 @@ async function gatherIceCandidates() {
   const status = $("[data-ice-status]");
   const iceUrl = $("[data-ice-url]").value.trim();
   const candidates = [];
-  status.textContent = "Gathering";
-  list.innerHTML = `<p class="empty-note">Gathering ICE candidates...</p>`;
+  status.textContent = i18n.t("gathering");
+  list.innerHTML = `<p class="empty-note">${escapeHtml(i18n.t("gatheringCandidates"))}</p>`;
   let pc;
   try {
     const iceServers = iceUrl ? [{ urls: iceUrl }] : [];
@@ -332,10 +450,10 @@ async function gatherIceCandidates() {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     await waitForIceComplete(pc, 7000);
-    status.textContent = candidates.length ? `${candidates.length} found` : "None";
+    status.textContent = candidates.length ? String(candidates.length) : i18n.t("none");
     renderCandidates(candidates);
   } catch (error) {
-    status.textContent = "Failed";
+    status.textContent = i18n.t("failed");
     list.innerHTML = `<p class="empty-note">${escapeHtml(error.message)}</p>`;
   } finally {
     pc?.close();
@@ -345,7 +463,7 @@ async function gatherIceCandidates() {
 function renderCandidates(candidates) {
   const list = $("[data-candidate-list]");
   if (!candidates.length) {
-    list.innerHTML = `<p class="empty-note">No candidates yet. Browsers may hide host IPs behind mDNS.</p>`;
+    list.innerHTML = `<p class="empty-note">${escapeHtml(i18n.t("noCandidates"))}</p>`;
     return;
   }
   list.innerHTML = candidates.map((candidate) => `
@@ -381,14 +499,14 @@ function buildTransferManifest(files) {
 function simulateTransfer() {
   if (!adminState.transfer?.files.length) {
     adminState.transfer = buildTransferManifest([]);
-    renderTransferSummary("Select files first.");
+    renderTransferSummary(i18n.t("selectFilesFirst"));
     return;
   }
   clearInterval(transferTimer);
   const transfer = adminState.transfer;
   transfer.startedAt = performance.now();
   transfer.transferredBytes = 0;
-  $("[data-transfer-status]").textContent = "Running";
+  $("[data-transfer-status]").textContent = i18n.t("running");
   transferTimer = setInterval(() => {
     const elapsed = Math.max(1, performance.now() - transfer.startedAt);
     const targetSpeed = 18 * 1024 * 1024;
@@ -397,7 +515,7 @@ function simulateTransfer() {
     renderTransferSummary();
     if (transfer.transferredBytes >= transfer.totalBytes) {
       clearInterval(transferTimer);
-      $("[data-transfer-status]").textContent = "Complete";
+      $("[data-transfer-status]").textContent = i18n.t("complete");
     }
   }, 120);
 }
@@ -407,7 +525,7 @@ function resetTransfer() {
   selectedFiles = [];
   adminState.transfer = null;
   $("[data-file-input]").value = "";
-  $("[data-transfer-status]").textContent = "Idle";
+  $("[data-transfer-status]").textContent = i18n.t("idle");
   renderTransferSummary();
 }
 
@@ -417,7 +535,7 @@ function renderTransferSummary(message = "") {
   const summary = $("[data-transfer-summary]");
   if (!transfer?.files.length) {
     bar.style.width = "0%";
-    summary.innerHTML = `<p class="empty-note">${escapeHtml(message || "No files selected yet.")}</p>`;
+    summary.innerHTML = `<p class="empty-note">${escapeHtml(message || i18n.t("noFiles"))}</p>`;
     return;
   }
   const percent = transfer.totalBytes ? Math.round((transfer.transferredBytes / transfer.totalBytes) * 100) : 0;
@@ -445,7 +563,7 @@ function renderTransferSummary(message = "") {
 function renderDevices() {
   const table = $("[data-device-table]");
   if (!adminState.peers.length) {
-    table.innerHTML = `<p class="empty-note">No live signaling peers yet.</p>`;
+    table.innerHTML = `<p class="empty-note">${escapeHtml(i18n.t("noPeers"))}</p>`;
     return;
   }
   table.innerHTML = adminState.peers.map((peer) => `
@@ -454,16 +572,16 @@ function renderDevices() {
         <strong>${escapeHtml(peer.name || peer.deviceName || peer.id || "Unknown device")}</strong>
         <small>${escapeHtml(peer.deviceFamily || peer.family || "unknown")} - ${escapeHtml(peer.id || "no id")}</small>
       </div>
-      <span class="item-status">${escapeHtml(peer.online === false ? "Offline" : "Online")}</span>
+      <span class="item-status">${escapeHtml(peer.online === false ? i18n.t("offline") : i18n.t("online"))}</span>
     </div>
   `).join("");
 }
 
 function renderSessionFacts() {
   const session = adminState.session || {};
-  $("[data-session-client]").textContent = session.id || "Not connected";
-  $("[data-session-id]").textContent = session.sessionId || "Not connected";
-  $("[data-session-turn-token]").textContent = session.turnAccessToken || "Not issued";
+  $("[data-session-client]").textContent = session.id || i18n.t("notConnected");
+  $("[data-session-id]").textContent = session.sessionId || i18n.t("notConnected");
+  $("[data-session-turn-token]").textContent = session.turnAccessToken || i18n.t("notIssued");
 }
 
 function appendLog(line) {

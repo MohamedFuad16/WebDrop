@@ -622,6 +622,15 @@ export class SignalingHub {
       acousticRecordingDurationMs: Number(message.payload.metrics?.acousticRecordingDurationMs || 0),
       acousticRecordingRms: Number(message.payload.metrics?.acousticRecordingRms || 0),
       acousticRecordingPeak: Number(message.payload.metrics?.acousticRecordingPeak || 0),
+      acousticConfidenceMargin: Number(message.payload.metrics?.acousticConfidenceMargin || 0),
+      acousticRunnerUpCorrelation: Number(message.payload.metrics?.acousticRunnerUpCorrelation || 0),
+      acousticSignatureId: message.payload.metrics?.acousticSignatureId || null,
+      heardAcousticSignatureId: message.payload.metrics?.heardAcousticSignatureId || null,
+      acousticDetections: Array.isArray(message.payload.metrics?.acousticDetections)
+        ? message.payload.metrics.acousticDetections.slice(0, MAX_PROXIMITY_SESSION_CLIENTS)
+        : [],
+      bumpCorrelation: Number(message.payload.metrics?.bumpCorrelation || message.payload.metrics?.bump || 0),
+      tiltMatch: Number(message.payload.metrics?.tiltMatch || message.payload.metrics?.tilt || 0),
       acousticReason: message.payload.metrics?.acousticReason || null
     });
     this.tryMatchProximitySession(session);
@@ -926,6 +935,22 @@ export class SignalingHub {
   diagnosticsSnapshot() {
     const now = Date.now();
     return {
+      protocol: {
+        joinWindowMs: SESSION_JOIN_WINDOW_MS,
+        startDelayMs: SESSION_START_DELAY_MS,
+        sessionDurationMs: SESSION_DURATION_MS,
+        sessionTtlMs: SESSION_TTL_MS,
+        matchSlopMs: SESSION_MATCH_SLOP_MS,
+        scoreMinimum: SESSION_SCORE_MINIMUM,
+        maxClients: MAX_PROXIMITY_SESSION_CLIENTS,
+        acousticBandStartHz: ACOUSTIC_BAND_START_HZ,
+        acousticBandEndHz: ACOUSTIC_BAND_END_HZ,
+        acousticMinBandwidthHz: ACOUSTIC_MIN_BANDWIDTH_HZ,
+        acousticWinnerMargin: ACOUSTIC_WINNER_MARGIN,
+        acousticMinCorrelation: ACOUSTIC_MIN_CORRELATION,
+        energyAssistedMinCorrelation: ACOUSTIC_ENERGY_ASSISTED_MIN_CORRELATION,
+        energyAssistedMinMarginDb: ACOUSTIC_ENERGY_ASSISTED_MIN_MARGIN_DB
+      },
       clients: [...this.clients.values()].map((client) => ({
         id: client.id,
         deviceName: client.deviceName,
@@ -959,6 +984,7 @@ export class SignalingHub {
           return {
             clientId,
             deviceName: client?.deviceName || clientId,
+            acousticCapabilities: publicAcousticCapabilities(session.acousticCapabilities?.get(clientId)),
             signature: session.signatureDetails?.get(clientId) || null,
             telemetry: telemetry ? {
               receivedAt: new Date(telemetry.receivedAt).toISOString(),
@@ -1230,6 +1256,15 @@ function acousticDiagnostics(metrics = {}) {
       ? metrics.acousticDetections.slice(0, MAX_PROXIMITY_SESSION_CLIENTS)
       : [],
     reason: metrics.acousticReason || null
+  };
+}
+
+function publicAcousticCapabilities(capabilities = {}) {
+  return {
+    sampleRate: finiteOrNull(capabilities.sampleRate),
+    strictInaudible: Boolean(capabilities.strictInaudible),
+    audioContextReady: Boolean(capabilities.audioContextReady),
+    microphoneReady: Boolean(capabilities.microphoneReady)
   };
 }
 

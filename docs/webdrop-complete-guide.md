@@ -1,6 +1,6 @@
 # WebDrop Complete Technical Guide
 
-Version: WebDrop v2 production-readiness handoff for app version 1.0.67
+Version: WebDrop v2 production-readiness handoff for app version 1.0.70
 Scope: `/Users/mfuad16/Documents/web_drop_v2`
 Primary app entrypoint: `index.html` and `js/app.js`
 
@@ -14,7 +14,7 @@ The current repository ships a static browser application plus an Azure signalin
 
 ### Production readiness status
 
-- App/package/service-worker version: `1.0.67`.
+- App/package/service-worker version: `1.0.70`.
 - Default frontend runtime: production signaling, real proximity, peerless QR, and real transfer are enabled for `webdrop-wss-0618.japaneast.cloudapp.azure.com`.
 - Effective feature gating: `js/config/runtime-flags.js` refuses to enable real proximity, real transfer, or QR pairing unless production signaling is enabled with a valid WSS URL.
 - Backend package: `azure cloud server/` contains the Node WebSocket signaling service, QR token provider, TURN credential proxy, nginx/systemd/deploy assets, and load-test assets.
@@ -85,6 +85,7 @@ The active implementation is static and module-based. These are the files most d
 | Storage client | `js/storage/storage-client.js` | deferred IndexedDB receive chunks, explicit-Save StreamSaver export, iPhone/iPad Blob fallback, quota/cap checks, abort, and cleanup |
 | StreamSaver helper | `vendor/streamsaver/` | self-hosted MITM page and service worker invoked after Save to stream deferred chunks into a browser download |
 | Offline cache | `service-worker.js` | caches static files and demo PDFs outside localhost |
+| Operations UI | `admin/`, `css/operations.css`, `js/admin/` | bilingual readiness, live testing, device telemetry, protocol thresholds, and failure analysis |
 
 The existing `docs/architecture.md` and `docs/engineer-guide.md` are concise architecture notes. This guide is the expanded technical package.
 

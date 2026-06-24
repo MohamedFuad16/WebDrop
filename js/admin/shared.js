@@ -6,11 +6,12 @@ export function escapeHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
-export function formatAge(milliseconds) {
+export function formatAge(milliseconds, locale = "en") {
   const value = Math.max(0, Number(milliseconds) || 0);
-  if (value < 1000) return "now";
-  if (value < 60000) return `${Math.round(value / 1000)}s ago`;
-  return `${Math.round(value / 60000)}m ago`;
+  const japanese = locale === "ja";
+  if (value < 1000) return japanese ? "今" : "now";
+  if (value < 60000) return japanese ? `${Math.round(value / 1000)}秒前` : `${Math.round(value / 1000)}s ago`;
+  return japanese ? `${Math.round(value / 60000)}分前` : `${Math.round(value / 60000)}m ago`;
 }
 
 export function formatFrequency(start, end) {

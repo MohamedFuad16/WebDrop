@@ -17,11 +17,13 @@ The deployed site at `https://web-drop-lyart.vercel.app/` may be used as a produ
 As of this pass:
 
 - The active local runnable artifact is `index.html`.
-- The visible app/package/service-worker version is `1.0.67`.
+- The visible app/package/service-worker version is `1.0.70`.
 - The old architecture HTML page was deleted during the corrected rebuild.
 - `js/app.js` boots the modular static app.
 - `js/admin/readiness.js` boots the production-readiness console.
-- `js/admin/diagnostics.js`, `diagnostics-api.js`, and `acoustic-lab.js` own the live diagnostics page without coupling it to the main app controller.
+- `js/admin/diagnostics.js` and `diagnostics-api.js` own the live diagnostics page without coupling it to the main app controller.
+- `js/admin/operations-i18n.js` and `css/operations.css` keep readiness, live testing, and diagnostics on one English/Japanese operations system.
+- Live acoustic debugging comes from bounded device telemetry in the server snapshot. The removed browser-local acoustic lab must not be reintroduced as a substitute for physical phone evidence.
 - `js/core/controller.js` owns the state transitions that gate file controls.
 - `js/storage/storage-client.js` owns deferred IndexedDB receive chunks, byte-count checks, StreamSaver export on Save, iPhone/iPad Blob fallback, cleanup, and the 500 MB receive-session cap.
 - `azure cloud server/` owns the deployable signaling backend package; it coordinates metadata only and must not carry file bytes.

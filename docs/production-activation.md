@@ -22,9 +22,10 @@ Use [deployment-sizing.md](deployment-sizing.md) before selecting an Azure VM si
 
 - Enable `ENABLE_METRICS_ENDPOINT=true` on the signaling server.
 - Set a strong, non-placeholder `METRICS_API_TOKEN`.
-- Open `/admin/diagnostics.html`, enter the signaling HTTP base and metrics token, and keep the token browser-session-only.
-- The page can verify `/readyz` without a token. Device, pairing, proximity-session, event, and acoustic telemetry requires the protected diagnostics endpoint.
-- The local ultrasonic lab uses the production chirp implementation and never uploads raw microphone samples.
+- Open `/admin/diagnostics.html`. The production signaling base is derived from runtime configuration and requires no browser-entered token.
+- `/api/diagnostics-public` exposes bounded device, pairing, proximity-session, protocol, event, and acoustic telemetry for the live operations page.
+- `/api/metrics-summary` and `/api/diagnostics-snapshot` remain protected by `METRICS_API_TOKEN`.
+- The dashboard never requests its own microphone. It shows only bounded telemetry reported by connected devices, and raw microphone samples never leave those devices.
 
 Edit only `js/config/runtime-config.js`:
 
@@ -57,8 +58,9 @@ When enabled, a peer swipe triggers permission calls while the user gesture is s
 3. Join a peerless proximity session using a one-time client nonce.
 4. Receive the same future ceremony timestamp plus an anonymous acoustic slot and signature.
 5. Emit the assigned signature in its slot and listen for every other anonymous signature.
-   The assigned bands stay between 20.05 and 21.2 kHz; contexts that cannot
-   preserve that inaudible band must fail closed and offer QR.
+   The server selects a shared band from participant audio capabilities. The
+   current physical-iPhone policy uses `18.6-19.4 kHz`; diagnostics must show
+   the assigned band and whether each device reported strict inaudible support.
 6. Capture actual bump and tilt evidence during the shared ceremony window.
 7. Stop motion and analyzer capture while keeping the granted microphone stream warm for retry.
 8. Send normalized telemetry, nonce, own signature, strongest heard signature, and timing to the server.
@@ -79,9 +81,9 @@ Use two physical HTTPS-capable devices. Test:
 
 Real-device acoustic thresholds and timing may require tuning after measurements. If false-positive or false-negative behavior appears on physical devices, disable enforcement, keep QR available, and re-enable only after telemetry proves the adjusted threshold.
 
-## Verified on June 19, 2026
+## Verified through June 24, 2026
 
-- Pre-patch production Vercel served app version `1.0.50`; this changeset advances the app/cache key to `1.0.67` for deployment verification.
+- The current app/cache key is `1.0.70`.
 - Japan East `/readyz` reported production healthy with `proximityAnalysisEnabled:true`.
 - Azure `signaling-hub.js` matched the local source hash.
 - Public WSS assigns unique coded anonymous acoustic signatures for up to six clients and matches only reciprocal, unambiguous pairs.
@@ -89,6 +91,7 @@ Real-device acoustic thresholds and timing may require tuning after measurements
 - `npm run verify:full` passed.
 - `npm run test:e2e` passed with 52 passing tests and 44 expected project skips.
 - WebKit iPhone E2E covered one-gesture motion/microphone permission, QR camera permission from Scan, nonblank Canvas2D Siri wave, edge-to-edge Dynamic Island geometry, and received-file new-tab behavior.
+- The operations pages share one responsive visual system and English/Japanese locale state. Diagnostics shows device acoustic capabilities, slot assignments, capture quality, correlation margins, failure reasons, and a bounded server timeline without exposing raw audio.
 
 ## Launch blockers
 

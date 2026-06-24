@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.69";
+const APP_VERSION = "1.0.70";
 const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [
@@ -6,6 +6,7 @@ const ASSETS = [
   "./index.html",
   "./admin/index.html",
   "./admin/diagnostics.html",
+  "./css/operations.css",
   "./css/admin.css",
   "./css/diagnostics.css",
   "./css/base.css",
@@ -16,9 +17,9 @@ const ASSETS = [
   "./css/responsive.css",
   "./js/app.js",
   "./js/admin/readiness.js",
-  "./js/admin/acoustic-lab.js",
   "./js/admin/diagnostics-api.js",
   "./js/admin/diagnostics.js",
+  "./js/admin/operations-i18n.js",
   "./js/admin/shared.js",
   "./js/config/avatar-options.js",
   "./js/config/i18n.js",

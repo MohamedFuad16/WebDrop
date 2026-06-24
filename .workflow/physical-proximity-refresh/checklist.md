@@ -21,7 +21,7 @@
 - [x] Expand the mobile Dynamic Island to both viewport edges.
 - [x] Center and standardize the Siri wave on Canvas2D across browsers.
 - [x] Place peer avatar centers on the visible SVG ring paths.
-- [x] Keep acoustic signatures above 20 kHz or refuse emission.
+- [x] Negotiate the shared acoustic band from device capabilities and report whether strict inaudible output is available.
 - [x] Require reciprocal per-device acoustic signatures before multi-user matching.
 - [x] Bind proximity telemetry to the nonce issued when the client joined.
 - [x] Require ultrasound, bump, tilt, valid timing, and score >=55 independently.
@@ -43,3 +43,13 @@
 - [x] Require reciprocal evidence and a clear winning-pair margin.
 - [x] Add five-device and ambiguous-room server regressions.
 - [x] Run unit, server, full verification, E2E, and browser QA.
+
+## Operations Debugging
+
+- [x] Unify readiness, live testing, and diagnostics under one responsive operations theme.
+- [x] Add English and Japanese support to every admin surface.
+- [x] Remove the browser-local ultrasonic lab and its offline-cache entry.
+- [x] Show only live device-originated acoustic telemetry.
+- [x] Expose protocol thresholds and participant audio capabilities in the bounded diagnostics snapshot.
+- [x] Deduplicate session and event copies of the same acoustic channel.
+- [x] Add capture duration, confidence margin, runner-up correlation, detection candidates, and failure analysis.
