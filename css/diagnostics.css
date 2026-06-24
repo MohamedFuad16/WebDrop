@@ -391,6 +391,121 @@ td small {
   line-height: 1.5;
 }
 
+.local-acoustic-panel {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(89, 216, 209, .14), transparent 30%),
+    radial-gradient(circle at 82% 8%, rgba(63, 134, 247, .15), transparent 34%),
+    var(--ops-panel);
+}
+
+.local-acoustic-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.local-acoustic-grid article {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--ops-line);
+  border-radius: 16px;
+  background: var(--ops-panel-soft);
+}
+
+.local-acoustic-grid span,
+.local-acoustic-log span,
+.local-acoustic-log small {
+  color: var(--ops-muted);
+  font-size: 11px;
+}
+
+.local-acoustic-grid strong {
+  display: block;
+  overflow: hidden;
+  margin-top: 5px;
+  color: var(--ops-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.local-frequency-bars {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 13px;
+}
+
+.local-frequency-bars span {
+  position: relative;
+  min-height: 74px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  padding: 7px 3px;
+  border: 1px solid var(--ops-line);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, .18);
+}
+
+.local-frequency-bars i {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: var(--fill);
+  background: linear-gradient(180deg, rgba(89, 216, 209, .85), rgba(63, 134, 247, .48));
+  box-shadow: 0 -10px 24px rgba(89, 216, 209, .2);
+  transition: height 160ms ease;
+}
+
+.local-frequency-bars span[data-detected="true"] {
+  border-color: rgba(77, 211, 155, .72);
+}
+
+.local-frequency-bars b {
+  position: relative;
+  z-index: 1;
+  color: #dce9fb;
+  font-size: 9px;
+  font-weight: 820;
+  line-height: 1.15;
+  text-align: center;
+  text-shadow: 0 1px 9px rgba(0, 0, 0, .68);
+}
+
+.local-acoustic-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.local-acoustic-log {
+  display: grid;
+  gap: 8px;
+  margin-top: 13px;
+}
+
+.local-acoustic-log article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ops-line);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, .16);
+}
+
+.local-acoustic-log strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.local-acoustic-log small {
+  grid-column: 1 / -1;
+}
+
 .event-stream {
   max-height: 560px;
   overflow: auto;
@@ -431,6 +546,7 @@ td small {
 
 @media (max-width: 1180px) {
   .channel-grid,
+  .local-acoustic-grid,
   .analysis-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -451,8 +567,13 @@ td small {
 @media (max-width: 620px) {
   .status-grid,
   .channel-grid,
+  .local-acoustic-grid,
   .analysis-grid {
     grid-template-columns: 1fr;
+  }
+
+  .local-frequency-bars {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .channel-card dl,

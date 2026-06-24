@@ -1243,7 +1243,7 @@ function selectSharedAcousticBand(session) {
 function fallbackSessionAnalysis(metrics = {}) {
   const normalized = fallbackNormalizedMetrics(metrics);
   const { sound, motion, bump, tilt, qr } = normalized;
-  const score = sound * 0.34 + motion * 0.26 + bump * 0.2 + tilt * 0.12 + qr * 0.08;
+  const score = sound * 0.34 + motion * 0.26 + bump * 0.1 + tilt * 0.12 + qr * 0.08;
   return {
     enabled: false,
     mode: "fallback",

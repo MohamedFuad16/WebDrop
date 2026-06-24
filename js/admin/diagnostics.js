@@ -1,19 +1,24 @@
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.73";
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.73";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.74";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.74";
+import { AcousticProximitySensor } from "../services/acoustic-proximity.js?v=1.0.74";
 import {
   apiBaseFrom,
   escapeHtml,
   formatAge,
   formatFrequency,
   formatNumber
-} from "./shared.js?v=1.0.73";
+} from "./shared.js?v=1.0.74";
 
-const APP_VERSION = "1.0.73";
+const APP_VERSION = "1.0.74";
 const runtime = globalThis.WEBDROP_RUNTIME_CONFIG || {};
 const DEFAULT_BASE_URL = apiBaseFrom(runtime.turnConfigUrl || runtime.signalingUrl || "")
   || "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DISPLAY_BAND_START_HZ = 18_000;
 const DISPLAY_BAND_END_HZ = 21_000;
+const LOCAL_MONITOR_BANDS = Array.from({ length: 12 }, (_, index) => {
+  const startFrequencyHz = DISPLAY_BAND_START_HZ + index * 250;
+  return { startFrequencyHz, endFrequencyHz: startFrequencyHz + 250 };
+});
 
 const MESSAGES = {
   en: {
@@ -52,6 +57,32 @@ const MESSAGES = {
     acousticTitle: "Live ultrasonic channels",
     noChannels: "No acoustic telemetry yet. Tap Connect on two devices to stream channel data.",
     acousticNote: "Shows server-observed acoustic evidence from connected devices. Raw microphone audio stays on each device; this dashboard receives bounded telemetry only.",
+    localAcousticKicker: "This browser",
+    localAcousticTitle: "Local ultrasonic monitor",
+    localAcousticEmpty: "Enable the microphone from this browser to inspect local ultrasonic input.",
+    localAcousticNote: "This local probe does not need another phone. It proves whether the current browser can open the mic, run Web Audio, emit the inaudible WebDrop chirp, and see energy in the ultrasonic band.",
+    enableMicrophone: "Enable microphone",
+    emitChirp: "Emit chirp",
+    runLoopback: "Run loopback",
+    stop: "Stop",
+    microphone: "Microphone",
+    audioContext: "Audio context",
+    peakFrequency: "Peak frequency",
+    notRequested: "Not requested",
+    notStarted: "Not started",
+    idle: "Idle",
+    monitoring: "Monitoring",
+    emittingNow: "Emitting",
+    loopbackRunning: "Loopback",
+    granted: "Granted",
+    unsupported: "Unsupported",
+    failed: "Failed",
+    startedMonitor: "Local monitor started",
+    stoppedMonitor: "Local monitor stopped",
+    chirpEmitted: "Chirp emitted",
+    chirpFailed: "Chirp failed",
+    loopbackDetected: "Loopback detected",
+    loopbackMissed: "Loopback missed",
     analysisKicker: "Debug analysis",
     analysisTitle: "Ceremony health and failure reasons",
     noAnalysis: "No ceremony evidence has arrived yet.",
@@ -148,6 +179,32 @@ const MESSAGES = {
     acousticTitle: "超音波ライブチャンネル",
     noChannels: "音響テレメトリはまだありません。2台で接続を押すとチャンネル情報が流れます。",
     acousticNote: "接続中端末からサーバーに届いた音響証拠を表示します。生のマイク音声は端末内に残り、この画面には範囲を限定したテレメトリだけが届きます。",
+    localAcousticKicker: "このブラウザ",
+    localAcousticTitle: "ローカル超音波モニター",
+    localAcousticEmpty: "このブラウザでマイクを有効にすると、ローカルの超音波入力を確認できます。",
+    localAcousticNote: "このローカル確認は別の端末を必要としません。現在のブラウザがマイク、Web Audio、非可聴 WebDrop チャープ送信、超音波帯域の入力を扱えるかを確認します。",
+    enableMicrophone: "マイクを有効化",
+    emitChirp: "チャープ送信",
+    runLoopback: "ループバック実行",
+    stop: "停止",
+    microphone: "マイク",
+    audioContext: "Audio context",
+    peakFrequency: "ピーク周波数",
+    notRequested: "未要求",
+    notStarted: "未開始",
+    idle: "待機中",
+    monitoring: "監視中",
+    emittingNow: "送信中",
+    loopbackRunning: "ループバック",
+    granted: "許可済み",
+    unsupported: "非対応",
+    failed: "失敗",
+    startedMonitor: "ローカルモニター開始",
+    stoppedMonitor: "ローカルモニター停止",
+    chirpEmitted: "チャープを送信しました",
+    chirpFailed: "チャープ送信に失敗しました",
+    loopbackDetected: "ループバック検出",
+    loopbackMissed: "ループバック未検出",
     analysisKicker: "デバッグ分析",
     analysisTitle: "セレモニー状態と失敗理由",
     noAnalysis: "セレモニー証拠はまだ届いていません。",
@@ -227,6 +284,14 @@ const nodes = {
   channelCount: document.querySelector("[data-channel-count]"),
   channelList: document.querySelector("[data-channel-list]"),
   frequencyStrip: document.querySelector("[data-frequency-strip]"),
+  localAcousticStatus: document.querySelector("[data-local-acoustic-status]"),
+  localAcousticMic: document.querySelector("[data-local-acoustic-mic]"),
+  localAcousticContext: document.querySelector("[data-local-acoustic-context]"),
+  localAcousticSample: document.querySelector("[data-local-acoustic-sample]"),
+  localAcousticPeak: document.querySelector("[data-local-acoustic-peak]"),
+  localAcousticMargin: document.querySelector("[data-local-acoustic-margin]"),
+  localAcousticBars: document.querySelector("[data-local-acoustic-bars]"),
+  localAcousticLog: document.querySelector("[data-local-acoustic-log]"),
   analysisStatus: document.querySelector("[data-analysis-status]"),
   analysisGrid: document.querySelector("[data-analysis-grid]"),
   eventStream: document.querySelector("[data-event-stream]"),
@@ -235,12 +300,15 @@ const nodes = {
 
 const state = {
   pollTimer: 0,
+  localMonitorTimer: 0,
+  localLogs: [],
   eventsClearedAt: 0,
   refreshing: false,
   lastSnapshot: null,
   lastReadiness: null
 };
 const api = new DiagnosticsApi({ baseUrl: DEFAULT_BASE_URL });
+const localSensor = new AcousticProximitySensor();
 const i18n = createOperationsI18n(MESSAGES, {
   onChange: () => {
     renderSourceLabel();
@@ -259,7 +327,12 @@ function init() {
     state.eventsClearedAt = Date.now();
     renderEvents([]);
   });
+  document.querySelector("[data-action='local-acoustic-enable']")?.addEventListener("click", startLocalMonitor);
+  document.querySelector("[data-action='local-acoustic-emit']")?.addEventListener("click", emitLocalChirp);
+  document.querySelector("[data-action='local-acoustic-loopback']")?.addEventListener("click", runLocalLoopback);
+  document.querySelector("[data-action='local-acoustic-stop']")?.addEventListener("click", stopLocalMonitor);
   nodes.polling.addEventListener("change", syncPolling);
+  renderLocalBands([]);
   refresh();
   syncPolling();
 }
@@ -313,6 +386,140 @@ function syncPolling() {
   if (nodes.polling.checked) {
     state.pollTimer = globalThis.setInterval(refresh, 1200);
   }
+}
+
+async function startLocalMonitor() {
+  setLocalStatus(i18n.t("monitoring"));
+  const permission = await localSensor.requestMicrophonePermission();
+  if (!permission.granted) {
+    nodes.localAcousticMic.textContent = localPermissionText(permission.reason);
+    appendLocalLog(i18n.t("failed"), permission.reason || "microphone");
+    setLocalStatus(i18n.t("failed"));
+    return false;
+  }
+  const output = await localSensor.prepareAudioOutput();
+  const status = localSensor.getStatus();
+  nodes.localAcousticMic.textContent = permission.cached ? `${i18n.t("granted")} · cached` : i18n.t("granted");
+  nodes.localAcousticContext.textContent = output.reason || status.contextState || "running";
+  nodes.localAcousticSample.textContent = status.sampleRate ? `${status.sampleRate} Hz` : "Unknown";
+  appendLocalLog(i18n.t("startedMonitor"), `${status.sampleRate || "unknown"} Hz`);
+  startLocalSamplingLoop();
+  return true;
+}
+
+async function emitLocalChirp() {
+  const ready = await startLocalMonitor();
+  if (!ready) return;
+  setLocalStatus(i18n.t("emittingNow"));
+  const result = await localSensor.emitChirp();
+  if (result.emitted) {
+    appendLocalLog(i18n.t("chirpEmitted"), formatFrequency(result.startFrequencyHz, result.endFrequencyHz));
+  } else {
+    appendLocalLog(i18n.t("chirpFailed"), result.reason || "unknown");
+  }
+  setLocalStatus(i18n.t("monitoring"));
+}
+
+async function runLocalLoopback() {
+  const ready = await startLocalMonitor();
+  if (!ready) return;
+  setLocalStatus(i18n.t("loopbackRunning"));
+  const detection = localSensor.detectChirp({
+    timeoutMs: 1500,
+    threshold: 0.2,
+    requiredBandHits: 1
+  });
+  await wait(80);
+  await localSensor.emitChirp();
+  const result = await detection;
+  const label = result.detected ? i18n.t("loopbackDetected") : i18n.t("loopbackMissed");
+  appendLocalLog(label, `corr ${formatNumber(result.correlation, 2)} · ${formatNumber(result.band?.marginDb)} dB`);
+  setLocalStatus(i18n.t("monitoring"));
+}
+
+function stopLocalMonitor() {
+  globalThis.clearInterval(state.localMonitorTimer);
+  state.localMonitorTimer = 0;
+  localSensor.stopCapture({ releaseStream: true });
+  setLocalStatus(i18n.t("idle"));
+  nodes.localAcousticMic.textContent = i18n.t("notRequested");
+  nodes.localAcousticContext.textContent = i18n.t("notStarted");
+  nodes.localAcousticSample.textContent = "Unknown";
+  nodes.localAcousticPeak.textContent = "Unknown";
+  nodes.localAcousticMargin.textContent = "Unknown";
+  renderLocalBands([]);
+  appendLocalLog(i18n.t("stoppedMonitor"), "");
+}
+
+function startLocalSamplingLoop() {
+  if (state.localMonitorTimer) return;
+  void sampleLocalBands();
+  state.localMonitorTimer = globalThis.setInterval(sampleLocalBands, 420);
+}
+
+async function sampleLocalBands() {
+  const sample = await localSensor.sampleFrequencyBands({ bands: LOCAL_MONITOR_BANDS, fftSize: 4096 });
+  const status = localSensor.getStatus();
+  nodes.localAcousticContext.textContent = sample.contextState || status.contextState || "Unknown";
+  nodes.localAcousticSample.textContent = sample.sampleRate ? `${sample.sampleRate} Hz` : "Unknown";
+  if (!sample.available) {
+    nodes.localAcousticPeak.textContent = sample.reason || "Unknown";
+    nodes.localAcousticMargin.textContent = "Unknown";
+    renderLocalBands([]);
+    return;
+  }
+  const strongest = [...sample.bands].sort((a, b) => Number(b.peakDb) - Number(a.peakDb))[0];
+  nodes.localAcousticPeak.textContent = strongest
+    ? `${formatFrequency(strongest.startFrequencyHz, strongest.endFrequencyHz)} · ${formatNumber(strongest.peakDb)} dB`
+    : "Unknown";
+  nodes.localAcousticMargin.textContent = strongest ? `${formatNumber(strongest.marginDb)} dB` : "Unknown";
+  renderLocalBands(sample.bands);
+}
+
+function renderLocalBands(bands) {
+  const rows = bands.length ? bands : LOCAL_MONITOR_BANDS.map((band) => ({
+    ...band,
+    detected: false,
+    confidence: 0,
+    marginDb: 0,
+    peakDb: -100
+  }));
+  nodes.localAcousticBars.innerHTML = rows.map((band) => {
+    const confidence = clamp(Number(band.confidence || 0), 0, 1);
+    const level = clamp((Number(band.peakDb || -100) + 92) / 34, 0, 1);
+    const fill = Math.round(Math.max(confidence, level) * 100);
+    return `
+      <span data-detected="${band.detected ? "true" : "false"}" title="${escapeHtml(`${formatFrequency(band.startFrequencyHz, band.endFrequencyHz)} · ${formatNumber(band.marginDb)} dB`)}">
+        <i style="--fill:${fill}%"></i>
+        <b>${escapeHtml(formatFrequency(band.startFrequencyHz, band.endFrequencyHz))}</b>
+      </span>
+    `;
+  }).join("");
+}
+
+function appendLocalLog(title, detail) {
+  state.localLogs.unshift({
+    title,
+    detail,
+    at: new Date().toLocaleTimeString(i18n.locale)
+  });
+  state.localLogs = state.localLogs.slice(0, 10);
+  nodes.localAcousticLog.innerHTML = state.localLogs.map((entry) => `
+    <article>
+      <strong>${escapeHtml(entry.title)}</strong>
+      <span>${escapeHtml(entry.at)}</span>
+      ${entry.detail ? `<small>${escapeHtml(entry.detail)}</small>` : ""}
+    </article>
+  `).join("");
+}
+
+function setLocalStatus(value) {
+  nodes.localAcousticStatus.textContent = value;
+}
+
+function localPermissionText(reason) {
+  if (reason === "unsupported") return i18n.t("unsupported");
+  return reason || i18n.t("failed");
 }
 
 function renderSnapshot(snapshot = {}) {
@@ -667,4 +874,8 @@ function average(values) {
 
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+function wait(ms) {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 }

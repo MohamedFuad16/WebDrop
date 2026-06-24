@@ -13,16 +13,16 @@ test("proximity analysis accepts a minimum score of 55 percent", () => {
   });
   const minimum = analyzer.analyze({
     soundCorrelation: 1,
-    motionCorrelation: 21 / 26
+    motionCorrelation: (0.55 * 0.9 - 0.34) / 0.26
   });
   const belowMinimum = analyzer.analyze({
     soundCorrelation: 1,
-    motionCorrelation: 20 / 26
+    motionCorrelation: (0.55 * 0.9 - 0.34) / 0.26 - 0.01
   });
 
-  assert.equal(verified.score, 0.92);
+  assert.equal(Math.round(verified.score * 1000) / 1000, 0.911);
   assert.equal(verified.decision, "verified");
-  assert.equal(minimum.score, 0.55);
+  assert.ok(Math.abs(minimum.score - 0.55) < 0.000001);
   assert.equal(minimum.decision, "verified");
   assert.ok(belowMinimum.score < 0.55);
   assert.notEqual(belowMinimum.decision, "verified");

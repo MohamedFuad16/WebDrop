@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.73";
-import { Emitter } from "../utils/emitter.js?v=1.0.73";
-import { formatBytes } from "../utils/format.js?v=1.0.73";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.73";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.73";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.74";
+import { Emitter } from "../utils/emitter.js?v=1.0.74";
+import { formatBytes } from "../utils/format.js?v=1.0.74";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.74";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.74";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -601,7 +601,7 @@ export class DynamicIsland extends Emitter {
     this.setMetricState(this.nodes.bumpMetric, bump ? "complete" : motion.samples ? "active" : "waiting");
     this.setMetricState(this.nodes.tiltMetric, motion.tilted ? "complete" : motion.samples ? "active" : "waiting");
     if (this.nodes.bumpValue) {
-      this.nodes.bumpValue.textContent = bump ? "+20" : Number(motion.maxAcceleration || 0).toFixed(1);
+      this.nodes.bumpValue.textContent = bump ? "+10" : Number(motion.maxAcceleration || 0).toFixed(1);
     }
     if (this.nodes.tiltValue) this.nodes.tiltValue.textContent = `${degrees}°`;
   }

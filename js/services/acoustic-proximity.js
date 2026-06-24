@@ -214,6 +214,40 @@ export class AcousticProximitySensor {
     };
   }
 
+  async sampleFrequencyBands({ bands = [], fftSize = 4096 } = {}) {
+    if (!this.stream?.active) {
+      return { available: false, reason: "microphone-not-granted", bands: [] };
+    }
+    const contextResult = await this.#getContextResult();
+    if (!contextResult.context) {
+      return {
+        available: false,
+        reason: contextResult.reason,
+        error: contextResult.error,
+        bands: []
+      };
+    }
+    const context = contextResult.context;
+    this.#ensureAnalyser(context);
+    this.analyser.fftSize = fftSize;
+    const frequencies = new Float32Array(this.analyser.frequencyBinCount);
+    this.analyser.getFloatFrequencyData(frequencies);
+    return {
+      available: true,
+      sampleRate: context.sampleRate,
+      contextState: context.state,
+      bands: bands.map((band) => ({
+        ...band,
+        ...analyzeFrequencyBand(frequencies, {
+          sampleRate: context.sampleRate,
+          fftSize: this.analyser.fftSize,
+          startFrequencyHz: band.startFrequencyHz,
+          endFrequencyHz: band.endFrequencyHz
+        })
+      }))
+    };
+  }
+
   async startCeremonyCapture({ maximumDurationMs = 6000, bufferSize = 2048 } = {}) {
     if (!this.stream?.active) return { started: false, reason: "microphone-not-granted" };
     const contextResult = await this.#getContextResult();

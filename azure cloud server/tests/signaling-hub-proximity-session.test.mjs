@@ -64,7 +64,7 @@ test("proximity session rejects scores below 55", () => {
   hub.close();
 });
 
-test("proximity failure reports missing acoustics when motion score is already 58", () => {
+test("proximity failure reports missing acoustics before low score when audio is absent", () => {
   const hub = createTestHub();
   const clientA = addClient(hub, "client-a");
   const clientB = addClient(hub, "client-b");
@@ -80,7 +80,7 @@ test("proximity failure reports missing acoustics when motion score is already 5
   hub.failUnmatchedProximitySession(session.id);
 
   const failure = messagesOf(clientA, "proximity:session:failed")[0];
-  assert.ok(Math.abs(failure.payload.score - 0.58) < 0.000001);
+  assert.ok(Math.abs(failure.payload.score - (0.48 / 0.9)) < 0.000001);
   assert.equal(failure.payload.reason, "acoustic_not_detected");
 
   hub.close();

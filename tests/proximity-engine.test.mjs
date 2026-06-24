@@ -20,7 +20,7 @@ test("physical proximity uses a minimum score of 55", () => {
     bump: true,
     tilt: true,
     qrFallback: false
-  }), 92);
+  }), 82);
 
   assert.equal(proximityScore({
     soundCorrelation: 1,
@@ -28,7 +28,7 @@ test("physical proximity uses a minimum score of 55", () => {
     bump: true,
     tilt: false,
     qrFallback: false
-  }), 80);
+  }), 70);
   assert.equal(PROXIMITY_SCORE_MINIMUM, 55);
 });
 
