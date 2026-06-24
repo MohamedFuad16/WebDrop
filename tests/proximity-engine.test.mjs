@@ -39,6 +39,35 @@ test("tilt must be strictly greater than 30 degrees", () => {
   assert.equal(exceedsTiltThreshold({ beta: 0, gamma: -30.01 }), true);
 });
 
+test("Android-style motion detects bump from gravity-vector jerk when linear acceleration is absent", async () => {
+  const listeners = new Map();
+  const target = {
+    DeviceMotionEvent: {},
+    addEventListener(type, listener) {
+      listeners.set(type, listener);
+    },
+    removeEventListener(type) {
+      listeners.delete(type);
+    }
+  };
+  const sensor = new MotionProximitySensor({ target, gravityBumpThreshold: 3.5 });
+  await sensor.requestPermission();
+  assert.deepEqual(sensor.startCapture(), { started: true });
+
+  listeners.get("devicemotion")({
+    acceleration: null,
+    accelerationIncludingGravity: { x: 0, y: 0, z: 9.8 }
+  });
+  listeners.get("devicemotion")({
+    acceleration: null,
+    accelerationIncludingGravity: { x: 4.2, y: 0, z: 8.6 }
+  });
+
+  const snapshot = sensor.getSnapshot();
+  assert.equal(snapshot.bump, true);
+  assert.ok(snapshot.maxAcceleration >= 3.5);
+});
+
 test("restored iPhone motion grants are revalidated through the native prompt", async () => {
   let permissionRequests = 0;
   const target = {

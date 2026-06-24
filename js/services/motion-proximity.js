@@ -2,16 +2,19 @@ export class MotionProximitySensor {
   constructor({
     target = globalThis,
     bumpThreshold = 14,
+    gravityBumpThreshold = 3.5,
     tiltThreshold = 30,
     now = () => Date.now()
   } = {}) {
     this.target = target;
     this.bumpThreshold = bumpThreshold;
+    this.gravityBumpThreshold = gravityBumpThreshold;
     this.tiltThreshold = tiltThreshold;
     this.now = now;
     this.permission = "unknown";
     this.listening = false;
     this.snapshot = emptySnapshot();
+    this.previousGravityAcceleration = null;
     this.boundMotionHandler = (event) => this.#handleMotion(event);
   }
 
@@ -74,6 +77,7 @@ export class MotionProximitySensor {
 
   reset() {
     this.snapshot = emptySnapshot();
+    this.previousGravityAcceleration = null;
   }
 
   getSnapshot() {
@@ -84,10 +88,16 @@ export class MotionProximitySensor {
   }
 
   #handleMotion(event) {
-    const tilt = tiltFromAcceleration(event.accelerationIncludingGravity);
-    const acceleration = vectorMagnitude(event.acceleration);
-    const bump = acceleration >= this.bumpThreshold;
+    const gravityAcceleration = normalizedVector(event.accelerationIncludingGravity);
+    const tilt = tiltFromAcceleration(gravityAcceleration);
+    const linearAcceleration = vectorMagnitude(event.acceleration);
+    const gravityDelta = this.previousGravityAcceleration
+      ? vectorDeltaMagnitude(gravityAcceleration, this.previousGravityAcceleration)
+      : 0;
+    const acceleration = Math.max(linearAcceleration, gravityDelta);
+    const bump = linearAcceleration >= this.bumpThreshold || gravityDelta >= this.gravityBumpThreshold;
     const tilted = exceedsTiltThreshold(tilt, this.tiltThreshold);
+    this.previousGravityAcceleration = gravityAcceleration;
 
     this.snapshot = {
       samples: this.snapshot.samples + 1,
@@ -103,19 +113,24 @@ export class MotionProximitySensor {
 }
 
 export function vectorMagnitude(vector = {}) {
-  const x = finite(vector?.x);
-  const y = finite(vector?.y);
-  const z = finite(vector?.z);
+  const { x, y, z } = normalizedVector(vector);
   return Math.sqrt(x * x + y * y + z * z);
 }
 
 export function tiltFromAcceleration(acceleration = {}) {
-  const x = finite(acceleration?.x);
-  const y = finite(acceleration?.y);
-  const z = finite(acceleration?.z);
+  const { x, y, z } = normalizedVector(acceleration);
   const beta = Math.atan2(y, Math.sqrt(x * x + z * z)) * 180 / Math.PI;
   const gamma = Math.atan2(x, Math.sqrt(y * y + z * z)) * 180 / Math.PI;
   return { beta, gamma };
+}
+
+export function vectorDeltaMagnitude(a = {}, b = {}) {
+  const first = normalizedVector(a);
+  const second = normalizedVector(b);
+  const x = first.x - second.x;
+  const y = first.y - second.y;
+  const z = first.z - second.z;
+  return Math.sqrt(x * x + y * y + z * z);
 }
 
 export function exceedsTiltThreshold(tilt = {}, threshold = 30) {
@@ -125,6 +140,14 @@ export function exceedsTiltThreshold(tilt = {}, threshold = 30) {
 
 function finite(value) {
   return Number.isFinite(value) ? value : 0;
+}
+
+function normalizedVector(vector = {}) {
+  return {
+    x: finite(vector?.x),
+    y: finite(vector?.y),
+    z: finite(vector?.z)
+  };
 }
 
 function emptySnapshot() {
