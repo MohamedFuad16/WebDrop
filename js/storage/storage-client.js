@@ -1,4 +1,4 @@
-import { createStreamSaverAdapter, isStreamSaverSupported } from "../vendor/streamsaver-adapter.js?v=1.0.70";
+import { createStreamSaverAdapter, isStreamSaverSupported } from "../vendor/streamsaver-adapter.js?v=1.0.71";
 
 const DEFAULT_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const DEFAULT_BLOB_FALLBACK_CAP_BYTES = 128 * 1024 * 1024;
@@ -297,11 +297,12 @@ class DeferredIndexedDbStorageClient {
     });
   }
 
-  async readForExport(fileId, { sessionId = this.activeSessionId } = {}) {
+  async readForExport(fileId, { sessionId = this.activeSessionId, preferBlob = false } = {}) {
     const session = this.requireSession(sessionId);
     const file = this.requireFile(session, fileId);
     this.assertFileComplete(file);
-    if (this.canStreamOnSave()) {
+    const canBlobExport = file.expectedBytes <= this.blobExportCapBytes;
+    if (this.canStreamOnSave() && !(preferBlob && canBlobExport)) {
       const stream = this.streamSaver.createWriteStream(file.name, { size: file.expectedBytes });
       const writer = stream.getWriter();
       try {
@@ -321,7 +322,7 @@ class DeferredIndexedDbStorageClient {
       });
     }
 
-    if (file.expectedBytes > this.blobExportCapBytes) {
+    if (!canBlobExport) {
       throw new StorageClientError(
         "BLOB_FALLBACK_CAP_EXCEEDED",
         `Blob export is limited to ${formatBytes(this.blobExportCapBytes)}.`,

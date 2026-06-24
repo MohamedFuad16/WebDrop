@@ -1,6 +1,6 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.70";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.71";
 
-const APP_VERSION = "1.0.70";
+const APP_VERSION = "1.0.71";
 const CHUNK_SIZE = 256 * 1024;
 
 const ADMIN_MESSAGES = {

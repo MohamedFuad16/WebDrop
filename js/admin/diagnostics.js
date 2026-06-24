@@ -1,14 +1,14 @@
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.70";
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.70";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.71";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.71";
 import {
   apiBaseFrom,
   escapeHtml,
   formatAge,
   formatFrequency,
   formatNumber
-} from "./shared.js?v=1.0.70";
+} from "./shared.js?v=1.0.71";
 
-const APP_VERSION = "1.0.70";
+const APP_VERSION = "1.0.71";
 const runtime = globalThis.WEBDROP_RUNTIME_CONFIG || {};
 const DEFAULT_BASE_URL = apiBaseFrom(runtime.turnConfigUrl || runtime.signalingUrl || "")
   || "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";

@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.70";
+import { formatBytes } from "../utils/format.js?v=1.0.71";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -460,20 +460,29 @@ export function createController({
     }
     if (!runtime.realTransfer || !transferId || !fileId) return;
     try {
-      const exported = await transfer.storage.exportFile(fileId, { sessionId: transferId });
+      const preferBlob = intent === "view" && isPreviewableReceivedItem(existing);
+      const exported = await transfer.storage.exportFile(fileId, { sessionId: transferId, preferBlob });
       if (exported?.openUnavailable) {
         view.toast(view.translate("downloadSaved"));
         return;
       }
       if (!exported?.blob) return;
       const url = URL.createObjectURL(exported.blob);
-      openReceivedUrl(view, url, {
+      const receivedItem = {
         ...existing,
         name: exported.name || existing?.name,
         downloadName: exported.name || existing?.downloadName,
         type: exported.type || existing?.type
-      }, intent);
-      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      };
+      store.update((state) => ({
+        ...state,
+        receivedItems: state.receivedItems.map((item) => (
+          item.transferId === transferId && item.id === fileId
+            ? { ...item, url, status: "ready", canSave: true }
+            : item
+        ))
+      }));
+      openReceivedUrl(view, url, receivedItem, intent);
     } catch {
       view.toast(view.translate("noReceived"));
     }
@@ -775,8 +784,33 @@ export function createController({
           reason: "mock-physical-session"
         };
     } catch {
-      await failAnonymousVerification({ score: 0, errors: [view.translate("connectionRejected")] });
-      return;
+      const motion = proximity.getSnapshot?.().motion || {};
+      result = {
+        passed: false,
+        score: 0,
+        metrics: {
+          tokenFresh: Boolean(startPayload.sessionId),
+          acoustic: false,
+          soundCorrelation: 0,
+          acousticEmitted: false,
+          acousticDetected: false,
+          acousticReason: "ceremony_exception",
+          acousticSignatureId: startPayload.acousticSignatureId || null,
+          acousticSlot: startPayload.acousticSlot,
+          acousticSlotCount: startPayload.acousticPlan?.length || 0,
+          acousticStartFrequencyHz: startPayload.acousticPlan?.[startPayload.acousticSlot || 0]?.startFrequencyHz || null,
+          acousticEndFrequencyHz: startPayload.acousticPlan?.[startPayload.acousticSlot || 0]?.endFrequencyHz || null,
+          motionCorrelation: motion.bump && motion.tilted ? 1 : motion.samples > 0 ? 0.4 : 0,
+          bump: Boolean(motion.bump),
+          tilt: Boolean(motion.tilted),
+          microphonePermission: "ceremony-exception",
+          audioOutputPermission: "ceremony-exception",
+          motionPermission: "ceremony-exception",
+          sessionId
+        },
+        evidence: { motion },
+        reason: "ceremony-exception"
+      };
     }
     if (!isCurrentProximitySession(sessionId)) return;
     const match = waitForProximityMatch(sessionId, 30000);
@@ -2128,7 +2162,7 @@ function triggerBrowserDownload(url, name) {
   anchor.style.display = "none";
   document.body.append(anchor);
   anchor.click();
-  anchor.remove();
+  window.setTimeout(() => anchor.remove(), 1000);
 }
 
 function isPreviewableReceivedItem(item = {}) {

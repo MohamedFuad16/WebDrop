@@ -881,6 +881,68 @@ test("defers desktop receive chunks in IndexedDB until Download", async ({ page 
   });
 });
 
+test("exports Android deferred previews as Blob URLs for View", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-pixel-8", "Android preview export is validated on Pixel Chromium.");
+
+  await page.goto("/tests/e2e/blank.html?qa=e2e-android-preview-export", { waitUntil: "domcontentloaded" });
+  const result = await page.evaluate(async () => {
+    const { StorageClient } = await import("/js/storage/storage-client.js?v=e2e-android-preview-export");
+    const writes = [];
+    const storage = new StorageClient(null, {
+      enabled: true,
+      blobFallbackCapBytes: 1024 * 1024,
+      streamSaver: {
+        createWriteStream() {
+          return new WritableStream({
+            write(chunk) {
+              writes.push(chunk.byteLength);
+            }
+          });
+        }
+      }
+    });
+    const session = await storage.prepareSession({ id: "android-preview", expectedBytes: 7 });
+    await storage.prepareFile({
+      id: "photo-1",
+      name: "android-preview.png",
+      type: "image/png",
+      size: 7
+    }, { sessionId: "android-preview" });
+    await storage.writeChunk(new TextEncoder().encode("preview"), {
+      sessionId: "android-preview",
+      fileId: "photo-1",
+      index: 0,
+      byteLength: 7
+    });
+    await storage.finalize({ sessionId: "android-preview" });
+
+    const viewExport = await storage.exportFile("photo-1", {
+      sessionId: "android-preview",
+      preferBlob: true
+    });
+    const downloadExport = await storage.exportFile("photo-1", {
+      sessionId: "android-preview",
+      preferBlob: false
+    });
+    await storage.cleanup({ sessionId: "android-preview" });
+    return {
+      backend: session.backend,
+      viewBlobText: await viewExport.blob.text(),
+      viewOpenUnavailable: Boolean(viewExport.openUnavailable),
+      downloadOpenUnavailable: Boolean(downloadExport.openUnavailable),
+      writes
+    };
+  });
+
+  expect(result).toEqual({
+    backend: "indexeddb-deferred",
+    viewBlobText: "preview",
+    viewOpenUnavailable: false,
+    downloadOpenUnavailable: true,
+    writes: [7]
+  });
+});
+
 test("opens a received file in a new tab on iPhone WebKit without leaving WebDrop", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "webkit-iphone-15-pro", "iPhone new-tab receive behavior is WebKit-specific.");
 

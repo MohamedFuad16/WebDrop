@@ -287,6 +287,7 @@ test("diagnostics snapshot exposes safe live proximity and acoustic state", () =
   assert.equal(snapshot.clients.length, 2);
   assert.equal(snapshot.proximitySessions.length, 1);
   assert.equal(snapshot.protocol.scoreMinimum, 0.55);
+  assert.equal(snapshot.protocol.acousticSlotCorrelationMin, 0.2);
   assert.equal(snapshot.protocol.energyAssistedMinMarginDb, 4.5);
   assert.equal(snapshot.proximitySessions[0].participants[0].signature.slot, 1);
   assert.deepEqual(snapshot.proximitySessions[0].participants[0].acousticCapabilities, {

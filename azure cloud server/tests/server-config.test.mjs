@@ -75,6 +75,7 @@ test("diagnostics snapshot keeps private auth and exposes safe public status", a
     assert.deepEqual(publicBody.signaling.proximitySessions, []);
     assert.equal(publicBody.signaling.protocol.scoreMinimum, 0.55);
     assert.equal(publicBody.signaling.protocol.maxClients, 6);
+    assert.equal(publicBody.signaling.protocol.acousticSlotCorrelationMin, 0.2);
     assert.ok(Array.isArray(publicBody.metrics.recentEvents));
 
     const unauthorized = await fetch(`${base}/api/diagnostics-snapshot`);

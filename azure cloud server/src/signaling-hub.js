@@ -39,6 +39,7 @@ const ACOUSTIC_BAND_END_HZ = 19_400;
 const ACOUSTIC_MIN_BANDWIDTH_HZ = 420;
 const ACOUSTIC_WINNER_MARGIN = 0.04;
 const ACOUSTIC_MIN_CORRELATION = 0.3;
+const ACOUSTIC_SLOT_CORRELATION_MIN = 0.2;
 const ACOUSTIC_ENERGY_ASSISTED_MIN_CORRELATION = 0.16;
 const ACOUSTIC_ENERGY_ASSISTED_MIN_MARGIN_DB = 4.5;
 
@@ -948,6 +949,7 @@ export class SignalingHub {
         acousticMinBandwidthHz: ACOUSTIC_MIN_BANDWIDTH_HZ,
         acousticWinnerMargin: ACOUSTIC_WINNER_MARGIN,
         acousticMinCorrelation: ACOUSTIC_MIN_CORRELATION,
+        acousticSlotCorrelationMin: ACOUSTIC_SLOT_CORRELATION_MIN,
         energyAssistedMinCorrelation: ACOUSTIC_ENERGY_ASSISTED_MIN_CORRELATION,
         energyAssistedMinMarginDb: ACOUSTIC_ENERGY_ASSISTED_MIN_MARGIN_DB
       },
@@ -1185,6 +1187,7 @@ function hasUsableAcousticDetection(detection) {
   const correlation = Number(detection?.correlation || 0);
   const marginDb = Number(detection?.marginDb || 0);
   if (correlation >= ACOUSTIC_MIN_CORRELATION) return true;
+  if (detection?.detectionMethod === "slot-correlation" && correlation >= ACOUSTIC_SLOT_CORRELATION_MIN) return true;
   return Boolean(detection?.energyAssisted || detection?.detectionMethod === "energy-assisted")
     && correlation >= ACOUSTIC_ENERGY_ASSISTED_MIN_CORRELATION
     && marginDb >= ACOUSTIC_ENERGY_ASSISTED_MIN_MARGIN_DB;

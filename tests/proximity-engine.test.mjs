@@ -353,6 +353,38 @@ test("continuous decoder accepts weak iPhone waveform correlation when slot ener
   assert.ok(detection.marginDb >= 4.5);
 });
 
+test("continuous decoder accepts slotted peer correlation when dB margin collapses", () => {
+  const sampleRate = 48_000;
+  const slotDurationMs = 720;
+  const plan = [
+    { id: "self-signature", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 0 },
+    { id: "peer-signature", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 1 }
+  ];
+  const peerTemplate = createChirpSamples(sampleRate, plan[1]);
+  const samples = new Float32Array(Math.round(sampleRate * 2));
+  const offset = Math.round(sampleRate * 0.92);
+  samples.set(peerTemplate.map((sample) => sample * 0.24), offset);
+  const sensor = new AcousticProximitySensor();
+
+  const [detection] = sensor.decodeCeremonyCapture(
+    { samples, sampleRate },
+    plan,
+    {
+      ownSignatureId: "self-signature",
+      slotDurationMs,
+      threshold: 1.1,
+      minimumMarginDb: 99,
+      energyAssistedCorrelation: 1.1,
+      slotCorrelationMinimum: 0.2
+    }
+  );
+
+  assert.equal(detection.detected, true);
+  assert.equal(detection.detectionMethod, "slot-correlation");
+  assert.equal(detection.energyAssisted, false);
+  assert.ok(detection.correlation >= 0.2);
+});
+
 test("anonymous ceremony records continuously and decodes after every transmit slot", async () => {
   const calls = [];
   const acoustic = {

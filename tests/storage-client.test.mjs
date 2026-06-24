@@ -73,6 +73,41 @@ test("falls back to Blob storage for small files when streaming is unavailable",
   assert.equal(await result.files[0].blob.text(), "small");
 });
 
+test("exports a deferred preview as a Blob even when streaming download is available", async () => {
+  const writes = [];
+  const storage = new StorageClient(null, {
+    enabled: true,
+    blobFallbackCapBytes: 2 * MB,
+    streamSaver: {
+      createWriteStream() {
+        return new WritableStream({
+          write(chunk) {
+            writes.push(chunk.byteLength);
+          }
+        });
+      }
+    }
+  });
+
+  withBrowserStreamingSupport();
+  withMemoryIndexedDb();
+  await storage.prepareSession({ id: "rx-preview", expectedBytes: 7 });
+  await storage.prepareFile({ id: "image-1", name: "photo.png", type: "image/png", size: 7 }, { sessionId: "rx-preview" });
+  await storage.writeChunk(new TextEncoder().encode("preview"), {
+    sessionId: "rx-preview",
+    fileId: "image-1",
+    index: 0,
+    byteLength: 7
+  });
+
+  const exported = await storage.exportFile("image-1", { sessionId: "rx-preview", preferBlob: true });
+  assert.equal(exported.backend, "indexeddb-deferred");
+  assert.equal(exported.openUnavailable, false);
+  assert.equal(exported.blob instanceof Blob, true);
+  assert.equal(await exported.blob.text(), "preview");
+  assert.deepEqual(writes, []);
+});
+
 test("rejects large receives before bytes arrive when only Blob fallback is available", async () => {
   const storage = new StorageClient(null, {
     enabled: true,
@@ -102,6 +137,10 @@ function withBrowserStreamingSupport() {
     },
     configurable: true
   });
+  Object.defineProperty(globalThis, "indexedDB", {
+    value: undefined,
+    configurable: true
+  });
 }
 
 function withoutBrowserStreamingSupport() {
@@ -117,5 +156,71 @@ function withoutBrowserStreamingSupport() {
       maxTouchPoints: 0
     },
     configurable: true
+  });
+  Object.defineProperty(globalThis, "indexedDB", {
+    value: undefined,
+    configurable: true
+  });
+}
+
+function withMemoryIndexedDb() {
+  const chunks = new Map();
+  const keyFor = (key) => JSON.stringify(key);
+  Object.defineProperty(globalThis, "indexedDB", {
+    configurable: true,
+    value: {
+      open() {
+        const request = {};
+        const database = {
+          objectStoreNames: {
+            contains() {
+              return true;
+            }
+          },
+          createObjectStore() {},
+          transaction(_storeName, _mode) {
+            const transaction = {
+              error: null,
+              objectStore() {
+                return {
+                  put(value) {
+                    chunks.set(keyFor([value.sessionId, value.fileId, value.index]), value);
+                    queueMicrotask(() => transaction.oncomplete?.());
+                  },
+                  get(key) {
+                    const getRequest = {};
+                    queueMicrotask(() => {
+                      getRequest.result = chunks.get(keyFor(key)) || null;
+                      getRequest.onsuccess?.();
+                    });
+                    return getRequest;
+                  },
+                  delete(key) {
+                    chunks.delete(keyFor(key));
+                    queueMicrotask(() => transaction.oncomplete?.());
+                  },
+                  openCursor() {
+                    const cursorRequest = {};
+                    queueMicrotask(() => {
+                      cursorRequest.result = null;
+                      cursorRequest.onsuccess?.();
+                      transaction.oncomplete?.();
+                    });
+                    return cursorRequest;
+                  }
+                };
+              }
+            };
+            return transaction;
+          }
+        };
+        queueMicrotask(() => {
+          request.result = database;
+          request.onupgradeneeded?.();
+          request.onsuccess?.();
+        });
+        return request;
+      }
+    }
   });
 }

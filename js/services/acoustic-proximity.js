@@ -9,6 +9,7 @@ export const DEFAULT_CHIRP = Object.freeze({
 export const MIN_INAUDIBLE_FREQUENCY_HZ = 18500;
 export const ENERGY_ASSISTED_CORRELATION_MINIMUM = 0.16;
 export const ENERGY_ASSISTED_MARGIN_DB_MINIMUM = 4.5;
+export const SLOT_CORRELATION_MINIMUM = 0.2;
 
 export class AcousticProximitySensor {
   constructor({
@@ -270,7 +271,8 @@ export class AcousticProximitySensor {
     driftGuardMs = 760,
     minimumMarginDb = 1.5,
     energyAssistedCorrelation = ENERGY_ASSISTED_CORRELATION_MINIMUM,
-    energyAssistedMarginDb = ENERGY_ASSISTED_MARGIN_DB_MINIMUM
+    energyAssistedMarginDb = ENERGY_ASSISTED_MARGIN_DB_MINIMUM,
+    slotCorrelationMinimum = SLOT_CORRELATION_MINIMUM
   } = {}) {
     const sampleRate = Number(recording?.sampleRate);
     const samples = recording?.samples;
@@ -294,6 +296,9 @@ export class AcousticProximitySensor {
         const energyAssisted = !correlationDetected
           && scored.correlation >= energyAssistedCorrelation
           && scored.marginDb >= energyAssistedMarginDb;
+        const slottedCorrelation = !correlationDetected
+          && !energyAssisted
+          && scored.correlation >= slotCorrelationMinimum;
         return {
           signatureId: signature.id,
           slot: index + 1,
@@ -301,8 +306,14 @@ export class AcousticProximitySensor {
           code: Number(signature.code || 0),
           startFrequencyHz: signature.startFrequencyHz,
           endFrequencyHz: signature.endFrequencyHz,
-          detected: correlationDetected || energyAssisted,
-          detectionMethod: correlationDetected ? "correlation" : energyAssisted ? "energy-assisted" : "missed",
+          detected: correlationDetected || energyAssisted || slottedCorrelation,
+          detectionMethod: correlationDetected
+            ? "correlation"
+            : energyAssisted
+              ? "energy-assisted"
+              : slottedCorrelation
+                ? "slot-correlation"
+                : "missed",
           energyAssisted,
           correlation: roundMetric(scored.correlation),
           marginDb: roundMetric(scored.marginDb),
