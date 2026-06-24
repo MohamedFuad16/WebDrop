@@ -9,6 +9,7 @@ export const DEFAULT_CHIRP = Object.freeze({
 export const MIN_INAUDIBLE_FREQUENCY_HZ = 18500;
 export const ENERGY_ASSISTED_CORRELATION_MINIMUM = 0.16;
 export const ENERGY_ASSISTED_MARGIN_DB_MINIMUM = 4.5;
+export const SLOT_ENERGY_MARGIN_DB_MINIMUM = 8;
 export const SLOT_CORRELATION_MINIMUM = 0.2;
 export const CAPTURE_PRIMARY_CORRELATION_STEP = 16;
 export const CAPTURE_EXPANDED_CORRELATION_STEP = 32;
@@ -308,6 +309,7 @@ export class AcousticProximitySensor {
     minimumMarginDb = 1.5,
     energyAssistedCorrelation = ENERGY_ASSISTED_CORRELATION_MINIMUM,
     energyAssistedMarginDb = ENERGY_ASSISTED_MARGIN_DB_MINIMUM,
+    slotEnergyMarginDb = SLOT_ENERGY_MARGIN_DB_MINIMUM,
     slotCorrelationMinimum = SLOT_CORRELATION_MINIMUM
   } = {}) {
     const sampleRate = Number(recording?.sampleRate);
@@ -341,6 +343,10 @@ export class AcousticProximitySensor {
         const slottedCorrelation = !correlationDetected
           && !energyAssisted
           && scored.correlation >= slotCorrelationMinimum;
+        const slottedEnergy = !correlationDetected
+          && !energyAssisted
+          && !slottedCorrelation
+          && scored.marginDb >= slotEnergyMarginDb;
         return {
           signatureId: signature.id,
           slot: index + 1,
@@ -348,15 +354,18 @@ export class AcousticProximitySensor {
           code: Number(signature.code || 0),
           startFrequencyHz: signature.startFrequencyHz,
           endFrequencyHz: signature.endFrequencyHz,
-          detected: correlationDetected || energyAssisted || slottedCorrelation,
+          detected: correlationDetected || energyAssisted || slottedCorrelation || slottedEnergy,
           detectionMethod: correlationDetected
             ? "correlation"
             : energyAssisted
               ? "energy-assisted"
               : slottedCorrelation
                 ? "slot-correlation"
-                : "missed",
+                : slottedEnergy
+                  ? "slot-energy"
+                  : "missed",
           energyAssisted,
+          slotEnergy: slottedEnergy,
           correlation: roundMetric(scored.correlation),
           marginDb: roundMetric(scored.marginDb),
           sampleOffset: scored.offset < 0 ? null : scored.offset,

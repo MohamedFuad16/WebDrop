@@ -1,5 +1,5 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.76";
-import { IncrementalSha256 } from "../../workers/incremental-sha256.js?v=1.0.76";
+import { Emitter } from "../utils/emitter.js?v=1.0.77";
+import { IncrementalSha256 } from "../../workers/incremental-sha256.js?v=1.0.77";
 
 export const DATA_CHANNEL_LABELS = Object.freeze({
   control: "webdrop-control-v1",

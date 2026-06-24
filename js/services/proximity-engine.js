@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.76";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.76";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.76";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.77";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.77";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.77";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 const ACOUSTIC_SLOT_GUARD_MS = 80;
@@ -157,6 +157,7 @@ export class ProximityEngine {
         marginDb: detection.marginDb || 0,
         detectionMethod: detection.detectionMethod || null,
         energyAssisted: Boolean(detection.energyAssisted),
+        slotEnergy: Boolean(detection.slotEnergy),
         sampleOffset: detection.sampleOffset ?? null
       })),
       motionCorrelation: motion.bump && motion.tilted ? 1 : motion.samples > 0 ? 0.4 : 0,

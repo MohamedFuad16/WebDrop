@@ -414,6 +414,42 @@ test("continuous decoder accepts slotted peer correlation when dB margin collaps
   assert.ok(detection.correlation >= 0.2);
 });
 
+test("continuous decoder accepts strong slot energy when Android output warps chirp shape", () => {
+  const sampleRate = 48_000;
+  const slotDurationMs = 720;
+  const plan = [
+    { id: "self-signature", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 0 },
+    { id: "peer-signature", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 1 }
+  ];
+  const samples = new Float32Array(Math.round(sampleRate * 2));
+  const offset = Math.round(sampleRate * 0.88);
+  const length = Math.round(sampleRate * 0.16);
+  for (let index = 0; index < length; index += 1) {
+    const envelope = Math.sin(Math.PI * index / Math.max(1, length - 1)) ** 2;
+    samples[offset + index] += 0.9 * Math.sin(2 * Math.PI * 19100 * index / sampleRate + 0.4) * envelope;
+  }
+  const sensor = new AcousticProximitySensor();
+
+  const [detection] = sensor.decodeCeremonyCapture(
+    { samples, sampleRate },
+    plan,
+    {
+      ownSignatureId: "self-signature",
+      slotDurationMs,
+      threshold: 1.1,
+      minimumMarginDb: 99,
+      energyAssistedCorrelation: 1.1,
+      slotCorrelationMinimum: 1.1,
+      slotEnergyMarginDb: 8
+    }
+  );
+
+  assert.equal(detection.detected, true);
+  assert.equal(detection.detectionMethod, "slot-energy");
+  assert.equal(detection.slotEnergy, true);
+  assert.ok(detection.marginDb >= 8);
+});
+
 test("anonymous ceremony records continuously and decodes after every transmit slot", async () => {
   const calls = [];
   const acoustic = {
