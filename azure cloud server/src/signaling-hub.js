@@ -472,6 +472,7 @@ export class SignalingHub {
       startFrequencyHz: message.payload.startFrequencyHz,
       endFrequencyHz: message.payload.endFrequencyHz,
       sampleRate: message.payload.sampleRate,
+      bands: message.payload.bands,
       reason: message.payload.reason
     });
   }

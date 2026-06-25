@@ -111,6 +111,9 @@ test("redesigns admin readiness around truthful launch state", async ({ page }, 
   await expect(page.locator("[data-readiness-board]")).toContainText("No production infrastructure blocker");
   await expect(page.locator("[data-summary-devices]")).toHaveText("2");
   await expect(page.locator("[data-summary-pairs]")).toHaveText("1");
+  await expect(page.locator("[data-summary-readiness]")).toHaveText("44%");
+  await expect(page.locator("[data-readiness-score]")).toHaveText("44%");
+  await expect(page.locator("[data-readiness-explainer]")).toContainText("4 of 9");
 
   await page.locator("[data-operations-language]").selectOption("ja");
   await expect(page.getByRole("heading", { name: "実際に準備できているもの" })).toBeVisible();
@@ -138,6 +141,11 @@ test("folds old diagnostics into live testing and monitors a selected device", a
   await expect(page.locator("[data-monitor-metrics]")).toContainText("42% · Yes");
   await expect(page.locator("[data-monitor-metrics]")).toContainText("9.4 dB");
   await expect(page.locator("[data-monitor-metrics]")).toContainText("48 kHz");
+  await expect(page.locator("[data-frequency-channels] .frequency-channel")).toHaveCount(4);
+  await expect(page.locator("[data-frequency-channels]")).toContainText("18 kHz");
+  await expect(page.locator("[data-frequency-channels]")).toContainText("19 kHz");
+  await expect(page.locator("[data-frequency-channels]")).toContainText("-42.0 dB");
+  await expect(page.locator("[data-frequency-channels]")).toContainText("Signal");
   await expect(page.locator("[data-event-timeline]")).toContainText("monitor telemetry");
   await expect(page.locator("[data-session-table]")).toContainText("prox-test");
 
@@ -198,7 +206,40 @@ async function installRuntimeMocks(page) {
               peakDb: -42,
               noiseDb: -51.4,
               marginDb: 9.4,
-              confidence: 0.42
+              confidence: 0.42,
+              bands: [{
+                startFrequencyHz: 18000,
+                endFrequencyHz: 18500,
+                detected: false,
+                peakDb: -81,
+                noiseDb: -91,
+                marginDb: 10,
+                confidence: 0.12
+              }, {
+                startFrequencyHz: 18500,
+                endFrequencyHz: 19500,
+                detected: true,
+                peakDb: -42,
+                noiseDb: -51.4,
+                marginDb: 9.4,
+                confidence: 0.42
+              }, {
+                startFrequencyHz: 19500,
+                endFrequencyHz: 20500,
+                detected: false,
+                peakDb: -77,
+                noiseDb: -89,
+                marginDb: 12,
+                confidence: 0.16
+              }, {
+                startFrequencyHz: 20500,
+                endFrequencyHz: 21000,
+                detected: false,
+                peakDb: -92,
+                noiseDb: -95,
+                marginDb: 3,
+                confidence: 0
+              }]
             });
           }, 0);
         }

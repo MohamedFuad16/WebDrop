@@ -1,8 +1,8 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.79";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.79";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.79";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.80";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.80";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.80";
 
-const APP_VERSION = "1.0.79";
+const APP_VERSION = "1.0.80";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -22,6 +22,9 @@ const ADMIN_MESSAGES = {
     devicesOnline: "Devices online",
     activePairs: "Active pairs",
     verifiedConnections: "Verified connections",
+    verifiedReadiness: "Verified readiness",
+    launchChecks: "{verified} of {total} launch checks",
+    readinessExplainer: "{verified} of {total} launch-critical checks are signed off. Physical-device proof remains unverified.",
     appVersion: "App version",
     productionFrontend: "Production frontend",
     readinessTitle: "What is actually ready",
@@ -42,6 +45,11 @@ const ADMIN_MESSAGES = {
     selectDeviceHelp: "Select a device to inspect it",
     acousticInspection: "Acoustic inspection",
     continuousMonitor: "Continuous ultrasonic monitor",
+    liveFrequencyMap: "Live frequency map",
+    liveFrequencyMapCopy: "Actual microphone energy reported by the selected phone",
+    targetBand: "Target {band}",
+    quietBand: "Quiet",
+    signalBand: "Signal",
     idle: "Idle",
     active: "Active",
     blocked: "Blocked",
@@ -154,6 +162,9 @@ const ADMIN_MESSAGES = {
     devicesOnline: "オンライン端末",
     activePairs: "接続ペア",
     verifiedConnections: "確認済み接続",
+    verifiedReadiness: "確認済み準備度",
+    launchChecks: "リリース確認 {verified}/{total}",
+    readinessExplainer: "リリース必須項目 {total} 件中 {verified} 件を確認済みです。実機証明はまだ未完了です。",
     appVersion: "アプリ版",
     productionFrontend: "本番フロント",
     readinessTitle: "実際に準備できているもの",
@@ -174,6 +185,11 @@ const ADMIN_MESSAGES = {
     selectDeviceHelp: "端末を選ぶと監視できます",
     acousticInspection: "音響検査",
     continuousMonitor: "超音波の継続モニター",
+    liveFrequencyMap: "ライブ周波数マップ",
+    liveFrequencyMapCopy: "選択端末のマイクが報告した実際の音響エネルギー",
+    targetBand: "対象 {band}",
+    quietBand: "静音",
+    signalBand: "信号",
     idle: "待機中",
     active: "稼働中",
     blocked: "ブロック",
@@ -506,6 +522,9 @@ function renderSummary() {
   $("[data-summary-devices]").textContent = String(devices.length);
   $("[data-summary-devices-detail]").textContent = i18n.t("physicalDevices", { count: devices.length });
   $("[data-summary-pairs]").textContent = String(pairs.length);
+  const readiness = readinessSummary();
+  $("[data-summary-readiness]").textContent = `${readiness.percent}%`;
+  $("[data-summary-readiness-detail]").textContent = i18n.t("launchChecks", readiness);
 }
 
 function renderReadinessBoard() {
@@ -519,6 +538,10 @@ function renderReadinessBoard() {
     { key: "blocked", title: i18n.t("blockedColumn"), icon: connected ? "0" : "!", items: blockedItems },
     { key: "later", title: i18n.t("laterColumn"), icon: "→", items: i18n.t("laterItems") }
   ];
+  const readiness = readinessSummary();
+  $("[data-readiness-score]").textContent = `${readiness.percent}%`;
+  $("[data-readiness-progress]").style.width = `${readiness.percent}%`;
+  $("[data-readiness-explainer]").textContent = i18n.t("readinessExplainer", readiness);
   $("[data-readiness-board]").innerHTML = columns.map((column) => `
     <section class="readiness-column" data-state="${escapeHtml(column.key)}">
       <header><span class="state-icon">${escapeHtml(column.icon)}</span><span>${escapeHtml(column.title)}</span><b>${column.items.length}</b></header>
@@ -635,20 +658,72 @@ function renderMonitor() {
   $("[data-monitor-status-copy]").textContent = i18n.t(normalizedStatus);
   $("[data-action='monitor-start']").disabled = Boolean(active);
   $("[data-action='monitor-stop']").disabled = !active;
-  renderFrequencyLane(telemetry);
+  renderFrequencySpectrum(telemetry);
   renderMetricRows();
 }
 
-function renderFrequencyLane(telemetry) {
+function renderFrequencySpectrum(telemetry) {
   const start = Number(telemetry?.startFrequencyHz || MONITOR_START_HZ);
   const end = Number(telemetry?.endFrequencyHz || MONITOR_END_HZ);
-  const min = 18_000;
-  const max = 21_000;
-  const left = Math.max(0, Math.min(100, ((start - min) / (max - min)) * 100));
-  const width = Math.max(4, Math.min(100 - left, ((end - start) / (max - min)) * 100));
-  const band = $("[data-frequency-lane] .frequency-band");
-  band.style.setProperty("--start", `${left}%`);
-  band.style.setProperty("--width", `${width}%`);
+  const bands = monitorFrequencyBands().map((definition, index) => ({
+    ...definition,
+    ...(telemetry?.bands?.[index] || {})
+  }));
+  $("[data-frequency-target]").textContent = i18n.t("targetBand", {
+    band: formatFrequency(start, end)
+  });
+  $("[data-frequency-channels]").innerHTML = bands.map((band, index) => {
+    const peakDb = Number(band.peakDb);
+    const confidence = Number(band.confidence);
+    const level = Number.isFinite(peakDb)
+      ? Math.max(4, Math.min(100, ((peakDb + 100) / 65) * 100))
+      : 4;
+    const tone = !telemetry
+      ? "idle"
+      : band.detected || confidence >= 0.35
+        ? "good"
+        : confidence >= 0.15
+          ? "warn"
+          : "quiet";
+    const overlapsTarget = band.startFrequencyHz < end && band.endFrequencyHz > start;
+    const status = tone === "good" || tone === "warn" ? i18n.t("signalBand") : i18n.t("quietBand");
+    const targetLabel = i18n.t("targetBand", { band: "" }).trim();
+    return `
+      <article class="frequency-channel" data-channel="${index}" data-tone="${tone}" tabindex="0"
+        title="${escapeHtml(`${formatFrequency(band.startFrequencyHz, band.endFrequencyHz)} · ${Number.isFinite(peakDb) ? `${formatNumber(peakDb, 1)} dB` : i18n.t("waiting")}`)}">
+        <header>
+          <strong>${escapeHtml(band.label)}</strong>
+          ${overlapsTarget ? `<span>${escapeHtml(targetLabel)}</span>` : ""}
+        </header>
+        <div class="frequency-channel-meter" aria-hidden="true"><i style="--level:${level}%"></i></div>
+        <footer>
+          <b>${Number.isFinite(peakDb) ? `${escapeHtml(formatNumber(peakDb, 1))} dB` : "-- dB"}</b>
+          <span>${escapeHtml(status)}</span>
+        </footer>
+      </article>
+    `;
+  }).join("");
+}
+
+function monitorFrequencyBands() {
+  return [
+    { label: "18 kHz", startFrequencyHz: 18_000, endFrequencyHz: 18_500 },
+    { label: "19 kHz", startFrequencyHz: 18_500, endFrequencyHz: 19_500 },
+    { label: "20 kHz", startFrequencyHz: 19_500, endFrequencyHz: 20_500 },
+    { label: "21 kHz", startFrequencyHz: 20_500, endFrequencyHz: 21_000 }
+  ];
+}
+
+function readinessSummary() {
+  const total = i18n.t("readyItems").length + i18n.t("proofItems").length;
+  const liveInfrastructureChecks = isServerHealthy() ? 2 : 0;
+  const locallyVerifiedChecks = Math.max(0, i18n.t("readyItems").length - 2);
+  const verified = Math.min(total, liveInfrastructureChecks + locallyVerifiedChecks);
+  return {
+    verified,
+    total,
+    percent: total ? Math.round((verified / total) * 100) : 0
+  };
 }
 
 function renderMetricRows() {

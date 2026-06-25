@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.79";
+import { formatBytes } from "../utils/format.js?v=1.0.80";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -392,25 +392,39 @@ export function createController({
     monitor.sequence += 1;
     let emitted = { emitted: false };
     try {
-      if (monitor.emit) {
-        emitted = await proximity.emitAcousticChirp?.({
+      const monitorBands = [
+        {
+          startFrequencyHz: monitor.startFrequencyHz,
+          endFrequencyHz: monitor.endFrequencyHz,
+          role: "target"
+        },
+        ...adminMonitorFrequencyBands()
+      ];
+      const emission = monitor.emit
+        ? proximity.emitAcousticChirp?.({
           startFrequencyHz: monitor.startFrequencyHz,
           endFrequencyHz: monitor.endFrequencyHz
-        }) || emitted;
-        await wait(90);
+        })
+        : Promise.resolve(emitted);
+      const snapshots = [];
+      for (const delayMs of [18, 30, 30]) {
+        await wait(delayMs);
+        const snapshot = await proximity.sampleAcousticFrequencyBands?.({
+          bands: monitorBands
+        });
+        if (snapshot?.available) snapshots.push(snapshot);
       }
-      const sample = await proximity.sampleAcousticFrequencyBand?.({
-        startFrequencyHz: monitor.startFrequencyHz,
-        endFrequencyHz: monitor.endFrequencyHz
-      }) || {};
+      emitted = await emission || emitted;
+      const sampled = strongestAdminMonitorSnapshot(snapshots, monitorBands.length);
+      const sample = sampled.bands[0] || {};
       signaling.sendAdminMonitorTelemetry?.(monitor.adminId, {
         monitorId: monitor.monitorId,
-        status: sample.available ? "active" : "blocked",
-        reason: sample.reason || emitted.reason || null,
+        status: sampled.available ? "active" : "blocked",
+        reason: sampled.reason || emitted.reason || null,
         sequence: monitor.sequence,
         sampledAt: Date.now(),
-        contextState: sample.contextState || proximity.getAcousticStatus?.().contextState,
-        sampleRate: sample.sampleRate || emitted.sampleRate,
+        contextState: sampled.contextState || proximity.getAcousticStatus?.().contextState,
+        sampleRate: sampled.sampleRate || emitted.sampleRate,
         emitted: Boolean(emitted.emitted),
         detected: Boolean(sample.detected),
         startFrequencyHz: monitor.startFrequencyHz,
@@ -418,7 +432,8 @@ export function createController({
         peakDb: sample.peakDb,
         noiseDb: sample.noiseDb,
         marginDb: sample.marginDb,
-        confidence: sample.confidence
+        confidence: sample.confidence,
+        bands: sampled.bands.slice(1)
       });
     } catch (error) {
       signaling.sendAdminMonitorTelemetry?.(monitor.adminId, {
@@ -434,6 +449,42 @@ export function createController({
       () => runAdminAcousticMonitorTick(monitor),
       monitor.intervalMs
     );
+  }
+
+  function adminMonitorFrequencyBands() {
+    return [
+      { startFrequencyHz: 18_000, endFrequencyHz: 18_500 },
+      { startFrequencyHz: 18_500, endFrequencyHz: 19_500 },
+      { startFrequencyHz: 19_500, endFrequencyHz: 20_500 },
+      { startFrequencyHz: 20_500, endFrequencyHz: 21_000 }
+    ];
+  }
+
+  function strongestAdminMonitorSnapshot(snapshots, bandCount) {
+    if (!snapshots.length) {
+      return {
+        available: false,
+        reason: "frequency-sample-unavailable",
+        bands: Array.from({ length: bandCount }, () => ({}))
+      };
+    }
+    const strongestBands = Array.from({ length: bandCount }, (_, index) => (
+      snapshots
+        .map((snapshot) => snapshot.bands?.[index])
+        .filter(Boolean)
+        .sort((left, right) => (
+          Number(right.confidence ?? 0) - Number(left.confidence ?? 0)
+          || Number(right.marginDb ?? -Infinity) - Number(left.marginDb ?? -Infinity)
+          || Number(right.peakDb ?? -Infinity) - Number(left.peakDb ?? -Infinity)
+        ))[0] || {}
+    ));
+    const latest = snapshots.at(-1) || {};
+    return {
+      available: true,
+      contextState: latest.contextState,
+      sampleRate: latest.sampleRate,
+      bands: strongestBands
+    };
   }
 
   function stopAdminAcousticMonitor(monitorId) {

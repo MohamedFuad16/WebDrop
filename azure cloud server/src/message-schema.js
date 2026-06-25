@@ -327,7 +327,19 @@ export function validateRoutedMessage(message) {
         peakDb: signedNumber(payload.peakDb),
         noiseDb: signedNumber(payload.noiseDb),
         marginDb: safeNumber(payload.marginDb),
-        confidence: scoreMetric(payload.confidence)
+        confidence: scoreMetric(payload.confidence),
+        bands: (Array.isArray(payload.bands) ? payload.bands : [])
+          .slice(0, 8)
+          .map((band) => ({
+            startFrequencyHz: safeNumber(band?.startFrequencyHz),
+            endFrequencyHz: safeNumber(band?.endFrequencyHz),
+            detected: Boolean(band?.detected),
+            peakDb: signedNumber(band?.peakDb),
+            noiseDb: signedNumber(band?.noiseDb),
+            marginDb: signedNumber(band?.marginDb),
+            confidence: scoreMetric(band?.confidence)
+          }))
+          .filter((band) => band.startFrequencyHz && band.endFrequencyHz)
       }
     };
   }

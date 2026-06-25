@@ -359,7 +359,16 @@ test("admin monitor routes continuous acoustic telemetry from a selected device"
       startFrequencyHz: 18600,
       endFrequencyHz: 19400,
       marginDb: 9.4,
-      confidence: 0.42
+      confidence: 0.42,
+      bands: [{
+        startFrequencyHz: 18500,
+        endFrequencyHz: 19500,
+        detected: true,
+        peakDb: -42,
+        noiseDb: -51.4,
+        marginDb: 9.4,
+        confidence: 0.42
+      }]
     }
   });
 
@@ -369,6 +378,8 @@ test("admin monitor routes continuous acoustic telemetry from a selected device"
   assert.equal(telemetry.deviceFamily, "android");
   assert.equal(telemetry.detected, true);
   assert.equal(telemetry.marginDb, 9.4);
+  assert.equal(telemetry.bands.length, 1);
+  assert.equal(telemetry.bands[0].startFrequencyHz, 18500);
 
   hub.stopAdminMonitor(admin, {
     type: "admin:monitor:stop",

@@ -131,7 +131,24 @@ test("admin acoustic monitor payloads are bounded for live diagnostics", () => {
       peakDb: -42,
       noiseDb: -53.5,
       marginDb: 11.5,
-      confidence: 2
+      confidence: 2,
+      bands: [{
+        startFrequencyHz: 18000,
+        endFrequencyHz: 18500,
+        detected: false,
+        peakDb: -82,
+        noiseDb: -91,
+        marginDb: 9,
+        confidence: 0.12
+      }, {
+        startFrequencyHz: 18500,
+        endFrequencyHz: 19500,
+        detected: true,
+        peakDb: -42,
+        noiseDb: -53.5,
+        marginDb: 11.5,
+        confidence: 0.42
+      }]
     }
   });
   assert.equal(telemetry.payload.sequence, 7);
@@ -139,4 +156,14 @@ test("admin acoustic monitor payloads are bounded for live diagnostics", () => {
   assert.equal(telemetry.payload.noiseDb, -53.5);
   assert.equal(telemetry.payload.marginDb, 11.5);
   assert.equal(telemetry.payload.confidence, 1);
+  assert.equal(telemetry.payload.bands.length, 2);
+  assert.deepEqual(telemetry.payload.bands[1], {
+    startFrequencyHz: 18500,
+    endFrequencyHz: 19500,
+    detected: true,
+    peakDb: -42,
+    noiseDb: -53.5,
+    marginDb: 11.5,
+    confidence: 0.42
+  });
 });
