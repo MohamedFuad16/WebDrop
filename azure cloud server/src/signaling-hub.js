@@ -40,6 +40,8 @@ const ACOUSTIC_MIN_BANDWIDTH_HZ = 420;
 const ACOUSTIC_WINNER_MARGIN = 0.04;
 const ACOUSTIC_MIN_CORRELATION = 0.3;
 const ACOUSTIC_SLOT_CORRELATION_MIN = 0.2;
+const ACOUSTIC_PACKET_CONSENSUS_MIN_CORRELATION = 0.05;
+const ACOUSTIC_PACKET_CONSENSUS_MIN_COUNT = 3;
 const ACOUSTIC_ENERGY_ASSISTED_MIN_CORRELATION = 0.16;
 const ACOUSTIC_ENERGY_ASSISTED_MIN_MARGIN_DB = 4.5;
 const DETAILED_METRIC_TYPES = new Set([
@@ -747,6 +749,8 @@ export class SignalingHub {
     this.metrics?.recordEvent("proximity:session:telemetry", {
       sessionId,
       clientId: sender.id,
+      deviceName: sender.deviceName,
+      deviceFamily: sender.deviceFamily,
       score: analysis.score,
       decision: analysis.decision,
       acousticEmitted: Boolean(message.payload.metrics?.acousticEmitted),
@@ -1116,6 +1120,8 @@ export class SignalingHub {
         acousticWinnerMargin: ACOUSTIC_WINNER_MARGIN,
         acousticMinCorrelation: ACOUSTIC_MIN_CORRELATION,
         acousticSlotCorrelationMin: ACOUSTIC_SLOT_CORRELATION_MIN,
+        acousticPacketConsensusMinCorrelation: ACOUSTIC_PACKET_CONSENSUS_MIN_CORRELATION,
+        acousticPacketConsensusMinCount: ACOUSTIC_PACKET_CONSENSUS_MIN_COUNT,
         energyAssistedMinCorrelation: ACOUSTIC_ENERGY_ASSISTED_MIN_CORRELATION,
         energyAssistedMinMarginDb: ACOUSTIC_ENERGY_ASSISTED_MIN_MARGIN_DB
       },
@@ -1368,6 +1374,10 @@ function hasUsableAcousticDetection(detection) {
   const marginDb = Number(detection?.marginDb || 0);
   if (correlation >= ACOUSTIC_MIN_CORRELATION) return true;
   if (detection?.detectionMethod === "slot-correlation" && correlation >= ACOUSTIC_SLOT_CORRELATION_MIN) return true;
+  if (detection?.detectionMethod === "packet-consensus") {
+    return Number(detection?.packetCount || 0) >= ACOUSTIC_PACKET_CONSENSUS_MIN_COUNT
+      && Number(detection?.packetAverageCorrelation || correlation) >= ACOUSTIC_PACKET_CONSENSUS_MIN_CORRELATION;
+  }
   return Boolean(detection?.energyAssisted || detection?.detectionMethod === "energy-assisted")
     && correlation >= ACOUSTIC_ENERGY_ASSISTED_MIN_CORRELATION
     && marginDb >= ACOUSTIC_ENERGY_ASSISTED_MIN_MARGIN_DB;

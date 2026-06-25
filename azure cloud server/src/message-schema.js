@@ -7,6 +7,7 @@ export const MAX_ICE_CANDIDATE_LENGTH = 4096;
 export const MAX_TRANSFER_TOTAL_BYTES = 500 * 1024 * 1024;
 export const MAX_TRANSFER_CHUNK_SIZE_BYTES = 256 * 1024;
 export const MAX_TRANSFER_CHUNKS_PER_FILE = 1_000_000;
+export const MAX_AVATAR_DATA_URL_LENGTH = 60000;
 
 const ROUTED_TYPES = new Set([
   "invite",
@@ -77,7 +78,7 @@ export function validateClientHello(message) {
   const deviceId = cleanString(self.deviceId, 120) || id;
   const deviceFamily = cleanString(self.deviceFamily || self.platform || payload.capabilities?.platform?.family, 30) || null;
   const deviceLabel = cleanString(self.deviceLabel || self.deviceType, 80) || null;
-  const avatarId = cleanString(self.avatarId || self.avatar, 160) || null;
+  const avatarId = cleanAvatar(self.avatarId || self.avatar);
   return {
     id,
     deviceId,
@@ -390,6 +391,14 @@ function publicCapabilities(capabilities) {
   };
 }
 
+function cleanAvatar(value) {
+  const cleaned = cleanString(value, MAX_AVATAR_DATA_URL_LENGTH);
+  if (!cleaned) return null;
+  if (cleaned.startsWith("assets/icons/avatars/")) return cleaned.slice(0, 160);
+  if (/^data:image\/(png|jpe?g|webp);base64,[a-z0-9+/=]+$/i.test(cleaned)) return cleaned;
+  return null;
+}
+
 export class ProtocolError extends Error {
   constructor(code, message) {
     super(message);
@@ -518,6 +527,10 @@ function validateProximityMetrics(metrics) {
         marginDb: safeNumber(entry?.marginDb),
         detectionMethod: cleanString(entry?.detectionMethod, 32) || null,
         energyAssisted: Boolean(entry?.energyAssisted),
+        slotEnergy: Boolean(entry?.slotEnergy),
+        packetCount: clampNumber(entry?.packetCount, 0, 20, 0),
+        packetAverageCorrelation: scoreMetric(entry?.packetAverageCorrelation),
+        packetSpacingMs: clampNumber(entry?.packetSpacingMs, 0, 2000, 0),
         sampleOffset: safeNumber(entry?.sampleOffset)
       }))
       .filter((entry) => entry.signatureId)

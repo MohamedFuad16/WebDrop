@@ -48,6 +48,52 @@ test("proximity session accepts reciprocal energy-assisted acoustic detections",
   hub.close();
 });
 
+test("proximity session accepts reciprocal weak packet-consensus acoustic detections", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  const session = createSession(hub, [clientA, clientB]);
+
+  hub.recordProximitySessionTelemetry(
+    clientA,
+    sessionMessage(session, clientA, packetConsensusMetrics(session, clientB, 4, 0.07), 1000, clientB)
+  );
+  hub.recordProximitySessionTelemetry(
+    clientB,
+    sessionMessage(session, clientB, packetConsensusMetrics(session, clientA, 4, 0.08), 1040, clientA)
+  );
+
+  assert.equal(clientA.pairingId, clientB.pairingId);
+  assert.ok(clientA.pairingId);
+  assert.equal(messagesOf(clientA, "proximity:match")[0].payload.peerId, "client-b");
+  assert.equal(messagesOf(clientB, "proximity:match")[0].payload.peerId, "client-a");
+
+  hub.close();
+});
+
+test("proximity session rejects a single weak packet-consensus pulse", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  const session = createSession(hub, [clientA, clientB]);
+
+  hub.recordProximitySessionTelemetry(
+    clientA,
+    sessionMessage(session, clientA, packetConsensusMetrics(session, clientB, 1, 0.07), 1000, clientB)
+  );
+  hub.recordProximitySessionTelemetry(
+    clientB,
+    sessionMessage(session, clientB, packetConsensusMetrics(session, clientA, 4, 0.08), 1040, clientA)
+  );
+
+  assert.equal(clientA.pairingId, null);
+  assert.equal(clientB.pairingId, null);
+  assert.equal(messagesOf(clientA, "proximity:match").length, 0);
+  assert.equal(messagesOf(clientB, "proximity:match").length, 0);
+
+  hub.close();
+});
+
 test("proximity session rejects scores below 55", () => {
   const hub = createTestHub();
   const clientA = addClient(hub, "client-a");
@@ -289,6 +335,8 @@ test("diagnostics snapshot exposes safe live proximity and acoustic state", () =
   assert.equal(snapshot.proximitySessions.length, 1);
   assert.equal(snapshot.protocol.scoreMinimum, 0.55);
   assert.equal(snapshot.protocol.acousticSlotCorrelationMin, 0.2);
+  assert.equal(snapshot.protocol.acousticPacketConsensusMinCorrelation, 0.05);
+  assert.equal(snapshot.protocol.acousticPacketConsensusMinCount, 3);
   assert.equal(snapshot.protocol.energyAssistedMinMarginDb, 4.5);
   assert.equal(snapshot.proximitySessions[0].participants[0].signature.slot, 1);
   assert.deepEqual(snapshot.proximitySessions[0].participants[0].acousticCapabilities, {
@@ -510,6 +558,28 @@ function energyAssistedMetrics(session, heardClient) {
       marginDb: 4.8,
       detectionMethod: "energy-assisted",
       energyAssisted: true
+    }]
+  };
+}
+
+function packetConsensusMetrics(session, heardClient, packetCount, packetAverageCorrelation) {
+  const heardSignature = session.signatures.get(heardClient.id);
+  return {
+    ...verifiedMetrics(),
+    acousticDetected: true,
+    acousticCorrelation: packetAverageCorrelation,
+    acousticMarginDb: 0,
+    acousticDetectionMethod: "packet-consensus",
+    acousticConfidenceMargin: packetAverageCorrelation,
+    acousticDetections: [{
+      signatureId: heardSignature,
+      correlation: packetAverageCorrelation,
+      marginDb: 0,
+      detectionMethod: "packet-consensus",
+      energyAssisted: false,
+      packetCount,
+      packetAverageCorrelation,
+      packetSpacingMs: 332
     }]
   };
 }

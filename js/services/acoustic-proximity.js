@@ -1,9 +1,9 @@
 export const DEFAULT_CHIRP = Object.freeze({
-  durationMs: 96,
+  durationMs: 112,
   startFrequencyHz: 18600,
   endFrequencyHz: 19400,
   code: 0,
-  gain: 0.16
+  gain: 0.24
 });
 
 export const MIN_INAUDIBLE_FREQUENCY_HZ = 18500;
@@ -11,6 +11,9 @@ export const ENERGY_ASSISTED_CORRELATION_MINIMUM = 0.16;
 export const ENERGY_ASSISTED_MARGIN_DB_MINIMUM = 4.5;
 export const SLOT_ENERGY_MARGIN_DB_MINIMUM = 8;
 export const SLOT_CORRELATION_MINIMUM = 0.2;
+export const PACKET_CONSENSUS_CORRELATION_MINIMUM = 0.05;
+export const PACKET_CONSENSUS_AVERAGE_MINIMUM = 0.06;
+export const PACKET_CONSENSUS_COUNT_MINIMUM = 3;
 export const CAPTURE_PRIMARY_CORRELATION_STEP = 16;
 export const CAPTURE_EXPANDED_CORRELATION_STEP = 32;
 
@@ -310,7 +313,11 @@ export class AcousticProximitySensor {
     energyAssistedCorrelation = ENERGY_ASSISTED_CORRELATION_MINIMUM,
     energyAssistedMarginDb = ENERGY_ASSISTED_MARGIN_DB_MINIMUM,
     slotEnergyMarginDb = SLOT_ENERGY_MARGIN_DB_MINIMUM,
-    slotCorrelationMinimum = SLOT_CORRELATION_MINIMUM
+    slotCorrelationMinimum = SLOT_CORRELATION_MINIMUM,
+    packetIntervalMs = 220,
+    packetConsensusCorrelation = PACKET_CONSENSUS_CORRELATION_MINIMUM,
+    packetConsensusAverage = PACKET_CONSENSUS_AVERAGE_MINIMUM,
+    packetConsensusCount = PACKET_CONSENSUS_COUNT_MINIMUM
   } = {}) {
     const sampleRate = Number(recording?.sampleRate);
     const samples = recording?.samples;
@@ -336,6 +343,16 @@ export class AcousticProximitySensor {
           label: "expanded"
         });
         const scored = chooseBestCaptureScore(primary, expanded);
+        const packetConsensus = scoreRepeatedPacketTrain(samples, template, {
+          sampleRate,
+          windowStart: expandedStart,
+          windowEnd: expandedEnd,
+          seedOffset: scored.offset,
+          packetSpacingMs: Number(signature.durationMs || DEFAULT_CHIRP.durationMs) + packetIntervalMs,
+          minimumCorrelation: packetConsensusCorrelation,
+          minimumAverage: packetConsensusAverage,
+          minimumCount: packetConsensusCount
+        });
         const correlationDetected = scored.correlation >= threshold && scored.marginDb >= minimumMarginDb;
         const energyAssisted = !correlationDetected
           && scored.correlation >= energyAssistedCorrelation
@@ -343,9 +360,14 @@ export class AcousticProximitySensor {
         const slottedCorrelation = !correlationDetected
           && !energyAssisted
           && scored.correlation >= slotCorrelationMinimum;
+        const repeatedPacketConsensus = !correlationDetected
+          && !energyAssisted
+          && !slottedCorrelation
+          && packetConsensus.detected;
         const slottedEnergy = !correlationDetected
           && !energyAssisted
           && !slottedCorrelation
+          && !repeatedPacketConsensus
           && scored.marginDb >= slotEnergyMarginDb;
         return {
           signatureId: signature.id,
@@ -354,19 +376,24 @@ export class AcousticProximitySensor {
           code: Number(signature.code || 0),
           startFrequencyHz: signature.startFrequencyHz,
           endFrequencyHz: signature.endFrequencyHz,
-          detected: correlationDetected || energyAssisted || slottedCorrelation || slottedEnergy,
+          detected: correlationDetected || energyAssisted || slottedCorrelation || repeatedPacketConsensus || slottedEnergy,
           detectionMethod: correlationDetected
             ? "correlation"
             : energyAssisted
               ? "energy-assisted"
               : slottedCorrelation
                 ? "slot-correlation"
+                : repeatedPacketConsensus
+                  ? "packet-consensus"
                 : slottedEnergy
                   ? "slot-energy"
                   : "missed",
           energyAssisted,
           slotEnergy: slottedEnergy,
-          correlation: roundMetric(scored.correlation),
+          packetCount: packetConsensus.count,
+          packetAverageCorrelation: roundMetric(packetConsensus.averageCorrelation),
+          packetSpacingMs: roundMetric(packetConsensus.packetSpacingMs),
+          correlation: roundMetric(Math.max(scored.correlation, packetConsensus.averageCorrelation)),
           marginDb: roundMetric(scored.marginDb),
           sampleOffset: scored.offset < 0 ? null : scored.offset,
           window: scored.window
@@ -650,6 +677,48 @@ function scoreCaptureWindow(samples, template, start, end, { step = 8, label = "
     marginDb: correlationMarginDb(window, template, match.offset),
     offset: match.offset < 0 ? -1 : safeStart + match.offset,
     window: label
+  };
+}
+
+function scoreRepeatedPacketTrain(samples, template, {
+  sampleRate,
+  windowStart,
+  windowEnd,
+  seedOffset,
+  packetSpacingMs,
+  minimumCorrelation,
+  minimumAverage,
+  minimumCount
+}) {
+  if (seedOffset < 0 || !template.length || !Number.isFinite(sampleRate)) {
+    return { detected: false, count: 0, averageCorrelation: 0, packetSpacingMs };
+  }
+  const spacingSamples = Math.max(template.length, Math.round(sampleRate * packetSpacingMs / 1000));
+  const searchRadius = Math.max(16, Math.round(sampleRate * 0.035));
+  const correlations = [];
+  const maximumPackets = 12;
+
+  for (let packet = -maximumPackets; packet <= maximumPackets; packet += 1) {
+    const expectedOffset = seedOffset + packet * spacingSamples;
+    if (expectedOffset < windowStart || expectedOffset + template.length > windowEnd) continue;
+    let best = 0;
+    const first = Math.max(windowStart, expectedOffset - searchRadius);
+    const last = Math.min(windowEnd - template.length, expectedOffset + searchRadius);
+    for (let offset = first; offset <= last; offset += CAPTURE_PRIMARY_CORRELATION_STEP) {
+      best = Math.max(best, Math.abs(normalizedCorrelation(samples, template, offset)));
+    }
+    if (best >= minimumCorrelation) correlations.push(best);
+  }
+
+  const count = correlations.length;
+  const averageCorrelation = count
+    ? correlations.reduce((sum, correlation) => sum + correlation, 0) / count
+    : 0;
+  return {
+    detected: count >= minimumCount && averageCorrelation >= minimumAverage,
+    count,
+    averageCorrelation,
+    packetSpacingMs
   };
 }
 

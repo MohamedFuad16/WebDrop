@@ -1,5 +1,5 @@
-import { formatBytes } from "../utils/format.js?v=1.0.84";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.84";
+import { formatBytes } from "../utils/format.js?v=1.0.85";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.85";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -391,6 +391,8 @@ export function createController({
         sampledAt: Date.now()
       });
       view.toast(view.translate("diagnosticTapConnect"));
+      globalThis.clearTimeout(adminMonitorRetryTimer);
+      adminMonitorRetryTimer = globalThis.setTimeout(() => tryStartAdminAcousticMonitor(), 700);
       return false;
     }
     proximity.resetMotionCapture?.();
@@ -663,6 +665,9 @@ export function createController({
     const existing = store.getState().receivedItems.find((item) =>
       item.transferId === transferId && item.id === fileId
     );
+    const reservedView = intent === "view" && isPreviewableReceivedItem(existing) && !existing?.url
+      ? reserveBrowserView()
+      : null;
     if (existing?.url) {
       openReceivedUrl(view, existing.url, existing, intent);
       return;
@@ -672,10 +677,14 @@ export function createController({
       const preferBlob = intent === "view" && isPreviewableReceivedItem(existing);
       const exported = await transfer.storage.exportFile(fileId, { sessionId: transferId, preferBlob });
       if (exported?.openUnavailable) {
+        reservedView?.close?.();
         view.toast(view.translate("downloadSaved"));
         return;
       }
-      if (!exported?.blob) return;
+      if (!exported?.blob) {
+        reservedView?.close?.();
+        return;
+      }
       const url = URL.createObjectURL(exported.blob);
       const receivedItem = {
         ...existing,
@@ -691,8 +700,9 @@ export function createController({
             : item
         ))
       }));
-      openReceivedUrl(view, url, receivedItem, intent);
+      openReceivedUrl(view, url, receivedItem, intent, reservedView);
     } catch {
+      reservedView?.close?.();
       view.toast(view.translate("noReceived"));
     }
   });
@@ -707,7 +717,7 @@ export function createController({
   view.on("set-motion-on", () => setMotionPaused(false));
   view.on("set-motion-paused", () => setMotionPaused(true));
   view.on("select-avatar", (avatar) => {
-    if (!avatar?.startsWith("assets/icons/avatars/")) return;
+    if (!isAllowedAvatarChoice(avatar)) return;
     localStorage.setItem("webdrop.avatarChoice", avatar);
     store.update((state) => ({ ...state, self: { ...state.self, avatar, avatarId: avatar } }));
   });
@@ -2377,6 +2387,11 @@ function readStoredPermissions() {
   }
 }
 
+function isAllowedAvatarChoice(avatar) {
+  return typeof avatar === "string"
+    && (avatar.startsWith("assets/icons/avatars/") || /^data:image\/(png|jpeg|jpg|webp);base64,/i.test(avatar));
+}
+
 function writeStoredPermissions(permissions) {
   try {
     localStorage.setItem(PROXIMITY_PERMISSION_KEY, JSON.stringify(permissions));
@@ -2443,17 +2458,28 @@ function waitForTransportConnection(transport, timeoutMs) {
   });
 }
 
-function openReceivedUrl(view, url, item = {}, intent = "download") {
+function openReceivedUrl(view, url, item = {}, intent = "download", reservedView = null) {
   if (intent === "view" && isPreviewableReceivedItem(item)) {
-    const opened = triggerBrowserView(url);
+    const opened = triggerBrowserView(url, reservedView);
     view.toast(view.translate(opened ? "openedNewTab" : "downloadStarted"));
     if (opened) return;
   }
+  reservedView?.close?.();
   triggerBrowserDownload(url, item.downloadName || item.name);
   view.toast(view.translate("downloadStarted"));
 }
 
-function triggerBrowserView(url) {
+function reserveBrowserView() {
+  const opened = window.open("about:blank", "_blank");
+  if (opened) opened.opener = null;
+  return opened;
+}
+
+function triggerBrowserView(url, reservedView = null) {
+  if (reservedView && !reservedView.closed) {
+    reservedView.location.href = url;
+    return true;
+  }
   const opened = window.open(url, "_blank", "noopener,noreferrer");
   return Boolean(opened);
 }

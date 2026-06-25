@@ -565,7 +565,7 @@
 
 .monitor-controls {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto auto;
+  grid-template-columns: minmax(220px, 1fr) auto auto auto auto;
   gap: 8px;
   align-items: end;
 }
@@ -594,6 +594,12 @@
   border-color: #9ed9b6;
   color: #087f39;
   background: #f2fbf5;
+}
+
+.start-button--all {
+  border-color: #b8cdf5;
+  color: #235fb8;
+  background: #f3f7ff;
 }
 
 .stop-button {
@@ -935,6 +941,10 @@
 .session-row small {
   grid-column: 1 / -1;
   color: var(--ops-muted);
+}
+
+.session-row--recent {
+  background: linear-gradient(180deg, #fff, #fafcff);
 }
 
 .admin-footer {

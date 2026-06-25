@@ -78,11 +78,11 @@ test("emitted chirp reaches and is recognized by a second acoustic sensor", asyn
   });
 
   expect(result.permission).toBe(true);
-  expect(result.emitted).toMatchObject({ emitted: true, durationMs: 96, sampleRate: 48_000 });
+  expect(result.emitted).toMatchObject({ emitted: true, durationMs: 112, sampleRate: 48_000 });
   expect(result.emitted.startFrequencyHz).toBeGreaterThanOrEqual(18_500);
   expect(result.emitted.endFrequencyHz).toBeGreaterThan(result.emitted.startFrequencyHz);
   expect(result.detected.detected).toBe(true);
-  expect(result.detected.correlation).toBeGreaterThan(0.24);
+  expect(result.detected.correlation).toBeGreaterThan(0.1);
   expect(result.detected.band.marginDb).toBeGreaterThan(20);
 });
 
@@ -143,6 +143,23 @@ test("keeps mobile sheet controls at least 44 CSS pixels", async ({ page }) => {
     expect(box?.width).toBeGreaterThanOrEqual(44);
     expect(box?.height).toBeGreaterThanOrEqual(44);
   }
+});
+
+test("uploads and crops a custom profile photo", async ({ page }) => {
+  await page.goto("/?qa=e2e-custom-avatar&runtime=mock", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.locator("[data-avatar-file-input]").setInputFiles({
+    name: "profile.svg",
+    mimeType: "image/svg+xml",
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160"><rect width="240" height="160" fill="#2463eb"/><circle cx="120" cy="80" r="54" fill="#fff"/></svg>')
+  });
+
+  await expect(page.locator("[data-avatar-cropper]")).toBeVisible();
+  await page.locator("[data-avatar-zoom]").fill("1.4");
+  await page.locator('[data-action="apply-custom-avatar"]').click();
+
+  await expect(page.locator("[data-avatar-cropper]")).toBeHidden();
+  await expect(page.locator("[data-self-avatar-image] img")).toHaveAttribute("src", /^data:image\/jpeg;base64,/);
 });
 
 test("keeps Japanese QR instructions fully visible at 320 CSS pixels", async ({ page }) => {

@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.84";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.84";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.84";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.85";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.85";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.85";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 export const BUMP_SCORE_POINTS = 20;
@@ -167,6 +167,9 @@ export class ProximityEngine {
         detectionMethod: detection.detectionMethod || null,
         energyAssisted: Boolean(detection.energyAssisted),
         slotEnergy: Boolean(detection.slotEnergy),
+        packetCount: Number(detection.packetCount || 0),
+        packetAverageCorrelation: Number(detection.packetAverageCorrelation || 0),
+        packetSpacingMs: Number(detection.packetSpacingMs || 0),
         sampleOffset: detection.sampleOffset ?? null
       })),
       motionCorrelation: motion.bump && motion.tilted ? 1 : motion.samples > 0 ? 0.4 : 0,
@@ -414,7 +417,8 @@ async function exchangeCapturedSignatureChirps(acoustic, {
   const detections = acoustic.decodeCeremonyCapture(recording, signatures, {
     ownSignatureId,
     slotDurationMs,
-    slotGuardMs: ACOUSTIC_SLOT_GUARD_MS
+    slotGuardMs: ACOUSTIC_SLOT_GUARD_MS,
+    packetIntervalMs: Number(options.intervalMs) || 220
   });
   onProgress({
     phase: "audio",

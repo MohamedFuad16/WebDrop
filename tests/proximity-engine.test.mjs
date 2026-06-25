@@ -14,6 +14,7 @@ import {
   DEFAULT_CHIRP,
   findBestCorrelation,
   MIN_INAUDIBLE_FREQUENCY_HZ,
+  PACKET_CONSENSUS_COUNT_MINIMUM,
   supportsInaudibleChirp
 } from "../js/services/acoustic-proximity.js";
 import {
@@ -483,6 +484,62 @@ test("continuous decoder accepts strong slot energy when Android output warps ch
   assert.equal(detection.detectionMethod, "slot-energy");
   assert.equal(detection.slotEnergy, true);
   assert.ok(detection.marginDb >= 8);
+});
+
+test("continuous decoder accepts a weak repeated iPhone packet train but rejects one weak pulse", () => {
+  const sampleRate = 48_000;
+  const slotDurationMs = 1800;
+  const plan = [
+    { id: "peer-signature", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 0 },
+    { id: "self-signature", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 1 }
+  ];
+  const template = createChirpSamples(sampleRate, plan[0]);
+  const spacingSamples = Math.round(sampleRate * (DEFAULT_CHIRP.durationMs + 220) / 1000);
+  const samples = new Float32Array(Math.round(sampleRate * 3.8));
+  const firstOffset = Math.round(sampleRate * 0.18);
+  for (let packet = 0; packet < 5; packet += 1) {
+    const offset = firstOffset + packet * spacingSamples;
+    for (let index = 0; index < template.length; index += 1) {
+      samples[offset + index] += template[index] * 0.025
+        + Math.sin(2 * Math.PI * 18_900 * index / sampleRate + packet) * 0.15;
+    }
+  }
+  const sensor = new AcousticProximitySensor();
+
+  const [repeated] = sensor.decodeCeremonyCapture(
+    { samples, sampleRate },
+    plan,
+    {
+      ownSignatureId: "self-signature",
+      slotDurationMs,
+      threshold: 1.1,
+      minimumMarginDb: 99,
+      energyAssistedCorrelation: 1.1,
+      slotCorrelationMinimum: 1.1,
+      slotEnergyMarginDb: 99
+    }
+  );
+  assert.equal(repeated.detected, true);
+  assert.equal(repeated.detectionMethod, "packet-consensus");
+  assert.ok(repeated.packetCount >= PACKET_CONSENSUS_COUNT_MINIMUM);
+
+  const singlePulse = new Float32Array(samples.length);
+  singlePulse.set(samples.subarray(firstOffset, firstOffset + template.length), firstOffset);
+  const [single] = sensor.decodeCeremonyCapture(
+    { samples: singlePulse, sampleRate },
+    plan,
+    {
+      ownSignatureId: "self-signature",
+      slotDurationMs,
+      threshold: 1.1,
+      minimumMarginDb: 99,
+      energyAssistedCorrelation: 1.1,
+      slotCorrelationMinimum: 1.1,
+      slotEnergyMarginDb: 99
+    }
+  );
+  assert.equal(single.detected, false);
+  assert.ok(single.packetCount < PACKET_CONSENSUS_COUNT_MINIMUM);
 });
 
 test("anonymous ceremony records continuously and decodes after every transmit slot", async () => {

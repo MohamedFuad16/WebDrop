@@ -1,8 +1,8 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.84";
-import { formatBytes } from "../utils/format.js?v=1.0.84";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.84";
-import { translate } from "../config/i18n.js?v=1.0.84";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.84";
+import { Emitter } from "../utils/emitter.js?v=1.0.85";
+import { formatBytes } from "../utils/format.js?v=1.0.85";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.85";
+import { translate } from "../config/i18n.js?v=1.0.85";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.85";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;
@@ -45,6 +45,10 @@ export class AppView extends Emitter {
       peerOrbits: document.querySelector("[data-peer-orbits]"),
       selfAvatarImage: document.querySelector("[data-self-avatar-image]"),
       avatarCarousel: document.querySelector("[data-avatar-carousel]"),
+      avatarFileInput: document.querySelector("[data-avatar-file-input]"),
+      avatarCropper: document.querySelector("[data-avatar-cropper]"),
+      avatarCropCanvas: document.querySelector("[data-avatar-crop-canvas]"),
+      avatarZoom: document.querySelector("[data-avatar-zoom]"),
       ringChoice: document.querySelector("[data-ring-choice]"),
       languageChoice: document.querySelector(".language-choice"),
       motionChoice: document.querySelector(".motion-choice"),
@@ -101,6 +105,8 @@ export class AppView extends Emitter {
       document.querySelector("[data-dynamic-island]")
     ].filter(Boolean);
     this.avatarOptionsRendered = false;
+    this.customAvatarImage = null;
+    this.customAvatarObjectUrl = "";
     this.peerRenderSignature = "";
     this.receivedRenderSignature = "";
     this.chatRenderSignature = "";
@@ -163,6 +169,15 @@ export class AppView extends Emitter {
     this.nodes.fileInput.addEventListener("change", (event) => {
       this.emit("files-selected", event.target.files);
       event.target.value = "";
+    });
+
+    this.nodes.avatarFileInput?.addEventListener("change", (event) => {
+      this.loadCustomAvatar(event.target.files?.[0]);
+      event.target.value = "";
+    });
+
+    this.nodes.avatarZoom?.addEventListener("input", () => {
+      this.drawCustomAvatarCrop();
     });
 
     this.nodes.disconnectHaptic?.addEventListener("change", () => {
@@ -359,6 +374,9 @@ export class AppView extends Emitter {
       "close-information": () => this.closeInformation(),
       "close-connection-method": () => this.closeConnectionMethodSheet(),
       "close-qr-sheet": () => this.closeQrChoiceSheet(),
+      "choose-custom-avatar": () => this.chooseCustomAvatar(),
+      "apply-custom-avatar": () => this.applyCustomAvatar(),
+      "cancel-custom-avatar": () => this.cancelCustomAvatar(),
       "close-action-sheet": () => this.closeActionSheets(),
       "close-all-sheets": () => this.closeAllSheets()
     };
@@ -1127,6 +1145,76 @@ export class AppView extends Emitter {
 
   openFilePicker() {
     this.nodes.fileInput.click();
+  }
+
+  chooseCustomAvatar() {
+    this.nodes.avatarFileInput?.click();
+  }
+
+  loadCustomAvatar(file) {
+    if (!file?.type?.startsWith("image/")) {
+      this.toast(this.translate("profilePhotoFailed"));
+      return;
+    }
+    this.releaseCustomAvatarObjectUrl();
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      this.customAvatarImage = image;
+      this.customAvatarObjectUrl = url;
+      if (this.nodes.avatarZoom) this.nodes.avatarZoom.value = "1";
+      if (this.nodes.avatarCropper) this.nodes.avatarCropper.hidden = false;
+      this.drawCustomAvatarCrop();
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      this.toast(this.translate("profilePhotoFailed"));
+    };
+    image.src = url;
+  }
+
+  drawCustomAvatarCrop() {
+    const canvas = this.nodes.avatarCropCanvas;
+    const image = this.customAvatarImage;
+    if (!canvas || !image) return;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    const size = canvas.width;
+    const zoom = Math.max(1, Math.min(2.6, Number(this.nodes.avatarZoom?.value || 1)));
+    const coverScale = Math.max(size / image.naturalWidth, size / image.naturalHeight) * zoom;
+    const width = image.naturalWidth * coverScale;
+    const height = image.naturalHeight * coverScale;
+    const x = (size - width) / 2;
+    const y = (size - height) / 2;
+    context.clearRect(0, 0, size, size);
+    context.fillStyle = "#eef2f7";
+    context.fillRect(0, 0, size, size);
+    context.drawImage(image, x, y, width, height);
+  }
+
+  applyCustomAvatar() {
+    const canvas = this.nodes.avatarCropCanvas;
+    if (!canvas || !this.customAvatarImage) return;
+    try {
+      const avatar = canvas.toDataURL("image/jpeg", 0.82);
+      this.cancelCustomAvatar();
+      this.emit("select-avatar", avatar);
+      this.toast(this.translate("profilePhotoSaved"));
+    } catch {
+      this.toast(this.translate("profilePhotoFailed"));
+    }
+  }
+
+  cancelCustomAvatar() {
+    this.customAvatarImage = null;
+    if (this.nodes.avatarCropper) this.nodes.avatarCropper.hidden = true;
+    this.releaseCustomAvatarObjectUrl();
+  }
+
+  releaseCustomAvatarObjectUrl() {
+    if (!this.customAvatarObjectUrl) return;
+    URL.revokeObjectURL(this.customAvatarObjectUrl);
+    this.customAvatarObjectUrl = "";
   }
 
   toast(message) {

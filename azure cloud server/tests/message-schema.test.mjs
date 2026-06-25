@@ -94,7 +94,11 @@ test("proximity session telemetry preserves bounded reciprocal acoustic signatur
     marginDb: 4.8,
     detectionMethod: "energy-assisted",
     energyAssisted: true,
-    sampleOffset: null
+    sampleOffset: null,
+    slotEnergy: false,
+    packetCount: 0,
+    packetAverageCorrelation: 0,
+    packetSpacingMs: 0
   }]);
 });
 

@@ -1,8 +1,8 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.84";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.84";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.84";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.85";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.85";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.85";
 
-const APP_VERSION = "1.0.84";
+const APP_VERSION = "1.0.85";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -58,7 +58,9 @@ const ADMIN_MESSAGES = {
     selectConnectedDevice: "Select a connected device",
     chooseDevice: "Choose a device",
     startMonitoring: "Start monitoring",
+    startAllMonitoring: "Start all",
     stop: "Stop",
+    stopAllMonitoring: "Stop all",
     monitorExplainer: "The selected phone must have opened WebDrop audio from a user tap. Monitoring continues until Stop is pressed.",
     goodRange: "Good: within expected range",
     marginalRange: "Marginal: check conditions",
@@ -69,6 +71,8 @@ const ADMIN_MESSAGES = {
     noEvents: "No events yet.",
     physicalMatching: "Physical matching",
     activeSessions: "Active proximity sessions",
+    recentSessions: "Recent slot attempts",
+    recentSessionCopy: "Finished sessions stay here briefly so you can inspect slots, evidence, and failure reasons.",
     singleDeviceTesting: "Single-device test",
     multiDeviceTesting: "Multi-device sessions",
     noSessions: "No active proximity sessions.",
@@ -87,7 +91,9 @@ const ADMIN_MESSAGES = {
     devicesCount: "{count} devices",
     activeCount: "{count} active",
     startedMonitor: "Monitoring {device}. Keep the phone on WebDrop and tap Connect if audio is not ready.",
+    startedAllMonitors: "Monitoring {count} devices. Keep each phone on WebDrop and tap Connect once if audio is not ready.",
     stoppedMonitor: "Monitor stopped.",
+    stoppedAllMonitors: "All monitors stopped.",
     stoppingMonitor: "Stopping monitor on {device}...",
     noDeviceSelected: "Select a connected phone first.",
     targetOffline: "Selected device is offline.",
@@ -204,7 +210,9 @@ const ADMIN_MESSAGES = {
     selectConnectedDevice: "接続中の端末を選択",
     chooseDevice: "端末を選択",
     startMonitoring: "監視開始",
+    startAllMonitoring: "全端末を監視",
     stop: "停止",
+    stopAllMonitoring: "全停止",
     monitorExplainer: "選択した端末で WebDrop の音声がタップ操作から有効になっている必要があります。停止するまで監視します。",
     goodRange: "良好: 期待範囲内",
     marginalRange: "注意: 条件を確認",
@@ -215,6 +223,8 @@ const ADMIN_MESSAGES = {
     noEvents: "イベントはまだありません。",
     physicalMatching: "物理マッチング",
     activeSessions: "近接セッション",
+    recentSessions: "直近のスロット試行",
+    recentSessionCopy: "終了したセッションも短時間ここに残し、スロット、証拠、失敗理由を確認できます。",
     singleDeviceTesting: "単体端末テスト",
     multiDeviceTesting: "複数端末セッション",
     noSessions: "アクティブな近接セッションはありません。",
@@ -233,7 +243,9 @@ const ADMIN_MESSAGES = {
     devicesCount: "{count} 台",
     activeCount: "{count} 件",
     startedMonitor: "{device} を監視中。音声が未準備なら端末側で Connect をタップしてください。",
+    startedAllMonitors: "{count} 台を監視中。各端末で WebDrop を開き、音声が未準備なら Connect を一度タップしてください。",
     stoppedMonitor: "監視を停止しました。",
+    stoppedAllMonitors: "すべての監視を停止しました。",
     stoppingMonitor: "{device} の監視を停止しています...",
     noDeviceSelected: "先に接続中の端末を選んでください。",
     targetOffline: "選択した端末はオフラインです。",
@@ -323,7 +335,9 @@ const state = {
   polling: true,
   selectedDeviceId: "",
   activeMonitor: null,
+  activeMonitors: new Map(),
   monitorTelemetry: null,
+  monitorTelemetryByDevice: new Map(),
   ignoredMonitorIds: new Set(),
   localEvents: [],
   clearEventsBefore: 0
@@ -358,6 +372,8 @@ function bindEvents() {
   });
   $("[data-action='monitor-start']")?.addEventListener("click", startMonitor);
   $("[data-action='monitor-stop']")?.addEventListener("click", stopMonitor);
+  $("[data-action='monitor-start-all']")?.addEventListener("click", startAllMonitors);
+  $("[data-action='monitor-stop-all']")?.addEventListener("click", stopAllMonitors);
   $("[data-action='timeline-clear']")?.addEventListener("click", () => {
     state.clearEventsBefore = Date.now();
     renderTimeline();
@@ -415,6 +431,7 @@ function connectAdminSocket() {
         state.activeMonitor = null;
         state.monitorTelemetry = null;
       }
+      state.activeMonitors.clear();
       renderMonitor();
       globalThis.setTimeout(connectAdminSocket, 1500);
     });
@@ -434,7 +451,9 @@ function handleSocketMessage(raw) {
   }
   const envelope = unwrapSocketEnvelope(message);
   if (envelope.type === "admin:monitor:started") {
-    if (state.activeMonitor?.status === "stopping" && state.activeMonitor.monitorId === envelope.monitorId) {
+    const targetId = envelope.targetId || state.activeMonitor?.targetId || "";
+    const existing = targetId ? state.activeMonitors.get(targetId) : state.activeMonitor;
+    if (existing?.status === "stopping" && existing.monitorId === envelope.monitorId) {
       addLocalEvent("admin:monitor:started", {
         deviceName: envelope.deviceName,
         targetId: envelope.targetId
@@ -443,25 +462,30 @@ function handleSocketMessage(raw) {
       return;
     }
     state.ignoredMonitorIds.delete(envelope.monitorId);
-    state.activeMonitor = {
-      ...(state.activeMonitor || {}),
+    const nextMonitor = {
+      ...(existing || state.activeMonitor || {}),
       monitorId: envelope.monitorId,
-      targetId: envelope.targetId,
+      targetId,
       deviceName: envelope.deviceName,
       status: "active",
       startedAt: Date.now()
     };
-    state.monitorTelemetry = null;
+    if (targetId) state.activeMonitors.set(targetId, nextMonitor);
+    if (!state.selectedDeviceId || state.selectedDeviceId === targetId) state.activeMonitor = nextMonitor;
+    if (state.selectedDeviceId === targetId) state.monitorTelemetry = null;
     addLocalEvent("admin:monitor:started", {
       deviceName: envelope.deviceName,
-      targetId: envelope.targetId
+      targetId
     });
     setMonitorExplainer(i18n.t("startedMonitor", { device: friendlyDeviceName(envelope) }));
     renderMonitor();
   }
   if (envelope.type === "admin:monitor:stopped") {
-    addLocalEvent("admin:monitor:stopped", { targetId: envelope.targetId });
-    if (!state.activeMonitor || state.activeMonitor.monitorId === envelope.monitorId) {
+    const targetId = envelope.targetId || state.activeMonitor?.targetId || "";
+    addLocalEvent("admin:monitor:stopped", { targetId });
+    if (targetId) state.activeMonitors.delete(targetId);
+    state.monitorTelemetryByDevice.delete(targetId);
+    if (!state.activeMonitor || state.activeMonitor.monitorId === envelope.monitorId || state.activeMonitor.targetId === targetId) {
       state.activeMonitor = null;
       state.monitorTelemetry = null;
     }
@@ -471,12 +495,19 @@ function handleSocketMessage(raw) {
   }
   if (envelope.type === "admin:monitor:telemetry") {
     if (envelope.monitorId && state.ignoredMonitorIds.has(envelope.monitorId)) return;
-    if (state.activeMonitor && envelope.monitorId && envelope.monitorId !== state.activeMonitor.monitorId) return;
-    state.monitorTelemetry = envelope;
-    if (state.activeMonitor) state.activeMonitor.status = envelope.status || "active";
+    const targetId = envelope.deviceId || envelope.targetId || state.activeMonitor?.targetId || "";
+    const activeForDevice = targetId ? state.activeMonitors.get(targetId) : null;
+    if (activeForDevice && envelope.monitorId && envelope.monitorId !== activeForDevice.monitorId) return;
+    if (targetId) state.monitorTelemetryByDevice.set(targetId, envelope);
+    if (!state.selectedDeviceId || state.selectedDeviceId === targetId) state.monitorTelemetry = envelope;
+    if (activeForDevice) {
+      activeForDevice.status = envelope.status || "active";
+      state.activeMonitors.set(targetId, activeForDevice);
+      if (state.selectedDeviceId === targetId) state.activeMonitor = activeForDevice;
+    }
     addLocalEvent("admin:monitor:telemetry", {
       monitorId: envelope.monitorId,
-      clientId: envelope.deviceId || envelope.targetId,
+      clientId: targetId,
       deviceName: envelope.deviceName,
       status: envelope.status,
       reason: envelope.reason,
@@ -492,7 +523,7 @@ function handleSocketMessage(raw) {
       tiltDegrees: envelope.tiltDegrees,
       motionSamples: envelope.motionSamples
     });
-    updateMonitorExplainerFromTelemetry(envelope);
+    if (!state.selectedDeviceId || state.selectedDeviceId === targetId) updateMonitorExplainerFromTelemetry(envelope);
     renderMonitor();
   }
   if (envelope.type === "route:error") {
@@ -625,16 +656,24 @@ function renderDevices() {
   if (!devices.length) {
     list.innerHTML = `<p class="empty-row">${escapeHtml(i18n.t("noDevices"))}</p>`;
   } else {
-    list.innerHTML = devices.map((device) => `
+    list.innerHTML = devices.map((device) => {
+      const monitor = state.activeMonitors.get(device.id);
+      const telemetry = state.monitorTelemetryByDevice.get(device.id);
+      const status = monitor?.status || telemetry?.status || "idle";
+      const age = telemetry?.sampledAt
+        ? formatAge(Date.now() - Number(telemetry.sampledAt), i18n.locale)
+        : formatAge(device.lastSeenMsAgo, i18n.locale);
+      return `
       <button class="device-row${device.id === state.selectedDeviceId ? " is-selected" : ""}" type="button" data-device-id="${escapeHtml(device.id)}">
         <span class="device-name">
           <span class="device-avatar">${escapeHtml(deviceInitials(device))}</span>
-          <span><strong>${escapeHtml(friendlyDeviceName(device))}</strong><small>${escapeHtml(device.id)}</small></span>
+          <span><strong>${escapeHtml(friendlyDeviceName(device))}</strong><small>${escapeHtml(statusLabel(status))} · ${escapeHtml(device.id)}</small></span>
         </span>
         <span>${escapeHtml(friendlyPlatform(device))}</span>
-        <span>${escapeHtml(formatAge(device.lastSeenMsAgo, i18n.locale))}</span>
+        <span>${escapeHtml(age)}</span>
       </button>
-    `).join("");
+    `;
+    }).join("");
   }
   list.querySelectorAll("[data-device-id]").forEach((button) => {
     button.addEventListener("click", () => selectDevice(button.dataset.deviceId));
@@ -649,7 +688,8 @@ function renderDevices() {
 
 function selectDevice(deviceId) {
   state.selectedDeviceId = deviceId || "";
-  state.monitorTelemetry = null;
+  state.activeMonitor = state.activeMonitors.get(state.selectedDeviceId) || null;
+  state.monitorTelemetry = state.monitorTelemetryByDevice.get(state.selectedDeviceId) || null;
   renderDevices();
   renderMonitor();
 }
@@ -660,15 +700,33 @@ function startMonitor() {
     setMonitorExplainer(i18n.t("noDeviceSelected"));
     return;
   }
+  startMonitorForDevice(device);
+}
+
+function startAllMonitors() {
+  const devices = physicalDevices();
+  if (!devices.length) {
+    setMonitorExplainer(i18n.t("openPhoneHint"));
+    return;
+  }
+  for (const device of devices) startMonitorForDevice(device);
+  setMonitorExplainer(i18n.t("startedAllMonitors", { count: devices.length }));
+  renderMonitor();
+}
+
+function startMonitorForDevice(device) {
   connectAdminSocket();
+  if (state.activeMonitors.has(device.id)) return;
   const monitorId = `monitor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  state.activeMonitor = {
+  const monitor = {
     monitorId,
     targetId: device.id,
     deviceName: friendlyDeviceName(device),
     status: "starting",
     startedAt: Date.now()
   };
+  state.activeMonitors.set(device.id, monitor);
+  if (device.id === state.selectedDeviceId) state.activeMonitor = monitor;
   state.ignoredMonitorIds.delete(monitorId);
   const sent = sendSocket({
     type: "admin:monitor:start",
@@ -682,7 +740,8 @@ function startMonitor() {
     }
   });
   if (!sent) {
-    state.activeMonitor = null;
+    state.activeMonitors.delete(device.id);
+    if (device.id === state.selectedDeviceId) state.activeMonitor = null;
     setMonitorExplainer(i18n.t("signalingDisconnected"));
   } else {
     setMonitorExplainer(i18n.t("startedMonitor", { device: friendlyDeviceName(device) }));
@@ -691,8 +750,19 @@ function startMonitor() {
 }
 
 function stopMonitor() {
-  if (!state.activeMonitor) return;
-  const monitor = state.activeMonitor;
+  const monitor = state.activeMonitors.get(state.selectedDeviceId) || state.activeMonitor;
+  if (!monitor) return;
+  stopMonitorFor(monitor);
+}
+
+function stopAllMonitors() {
+  const monitors = [...state.activeMonitors.values()];
+  for (const monitor of monitors) stopMonitorFor(monitor, { quiet: true });
+  setMonitorExplainer(i18n.t("stoppedAllMonitors"));
+  renderMonitor();
+}
+
+function stopMonitorFor(monitor, { quiet = false } = {}) {
   state.ignoredMonitorIds.add(monitor.monitorId);
   const sent = sendSocket({
     type: "admin:monitor:stop",
@@ -700,23 +770,30 @@ function stopMonitor() {
     payload: { monitorId: monitor.monitorId }
   });
   if (!sent) {
-    state.activeMonitor = null;
-    state.monitorTelemetry = null;
+    state.activeMonitors.delete(monitor.targetId);
+    state.monitorTelemetryByDevice.delete(monitor.targetId);
+    if (state.activeMonitor?.monitorId === monitor.monitorId) state.activeMonitor = null;
+    if (state.selectedDeviceId === monitor.targetId) state.monitorTelemetry = null;
     setMonitorExplainer(i18n.t("signalingDisconnected"));
     renderMonitor();
     return;
   }
-  state.activeMonitor = {
+  const nextMonitor = {
     ...monitor,
     status: "stopping"
   };
-  setMonitorExplainer(i18n.t("stoppingMonitor", { device: monitor.deviceName || i18n.t("chooseDevice") }));
+  state.activeMonitors.set(monitor.targetId, nextMonitor);
+  if (state.selectedDeviceId === monitor.targetId) state.activeMonitor = nextMonitor;
+  if (!quiet) setMonitorExplainer(i18n.t("stoppingMonitor", { device: monitor.deviceName || i18n.t("chooseDevice") }));
   renderMonitor();
 }
 
 function renderMonitor() {
-  const active = state.activeMonitor;
-  const telemetry = state.monitorTelemetry || latestMonitorTelemetry();
+  const selectedMonitor = state.activeMonitors.get(state.selectedDeviceId) || state.activeMonitor;
+  const active = selectedMonitor;
+  const telemetry = state.monitorTelemetryByDevice.get(state.selectedDeviceId)
+    || state.monitorTelemetry
+    || latestMonitorTelemetry();
   const status = active?.status || "idle";
   const normalizedStatus = ["active", "waiting", "stopping", "blocked", "error"].includes(status)
     ? status
@@ -724,8 +801,11 @@ function renderMonitor() {
   const statusNode = $("[data-monitor-status]");
   statusNode.dataset.monitorStatus = normalizedStatus;
   $("[data-monitor-status-copy]").textContent = i18n.t(normalizedStatus);
-  $("[data-action='monitor-start']").disabled = Boolean(active);
+  const devices = physicalDevices();
+  $("[data-action='monitor-start']").disabled = Boolean(active) || !state.selectedDeviceId;
   $("[data-action='monitor-stop']").disabled = !active || active.status === "stopping";
+  $("[data-action='monitor-start-all']").disabled = !devices.length || devices.every((device) => state.activeMonitors.has(device.id));
+  $("[data-action='monitor-stop-all']").disabled = !state.activeMonitors.size;
   renderFrequencySpectrum(telemetry);
   renderMetricRows(telemetry);
 }
@@ -922,13 +1002,15 @@ function renderTimeline() {
 
 function renderSessions() {
   const sessions = state.snapshot?.signaling?.proximitySessions || [];
+  const recent = recentSessionSummaries(sessions);
   $("[data-session-count]").textContent = i18n.t("activeCount", { count: sessions.length });
   const table = $("[data-session-table]");
-  if (!sessions.length) {
+  if (!sessions.length && !recent.length) {
     table.innerHTML = `<p class="empty-row">${escapeHtml(i18n.t("noSessions"))}</p>`;
     return;
   }
-  table.innerHTML = sessions.map((session) => {
+  table.innerHTML = [
+    ...sessions.map((session) => {
     const participants = session.participants || [];
     const score = Math.max(...participants.map((participant) => Number(participant.telemetry?.score || 0)), 0);
     const acoustic = participants.map((participant) => participant.telemetry?.acoustic).find(Boolean);
@@ -947,7 +1029,87 @@ function renderSessions() {
         ${participantRows}
       </article>
     `;
-  }).join("");
+    }),
+    ...recent.map((session) => `
+      <article class="session-row session-row--recent">
+        <strong>${escapeHtml(session.id)}</strong>
+        <span>${escapeHtml(session.result)}</span>
+        <span>${escapeHtml(`${session.participants.length} phones`)}</span>
+        <span>${escapeHtml(`score ${Math.round(session.score * 100)} · ${session.reason || session.method || "recent"}`)}</span>
+        <small>${escapeHtml(i18n.t("recentSessionCopy"))}</small>
+        ${session.participants.map((participant) => `
+          <small>${escapeHtml(participant.deviceName || participant.clientId || "device")} · slot ${escapeHtml(participant.slotLabel)} · ${participant.emitted ? "emitted" : "silent"} · ${participant.detected ? "heard" : "missed"} · corr ${formatNumber(participant.correlation, 2)} · peak ${formatNumber(participant.peak, 3)} · ${escapeHtml(participant.method || "n/a")}</small>
+        `).join("")}
+      </article>
+    `)
+  ].join("");
+}
+
+function recentSessionSummaries(activeSessions = []) {
+  const activeIds = new Set(activeSessions.map((session) => session.id));
+  const events = state.snapshot?.metrics?.recentEvents || [];
+  const sessions = new Map();
+  for (const event of events) {
+    const detail = event.detail || {};
+    const sessionId = detail.sessionId;
+    if (!sessionId || activeIds.has(sessionId)) continue;
+    const summary = sessions.get(sessionId) || {
+      id: sessionId,
+      at: event.at,
+      result: i18n.t("recentSessions"),
+      reason: "",
+      score: 0,
+      method: "",
+      participants: new Map()
+    };
+    summary.at = event.at || summary.at;
+    if (event.type === "proximity:session:matched") {
+      summary.result = i18n.t("verified");
+      summary.score = Math.max(summary.score, Number(detail.score || 0));
+    }
+    if (event.type === "proximity:session:failed") {
+      summary.result = i18n.t("failed");
+      summary.reason = detail.reason || summary.reason;
+      summary.score = Math.max(summary.score, Number(detail.score || 0));
+    }
+    if (event.type === "proximity:session:telemetry") {
+      summary.score = Math.max(summary.score, Number(detail.score || 0));
+      summary.method = detail.acousticDetectionMethod || summary.method;
+      summary.participants.set(detail.clientId, {
+        clientId: detail.clientId,
+        deviceName: detail.deviceName || "",
+        slotLabel: detail.acousticSlotCount
+          ? `${Number(detail.acousticSlot || 0) + 1}/${detail.acousticSlotCount}`
+          : String(Number(detail.acousticSlot || 0) + 1),
+        emitted: Boolean(detail.acousticEmitted),
+        detected: Boolean(detail.acousticDetected),
+        correlation: Number(detail.acousticCorrelation || 0),
+        peak: Number(detail.acousticRecordingPeak || 0),
+        method: detail.acousticDetectionMethod || "",
+        reason: detail.acousticReason || ""
+      });
+    }
+    if (event.type === "proximity:session:diagnostic" && detail.clientId && !summary.participants.has(detail.clientId)) {
+      summary.participants.set(detail.clientId, {
+        clientId: detail.clientId,
+        deviceName: detail.deviceName || "",
+        slotLabel: detail.acoustic?.slotCount
+          ? `${Number(detail.acoustic?.slot || 0)}/${detail.acoustic?.slotCount}`
+          : String(Number(detail.acoustic?.slot || 0)),
+        emitted: detail.acoustic?.mode === "emit",
+        detected: detail.acoustic?.mode === "detected",
+        correlation: Number(detail.acoustic?.correlation || 0),
+        peak: 0,
+        method: detail.acoustic?.detectionMethod || detail.acoustic?.mode || "",
+        reason: detail.reason || ""
+      });
+    }
+    sessions.set(sessionId, summary);
+  }
+  return [...sessions.values()]
+    .map((session) => ({ ...session, participants: [...session.participants.values()] }))
+    .sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0))
+    .slice(0, 8);
 }
 
 function setSocketState(nextState) {
@@ -1159,6 +1321,14 @@ function toneLabel(tone) {
   if (tone === "warn") return i18n.t("marginal");
   if (tone === "bad") return i18n.t("poor");
   return i18n.t("waiting");
+}
+
+function statusLabel(status) {
+  if (status === "active" || status === "waiting" || status === "stopping" || status === "blocked" || status === "error") {
+    return i18n.t(status);
+  }
+  if (status === "starting") return i18n.t("active");
+  return i18n.t("idle");
 }
 
 function eventTone(event) {

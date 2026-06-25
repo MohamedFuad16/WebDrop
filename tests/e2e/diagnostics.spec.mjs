@@ -153,6 +153,13 @@ test("folds old diagnostics into live testing and monitors a selected device", a
 
   await page.locator("[data-action='monitor-stop']").click();
   await expect(page.locator("[data-monitor-status-copy]")).toHaveText("Idle");
+
+  await page.locator("[data-action='monitor-start-all']").click();
+  await expect(page.locator("[data-action='monitor-start-all']")).toBeDisabled();
+  await expect(page.locator("[data-action='monitor-stop-all']")).toBeEnabled();
+  await expect(page.locator("[data-device-list]")).toContainText("Active");
+  await page.locator("[data-action='monitor-stop-all']").click();
+  await expect(page.locator("[data-action='monitor-stop-all']")).toBeDisabled();
   expect(consoleProblems()).toEqual([]);
 });
 

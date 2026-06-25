@@ -16,6 +16,7 @@ export function animatedFramesForAvatar(avatar) {
 export function normalizeAvatarChoice(avatar) {
   const raw = String(avatar || "").trim();
   if (!raw) return AVATAR_OPTIONS[0];
+  if (/^(data:image\/|blob:)/i.test(raw)) return raw;
   const fileMatch = raw.match(/user[-_]?(\d{1,2})\.png$/i) || raw.match(/^user[-_]?(\d{1,2})$/i);
   if (fileMatch) {
     const number = Number(fileMatch[1]);
