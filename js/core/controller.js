@@ -1,5 +1,5 @@
-import { formatBytes } from "../utils/format.js?v=1.0.85";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.85";
+import { formatBytes } from "../utils/format.js?v=1.0.86";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.86";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;

@@ -1,8 +1,8 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.85";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.85";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.85";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.86";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.86";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.86";
 
-const APP_VERSION = "1.0.85";
+const APP_VERSION = "1.0.86";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;

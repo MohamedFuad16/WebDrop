@@ -1,8 +1,8 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.85";
-import { formatBytes } from "../utils/format.js?v=1.0.85";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.85";
-import { translate } from "../config/i18n.js?v=1.0.85";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.85";
+import { Emitter } from "../utils/emitter.js?v=1.0.86";
+import { formatBytes } from "../utils/format.js?v=1.0.86";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.86";
+import { translate } from "../config/i18n.js?v=1.0.86";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.86";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;
@@ -46,6 +46,9 @@ export class AppView extends Emitter {
       selfAvatarImage: document.querySelector("[data-self-avatar-image]"),
       avatarCarousel: document.querySelector("[data-avatar-carousel]"),
       avatarFileInput: document.querySelector("[data-avatar-file-input]"),
+      avatarUploadButton: document.querySelector("[data-action='choose-custom-avatar']"),
+      avatarUploadPlaceholder: document.querySelector("[data-avatar-upload-placeholder]"),
+      avatarUploadPreview: document.querySelector("[data-avatar-upload-preview]"),
       avatarCropper: document.querySelector("[data-avatar-cropper]"),
       avatarCropCanvas: document.querySelector("[data-avatar-crop-canvas]"),
       avatarZoom: document.querySelector("[data-avatar-zoom]"),
@@ -107,6 +110,8 @@ export class AppView extends Emitter {
     this.avatarOptionsRendered = false;
     this.customAvatarImage = null;
     this.customAvatarObjectUrl = "";
+    this.customAvatarCropOffset = { x: 0, y: 0 };
+    this.customAvatarDrag = null;
     this.peerRenderSignature = "";
     this.receivedRenderSignature = "";
     this.chatRenderSignature = "";
@@ -125,6 +130,7 @@ export class AppView extends Emitter {
     this.dynamicIsland.on("fallback", () => this.emit("island-fallback"));
     this.preloadCriticalAssets();
     this.bindEvents();
+    this.bindCustomAvatarCrop();
     this.bindViewportEvents();
     this.bindSwipeControls();
     store.subscribe((state) => this.render(state));
@@ -196,6 +202,49 @@ export class AppView extends Emitter {
       }
       if (event.key === "Tab") this.trapSheetFocus(event, sheet);
     });
+  }
+
+  bindCustomAvatarCrop() {
+    const canvas = this.nodes.avatarCropCanvas;
+    if (!canvas) return;
+    canvas.addEventListener("pointerdown", (event) => {
+      if (!this.customAvatarImage) return;
+      event.preventDefault();
+      this.customAvatarDrag = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: this.customAvatarCropOffset.x,
+        originY: this.customAvatarCropOffset.y
+      };
+      canvas.classList.add("is-dragging");
+      canvas.setPointerCapture?.(event.pointerId);
+    });
+    canvas.addEventListener("pointermove", (event) => {
+      const drag = this.customAvatarDrag;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      event.preventDefault();
+      const bounds = canvas.getBoundingClientRect();
+      const scale = bounds.width ? canvas.width / bounds.width : 1;
+      this.customAvatarCropOffset = {
+        x: drag.originX + (event.clientX - drag.startX) * scale,
+        y: drag.originY + (event.clientY - drag.startY) * scale
+      };
+      this.drawCustomAvatarCrop();
+    });
+    const endDrag = (event) => {
+      if (!this.customAvatarDrag || this.customAvatarDrag.pointerId !== event.pointerId) return;
+      this.customAvatarDrag = null;
+      canvas.classList.remove("is-dragging");
+      try {
+        canvas.releasePointerCapture?.(event.pointerId);
+      } catch {
+        // Pointer capture can already be released when the sheet closes.
+      }
+    };
+    canvas.addEventListener("pointerup", endDrag);
+    canvas.addEventListener("pointercancel", endDrag);
+    canvas.addEventListener("lostpointercapture", endDrag);
   }
 
   bindViewportEvents() {
@@ -669,6 +718,16 @@ export class AppView extends Emitter {
   }
 
   renderAvatarSettings(state) {
+    const customAvatarSelected = state.self.avatar?.startsWith("data:image/");
+    if (this.nodes.avatarUploadPreview) {
+      this.nodes.avatarUploadPreview.hidden = !customAvatarSelected;
+      if (customAvatarSelected && this.nodes.avatarUploadPreview.src !== state.self.avatar) {
+        this.nodes.avatarUploadPreview.src = state.self.avatar;
+      }
+    }
+    if (this.nodes.avatarUploadPlaceholder) this.nodes.avatarUploadPlaceholder.hidden = customAvatarSelected;
+    this.nodes.avatarUploadButton?.classList.toggle("is-selected", customAvatarSelected);
+    this.nodes.avatarUploadButton?.setAttribute("aria-pressed", String(customAvatarSelected));
     this.nodes.avatarCarousel.querySelectorAll("[data-avatar]").forEach((button) => {
       const optionNumber = Number(button.dataset.avatar.match(/(\d+)\.png$/)?.[1] || 1);
       button.setAttribute("aria-label", this.translate("chooseProfileIcon", { number: optionNumber }));
@@ -1162,6 +1221,7 @@ export class AppView extends Emitter {
     image.onload = () => {
       this.customAvatarImage = image;
       this.customAvatarObjectUrl = url;
+      this.customAvatarCropOffset = { x: 0, y: 0 };
       if (this.nodes.avatarZoom) this.nodes.avatarZoom.value = "1";
       if (this.nodes.avatarCropper) this.nodes.avatarCropper.hidden = false;
       this.drawCustomAvatarCrop();
@@ -1180,12 +1240,17 @@ export class AppView extends Emitter {
     const context = canvas.getContext("2d");
     if (!context) return;
     const size = canvas.width;
-    const zoom = Math.max(1, Math.min(2.6, Number(this.nodes.avatarZoom?.value || 1)));
+    const zoom = Math.max(1, Math.min(3, Number(this.nodes.avatarZoom?.value || 1)));
     const coverScale = Math.max(size / image.naturalWidth, size / image.naturalHeight) * zoom;
     const width = image.naturalWidth * coverScale;
     const height = image.naturalHeight * coverScale;
-    const x = (size - width) / 2;
-    const y = (size - height) / 2;
+    const maxOffsetX = Math.max(0, (width - size) / 2);
+    const maxOffsetY = Math.max(0, (height - size) / 2);
+    const offsetX = Math.max(-maxOffsetX, Math.min(maxOffsetX, this.customAvatarCropOffset.x));
+    const offsetY = Math.max(-maxOffsetY, Math.min(maxOffsetY, this.customAvatarCropOffset.y));
+    this.customAvatarCropOffset = { x: offsetX, y: offsetY };
+    const x = (size - width) / 2 + offsetX;
+    const y = (size - height) / 2 + offsetY;
     context.clearRect(0, 0, size, size);
     context.fillStyle = "#eef2f7";
     context.fillRect(0, 0, size, size);
@@ -1196,7 +1261,11 @@ export class AppView extends Emitter {
     const canvas = this.nodes.avatarCropCanvas;
     if (!canvas || !this.customAvatarImage) return;
     try {
-      const avatar = canvas.toDataURL("image/jpeg", 0.82);
+      const output = this.document.createElement("canvas");
+      output.width = 128;
+      output.height = 128;
+      output.getContext("2d")?.drawImage(canvas, 0, 0, output.width, output.height);
+      const avatar = output.toDataURL("image/jpeg", 0.8);
       this.cancelCustomAvatar();
       this.emit("select-avatar", avatar);
       this.toast(this.translate("profilePhotoSaved"));
@@ -1207,6 +1276,8 @@ export class AppView extends Emitter {
 
   cancelCustomAvatar() {
     this.customAvatarImage = null;
+    this.customAvatarCropOffset = { x: 0, y: 0 };
+    this.customAvatarDrag = null;
     if (this.nodes.avatarCropper) this.nodes.avatarCropper.hidden = true;
     this.releaseCustomAvatarObjectUrl();
   }

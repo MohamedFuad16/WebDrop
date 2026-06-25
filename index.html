@@ -273,25 +273,35 @@
             <strong data-i18n="profileIcon">Profile icon</strong>
             <span data-i18n="swipeChoose">Swipe and tap to choose</span>
           </div>
-          <div class="avatar-upload">
-            <button class="avatar-upload__button" type="button" data-action="choose-custom-avatar">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v10M7 10l5-5 5 5"></path><path d="M5 18h14"></path></svg>
-              <span data-i18n="uploadProfilePhoto">Upload photo</span>
+          <div class="avatar-picker">
+            <button class="avatar-upload__button" type="button" data-action="choose-custom-avatar" aria-label="Upload photo" data-i18n-aria="uploadProfilePhoto">
+              <span class="avatar-upload__placeholder" data-avatar-upload-placeholder aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.25"></circle><path d="M5.5 19c.6-4 2.8-6 6.5-6s5.9 2 6.5 6"></path></svg>
+              </span>
+              <img data-avatar-upload-preview alt="" hidden>
+              <span class="avatar-upload__badge" aria-hidden="true">
+                <svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"></path></svg>
+              </span>
             </button>
             <input data-avatar-file-input type="file" accept="image/*" hidden>
-            <div class="avatar-cropper" data-avatar-cropper hidden>
-              <canvas data-avatar-crop-canvas width="128" height="128" aria-label="Profile photo crop preview" data-i18n-aria="profilePhotoPreview"></canvas>
-              <label>
-                <span data-i18n="photoZoom">Zoom</span>
-                <input data-avatar-zoom type="range" min="1" max="2.6" step="0.05" value="1">
-              </label>
-              <div class="avatar-cropper__actions">
-                <button type="button" data-action="apply-custom-avatar" data-i18n="setProfilePhoto">Set photo</button>
-                <button type="button" data-action="cancel-custom-avatar" data-i18n="cancel">Cancel</button>
-              </div>
+            <div class="avatar-carousel" data-avatar-carousel role="group" aria-label="Profile icons" data-i18n-aria="profileIcons"></div>
+          </div>
+          <div class="avatar-cropper" data-avatar-cropper hidden>
+            <div class="avatar-cropper__preview">
+              <canvas data-avatar-crop-canvas width="256" height="256" aria-label="Profile photo crop preview" data-i18n-aria="profilePhotoPreview"></canvas>
+            </div>
+            <p data-i18n="photoReposition">Drag the photo to reposition it</p>
+            <label class="avatar-cropper__zoom">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"></circle><path d="m13 13 4 4M6.5 9h5"></path></svg>
+              <span class="sr-only" data-i18n="photoZoom">Zoom</span>
+              <input data-avatar-zoom type="range" min="1" max="3" step="0.02" value="1" aria-label="Zoom" data-i18n-aria="photoZoom">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"></circle><path d="m13 13 4 4M6.5 9h5M9 6.5v5"></path></svg>
+            </label>
+            <div class="avatar-cropper__actions">
+              <button class="sheet-primary avatar-cropper__apply" type="button" data-action="apply-custom-avatar" data-i18n="setProfilePhoto">Set photo</button>
+              <button class="avatar-cropper__cancel" type="button" data-action="cancel-custom-avatar" data-i18n="cancel">Cancel</button>
             </div>
           </div>
-          <div class="avatar-carousel" data-avatar-carousel role="group" aria-label="Profile icons" data-i18n-aria="profileIcons"></div>
         </div>
         <div class="ring-setting">
           <div class="setting-heading">
@@ -324,7 +334,7 @@
         </button>
         <div class="app-version">
           <span data-i18n="appVersion">App version</span>
-          <strong>1.0.85</strong>
+          <strong>1.0.86</strong>
         </div>
       </section>
 
@@ -448,8 +458,8 @@
       <input data-file-input type="file" multiple hidden>
     </div>
 
-    <script src="js/vendor/jsqr.js?v=1.0.85"></script>
-    <script src="js/config/runtime-config.js?v=1.0.85"></script>
-    <script type="module" src="js/app.js?v=1.0.85"></script>
+    <script src="js/vendor/jsqr.js?v=1.0.86"></script>
+    <script src="js/config/runtime-config.js?v=1.0.86"></script>
+    <script type="module" src="js/app.js?v=1.0.86"></script>
   </body>
 </html>

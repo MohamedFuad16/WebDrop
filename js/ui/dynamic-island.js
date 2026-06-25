@@ -1,9 +1,9 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.85";
-import { Emitter } from "../utils/emitter.js?v=1.0.85";
-import { formatBytes } from "../utils/format.js?v=1.0.85";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.85";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.85";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.85";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.86";
+import { Emitter } from "../utils/emitter.js?v=1.0.86";
+import { formatBytes } from "../utils/format.js?v=1.0.86";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.86";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.86";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.86";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {

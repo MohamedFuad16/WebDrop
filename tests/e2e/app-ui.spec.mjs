@@ -156,10 +156,21 @@ test("uploads and crops a custom profile photo", async ({ page }) => {
 
   await expect(page.locator("[data-avatar-cropper]")).toBeVisible();
   await page.locator("[data-avatar-zoom]").fill("1.4");
+  const cropCanvas = page.locator("[data-avatar-crop-canvas]");
+  const beforeDrag = await cropCanvas.evaluate((canvas) => canvas.toDataURL());
+  const cropBox = await cropCanvas.boundingBox();
+  await page.mouse.move(cropBox.x + cropBox.width / 2, cropBox.y + cropBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(cropBox.x + cropBox.width / 2 + 38, cropBox.y + cropBox.height / 2);
+  await page.mouse.up();
+  const afterDrag = await cropCanvas.evaluate((canvas) => canvas.toDataURL());
+  expect(afterDrag).not.toBe(beforeDrag);
   await page.locator('[data-action="apply-custom-avatar"]').click();
 
   await expect(page.locator("[data-avatar-cropper]")).toBeHidden();
   await expect(page.locator("[data-self-avatar-image] img")).toHaveAttribute("src", /^data:image\/jpeg;base64,/);
+  await expect(page.locator("[data-avatar-upload-preview]")).toBeVisible();
+  await expect(page.locator("[data-action='choose-custom-avatar']")).toHaveClass(/is-selected/);
 });
 
 test("keeps Japanese QR instructions fully visible at 320 CSS pixels", async ({ page }) => {

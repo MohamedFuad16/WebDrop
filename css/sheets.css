@@ -8,6 +8,16 @@
   transition: opacity var(--motion-backdrop-out) linear;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
 .sheet-backdrop.is-open {
   opacity: 1;
   transition-duration: var(--motion-backdrop-in);
@@ -962,90 +972,200 @@
 }
 
 .avatar-carousel {
-  width: min(100%, 281px);
+  min-width: 0;
   display: flex;
   gap: 13px;
   overflow-x: auto;
-  margin-inline: auto;
-  padding: 8px 5px 12px;
+  padding: 8px 5px 12px 3px;
   scroll-padding-inline: 5px;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   touch-action: pan-x;
 }
 
-.avatar-upload {
+.avatar-picker {
+  width: min(100%, 354px);
   display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: start;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-inline: auto;
 }
 
 .avatar-upload__button {
-  min-height: 44px;
-  display: inline-flex;
+  position: relative;
+  width: 58px;
+  height: 58px;
+  display: grid;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  padding: 0 14px;
-  border-color: color-mix(in srgb, var(--blue) 28%, var(--line));
+  margin-top: 8px;
+  padding: 2px;
+  overflow: visible;
+  border: 0;
+  border-radius: 50%;
   color: var(--blue);
-  background: color-mix(in srgb, var(--blue) 8%, var(--panel-solid));
-  font-size: 13px;
-  font-weight: 750;
+  background: color-mix(in srgb, var(--blue) 10%, var(--panel-solid));
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--ink) 9%, transparent);
+  cursor: pointer;
 }
 
-.avatar-upload__button svg {
-  width: 18px;
-  height: 18px;
+.avatar-upload__button::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border: 3px solid transparent;
+  border-radius: inherit;
+  transition: border-color .18s ease, transform .18s ease;
+}
+
+.avatar-upload__button.is-selected::after {
+  border-color: var(--blue);
+  transform: scale(1.03);
+}
+
+.avatar-upload__placeholder,
+.avatar-upload__button > img {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.avatar-upload__placeholder svg {
+  width: 29px;
+  height: 29px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.avatar-upload__button > img {
+  object-fit: cover;
+}
+
+.avatar-upload__badge {
+  position: absolute;
+  z-index: 2;
+  right: -4px;
+  bottom: -3px;
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--panel-solid);
+  border-radius: 50%;
+  color: #fff;
+  background: var(--blue);
+  box-shadow: 0 5px 12px rgba(52, 125, 245, .28);
+}
+
+.avatar-upload__badge svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
 }
 
 .avatar-cropper {
   display: grid;
   justify-items: center;
-  gap: 10px;
-  padding: 12px;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 16px;
   border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--panel-solid);
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--panel-solid) 92%, transparent);
 }
 
 .avatar-cropper[hidden] {
   display: none;
 }
 
-.avatar-cropper canvas {
-  width: 112px;
-  height: 112px;
-  border: 4px solid #fff;
+.avatar-cropper__preview {
+  padding: 5px;
   border-radius: 50%;
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--ink) 14%, transparent);
+  background: linear-gradient(145deg, #fff, color-mix(in srgb, var(--blue) 28%, #fff));
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--ink) 16%, transparent);
 }
 
-.avatar-cropper label {
-  width: min(100%, 230px);
-  display: grid;
-  gap: 5px;
+.avatar-cropper canvas {
+  width: 176px;
+  height: 176px;
+  display: block;
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.avatar-cropper canvas.is-dragging {
+  cursor: grabbing;
+}
+
+.avatar-cropper > p {
+  margin: -1px 0 0;
   color: var(--ink-muted);
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 620;
+  text-align: center;
 }
 
-.avatar-cropper input[type="range"] {
+.avatar-cropper__zoom {
+  width: min(100%, 290px);
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-muted);
+}
+
+.avatar-cropper__zoom svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.avatar-cropper__zoom input[type="range"] {
+  height: 28px;
   width: 100%;
+  accent-color: var(--blue);
+  cursor: pointer;
 }
 
 .avatar-cropper__actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  width: min(100%, 230px);
+  gap: 10px;
+  width: min(100%, 290px);
 }
 
 .avatar-cropper__actions button {
-  min-height: 38px;
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 720;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 17px;
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.avatar-cropper__apply.sheet-primary {
+  min-height: 48px;
+}
+
+.avatar-cropper__cancel {
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: var(--card-shadow);
 }
 
 .avatar-carousel::-webkit-scrollbar {
