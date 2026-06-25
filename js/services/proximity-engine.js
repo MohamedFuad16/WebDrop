@@ -1,8 +1,9 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.83";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.83";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.83";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.84";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.84";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.84";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
+export const BUMP_SCORE_POINTS = 20;
 const ACOUSTIC_SLOT_GUARD_MS = 80;
 const ACOUSTIC_MIN_SLOT_MS = 520;
 const ACOUSTIC_GRACE_LISTEN_MS = 1600;
@@ -618,7 +619,7 @@ export function proximityScore(metrics) {
   const bump = metricValue(metrics.bump);
   const tilt = metricValue(metrics.tilt);
   const qr = metricValue(metrics.qrMatch ?? metrics.qrFallback);
-  return Math.round((sound * 34 + motion * 26 + bump * 10 + tilt * 12 + qr * 8) * 10) / 10;
+  return Math.round((sound * 34 + motion * 26 + bump * BUMP_SCORE_POINTS + tilt * 12 + qr * 8) * 10) / 10;
 }
 
 function metricValue(value) {

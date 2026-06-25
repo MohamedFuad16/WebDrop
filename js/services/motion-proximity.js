@@ -1,7 +1,9 @@
+export const BUMP_ACCELERATION_THRESHOLD = 10;
+
 export class MotionProximitySensor {
   constructor({
     target = globalThis,
-    bumpThreshold = 14,
+    bumpThreshold = BUMP_ACCELERATION_THRESHOLD,
     gravityBumpThreshold = 3.5,
     tiltThreshold = 30,
     now = () => Date.now()

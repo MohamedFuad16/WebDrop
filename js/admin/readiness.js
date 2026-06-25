@@ -1,8 +1,8 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.83";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.83";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.83";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.84";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.84";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.84";
 
-const APP_VERSION = "1.0.83";
+const APP_VERSION = "1.0.84";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -121,7 +121,7 @@ const ADMIN_MESSAGES = {
     emittedPacketExpected: "Should be yes during active monitoring.",
     bumpEvidence: "Bump evidence",
     bumpEvidenceMeaning: "Latest physical bump signal from a proximity attempt.",
-    bumpEvidenceExpected: "Good when bump score is 10 or more for this test build.",
+    bumpEvidenceExpected: "Raw bump value 10 or more awards 20 score points.",
     tiltEvidence: "Tilt evidence",
     tiltEvidenceMeaning: "Latest tilt angle from the selected phone.",
     tiltEvidenceExpected: "Must be strictly above 30 degrees.",
@@ -267,7 +267,7 @@ const ADMIN_MESSAGES = {
     emittedPacketExpected: "監視中は Yes が期待値です。",
     bumpEvidence: "バンプ証拠",
     bumpEvidenceMeaning: "直近の近接試行から得たバンプ信号。",
-    bumpEvidenceExpected: "このテスト版ではバンプスコア 10 以上で良好。",
+    bumpEvidenceExpected: "生のバンプ値が10以上の場合、スコアに20点加算。",
     tiltEvidence: "傾き証拠",
     tiltEvidenceMeaning: "選択端末の直近の傾き角度。",
     tiltEvidenceExpected: "30 度を厳密に超える必要があります。",
@@ -861,8 +861,12 @@ function renderMetricRows(telemetry = state.monitorTelemetry || latestMonitorTel
       name: i18n.t("bumpEvidence"),
       meaning: i18n.t("bumpEvidenceMeaning"),
       expected: i18n.t("bumpEvidenceExpected"),
-      value: Number.isFinite(bump) ? (bump > 1 ? formatNumber(bump, 1) : `+${Math.round(bump * 20)}`) : i18n.t("unknown"),
-      tone: Number.isFinite(bump) ? (bump >= 0.5 || bump >= 10 ? "good" : "bad") : "idle"
+      value: telemetry?.bumpDetected
+        ? `+${Math.round(Number(telemetry.bumpPoints || 20))} (raw ${formatNumber(telemetry.maxAcceleration, 1)})`
+        : Number.isFinite(telemetry?.maxAcceleration)
+          ? `raw ${formatNumber(telemetry.maxAcceleration, 1)}`
+          : i18n.t("unknown"),
+      tone: telemetry?.bumpDetected || Number(telemetry?.maxAcceleration) >= 10 ? "good" : telemetry ? "bad" : "idle"
     },
     {
       name: i18n.t("tiltEvidence"),

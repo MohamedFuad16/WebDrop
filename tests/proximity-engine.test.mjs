@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ProximityEngine, PROXIMITY_SCORE_MINIMUM, proximityScore } from "../js/services/proximity-engine.js";
+import {
+  BUMP_SCORE_POINTS,
+  ProximityEngine,
+  PROXIMITY_SCORE_MINIMUM,
+  proximityScore
+} from "../js/services/proximity-engine.js";
 import {
   AcousticProximitySensor,
   analyzeFrequencyBand,
@@ -11,7 +16,11 @@ import {
   MIN_INAUDIBLE_FREQUENCY_HZ,
   supportsInaudibleChirp
 } from "../js/services/acoustic-proximity.js";
-import { exceedsTiltThreshold, MotionProximitySensor } from "../js/services/motion-proximity.js";
+import {
+  BUMP_ACCELERATION_THRESHOLD,
+  exceedsTiltThreshold,
+  MotionProximitySensor
+} from "../js/services/motion-proximity.js";
 
 test("physical proximity uses a minimum score of 55", () => {
   assert.equal(proximityScore({
@@ -20,7 +29,7 @@ test("physical proximity uses a minimum score of 55", () => {
     bump: true,
     tilt: true,
     qrFallback: false
-  }), 82);
+  }), 92);
 
   assert.equal(proximityScore({
     soundCorrelation: 1,
@@ -28,8 +37,34 @@ test("physical proximity uses a minimum score of 55", () => {
     bump: true,
     tilt: false,
     qrFallback: false
-  }), 70);
+  }), 80);
+  assert.equal(BUMP_SCORE_POINTS, 20);
   assert.equal(PROXIMITY_SCORE_MINIMUM, 55);
+});
+
+test("a raw acceleration value of 10 awards the full 20 bump points", async () => {
+  const listeners = new Map();
+  const target = {
+    DeviceMotionEvent: {},
+    addEventListener(type, listener) {
+      listeners.set(type, listener);
+    },
+    removeEventListener(type) {
+      listeners.delete(type);
+    }
+  };
+  const sensor = new MotionProximitySensor({ target });
+  await sensor.requestPermission();
+  sensor.startCapture();
+
+  listeners.get("devicemotion")({
+    acceleration: { x: BUMP_ACCELERATION_THRESHOLD, y: 0, z: 0 },
+    accelerationIncludingGravity: { x: 0, y: 0, z: 9.8 }
+  });
+
+  const snapshot = sensor.getSnapshot();
+  assert.equal(snapshot.bump, true);
+  assert.equal(proximityScore({ bump: snapshot.bump }), BUMP_SCORE_POINTS);
 });
 
 test("tilt must be strictly greater than 30 degrees", () => {

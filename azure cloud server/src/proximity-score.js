@@ -1,7 +1,7 @@
 const DEFAULT_WEIGHTS = Object.freeze({
   sound: 0.34,
   motion: 0.26,
-  bump: 0.1,
+  bump: 0.2,
   tilt: 0.12,
   qr: 0.08
 });

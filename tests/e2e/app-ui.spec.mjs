@@ -61,13 +61,14 @@ test("emitted chirp reaches and is recognized by a second acoustic sensor", asyn
       mediaDevices: { getUserMedia: async () => link.stream }
     });
     const permission = await receiver.requestMicrophonePermission();
+    await receiver.sampleFrequencyBand();
     const detectionPromise = receiver.detectChirp({
       timeoutMs: 1800,
       pollIntervalMs: 12,
       requiredBandHits: 1,
       threshold: 0.24
     });
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await new Promise((resolve) => setTimeout(resolve, 80));
     const emitted = await sender.emitChirp();
     const detected = await detectionPromise;
     receiver.stopCapture();

@@ -163,7 +163,7 @@ test("admin acoustic monitor payloads are bounded for live diagnostics", () => {
   assert.equal(telemetry.payload.marginDb, 11.5);
   assert.equal(telemetry.payload.confidence, 1);
   assert.equal(telemetry.payload.bumpDetected, true);
-  assert.equal(telemetry.payload.bumpPoints, 10);
+  assert.equal(telemetry.payload.bumpPoints, 14);
   assert.equal(telemetry.payload.tiltDetected, true);
   assert.equal(telemetry.payload.tiltDegrees, 32.4);
   assert.equal(telemetry.payload.motionSamples, 84);

@@ -81,7 +81,7 @@ test("proximity failure reports missing acoustics before low score when audio is
   hub.failUnmatchedProximitySession(session.id);
 
   const failure = messagesOf(clientA, "proximity:session:failed")[0];
-  assert.ok(Math.abs(failure.payload.score - (0.48 / 0.9)) < 0.000001);
+  assert.ok(Math.abs(failure.payload.score - 0.58) < 0.000001);
   assert.equal(failure.payload.reason, "acoustic_not_detected");
 
   hub.close();
@@ -363,7 +363,7 @@ test("admin monitor routes continuous acoustic telemetry from a selected device"
       marginDb: 9.4,
       confidence: 0.42,
       bumpDetected: true,
-      bumpPoints: 10,
+      bumpPoints: 20,
       tiltDetected: true,
       tiltDegrees: 34,
       motionSamples: 72,
@@ -386,7 +386,7 @@ test("admin monitor routes continuous acoustic telemetry from a selected device"
   assert.equal(telemetry.deviceFamily, "android");
   assert.equal(telemetry.detected, true);
   assert.equal(telemetry.marginDb, 9.4);
-  assert.equal(telemetry.bumpPoints, 10);
+  assert.equal(telemetry.bumpPoints, 20);
   assert.equal(telemetry.tiltDegrees, 34);
   assert.equal(telemetry.motionSamples, 72);
   assert.equal(telemetry.bands.length, 1);

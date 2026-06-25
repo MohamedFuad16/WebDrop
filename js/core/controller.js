@@ -1,4 +1,5 @@
-import { formatBytes } from "../utils/format.js?v=1.0.83";
+import { formatBytes } from "../utils/format.js?v=1.0.84";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.84";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -464,7 +465,7 @@ export function createController({
         confidence: sample.confidence,
         bands: sampled.bands.slice(1),
         bumpDetected: Boolean(motion.bump),
-        bumpPoints: motion.bump ? 10 : 0,
+        bumpPoints: motion.bump ? BUMP_SCORE_POINTS : 0,
         tiltDetected: Boolean(motion.tilted),
         tiltDegrees,
         motionSamples: Number(motion.samples || 0),

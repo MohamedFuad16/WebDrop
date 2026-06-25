@@ -329,7 +329,7 @@ export function validateRoutedMessage(message) {
         marginDb: safeNumber(payload.marginDb),
         confidence: scoreMetric(payload.confidence),
         bumpDetected: Boolean(payload.bumpDetected),
-        bumpPoints: clampNumber(payload.bumpPoints, 0, 10, 0),
+        bumpPoints: clampNumber(payload.bumpPoints, 0, 20, 0),
         tiltDetected: Boolean(payload.tiltDetected),
         tiltDegrees: clampNumber(payload.tiltDegrees, 0, 180, 0),
         motionSamples: safeInteger(payload.motionSamples, 0),
