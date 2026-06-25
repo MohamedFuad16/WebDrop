@@ -473,6 +473,12 @@ export class SignalingHub {
       endFrequencyHz: message.payload.endFrequencyHz,
       sampleRate: message.payload.sampleRate,
       bands: message.payload.bands,
+      bumpDetected: message.payload.bumpDetected,
+      bumpPoints: message.payload.bumpPoints,
+      tiltDetected: message.payload.tiltDetected,
+      tiltDegrees: message.payload.tiltDegrees,
+      motionSamples: message.payload.motionSamples,
+      maxAcceleration: message.payload.maxAcceleration,
       reason: message.payload.reason
     });
   }

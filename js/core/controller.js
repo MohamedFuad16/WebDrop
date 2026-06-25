@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.80";
+import { formatBytes } from "../utils/format.js?v=1.0.81";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -40,6 +40,8 @@ export function createController({
   let permissionRequestPromise = null;
   let suppressDisconnectToast = false;
   let adminMonitor = null;
+  let pendingAdminMonitor = null;
+  let adminMonitorRetryTimer = 0;
   const storedPermissions = readStoredPermissions();
   proximity.restoreMotionPermission?.(storedPermissions.motion);
   globalThis.addEventListener?.("pagehide", () => proximity.close?.(), { once: true });
@@ -78,6 +80,7 @@ export function createController({
   signaling.on("disconnected", () => {
     if (!runtime.productionSignaling) return;
     stopAdminAcousticMonitor();
+    pendingAdminMonitor = null;
     const wasOnline = store.getState().signalingStatus === "online";
     transport.close?.();
     cancelPendingTransferPatch();
@@ -303,7 +306,7 @@ export function createController({
   });
 
   signaling.on("admin:monitor:start", (payload = {}) => {
-    startAdminAcousticMonitor(payload);
+    armAdminAcousticMonitor(payload);
   });
 
   signaling.on("admin:monitor:stop", (payload = {}) => {
@@ -346,33 +349,51 @@ export function createController({
     suppressDisconnectToast = false;
   });
 
-  async function startAdminAcousticMonitor(payload) {
+  function armAdminAcousticMonitor(payload) {
     stopAdminAcousticMonitor();
+    pendingAdminMonitor = payload;
+    tryStartAdminAcousticMonitor();
+  }
+
+  function tryStartAdminAcousticMonitor() {
+    const payload = pendingAdminMonitor;
+    if (!payload) return false;
     const monitorId = payload.monitorId;
     const adminId = payload.adminId;
-    if (!monitorId || !adminId) return;
+    if (!monitorId || !adminId) {
+      pendingAdminMonitor = null;
+      return false;
+    }
     const state = store.getState();
     const status = proximity.getAcousticStatus?.() || {};
     if (state.mode === "verifying") {
       signaling.sendAdminMonitorTelemetry?.(adminId, {
         monitorId,
-        status: "blocked",
+        status: "waiting",
         reason: "proximity-ceremony-active",
         sampledAt: Date.now()
       });
-      return;
+      view.toast(view.translate("diagnosticWaitingForCeremony"));
+      globalThis.clearTimeout(adminMonitorRetryTimer);
+      adminMonitorRetryTimer = globalThis.setTimeout(() => tryStartAdminAcousticMonitor(), 500);
+      return false;
     }
-    if (!status.streamActive || status.contextState !== "running") {
+    const motionCapture = proximity.startMotionCapture?.() || {};
+    if (!status.streamActive || status.contextState !== "running" || !motionCapture.started) {
+      proximity.stopMotionCapture?.();
       signaling.sendAdminMonitorTelemetry?.(adminId, {
         monitorId,
-        status: "blocked",
-        reason: "audio-not-ready",
+        status: "waiting",
+        reason: "device-tap-required",
         contextState: status.contextState,
         sampleRate: status.sampleRate,
         sampledAt: Date.now()
       });
-      return;
+      view.toast(view.translate("diagnosticTapConnect"));
+      return false;
     }
+    proximity.resetMotionCapture?.();
+    proximity.startMotionCapture?.();
     adminMonitor = {
       monitorId,
       adminId,
@@ -384,7 +405,12 @@ export function createController({
       timer: 0,
       stopped: false
     };
+    pendingAdminMonitor = null;
+    globalThis.clearTimeout(adminMonitorRetryTimer);
+    adminMonitorRetryTimer = 0;
+    view.toast(view.translate("diagnosticStarted"));
     runAdminAcousticMonitorTick(adminMonitor);
+    return true;
   }
 
   async function runAdminAcousticMonitorTick(monitor) {
@@ -417,6 +443,8 @@ export function createController({
       emitted = await emission || emitted;
       const sampled = strongestAdminMonitorSnapshot(snapshots, monitorBands.length);
       const sample = sampled.bands[0] || {};
+      const motion = proximity.getSnapshot?.().motion || {};
+      const tiltDegrees = maximumTiltDegrees(motion.tilt);
       signaling.sendAdminMonitorTelemetry?.(monitor.adminId, {
         monitorId: monitor.monitorId,
         status: sampled.available ? "active" : "blocked",
@@ -433,7 +461,13 @@ export function createController({
         noiseDb: sample.noiseDb,
         marginDb: sample.marginDb,
         confidence: sample.confidence,
-        bands: sampled.bands.slice(1)
+        bands: sampled.bands.slice(1),
+        bumpDetected: Boolean(motion.bump),
+        bumpPoints: motion.bump ? 10 : 0,
+        tiltDetected: Boolean(motion.tilted),
+        tiltDegrees,
+        motionSamples: Number(motion.samples || 0),
+        maxAcceleration: Number(motion.maxAcceleration || 0)
       });
     } catch (error) {
       signaling.sendAdminMonitorTelemetry?.(monitor.adminId, {
@@ -488,10 +522,20 @@ export function createController({
   }
 
   function stopAdminAcousticMonitor(monitorId) {
+    globalThis.clearTimeout(adminMonitorRetryTimer);
+    adminMonitorRetryTimer = 0;
+    if (pendingAdminMonitor && (!monitorId || pendingAdminMonitor.monitorId === monitorId)) {
+      pendingAdminMonitor = null;
+    }
     if (!adminMonitor || (monitorId && adminMonitor.monitorId !== monitorId)) return;
     adminMonitor.stopped = true;
     globalThis.clearTimeout(adminMonitor.timer);
     adminMonitor = null;
+    proximity.stopMotionCapture?.();
+  }
+
+  function maximumTiltDegrees(tilt = {}) {
+    return Math.max(Math.abs(Number(tilt.beta || 0)), Math.abs(Number(tilt.gamma || 0)));
   }
 
   transfer.on?.("receive-ready", ({ transferId, manifest }) => {
@@ -688,6 +732,18 @@ export function createController({
   });
 
   function startNearbyConnectionFromUi() {
+    if (pendingAdminMonitor) {
+      ensureProximityPermissions().then(() => {
+        if (!tryStartAdminAcousticMonitor()) {
+          view.toast(view.translate("diagnosticPermissionFailed"));
+        }
+      });
+      return;
+    }
+    if (adminMonitor) {
+      view.toast(view.translate("diagnosticAlreadyRunning"));
+      return;
+    }
     const { connectedPeerId, mode } = store.getState();
     if (mode === "verifying" || mode === "disconnecting") {
       view.toast(view.translate(mode === "verifying" ? "verifying" : "disconnecting"));
@@ -1687,6 +1743,9 @@ export function createController({
   function stopProximitySensors() {
     proximity.stopMotionCapture();
     proximity.stopAcousticCapture({ releaseStream: false });
+    if (pendingAdminMonitor) {
+      globalThis.setTimeout(() => tryStartAdminAcousticMonitor(), 180);
+    }
   }
 
   async function establishProductionPairing(peerId) {

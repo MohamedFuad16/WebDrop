@@ -141,6 +141,8 @@ test("folds old diagnostics into live testing and monitors a selected device", a
   await expect(page.locator("[data-monitor-metrics]")).toContainText("42% · Yes");
   await expect(page.locator("[data-monitor-metrics]")).toContainText("9.4 dB");
   await expect(page.locator("[data-monitor-metrics]")).toContainText("48 kHz");
+  await expect(page.locator("[data-monitor-metrics]")).toContainText("10.0");
+  await expect(page.locator("[data-monitor-metrics]")).toContainText("34°");
   await expect(page.locator("[data-frequency-channels] .frequency-channel")).toHaveCount(4);
   await expect(page.locator("[data-frequency-channels]")).toContainText("18 kHz");
   await expect(page.locator("[data-frequency-channels]")).toContainText("19 kHz");
@@ -207,6 +209,12 @@ async function installRuntimeMocks(page) {
               noiseDb: -51.4,
               marginDb: 9.4,
               confidence: 0.42,
+              bumpDetected: true,
+              bumpPoints: 10,
+              tiltDetected: true,
+              tiltDegrees: 34,
+              motionSamples: 72,
+              maxAcceleration: 16.8,
               bands: [{
                 startFrequencyHz: 18000,
                 endFrequencyHz: 18500,

@@ -132,6 +132,12 @@ test("admin acoustic monitor payloads are bounded for live diagnostics", () => {
       noiseDb: -53.5,
       marginDb: 11.5,
       confidence: 2,
+      bumpDetected: true,
+      bumpPoints: 14,
+      tiltDetected: true,
+      tiltDegrees: 32.4,
+      motionSamples: 84,
+      maxAcceleration: 18.2,
       bands: [{
         startFrequencyHz: 18000,
         endFrequencyHz: 18500,
@@ -156,6 +162,12 @@ test("admin acoustic monitor payloads are bounded for live diagnostics", () => {
   assert.equal(telemetry.payload.noiseDb, -53.5);
   assert.equal(telemetry.payload.marginDb, 11.5);
   assert.equal(telemetry.payload.confidence, 1);
+  assert.equal(telemetry.payload.bumpDetected, true);
+  assert.equal(telemetry.payload.bumpPoints, 10);
+  assert.equal(telemetry.payload.tiltDetected, true);
+  assert.equal(telemetry.payload.tiltDegrees, 32.4);
+  assert.equal(telemetry.payload.motionSamples, 84);
+  assert.equal(telemetry.payload.maxAcceleration, 18.2);
   assert.equal(telemetry.payload.bands.length, 2);
   assert.deepEqual(telemetry.payload.bands[1], {
     startFrequencyHz: 18500,

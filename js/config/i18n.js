@@ -250,6 +250,11 @@ const MESSAGES = {
     qrCancelled: "QR verification cancelled.",
     signalingLost: "The signaling connection was interrupted. Reconnecting...",
     signalingUnavailable: "The nearby service is unavailable. WebDrop will keep trying to reconnect.",
+    diagnosticTapConnect: "Live diagnostics are armed. Tap Connect once to enable microphone, speaker, and motion.",
+    diagnosticWaitingForCeremony: "Live diagnostics will begin when the current nearby test finishes.",
+    diagnosticStarted: "Live single-device diagnostics started.",
+    diagnosticPermissionFailed: "Live diagnostics still need microphone, speaker, and motion permission.",
+    diagnosticAlreadyRunning: "Live diagnostics are already running on this device.",
     connectionRejected: "The nearby connection could not be confirmed.",
     inviteDeclined: "Connection request declined.",
     inviteDeclinedBusy: "Declined {name}; this device is already busy."
@@ -505,6 +510,11 @@ const MESSAGES = {
     qrCancelled: "QR確認をキャンセルしました。",
     signalingLost: "シグナリング接続が中断されました。再接続しています...",
     signalingUnavailable: "近接サービスを利用できません。WebDropは再接続を続けます。",
+    diagnosticTapConnect: "ライブ診断の準備ができました。Connect を一度タップして、マイク、スピーカー、モーションを有効にしてください。",
+    diagnosticWaitingForCeremony: "現在の近接テストが終了すると、ライブ診断が開始されます。",
+    diagnosticStarted: "単一デバイスのライブ診断を開始しました。",
+    diagnosticPermissionFailed: "ライブ診断にはマイク、スピーカー、モーションの許可が必要です。",
+    diagnosticAlreadyRunning: "この端末ではライブ診断がすでに実行中です。",
     connectionRejected: "近くの接続を確認できませんでした。",
     inviteDeclined: "接続リクエストを拒否しました。",
     inviteDeclinedBusy: "{name} からのリクエストを拒否しました。この端末は使用中です。"

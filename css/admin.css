@@ -550,6 +550,10 @@
   color: var(--ops-green);
 }
 
+.monitor-status[data-monitor-status="waiting"] {
+  color: var(--ops-amber);
+}
+
 .monitor-status[data-monitor-status="blocked"],
 .monitor-status[data-monitor-status="error"] {
   color: var(--ops-red);

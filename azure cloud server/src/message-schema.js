@@ -328,6 +328,12 @@ export function validateRoutedMessage(message) {
         noiseDb: signedNumber(payload.noiseDb),
         marginDb: safeNumber(payload.marginDb),
         confidence: scoreMetric(payload.confidence),
+        bumpDetected: Boolean(payload.bumpDetected),
+        bumpPoints: clampNumber(payload.bumpPoints, 0, 10, 0),
+        tiltDetected: Boolean(payload.tiltDetected),
+        tiltDegrees: clampNumber(payload.tiltDegrees, 0, 180, 0),
+        motionSamples: safeInteger(payload.motionSamples, 0),
+        maxAcceleration: clampNumber(payload.maxAcceleration, 0, 500, 0),
         bands: (Array.isArray(payload.bands) ? payload.bands : [])
           .slice(0, 8)
           .map((band) => ({

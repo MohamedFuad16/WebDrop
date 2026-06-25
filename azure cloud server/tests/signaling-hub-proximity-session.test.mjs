@@ -360,6 +360,12 @@ test("admin monitor routes continuous acoustic telemetry from a selected device"
       endFrequencyHz: 19400,
       marginDb: 9.4,
       confidence: 0.42,
+      bumpDetected: true,
+      bumpPoints: 10,
+      tiltDetected: true,
+      tiltDegrees: 34,
+      motionSamples: 72,
+      maxAcceleration: 16.8,
       bands: [{
         startFrequencyHz: 18500,
         endFrequencyHz: 19500,
@@ -378,6 +384,9 @@ test("admin monitor routes continuous acoustic telemetry from a selected device"
   assert.equal(telemetry.deviceFamily, "android");
   assert.equal(telemetry.detected, true);
   assert.equal(telemetry.marginDb, 9.4);
+  assert.equal(telemetry.bumpPoints, 10);
+  assert.equal(telemetry.tiltDegrees, 34);
+  assert.equal(telemetry.motionSamples, 72);
   assert.equal(telemetry.bands.length, 1);
   assert.equal(telemetry.bands[0].startFrequencyHz, 18500);
 

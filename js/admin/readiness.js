@@ -1,8 +1,8 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.80";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.80";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.80";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.81";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.81";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.81";
 
-const APP_VERSION = "1.0.80";
+const APP_VERSION = "1.0.81";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -91,6 +91,8 @@ const ADMIN_MESSAGES = {
     ceremonyActive: "That phone is already inside a proximity ceremony. Try again after it finishes.",
     monitorBlocked: "The phone replied but cannot sample audio yet.",
     monitorRunning: "The phone is emitting and listening in the selected ultrasonic band once per second.",
+    monitorWaitingForTap: "The phone is armed. Tap Connect once on that phone to unlock microphone, speaker, and motion. Monitoring starts automatically afterward.",
+    monitorWaitingForCeremony: "Waiting for the phone's current proximity ceremony to finish. Monitoring starts automatically afterward.",
     monitorError: "The phone reported a monitor error.",
     openPhoneHint: "Open WebDrop on a phone, leave this admin tab open, then start monitoring that phone.",
     metric: "Metric",
@@ -231,6 +233,8 @@ const ADMIN_MESSAGES = {
     ceremonyActive: "その端末は近接セレモニー中です。終了後に再試行してください。",
     monitorBlocked: "端末は応答しましたが、まだ音声をサンプリングできません。",
     monitorRunning: "端末は 1 秒ごとに指定した超音波帯で送信と受信を行っています。",
+    monitorWaitingForTap: "端末の準備ができました。その端末で一度 Connect をタップしてマイク、スピーカー、モーションを有効にしてください。その後、監視が自動的に開始されます。",
+    monitorWaitingForCeremony: "端末の現在の近接セレモニーが終了するのを待っています。終了後、監視が自動的に開始されます。",
     monitorError: "端末が監視エラーを返しました。",
     openPhoneHint: "スマホで WebDrop を開き、この管理タブを開いたまま、その端末の監視を開始してください。",
     metric: "指標",
@@ -453,7 +457,10 @@ function handleSocketMessage(raw) {
       detected: message.detected,
       emitted: message.emitted,
       marginDb: message.marginDb,
-      confidence: message.confidence
+      confidence: message.confidence,
+      bumpPoints: message.bumpPoints,
+      tiltDegrees: message.tiltDegrees,
+      motionSamples: message.motionSamples
     });
     updateMonitorExplainerFromTelemetry(message);
     renderMonitor();
@@ -652,7 +659,9 @@ function renderMonitor() {
   const active = state.activeMonitor;
   const telemetry = state.monitorTelemetry;
   const status = active?.status || telemetry?.status || "idle";
-  const normalizedStatus = ["active", "blocked", "error"].includes(status) ? status : status === "starting" ? "active" : "idle";
+  const normalizedStatus = ["active", "waiting", "blocked", "error"].includes(status)
+    ? status
+    : status === "starting" ? "active" : "idle";
   const statusNode = $("[data-monitor-status]");
   statusNode.dataset.monitorStatus = normalizedStatus;
   $("[data-monitor-status-copy]").textContent = i18n.t(normalizedStatus);
@@ -730,17 +739,19 @@ function renderMetricRows() {
   const telemetry = state.monitorTelemetry;
   const sessionEvidence = latestSessionEvidence();
   const eventEvidence = latestEventEvidence();
-  const correlation = firstNumber(sessionEvidence?.acoustic?.correlation, eventEvidence?.acousticCorrelation, telemetry?.confidence);
+  const correlation = firstNumber(telemetry?.confidence, sessionEvidence?.acoustic?.correlation, eventEvidence?.acousticCorrelation);
   const marginDb = firstNumber(telemetry?.marginDb, sessionEvidence?.acoustic?.marginDb, eventEvidence?.acousticMarginDb);
-  const bump = firstNumber(eventEvidence?.bumpCorrelation, sessionEvidence?.physicalEvidence?.bumpCorrelation);
-  const tilt = firstNumber(eventEvidence?.tiltDegrees, sessionEvidence?.physicalEvidence?.tiltDegrees, eventEvidence?.tiltMatch);
+  const bump = firstNumber(telemetry?.bumpPoints, eventEvidence?.bumpCorrelation, sessionEvidence?.physicalEvidence?.bumpCorrelation);
+  const tilt = firstNumber(telemetry?.tiltDegrees, eventEvidence?.tiltDegrees, sessionEvidence?.physicalEvidence?.tiltDegrees, eventEvidence?.tiltMatch);
   const rows = [
     {
       name: i18n.t("heardSignal"),
       meaning: i18n.t("heardSignalMeaning"),
       expected: i18n.t("heardSignalExpected"),
-      value: telemetry ? `${Math.round(Number(telemetry.confidence || 0) * 100)}% · ${telemetry.detected ? i18n.t("yes") : i18n.t("no")}` : i18n.t("waiting"),
-      tone: telemetryTone(telemetry)
+      value: telemetry?.status === "active"
+        ? `${Math.round(Number(telemetry.confidence || 0) * 100)}% · ${telemetry.detected ? i18n.t("yes") : i18n.t("no")}`
+        : i18n.t("waiting"),
+      tone: telemetry?.status === "active" ? telemetryTone(telemetry) : "idle"
     },
     {
       name: i18n.t("correlation"),
@@ -767,8 +778,8 @@ function renderMetricRows() {
       name: i18n.t("emittedPacket"),
       meaning: i18n.t("emittedPacketMeaning"),
       expected: i18n.t("emittedPacketExpected"),
-      value: telemetry ? (telemetry.emitted ? i18n.t("yes") : i18n.t("no")) : i18n.t("waiting"),
-      tone: telemetry ? (telemetry.emitted ? "good" : "bad") : "idle"
+      value: telemetry?.status === "active" ? (telemetry.emitted ? i18n.t("yes") : i18n.t("no")) : i18n.t("waiting"),
+      tone: telemetry?.status === "active" ? (telemetry.emitted ? "good" : "bad") : "idle"
     },
     {
       name: i18n.t("bumpEvidence"),
@@ -867,6 +878,10 @@ function setMonitorExplainer(text) {
 
 function updateMonitorExplainerFromTelemetry(telemetry) {
   if (telemetry.status === "active") setMonitorExplainer(i18n.t("monitorRunning"));
+  if (telemetry.status === "waiting") {
+    if (telemetry.reason === "device-tap-required") setMonitorExplainer(i18n.t("monitorWaitingForTap"));
+    else if (telemetry.reason === "proximity-ceremony-active") setMonitorExplainer(i18n.t("monitorWaitingForCeremony"));
+  }
   if (telemetry.status === "blocked") {
     if (telemetry.reason === "audio-not-ready") setMonitorExplainer(i18n.t("audioNotReady"));
     else if (telemetry.reason === "proximity-ceremony-active") setMonitorExplainer(i18n.t("ceremonyActive"));
@@ -1051,7 +1066,12 @@ function friendlyEventDetail(type, detail = {}) {
     return "Admin requested the monitor to stop.";
   }
   if (type === "admin:monitor:telemetry") {
-    return `${detail.deviceName || detail.clientId || "device"} · ${detail.status || "active"} · ${detail.emitted ? "emitted" : "silent"} · ${detail.detected ? "heard" : "missed"} · ${formatNumber(detail.marginDb, 1)} dB`;
+    if (detail.status === "waiting") {
+      return `${detail.deviceName || detail.clientId || "device"} · waiting · ${detail.reason || "device action required"}`;
+    }
+    const bump = Number.isFinite(Number(detail.bumpPoints)) ? formatNumber(detail.bumpPoints, 0) : "--";
+    const tilt = Number.isFinite(Number(detail.tiltDegrees)) ? formatNumber(detail.tiltDegrees, 0) : "--";
+    return `${detail.deviceName || detail.clientId || "device"} · ${detail.status || "active"} · ${detail.emitted ? "emitted" : "silent"} · ${detail.detected ? "heard" : "missed"} · ${formatNumber(detail.marginDb, 1)} dB · bump ${bump} · tilt ${tilt}°`;
   }
   if (type === "proximity:session:telemetry") {
     return `${detail.deviceName || detail.clientId || "device"} · score ${Math.round(Number(detail.score || 0) * 100)} · ${formatFrequency(detail.acousticStartFrequencyHz, detail.acousticEndFrequencyHz)}`;
