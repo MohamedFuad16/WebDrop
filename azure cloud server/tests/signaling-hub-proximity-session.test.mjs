@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { SignalingHub } from "../src/signaling-hub.js";
 import { ProximityScoreAnalyzer } from "../src/proximity-score.js";
+import { ServerMetrics } from "../src/metrics.js";
 
 test("proximity session matches the intended pair while a third client is nearby", () => {
   const hub = createTestHub();
@@ -321,7 +322,8 @@ test("diagnostics snapshot exposes safe live proximity and acoustic state", () =
 });
 
 test("admin monitor routes continuous acoustic telemetry from a selected device", () => {
-  const hub = createTestHub();
+  const metrics = new ServerMetrics();
+  const hub = createTestHub({ metrics });
   const admin = addClient(hub, "admin-a");
   const phone = addClient(hub, "phone-a");
   admin.capabilities = { admin: true };
@@ -346,7 +348,7 @@ test("admin monitor routes continuous acoustic telemetry from a selected device"
   assert.equal(messagesOf(phone, "admin:monitor:start")[0].payload.adminId, admin.id);
   assert.equal(messagesOf(admin, "admin:monitor:started")[0].payload.targetId, phone.id);
 
-  hub.forwardAdminMonitorTelemetry(phone, {
+  hub.handleMessage(phone.socket, Buffer.from(JSON.stringify({
     type: "admin:monitor:telemetry",
     targetId: admin.id,
     payload: {
@@ -376,7 +378,7 @@ test("admin monitor routes continuous acoustic telemetry from a selected device"
         confidence: 0.42
       }]
     }
-  });
+  })), false);
 
   const telemetry = messagesOf(admin, "admin:monitor:telemetry")[0].payload;
   assert.equal(telemetry.deviceId, phone.id);
@@ -389,6 +391,9 @@ test("admin monitor routes continuous acoustic telemetry from a selected device"
   assert.equal(telemetry.motionSamples, 72);
   assert.equal(telemetry.bands.length, 1);
   assert.equal(telemetry.bands[0].startFrequencyHz, 18500);
+  const monitorEvents = metrics.summary().recentEvents.filter((event) => event.type === "admin:monitor:telemetry");
+  assert.equal(monitorEvents.length, 1);
+  assert.equal(monitorEvents[0].detail.monitorId, "monitor-a");
 
   hub.stopAdminMonitor(admin, {
     type: "admin:monitor:stop",
@@ -402,10 +407,11 @@ test("admin monitor routes continuous acoustic telemetry from a selected device"
   hub.close();
 });
 
-function createTestHub() {
+function createTestHub({ metrics } = {}) {
   return new SignalingHub({
     server: { on() {} },
-    proximityAnalyzer: new ProximityScoreAnalyzer({ enabled: false })
+    proximityAnalyzer: new ProximityScoreAnalyzer({ enabled: false }),
+    metrics
   });
 }
 
@@ -434,6 +440,7 @@ function addClient(hub, id) {
     lastSeenAt: Date.now()
   };
   hub.clients.set(id, client);
+  hub.socketToClient.set(socket, client);
   return client;
 }
 

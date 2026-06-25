@@ -1,8 +1,8 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.81";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.81";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.81";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.82";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.82";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.82";
 
-const APP_VERSION = "1.0.81";
+const APP_VERSION = "1.0.82";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -52,6 +52,7 @@ const ADMIN_MESSAGES = {
     signalBand: "Signal",
     idle: "Idle",
     active: "Active",
+    stopping: "Stopping",
     blocked: "Blocked",
     error: "Error",
     selectConnectedDevice: "Select a connected device",
@@ -68,6 +69,8 @@ const ADMIN_MESSAGES = {
     noEvents: "No events yet.",
     physicalMatching: "Physical matching",
     activeSessions: "Active proximity sessions",
+    singleDeviceTesting: "Single-device test",
+    multiDeviceTesting: "Multi-device sessions",
     noSessions: "No active proximity sessions.",
     pollingEverySecond: "Live data refreshes every second",
     serverTime: "Server time",
@@ -85,6 +88,7 @@ const ADMIN_MESSAGES = {
     activeCount: "{count} active",
     startedMonitor: "Monitoring {device}. Keep the phone on WebDrop and tap Connect if audio is not ready.",
     stoppedMonitor: "Monitor stopped.",
+    stoppingMonitor: "Stopping monitor on {device}...",
     noDeviceSelected: "Select a connected phone first.",
     targetOffline: "Selected device is offline.",
     audioNotReady: "Audio is not unlocked on that phone. Open WebDrop there and tap Connect once.",
@@ -194,6 +198,7 @@ const ADMIN_MESSAGES = {
     signalBand: "信号",
     idle: "待機中",
     active: "稼働中",
+    stopping: "停止中",
     blocked: "ブロック",
     error: "エラー",
     selectConnectedDevice: "接続中の端末を選択",
@@ -210,6 +215,8 @@ const ADMIN_MESSAGES = {
     noEvents: "イベントはまだありません。",
     physicalMatching: "物理マッチング",
     activeSessions: "近接セッション",
+    singleDeviceTesting: "単体端末テスト",
+    multiDeviceTesting: "複数端末セッション",
     noSessions: "アクティブな近接セッションはありません。",
     pollingEverySecond: "ライブデータは 1 秒ごとに更新されます",
     serverTime: "サーバー時刻",
@@ -227,6 +234,7 @@ const ADMIN_MESSAGES = {
     activeCount: "{count} 件",
     startedMonitor: "{device} を監視中。音声が未準備なら端末側で Connect をタップしてください。",
     stoppedMonitor: "監視を停止しました。",
+    stoppingMonitor: "{device} の監視を停止しています...",
     noDeviceSelected: "先に接続中の端末を選んでください。",
     targetOffline: "選択した端末はオフラインです。",
     audioNotReady: "その端末の音声がまだ有効化されていません。WebDrop を開き、Connect を一度タップしてください。",
@@ -316,6 +324,7 @@ const state = {
   selectedDeviceId: "",
   activeMonitor: null,
   monitorTelemetry: null,
+  ignoredMonitorIds: new Set(),
   localEvents: [],
   clearEventsBefore: 0
 };
@@ -424,6 +433,15 @@ function handleSocketMessage(raw) {
     return;
   }
   if (message.type === "admin:monitor:started") {
+    if (state.activeMonitor?.status === "stopping" && state.activeMonitor.monitorId === message.monitorId) {
+      addLocalEvent("admin:monitor:started", {
+        deviceName: message.deviceName,
+        targetId: message.targetId
+      });
+      renderMonitor();
+      return;
+    }
+    state.ignoredMonitorIds.delete(message.monitorId);
     state.activeMonitor = {
       ...(state.activeMonitor || {}),
       monitorId: message.monitorId,
@@ -442,12 +460,17 @@ function handleSocketMessage(raw) {
   }
   if (message.type === "admin:monitor:stopped") {
     addLocalEvent("admin:monitor:stopped", { targetId: message.targetId });
-    state.activeMonitor = null;
-    state.monitorTelemetry = null;
+    if (!state.activeMonitor || state.activeMonitor.monitorId === message.monitorId) {
+      state.activeMonitor = null;
+      state.monitorTelemetry = null;
+    }
+    if (message.monitorId) state.ignoredMonitorIds.add(message.monitorId);
     setMonitorExplainer(i18n.t("stoppedMonitor"));
     renderMonitor();
   }
   if (message.type === "admin:monitor:telemetry") {
+    if (message.monitorId && state.ignoredMonitorIds.has(message.monitorId)) return;
+    if (state.activeMonitor && message.monitorId && message.monitorId !== state.activeMonitor.monitorId) return;
     state.monitorTelemetry = message;
     if (state.activeMonitor) state.activeMonitor.status = message.status || "active";
     addLocalEvent("admin:monitor:telemetry", {
@@ -468,7 +491,14 @@ function handleSocketMessage(raw) {
   if (message.type === "route:error") {
     addLocalEvent("route:error", message);
     if (message.code === "target_offline") setMonitorExplainer(i18n.t("targetOffline"));
+    else if (message.code === "monitor_not_available" && state.activeMonitor?.status === "stopping") {
+      if (state.activeMonitor.monitorId) state.ignoredMonitorIds.add(state.activeMonitor.monitorId);
+      state.activeMonitor = null;
+      state.monitorTelemetry = null;
+      setMonitorExplainer(i18n.t("stoppedMonitor"));
+    }
     else setMonitorExplainer(message.code || i18n.t("error"));
+    renderMonitor();
     renderTimeline();
   }
 }
@@ -622,6 +652,7 @@ function startMonitor() {
     status: "starting",
     startedAt: Date.now()
   };
+  state.ignoredMonitorIds.delete(monitorId);
   const sent = sendSocket({
     type: "admin:monitor:start",
     targetId: device.id,
@@ -644,31 +675,42 @@ function startMonitor() {
 
 function stopMonitor() {
   if (!state.activeMonitor) return;
-  sendSocket({
+  const monitor = state.activeMonitor;
+  state.ignoredMonitorIds.add(monitor.monitorId);
+  const sent = sendSocket({
     type: "admin:monitor:stop",
-    targetId: state.activeMonitor.targetId,
-    payload: { monitorId: state.activeMonitor.monitorId }
+    targetId: monitor.targetId,
+    payload: { monitorId: monitor.monitorId }
   });
-  state.activeMonitor = null;
-  state.monitorTelemetry = null;
-  setMonitorExplainer(i18n.t("stoppedMonitor"));
+  if (!sent) {
+    state.activeMonitor = null;
+    state.monitorTelemetry = null;
+    setMonitorExplainer(i18n.t("signalingDisconnected"));
+    renderMonitor();
+    return;
+  }
+  state.activeMonitor = {
+    ...monitor,
+    status: "stopping"
+  };
+  setMonitorExplainer(i18n.t("stoppingMonitor", { device: monitor.deviceName || i18n.t("chooseDevice") }));
   renderMonitor();
 }
 
 function renderMonitor() {
   const active = state.activeMonitor;
-  const telemetry = state.monitorTelemetry;
-  const status = active?.status || telemetry?.status || "idle";
-  const normalizedStatus = ["active", "waiting", "blocked", "error"].includes(status)
+  const telemetry = state.monitorTelemetry || latestMonitorTelemetry();
+  const status = active?.status || "idle";
+  const normalizedStatus = ["active", "waiting", "stopping", "blocked", "error"].includes(status)
     ? status
     : status === "starting" ? "active" : "idle";
   const statusNode = $("[data-monitor-status]");
   statusNode.dataset.monitorStatus = normalizedStatus;
   $("[data-monitor-status-copy]").textContent = i18n.t(normalizedStatus);
   $("[data-action='monitor-start']").disabled = Boolean(active);
-  $("[data-action='monitor-stop']").disabled = !active;
+  $("[data-action='monitor-stop']").disabled = !active || active.status === "stopping";
   renderFrequencySpectrum(telemetry);
-  renderMetricRows();
+  renderMetricRows(telemetry);
 }
 
 function renderFrequencySpectrum(telemetry) {
@@ -735,8 +777,7 @@ function readinessSummary() {
   };
 }
 
-function renderMetricRows() {
-  const telemetry = state.monitorTelemetry;
+function renderMetricRows(telemetry = state.monitorTelemetry || latestMonitorTelemetry()) {
   const sessionEvidence = latestSessionEvidence();
   const eventEvidence = latestEventEvidence();
   const correlation = firstNumber(telemetry?.confidence, sessionEvidence?.acoustic?.correlation, eventEvidence?.acousticCorrelation);
@@ -818,7 +859,7 @@ function renderTimeline() {
   const remote = (state.snapshot?.metrics?.recentEvents || []).map((event) => ({
     ...event,
     timestamp: new Date(event.at).getTime()
-  }));
+  })).filter((event) => !isEmptyTelemetryEvent(event));
   const events = [...local, ...remote]
     .filter((event) => Number(event.timestamp || 0) >= state.clearEventsBefore)
     .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
@@ -852,12 +893,19 @@ function renderSessions() {
     const participants = session.participants || [];
     const score = Math.max(...participants.map((participant) => Number(participant.telemetry?.score || 0)), 0);
     const acoustic = participants.map((participant) => participant.telemetry?.acoustic).find(Boolean);
+    const participantRows = participants.map((participant) => {
+      const telemetry = participant.telemetry || {};
+      const acousticEvidence = telemetry.acoustic || {};
+      const motion = telemetry.physicalEvidence || telemetry.motion || {};
+      return `<small>${escapeHtml(participant.deviceName || participant.clientId || "device")} · audio ${formatNumber(acousticEvidence.correlation, 2)} · bump ${formatNumber(motion.bumpCorrelation ?? motion.bumpPoints, 1)} · tilt ${formatNumber(motion.tiltDegrees ?? motion.maxTiltDeg, 0)}°</small>`;
+    }).join("");
     return `
       <article class="session-row">
         <strong>${escapeHtml(session.id)}</strong>
         <span>${escapeHtml(i18n.t(session.phase || "joining"))}</span>
         <span>${escapeHtml(`${participants.length} phones`)}</span>
         <span>${escapeHtml(`score ${Math.round(score * 100)} · ${formatFrequency(acoustic?.startFrequencyHz, acoustic?.endFrequencyHz)}`)}</span>
+        ${participantRows}
       </article>
     `;
   }).join("");
@@ -992,6 +1040,42 @@ function latestEventEvidence() {
   return null;
 }
 
+function latestMonitorTelemetry() {
+  const deviceId = state.selectedDeviceId || state.activeMonitor?.targetId || "";
+  if (!deviceId) return null;
+  const events = state.snapshot?.metrics?.recentEvents || [];
+  for (const event of events) {
+    if (event.type !== "admin:monitor:telemetry") continue;
+    const detail = event.detail || {};
+    if (deviceId && detail.clientId && detail.clientId !== deviceId) continue;
+    if (detail.monitorId && state.ignoredMonitorIds.has(detail.monitorId)) continue;
+    return {
+      monitorId: detail.monitorId,
+      deviceId: detail.clientId,
+      deviceName: detail.deviceName,
+      status: detail.status || "active",
+      reason: detail.reason || null,
+      sequence: detail.sequence,
+      sampledAt: event.at,
+      sampleRate: detail.sampleRate,
+      emitted: detail.emitted,
+      detected: detail.detected,
+      startFrequencyHz: detail.startFrequencyHz,
+      endFrequencyHz: detail.endFrequencyHz,
+      marginDb: detail.marginDb,
+      confidence: detail.confidence,
+      bands: detail.bands,
+      bumpDetected: detail.bumpDetected,
+      bumpPoints: detail.bumpPoints,
+      tiltDetected: detail.tiltDetected,
+      tiltDegrees: detail.tiltDegrees,
+      motionSamples: detail.motionSamples,
+      maxAcceleration: detail.maxAcceleration
+    };
+  }
+  return null;
+}
+
 function isServerHealthy() {
   return Boolean(state.readyz?.ok || state.snapshot?.generatedAt);
 }
@@ -1042,6 +1126,14 @@ function eventTone(event) {
   }
   if (/diagnostic|stopped|stop|left/.test(event.type)) return "warn";
   return "good";
+}
+
+function isEmptyTelemetryEvent(event) {
+  return !event.detail && (
+    event.type === "admin:monitor:telemetry"
+    || event.type === "proximity:session:telemetry"
+    || event.type === "proximity:session:diagnostic"
+  );
 }
 
 function friendlyEventType(type = "") {

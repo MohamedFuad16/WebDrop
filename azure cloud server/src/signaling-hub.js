@@ -42,6 +42,11 @@ const ACOUSTIC_MIN_CORRELATION = 0.3;
 const ACOUSTIC_SLOT_CORRELATION_MIN = 0.2;
 const ACOUSTIC_ENERGY_ASSISTED_MIN_CORRELATION = 0.16;
 const ACOUSTIC_ENERGY_ASSISTED_MIN_MARGIN_DB = 4.5;
+const DETAILED_METRIC_TYPES = new Set([
+  "admin:monitor:telemetry",
+  "proximity:session:telemetry",
+  "proximity:session:diagnostic"
+]);
 
 export class SignalingHub {
   constructor({ server, path = "/ws", logger, maxJsonBytes = 131072, heartbeatIntervalMs = 25000, sessionTtlMs = 900000, pairingTtlMs = 120000, proximityAnalyzer, qrTokenProvider, metrics } = {}) {
@@ -155,7 +160,7 @@ export class SignalingHub {
       }
 
       const routed = validateRoutedMessage(message);
-      this.metrics?.recordEvent(routed.type);
+      if (!DETAILED_METRIC_TYPES.has(routed.type)) this.metrics?.recordEvent(routed.type);
       this.route(client, routed);
     } catch (error) {
       this.handleProtocolError(socket, error);

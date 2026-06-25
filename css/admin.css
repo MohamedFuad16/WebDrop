@@ -554,6 +554,10 @@
   color: var(--ops-amber);
 }
 
+.monitor-status[data-monitor-status="stopping"] {
+  color: var(--ops-amber);
+}
+
 .monitor-status[data-monitor-status="blocked"],
 .monitor-status[data-monitor-status="error"] {
   color: var(--ops-red);
@@ -925,6 +929,11 @@
 }
 
 .session-row span {
+  color: var(--ops-muted);
+}
+
+.session-row small {
+  grid-column: 1 / -1;
   color: var(--ops-muted);
 }
 

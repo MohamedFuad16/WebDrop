@@ -258,6 +258,29 @@ async function installRuntimeMocks(page) {
               monitorId: message.payload.monitorId,
               targetId: message.targetId
             });
+            this.dispatchMessage({
+              type: "admin:monitor:telemetry",
+              monitorId: message.payload.monitorId,
+              targetId: message.targetId,
+              deviceId: message.targetId,
+              deviceName: "Pixel 9",
+              deviceFamily: "android",
+              status: "active",
+              sequence: 99,
+              emitted: true,
+              detected: true,
+              confidence: 0.99,
+              marginDb: 30,
+              bands: [{
+                startFrequencyHz: 18500,
+                endFrequencyHz: 19500,
+                detected: true,
+                peakDb: -10,
+                noiseDb: -40,
+                marginDb: 30,
+                confidence: 0.99
+              }]
+            });
           }, 0);
         }
       }

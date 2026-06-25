@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.81";
+import { formatBytes } from "../utils/format.js?v=1.0.82";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -441,6 +441,7 @@ export function createController({
         if (snapshot?.available) snapshots.push(snapshot);
       }
       emitted = await emission || emitted;
+      if (!adminMonitor || adminMonitor !== monitor || monitor.stopped) return;
       const sampled = strongestAdminMonitorSnapshot(snapshots, monitorBands.length);
       const sample = sampled.bands[0] || {};
       const motion = proximity.getSnapshot?.().motion || {};
@@ -470,6 +471,7 @@ export function createController({
         maxAcceleration: Number(motion.maxAcceleration || 0)
       });
     } catch (error) {
+      if (!adminMonitor || adminMonitor !== monitor || monitor.stopped) return;
       signaling.sendAdminMonitorTelemetry?.(monitor.adminId, {
         monitorId: monitor.monitorId,
         status: "error",
