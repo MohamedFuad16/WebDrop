@@ -1,8 +1,8 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.82";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.82";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.82";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.83";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.83";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.83";
 
-const APP_VERSION = "1.0.82";
+const APP_VERSION = "1.0.83";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -432,75 +432,92 @@ function handleSocketMessage(raw) {
   } catch {
     return;
   }
-  if (message.type === "admin:monitor:started") {
-    if (state.activeMonitor?.status === "stopping" && state.activeMonitor.monitorId === message.monitorId) {
+  const envelope = unwrapSocketEnvelope(message);
+  if (envelope.type === "admin:monitor:started") {
+    if (state.activeMonitor?.status === "stopping" && state.activeMonitor.monitorId === envelope.monitorId) {
       addLocalEvent("admin:monitor:started", {
-        deviceName: message.deviceName,
-        targetId: message.targetId
+        deviceName: envelope.deviceName,
+        targetId: envelope.targetId
       });
       renderMonitor();
       return;
     }
-    state.ignoredMonitorIds.delete(message.monitorId);
+    state.ignoredMonitorIds.delete(envelope.monitorId);
     state.activeMonitor = {
       ...(state.activeMonitor || {}),
-      monitorId: message.monitorId,
-      targetId: message.targetId,
-      deviceName: message.deviceName,
+      monitorId: envelope.monitorId,
+      targetId: envelope.targetId,
+      deviceName: envelope.deviceName,
       status: "active",
       startedAt: Date.now()
     };
     state.monitorTelemetry = null;
     addLocalEvent("admin:monitor:started", {
-      deviceName: message.deviceName,
-      targetId: message.targetId
+      deviceName: envelope.deviceName,
+      targetId: envelope.targetId
     });
-    setMonitorExplainer(i18n.t("startedMonitor", { device: friendlyDeviceName(message) }));
+    setMonitorExplainer(i18n.t("startedMonitor", { device: friendlyDeviceName(envelope) }));
     renderMonitor();
   }
-  if (message.type === "admin:monitor:stopped") {
-    addLocalEvent("admin:monitor:stopped", { targetId: message.targetId });
-    if (!state.activeMonitor || state.activeMonitor.monitorId === message.monitorId) {
+  if (envelope.type === "admin:monitor:stopped") {
+    addLocalEvent("admin:monitor:stopped", { targetId: envelope.targetId });
+    if (!state.activeMonitor || state.activeMonitor.monitorId === envelope.monitorId) {
       state.activeMonitor = null;
       state.monitorTelemetry = null;
     }
-    if (message.monitorId) state.ignoredMonitorIds.add(message.monitorId);
+    if (envelope.monitorId) state.ignoredMonitorIds.add(envelope.monitorId);
     setMonitorExplainer(i18n.t("stoppedMonitor"));
     renderMonitor();
   }
-  if (message.type === "admin:monitor:telemetry") {
-    if (message.monitorId && state.ignoredMonitorIds.has(message.monitorId)) return;
-    if (state.activeMonitor && message.monitorId && message.monitorId !== state.activeMonitor.monitorId) return;
-    state.monitorTelemetry = message;
-    if (state.activeMonitor) state.activeMonitor.status = message.status || "active";
+  if (envelope.type === "admin:monitor:telemetry") {
+    if (envelope.monitorId && state.ignoredMonitorIds.has(envelope.monitorId)) return;
+    if (state.activeMonitor && envelope.monitorId && envelope.monitorId !== state.activeMonitor.monitorId) return;
+    state.monitorTelemetry = envelope;
+    if (state.activeMonitor) state.activeMonitor.status = envelope.status || "active";
     addLocalEvent("admin:monitor:telemetry", {
-      deviceName: message.deviceName,
-      status: message.status,
-      reason: message.reason,
-      detected: message.detected,
-      emitted: message.emitted,
-      marginDb: message.marginDb,
-      confidence: message.confidence,
-      bumpPoints: message.bumpPoints,
-      tiltDegrees: message.tiltDegrees,
-      motionSamples: message.motionSamples
+      monitorId: envelope.monitorId,
+      clientId: envelope.deviceId || envelope.targetId,
+      deviceName: envelope.deviceName,
+      status: envelope.status,
+      reason: envelope.reason,
+      detected: envelope.detected,
+      emitted: envelope.emitted,
+      startFrequencyHz: envelope.startFrequencyHz,
+      endFrequencyHz: envelope.endFrequencyHz,
+      sampleRate: envelope.sampleRate,
+      bands: envelope.bands,
+      marginDb: envelope.marginDb,
+      confidence: envelope.confidence,
+      bumpPoints: envelope.bumpPoints,
+      tiltDegrees: envelope.tiltDegrees,
+      motionSamples: envelope.motionSamples
     });
-    updateMonitorExplainerFromTelemetry(message);
+    updateMonitorExplainerFromTelemetry(envelope);
     renderMonitor();
   }
-  if (message.type === "route:error") {
-    addLocalEvent("route:error", message);
-    if (message.code === "target_offline") setMonitorExplainer(i18n.t("targetOffline"));
-    else if (message.code === "monitor_not_available" && state.activeMonitor?.status === "stopping") {
+  if (envelope.type === "route:error") {
+    addLocalEvent("route:error", envelope);
+    if (envelope.code === "target_offline") setMonitorExplainer(i18n.t("targetOffline"));
+    else if (envelope.code === "monitor_not_available" && state.activeMonitor?.status === "stopping") {
       if (state.activeMonitor.monitorId) state.ignoredMonitorIds.add(state.activeMonitor.monitorId);
       state.activeMonitor = null;
       state.monitorTelemetry = null;
       setMonitorExplainer(i18n.t("stoppedMonitor"));
     }
-    else setMonitorExplainer(message.code || i18n.t("error"));
+    else setMonitorExplainer(envelope.code || i18n.t("error"));
     renderMonitor();
     renderTimeline();
   }
+}
+
+function unwrapSocketEnvelope(message) {
+  const payload = isPlainObject(message?.payload) ? message.payload : {};
+  return {
+    ...message,
+    ...payload,
+    type: message?.type || payload.type || "",
+    payload
+  };
 }
 
 function sendSocket(payload) {
@@ -718,7 +735,7 @@ function renderFrequencySpectrum(telemetry) {
   const end = Number(telemetry?.endFrequencyHz || MONITOR_END_HZ);
   const bands = monitorFrequencyBands().map((definition, index) => ({
     ...definition,
-    ...(telemetry?.bands?.[index] || {})
+    ...matchingFrequencyBand(definition, telemetry?.bands, index)
   }));
   $("[data-frequency-target]").textContent = i18n.t("targetBand", {
     band: formatFrequency(start, end)
@@ -727,7 +744,7 @@ function renderFrequencySpectrum(telemetry) {
     const peakDb = Number(band.peakDb);
     const confidence = Number(band.confidence);
     const level = Number.isFinite(peakDb)
-      ? Math.max(4, Math.min(100, ((peakDb + 100) / 65) * 100))
+      ? Math.max(4, Math.min(100, ((peakDb + 140) / 90) * 100))
       : 4;
     const tone = !telemetry
       ? "idle"
@@ -754,6 +771,24 @@ function renderFrequencySpectrum(telemetry) {
       </article>
     `;
   }).join("");
+}
+
+function matchingFrequencyBand(definition, telemetryBands, index) {
+  const bands = Array.isArray(telemetryBands) ? telemetryBands : [];
+  const overlapping = bands
+    .map((band) => ({
+      band,
+      overlap: frequencyOverlap(definition, band)
+    }))
+    .filter((item) => item.overlap > 0)
+    .sort((a, b) => b.overlap - a.overlap);
+  return overlapping[0]?.band || bands[index] || {};
+}
+
+function frequencyOverlap(a, b) {
+  const start = Math.max(Number(a?.startFrequencyHz), Number(b?.startFrequencyHz));
+  const end = Math.min(Number(a?.endFrequencyHz), Number(b?.endFrequencyHz));
+  return Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : 0;
 }
 
 function monitorFrequencyBands() {
@@ -1086,6 +1121,10 @@ function firstNumber(...values) {
     if (Number.isFinite(number)) return number;
   }
   return NaN;
+}
+
+function isPlainObject(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 function telemetryTone(telemetry) {

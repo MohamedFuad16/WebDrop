@@ -184,70 +184,74 @@ async function installRuntimeMocks(page) {
           setTimeout(() => {
             this.dispatchMessage({
               type: "admin:monitor:started",
-              monitorId: message.payload.monitorId,
-              targetId: message.targetId,
-              deviceName: "Pixel 9"
+              payload: {
+                monitorId: message.payload.monitorId,
+                targetId: message.targetId,
+                deviceName: "Pixel 9"
+              }
             });
             this.dispatchMessage({
               type: "admin:monitor:telemetry",
-              monitorId: message.payload.monitorId,
-              targetId: message.targetId,
-              deviceId: message.targetId,
-              deviceName: "Pixel 9",
-              deviceFamily: "android",
-              status: "active",
-              reason: null,
-              sequence: 1,
-              sampledAt: Date.now(),
-              contextState: "running",
-              sampleRate: 48000,
-              emitted: true,
-              detected: true,
-              startFrequencyHz: 18600,
-              endFrequencyHz: 19400,
-              peakDb: -42,
-              noiseDb: -51.4,
-              marginDb: 9.4,
-              confidence: 0.42,
-              bumpDetected: true,
-              bumpPoints: 10,
-              tiltDetected: true,
-              tiltDegrees: 34,
-              motionSamples: 72,
-              maxAcceleration: 16.8,
-              bands: [{
-                startFrequencyHz: 18000,
-                endFrequencyHz: 18500,
-                detected: false,
-                peakDb: -81,
-                noiseDb: -91,
-                marginDb: 10,
-                confidence: 0.12
-              }, {
-                startFrequencyHz: 18500,
-                endFrequencyHz: 19500,
+              payload: {
+                monitorId: message.payload.monitorId,
+                targetId: message.targetId,
+                deviceId: message.targetId,
+                deviceName: "Pixel 9",
+                deviceFamily: "android",
+                status: "active",
+                reason: null,
+                sequence: 1,
+                sampledAt: Date.now(),
+                contextState: "running",
+                sampleRate: 48000,
+                emitted: true,
                 detected: true,
+                startFrequencyHz: 18600,
+                endFrequencyHz: 19400,
                 peakDb: -42,
                 noiseDb: -51.4,
                 marginDb: 9.4,
-                confidence: 0.42
-              }, {
-                startFrequencyHz: 19500,
-                endFrequencyHz: 20500,
-                detected: false,
-                peakDb: -77,
-                noiseDb: -89,
-                marginDb: 12,
-                confidence: 0.16
-              }, {
-                startFrequencyHz: 20500,
-                endFrequencyHz: 21000,
-                detected: false,
-                peakDb: -92,
-                noiseDb: -95,
-                marginDb: 3,
-                confidence: 0
-              }]
+                confidence: 0.42,
+                bumpDetected: true,
+                bumpPoints: 10,
+                tiltDetected: true,
+                tiltDegrees: 34,
+                motionSamples: 72,
+                maxAcceleration: 16.8,
+                bands: [{
+                  startFrequencyHz: 18000,
+                  endFrequencyHz: 18500,
+                  detected: false,
+                  peakDb: -81,
+                  noiseDb: -91,
+                  marginDb: 10,
+                  confidence: 0.12
+                }, {
+                  startFrequencyHz: 18500,
+                  endFrequencyHz: 19500,
+                  detected: true,
+                  peakDb: -42,
+                  noiseDb: -51.4,
+                  marginDb: 9.4,
+                  confidence: 0.42
+                }, {
+                  startFrequencyHz: 19500,
+                  endFrequencyHz: 20500,
+                  detected: false,
+                  peakDb: -77,
+                  noiseDb: -89,
+                  marginDb: 12,
+                  confidence: 0.16
+                }, {
+                  startFrequencyHz: 20500,
+                  endFrequencyHz: 21000,
+                  detected: false,
+                  peakDb: -92,
+                  noiseDb: -95,
+                  marginDb: 3,
+                  confidence: 0
+                }]
+              }
             });
           }, 0);
         }
@@ -255,31 +259,35 @@ async function installRuntimeMocks(page) {
           setTimeout(() => {
             this.dispatchMessage({
               type: "admin:monitor:stopped",
-              monitorId: message.payload.monitorId,
-              targetId: message.targetId
+              payload: {
+                monitorId: message.payload.monitorId,
+                targetId: message.targetId
+              }
             });
             this.dispatchMessage({
               type: "admin:monitor:telemetry",
-              monitorId: message.payload.monitorId,
-              targetId: message.targetId,
-              deviceId: message.targetId,
-              deviceName: "Pixel 9",
-              deviceFamily: "android",
-              status: "active",
-              sequence: 99,
-              emitted: true,
-              detected: true,
-              confidence: 0.99,
-              marginDb: 30,
-              bands: [{
-                startFrequencyHz: 18500,
-                endFrequencyHz: 19500,
+              payload: {
+                monitorId: message.payload.monitorId,
+                targetId: message.targetId,
+                deviceId: message.targetId,
+                deviceName: "Pixel 9",
+                deviceFamily: "android",
+                status: "active",
+                sequence: 99,
+                emitted: true,
                 detected: true,
-                peakDb: -10,
-                noiseDb: -40,
+                confidence: 0.99,
                 marginDb: 30,
-                confidence: 0.99
-              }]
+                bands: [{
+                  startFrequencyHz: 18500,
+                  endFrequencyHz: 19500,
+                  detected: true,
+                  peakDb: -10,
+                  noiseDb: -40,
+                  marginDb: 30,
+                  confidence: 0.99
+                }]
+              }
             });
           }, 0);
         }
