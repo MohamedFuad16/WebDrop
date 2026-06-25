@@ -1,15 +1,15 @@
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.78";
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.78";
-import { AcousticProximitySensor } from "../services/acoustic-proximity.js?v=1.0.78";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.79";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.79";
+import { AcousticProximitySensor } from "../services/acoustic-proximity.js?v=1.0.79";
 import {
   apiBaseFrom,
   escapeHtml,
   formatAge,
   formatFrequency,
   formatNumber
-} from "./shared.js?v=1.0.78";
+} from "./shared.js?v=1.0.79";
 
-const APP_VERSION = "1.0.78";
+const APP_VERSION = "1.0.79";
 const runtime = globalThis.WEBDROP_RUNTIME_CONFIG || {};
 const DEFAULT_BASE_URL = apiBaseFrom(runtime.turnConfigUrl || runtime.signalingUrl || "")
   || "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";

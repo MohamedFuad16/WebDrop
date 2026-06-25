@@ -1,8 +1,8 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.78";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.78";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.78";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.79";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.79";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.79";
 
-const APP_VERSION = "1.0.78";
+const APP_VERSION = "1.0.79";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -945,8 +945,12 @@ function toneLabel(tone) {
 }
 
 function eventTone(event) {
-  if (event.type === "route:error" || /failed|error|blocked/i.test(event.type)) return "bad";
-  if (/diagnostic|telemetry|monitor/.test(event.type)) return "warn";
+  const detail = event.detail || {};
+  if (event.type === "route:error" || /failed|error|blocked/i.test(event.type) || ["error", "blocked"].includes(detail.status)) return "bad";
+  if (event.type === "admin:monitor:telemetry") {
+    return detail.status === "active" && detail.detected ? "good" : "warn";
+  }
+  if (/diagnostic|stopped|stop|left/.test(event.type)) return "warn";
   return "good";
 }
 
@@ -959,6 +963,18 @@ function friendlyEventType(type = "") {
 }
 
 function friendlyEventDetail(type, detail = {}) {
+  if (type === "admin:monitor:started") {
+    return `${detail.deviceName || "Selected device"} · continuous monitoring started`;
+  }
+  if (type === "admin:monitor:start") {
+    return "Admin requested continuous ultrasonic monitoring.";
+  }
+  if (type === "admin:monitor:stopped") {
+    return `${detail.deviceName || "Selected device"} · monitoring stopped`;
+  }
+  if (type === "admin:monitor:stop") {
+    return "Admin requested the monitor to stop.";
+  }
   if (type === "admin:monitor:telemetry") {
     return `${detail.deviceName || detail.clientId || "device"} · ${detail.status || "active"} · ${detail.emitted ? "emitted" : "silent"} · ${detail.detected ? "heard" : "missed"} · ${formatNumber(detail.marginDb, 1)} dB`;
   }
