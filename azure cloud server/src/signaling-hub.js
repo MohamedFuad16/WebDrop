@@ -64,6 +64,7 @@ export class SignalingHub {
     this.proximityDecisions = new Map();
     this.proximityReady = new Map();
     this.proximitySessions = new Map();
+    this.adminMonitors = new Map();
     this.openProximitySessionId = null;
     this.socketToClient = new WeakMap();
     this.rateLimits = new TokenBucket({ capacity: 90, refillPerSecond: 30 });
@@ -232,6 +233,18 @@ export class SignalingHub {
       this.cancelProximitySession(sender, message);
       return;
     }
+    if (message.type === "admin:monitor:start") {
+      this.startAdminMonitor(sender, message);
+      return;
+    }
+    if (message.type === "admin:monitor:stop") {
+      this.stopAdminMonitor(sender, message);
+      return;
+    }
+    if (message.type === "admin:monitor:telemetry") {
+      this.forwardAdminMonitorTelemetry(sender, message);
+      return;
+    }
     if (message.type === "proximity:qr:issue" && !message.targetId) {
       this.issuePeerlessQrToken(sender);
       return;
@@ -351,6 +364,116 @@ export class SignalingHub {
       targetId: target.id
     });
     this.send(sender.socket, "proximity:qr:issued", issued);
+  }
+
+  startAdminMonitor(sender, message) {
+    if (!sender.capabilities?.admin) {
+      this.send(sender.socket, "route:error", {
+        code: "admin_required",
+        targetId: message.targetId,
+        type: message.type
+      });
+      return;
+    }
+    const target = this.clients.get(message.targetId);
+    if (!target || target.capabilities?.admin) {
+      this.send(sender.socket, "route:error", {
+        code: target ? "device_required" : "target_offline",
+        targetId: message.targetId,
+        type: message.type
+      });
+      return;
+    }
+    const monitorId = message.payload.monitorId;
+    this.adminMonitors.set(monitorId, {
+      monitorId,
+      adminId: sender.id,
+      targetId: target.id,
+      createdAt: Date.now()
+    });
+    this.send(target.socket, "admin:monitor:start", {
+      ...message.payload,
+      adminId: sender.id,
+      deviceId: target.id
+    });
+    this.send(sender.socket, "admin:monitor:started", {
+      monitorId,
+      targetId: target.id,
+      deviceName: target.deviceName
+    });
+    this.metrics?.recordEvent("admin:monitor:started", {
+      monitorId,
+      adminId: sender.id,
+      targetId: target.id,
+      deviceName: target.deviceName
+    });
+  }
+
+  stopAdminMonitor(sender, message) {
+    const monitor = this.adminMonitors.get(message.payload.monitorId);
+    if (!monitor || monitor.adminId !== sender.id || !sender.capabilities?.admin) {
+      this.send(sender.socket, "route:error", {
+        code: "monitor_not_available",
+        targetId: message.targetId,
+        type: message.type
+      });
+      return;
+    }
+    const target = this.clients.get(monitor.targetId);
+    if (target) {
+      this.send(target.socket, "admin:monitor:stop", {
+        monitorId: monitor.monitorId,
+        adminId: sender.id
+      });
+    }
+    this.adminMonitors.delete(monitor.monitorId);
+    this.send(sender.socket, "admin:monitor:stopped", {
+      monitorId: monitor.monitorId,
+      targetId: monitor.targetId
+    });
+    this.metrics?.recordEvent("admin:monitor:stopped", {
+      monitorId: monitor.monitorId,
+      adminId: sender.id,
+      targetId: monitor.targetId
+    });
+  }
+
+  forwardAdminMonitorTelemetry(sender, message) {
+    const monitor = this.adminMonitors.get(message.payload.monitorId);
+    if (!monitor || monitor.targetId !== sender.id || message.targetId !== monitor.adminId) {
+      this.send(sender.socket, "route:error", {
+        code: "monitor_not_available",
+        targetId: message.targetId,
+        type: message.type
+      });
+      return;
+    }
+    const admin = this.clients.get(monitor.adminId);
+    if (!admin?.capabilities?.admin) {
+      this.adminMonitors.delete(monitor.monitorId);
+      return;
+    }
+    this.send(admin.socket, "admin:monitor:telemetry", {
+      ...message.payload,
+      deviceId: sender.id,
+      deviceName: sender.deviceName,
+      deviceFamily: sender.deviceFamily
+    });
+    this.metrics?.recordEvent("admin:monitor:telemetry", {
+      monitorId: monitor.monitorId,
+      clientId: sender.id,
+      deviceName: sender.deviceName,
+      status: message.payload.status,
+      sequence: message.payload.sequence,
+      emitted: message.payload.emitted,
+      detected: message.payload.detected,
+      marginDb: message.payload.marginDb,
+      confidence: message.payload.confidence,
+      startFrequencyHz: message.payload.startFrequencyHz,
+      endFrequencyHz: message.payload.endFrequencyHz,
+      sampleRate: message.payload.sampleRate,
+      reason: message.payload.reason
+    });
   }
 
   verifyQrToken(sender, target, message) {
@@ -1078,6 +1201,19 @@ export class SignalingHub {
     for (const [pairingId, pending] of this.pendingInvites) {
       if (pending.fromId === client.id || pending.toId === client.id) this.pendingInvites.delete(pairingId);
     }
+    for (const [monitorId, monitor] of this.adminMonitors) {
+      if (monitor.adminId !== client.id && monitor.targetId !== client.id) continue;
+      const counterpartId = monitor.adminId === client.id ? monitor.targetId : monitor.adminId;
+      const counterpart = this.clients.get(counterpartId);
+      if (counterpart) {
+        this.send(counterpart.socket, "admin:monitor:stopped", {
+          monitorId,
+          targetId: monitor.targetId,
+          reason: "device_disconnected"
+        });
+      }
+      this.adminMonitors.delete(monitorId);
+    }
     this.broadcast("peers", this.peerList());
   }
 
@@ -1138,6 +1274,7 @@ export class SignalingHub {
 
   close() {
     clearInterval(this.heartbeatTimer);
+    this.adminMonitors.clear();
     for (const client of this.clients.values()) client.socket.close();
     this.wss.close();
   }

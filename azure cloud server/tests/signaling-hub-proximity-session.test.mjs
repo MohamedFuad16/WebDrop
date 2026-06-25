@@ -320,6 +320,68 @@ test("diagnostics snapshot exposes safe live proximity and acoustic state", () =
   hub.close();
 });
 
+test("admin monitor routes continuous acoustic telemetry from a selected device", () => {
+  const hub = createTestHub();
+  const admin = addClient(hub, "admin-a");
+  const phone = addClient(hub, "phone-a");
+  admin.capabilities = { admin: true };
+  admin.deviceFamily = "admin";
+  phone.deviceName = "Pixel 9";
+  phone.deviceFamily = "android";
+  phone.deviceLabel = null;
+
+  hub.startAdminMonitor(admin, {
+    type: "admin:monitor:start",
+    targetId: phone.id,
+    payload: {
+      monitorId: "monitor-a",
+      intervalMs: 1000,
+      startFrequencyHz: 18600,
+      endFrequencyHz: 19400,
+      emit: true
+    }
+  });
+
+  assert.equal(messagesOf(phone, "admin:monitor:start")[0].payload.monitorId, "monitor-a");
+  assert.equal(messagesOf(phone, "admin:monitor:start")[0].payload.adminId, admin.id);
+  assert.equal(messagesOf(admin, "admin:monitor:started")[0].payload.targetId, phone.id);
+
+  hub.forwardAdminMonitorTelemetry(phone, {
+    type: "admin:monitor:telemetry",
+    targetId: admin.id,
+    payload: {
+      monitorId: "monitor-a",
+      status: "active",
+      sequence: 1,
+      sampleRate: 48000,
+      emitted: true,
+      detected: true,
+      startFrequencyHz: 18600,
+      endFrequencyHz: 19400,
+      marginDb: 9.4,
+      confidence: 0.42
+    }
+  });
+
+  const telemetry = messagesOf(admin, "admin:monitor:telemetry")[0].payload;
+  assert.equal(telemetry.deviceId, phone.id);
+  assert.equal(telemetry.deviceName, "Pixel 9");
+  assert.equal(telemetry.deviceFamily, "android");
+  assert.equal(telemetry.detected, true);
+  assert.equal(telemetry.marginDb, 9.4);
+
+  hub.stopAdminMonitor(admin, {
+    type: "admin:monitor:stop",
+    targetId: phone.id,
+    payload: { monitorId: "monitor-a" }
+  });
+
+  assert.equal(messagesOf(phone, "admin:monitor:stop")[0].payload.monitorId, "monitor-a");
+  assert.equal(messagesOf(admin, "admin:monitor:stopped")[0].payload.targetId, phone.id);
+
+  hub.close();
+});
+
 function createTestHub() {
   return new SignalingHub({
     server: { on() {} },

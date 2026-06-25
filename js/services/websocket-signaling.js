@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.77";
+import { Emitter } from "../utils/emitter.js?v=1.0.78";
 
 export class WebSocketSignalingAdapter extends Emitter {
   constructor({
@@ -166,6 +166,18 @@ export class WebSocketSignalingAdapter extends Emitter {
 
   async sendProximitySessionDiagnostic(payload = {}) {
     return this.send({ type: "proximity:session:diagnostic", payload });
+  }
+
+  async startAdminMonitor(targetId, payload = {}) {
+    return this.send({ type: "admin:monitor:start", targetId, payload });
+  }
+
+  async stopAdminMonitor(targetId, monitorId) {
+    return this.send({ type: "admin:monitor:stop", targetId, payload: { monitorId } });
+  }
+
+  async sendAdminMonitorTelemetry(targetId, payload = {}) {
+    return this.send({ type: "admin:monitor:telemetry", targetId, payload });
   }
 
   async cancelProximitySession(sessionId) {

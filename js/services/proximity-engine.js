@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.77";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.77";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.77";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.78";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.78";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.78";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 const ACOUSTIC_SLOT_GUARD_MS = 80;
@@ -61,6 +61,10 @@ export class ProximityEngine {
 
   async detectAcousticChirp(options) {
     return this.acoustic.detectChirp(options);
+  }
+
+  async sampleAcousticFrequencyBand(options) {
+    return this.acoustic.sampleFrequencyBand(options);
   }
 
   createQrToken(options) {

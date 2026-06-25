@@ -1,4 +1,4 @@
-import { formatBytes } from "../utils/format.js?v=1.0.77";
+import { formatBytes } from "../utils/format.js?v=1.0.78";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -39,6 +39,7 @@ export function createController({
   let receivePresentationTimer = 0;
   let permissionRequestPromise = null;
   let suppressDisconnectToast = false;
+  let adminMonitor = null;
   const storedPermissions = readStoredPermissions();
   proximity.restoreMotionPermission?.(storedPermissions.motion);
   globalThis.addEventListener?.("pagehide", () => proximity.close?.(), { once: true });
@@ -76,6 +77,7 @@ export function createController({
 
   signaling.on("disconnected", () => {
     if (!runtime.productionSignaling) return;
+    stopAdminAcousticMonitor();
     const wasOnline = store.getState().signalingStatus === "online";
     transport.close?.();
     cancelPendingTransferPatch();
@@ -300,6 +302,18 @@ export function createController({
     proximityMatchResolver = null;
   });
 
+  signaling.on("admin:monitor:start", (payload = {}) => {
+    startAdminAcousticMonitor(payload);
+  });
+
+  signaling.on("admin:monitor:stop", (payload = {}) => {
+    stopAdminAcousticMonitor(payload.monitorId);
+  });
+
+  signaling.on("admin:monitor:stopped", (payload = {}) => {
+    stopAdminAcousticMonitor(payload.monitorId);
+  });
+
   signaling.on("peerDisconnected", ({ peerId, pairingId } = {}) => {
     const state = store.getState();
     const relevantPeerId = state.connectedPeerId || state.pendingInviteId || activePeerId;
@@ -331,6 +345,103 @@ export function createController({
     if (suppressDisconnectToast && failedProximityPeerId) activePeerId = failedProximityPeerId;
     suppressDisconnectToast = false;
   });
+
+  async function startAdminAcousticMonitor(payload) {
+    stopAdminAcousticMonitor();
+    const monitorId = payload.monitorId;
+    const adminId = payload.adminId;
+    if (!monitorId || !adminId) return;
+    const state = store.getState();
+    const status = proximity.getAcousticStatus?.() || {};
+    if (state.mode === "verifying") {
+      signaling.sendAdminMonitorTelemetry?.(adminId, {
+        monitorId,
+        status: "blocked",
+        reason: "proximity-ceremony-active",
+        sampledAt: Date.now()
+      });
+      return;
+    }
+    if (!status.streamActive || status.contextState !== "running") {
+      signaling.sendAdminMonitorTelemetry?.(adminId, {
+        monitorId,
+        status: "blocked",
+        reason: "audio-not-ready",
+        contextState: status.contextState,
+        sampleRate: status.sampleRate,
+        sampledAt: Date.now()
+      });
+      return;
+    }
+    adminMonitor = {
+      monitorId,
+      adminId,
+      sequence: 0,
+      intervalMs: Math.max(500, Math.min(5000, Number(payload.intervalMs) || 1000)),
+      startFrequencyHz: Number(payload.startFrequencyHz) || 18_600,
+      endFrequencyHz: Number(payload.endFrequencyHz) || 19_400,
+      emit: payload.emit !== false,
+      timer: 0,
+      stopped: false
+    };
+    runAdminAcousticMonitorTick(adminMonitor);
+  }
+
+  async function runAdminAcousticMonitorTick(monitor) {
+    if (!adminMonitor || adminMonitor !== monitor || monitor.stopped) return;
+    monitor.sequence += 1;
+    let emitted = { emitted: false };
+    try {
+      if (monitor.emit) {
+        emitted = await proximity.emitAcousticChirp?.({
+          startFrequencyHz: monitor.startFrequencyHz,
+          endFrequencyHz: monitor.endFrequencyHz
+        }) || emitted;
+        await wait(90);
+      }
+      const sample = await proximity.sampleAcousticFrequencyBand?.({
+        startFrequencyHz: monitor.startFrequencyHz,
+        endFrequencyHz: monitor.endFrequencyHz
+      }) || {};
+      signaling.sendAdminMonitorTelemetry?.(monitor.adminId, {
+        monitorId: monitor.monitorId,
+        status: sample.available ? "active" : "blocked",
+        reason: sample.reason || emitted.reason || null,
+        sequence: monitor.sequence,
+        sampledAt: Date.now(),
+        contextState: sample.contextState || proximity.getAcousticStatus?.().contextState,
+        sampleRate: sample.sampleRate || emitted.sampleRate,
+        emitted: Boolean(emitted.emitted),
+        detected: Boolean(sample.detected),
+        startFrequencyHz: monitor.startFrequencyHz,
+        endFrequencyHz: monitor.endFrequencyHz,
+        peakDb: sample.peakDb,
+        noiseDb: sample.noiseDb,
+        marginDb: sample.marginDb,
+        confidence: sample.confidence
+      });
+    } catch (error) {
+      signaling.sendAdminMonitorTelemetry?.(monitor.adminId, {
+        monitorId: monitor.monitorId,
+        status: "error",
+        reason: error?.message || "monitor-failed",
+        sequence: monitor.sequence,
+        sampledAt: Date.now()
+      });
+    }
+    if (!adminMonitor || adminMonitor !== monitor || monitor.stopped) return;
+    monitor.timer = globalThis.setTimeout(
+      () => runAdminAcousticMonitorTick(monitor),
+      monitor.intervalMs
+    );
+  }
+
+  function stopAdminAcousticMonitor(monitorId) {
+    if (!adminMonitor || (monitorId && adminMonitor.monitorId !== monitorId)) return;
+    adminMonitor.stopped = true;
+    globalThis.clearTimeout(adminMonitor.timer);
+    adminMonitor = null;
+  }
 
   transfer.on?.("receive-ready", ({ transferId, manifest }) => {
     globalThis.clearTimeout(receivePresentationTimer);

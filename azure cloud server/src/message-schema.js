@@ -18,6 +18,9 @@ const ROUTED_TYPES = new Set([
   "proximity:session:diagnostic",
   "proximity:session:telemetry",
   "proximity:session:cancel",
+  "admin:monitor:start",
+  "admin:monitor:stop",
+  "admin:monitor:telemetry",
   "proximity:qr:issue",
   "proximity:qr:verify",
   "proximity:fallback",
@@ -281,6 +284,54 @@ export function validateRoutedMessage(message) {
     };
   }
 
+  if (message.type === "admin:monitor:start") {
+    const payload = objectPayload(message.payload);
+    return {
+      ...base,
+      payload: {
+        monitorId: cleanString(payload.monitorId, 120) || cryptoRandomId("monitor"),
+        intervalMs: clampInteger(payload.intervalMs, 500, 5000, 1000),
+        startFrequencyHz: clampNumber(payload.startFrequencyHz, 18_500, 21_000, 18_600),
+        endFrequencyHz: clampNumber(payload.endFrequencyHz, 18_500, 21_000, 19_400),
+        emit: payload.emit !== false
+      }
+    };
+  }
+
+  if (message.type === "admin:monitor:stop") {
+    const payload = objectPayload(message.payload);
+    return {
+      ...base,
+      payload: {
+        monitorId: cleanString(payload.monitorId, 120) || null
+      }
+    };
+  }
+
+  if (message.type === "admin:monitor:telemetry") {
+    const payload = objectPayload(message.payload);
+    return {
+      ...base,
+      payload: {
+        monitorId: cleanString(payload.monitorId, 120) || null,
+        status: cleanString(payload.status, 40) || "active",
+        reason: cleanString(payload.reason, 160) || null,
+        sequence: safeInteger(payload.sequence, 0),
+        sampledAt: safeNumber(payload.sampledAt),
+        contextState: cleanString(payload.contextState, 40) || null,
+        sampleRate: safeNumber(payload.sampleRate),
+        emitted: Boolean(payload.emitted),
+        detected: Boolean(payload.detected),
+        startFrequencyHz: safeNumber(payload.startFrequencyHz),
+        endFrequencyHz: safeNumber(payload.endFrequencyHz),
+        peakDb: signedNumber(payload.peakDb),
+        noiseDb: signedNumber(payload.noiseDb),
+        marginDb: safeNumber(payload.marginDb),
+        confidence: scoreMetric(payload.confidence)
+      }
+    };
+  }
+
   return {
     ...base,
     payload: objectPayload(message.payload || {})
@@ -480,6 +531,23 @@ function safeInteger(value, fallback) {
 function safeNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
+function signedNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function clampInteger(value, minimum, maximum, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(maximum, Math.max(minimum, Math.round(number)));
+}
+
+function clampNumber(value, minimum, maximum, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(maximum, Math.max(minimum, number));
 }
 
 function cryptoRandomId(prefix) {

@@ -97,3 +97,46 @@ test("proximity session telemetry preserves bounded reciprocal acoustic signatur
     sampleOffset: null
   }]);
 });
+
+test("admin acoustic monitor payloads are bounded for live diagnostics", () => {
+  const start = validateRoutedMessage({
+    type: "admin:monitor:start",
+    targetId: "phone-a",
+    payload: {
+      monitorId: "monitor-a",
+      intervalMs: 120,
+      startFrequencyHz: 17000,
+      endFrequencyHz: 22000,
+      emit: true
+    }
+  });
+  assert.equal(start.payload.monitorId, "monitor-a");
+  assert.equal(start.payload.intervalMs, 500);
+  assert.equal(start.payload.startFrequencyHz, 18500);
+  assert.equal(start.payload.endFrequencyHz, 21000);
+  assert.equal(start.payload.emit, true);
+
+  const telemetry = validateRoutedMessage({
+    type: "admin:monitor:telemetry",
+    targetId: "admin-a",
+    payload: {
+      monitorId: "monitor-a",
+      status: "active",
+      sequence: 7,
+      sampleRate: 48000,
+      emitted: true,
+      detected: true,
+      startFrequencyHz: 18600,
+      endFrequencyHz: 19400,
+      peakDb: -42,
+      noiseDb: -53.5,
+      marginDb: 11.5,
+      confidence: 2
+    }
+  });
+  assert.equal(telemetry.payload.sequence, 7);
+  assert.equal(telemetry.payload.peakDb, -42);
+  assert.equal(telemetry.payload.noiseDb, -53.5);
+  assert.equal(telemetry.payload.marginDb, 11.5);
+  assert.equal(telemetry.payload.confidence, 1);
+});

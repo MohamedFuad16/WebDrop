@@ -3,172 +3,156 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#151616">
+  <meta name="theme-color" content="#ffffff">
   <title>WebDrop Admin</title>
-  <link rel="stylesheet" href="../css/operations.css?v=1.0.77">
-  <link rel="stylesheet" href="../css/admin.css?v=1.0.77">
+  <link rel="stylesheet" href="../css/operations.css?v=1.0.78">
+  <link rel="stylesheet" href="../css/admin.css?v=1.0.78">
 </head>
 <body>
   <main class="operations-shell admin-shell">
-    <header class="operations-hero admin-hero">
-      <div class="operations-toolbar">
-        <div class="operations-links">
-          <a class="operations-link" href="../" data-i18n="backToApp">Back to app</a>
-          <a class="operations-link" href="./diagnostics.html" data-i18n="openDiagnostics">Open live diagnostics</a>
-        </div>
-        <label class="operations-language">
-          <span data-i18n="language">Language</span>
+    <header class="admin-topbar">
+      <div class="admin-brand">
+        <span class="admin-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <strong>WebDrop Admin</strong>
+      </div>
+      <nav class="admin-tabs" data-i18n-aria="adminSections">
+        <button class="is-active" type="button" data-admin-tab="readiness" data-i18n="readiness">Readiness</button>
+        <button type="button" data-admin-tab="live" data-i18n="liveTesting">Live testing</button>
+      </nav>
+      <div class="admin-tools">
+        <label class="admin-language">
+          <span class="sr-only" data-i18n="language">Language</span>
           <select data-operations-language>
             <option value="en">English</option>
             <option value="ja">日本語</option>
           </select>
         </label>
-      </div>
-      <p class="eyebrow" data-i18n="adminKicker">WebDrop Admin</p>
-      <h1 data-i18n="heroTitle">Production readiness and live testing</h1>
-      <p class="operations-hero-copy" data-i18n="heroCopy">A focused control room for launch status, device sessions, ICE paths, transfer manifests, and server checks.</p>
-      <div class="operations-status" data-i18n-aria="adminStatusSummary">
-        <span><strong data-admin-version>1.0.77</strong> <span data-i18n="appVersion">app version</span></span>
-        <span><strong data-admin-mode>Mock</strong> <span data-i18n="runtimeMode">runtime mode</span></span>
-        <span><strong data-admin-score>0%</strong> <span data-i18n="launchReadiness">launch readiness</span></span>
+        <span class="connection-label" data-server-connection>
+          <i aria-hidden="true"></i>
+          <span data-i18n="checkingServer">Checking server</span>
+        </span>
       </div>
     </header>
 
-    <nav class="operations-tabs admin-tabs" data-i18n-aria="adminSections">
-      <button class="is-active" type="button" data-admin-tab="readiness" data-i18n="readiness">Readiness</button>
-      <button type="button" data-admin-tab="live" data-i18n="liveTesting">Live testing</button>
-    </nav>
+    <section class="summary-strip" aria-label="WebDrop production summary">
+      <article>
+        <span class="summary-icon" data-tone="green" aria-hidden="true">✓</span>
+        <div><small data-i18n="server">Server</small><strong data-summary-server>Checking</strong><span data-summary-server-detail>Azure signaling</span></div>
+      </article>
+      <article>
+        <span class="summary-icon" aria-hidden="true">▣</span>
+        <div><small data-i18n="devicesOnline">Devices online</small><strong data-summary-devices>0</strong><span data-summary-devices-detail>0 physical devices</span></div>
+      </article>
+      <article>
+        <span class="summary-icon" aria-hidden="true">⌁</span>
+        <div><small data-i18n="activePairs">Active pairs</small><strong data-summary-pairs>0</strong><span data-i18n="verifiedConnections">Verified connections</span></div>
+      </article>
+      <article>
+        <span class="summary-icon" aria-hidden="true">◇</span>
+        <div><small data-i18n="appVersion">App version</small><strong data-admin-version>1.0.78</strong><span data-i18n="productionFrontend">Production frontend</span></div>
+      </article>
+    </section>
 
     <section class="admin-panel is-active" data-admin-panel="readiness" aria-labelledby="readiness-title">
-      <div class="operations-section-heading section-heading">
-        <p class="eyebrow" data-i18n="doneKicker">What is done</p>
-        <h2 id="readiness-title" data-i18n="launchMap">Launch map</h2>
+      <div class="section-intro">
+        <div>
+          <h1 id="readiness-title" data-i18n="readinessTitle">What is actually ready</h1>
+          <p data-i18n="readinessCopy">Live infrastructure is separated from work that still needs physical device proof.</p>
+        </div>
+        <span class="snapshot-label"><span data-i18n="lastUpdated">Last updated</span> <strong data-snapshot-time>now</strong></span>
       </div>
-      <div class="readiness-grid" data-readiness-grid></div>
-      <div class="operations-section-heading section-heading">
-        <p class="eyebrow" data-i18n="leftKicker">What is left</p>
-        <h2 data-i18n="productionBlockers">Production blockers</h2>
+      <div class="readiness-board" data-readiness-board></div>
+      <div class="readiness-note">
+        <span aria-hidden="true">i</span>
+        <p data-i18n="physicalProofNote">Items under “Needs physical proof” require two real devices and cannot be signed off by browser tests alone.</p>
       </div>
-      <div class="blocker-list" data-blocker-list></div>
     </section>
 
     <section class="admin-panel" data-admin-panel="live" aria-labelledby="live-title">
-      <div class="operations-section-heading section-heading">
-        <p class="eyebrow" data-i18n="liveTracking">Live tracking</p>
-        <h2 id="live-title" data-i18n="liveTitle">Devices, transfer, ICE, and server probes</h2>
+      <div class="section-intro">
+        <div>
+          <h1 id="live-title" data-i18n="liveTitle">Live testing</h1>
+          <p data-i18n="liveCopy">Watch connected phones, inspect one device continuously, and understand each signal without reading raw logs.</p>
+        </div>
+        <label class="poll-control">
+          <input data-live-poll type="checkbox" checked>
+          <span data-i18n="liveUpdates">Live updates</span>
+        </label>
       </div>
 
-      <div class="live-grid">
-        <article class="operations-panel admin-card span-2">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow" data-i18n="signaling">Signaling</p>
-              <h3 data-i18n="websocketMonitor">WebSocket session monitor</h3>
-            </div>
-            <span class="status-pill" data-ws-status>Disconnected</span>
+      <div class="live-workspace">
+        <section class="workspace-section devices-section" aria-labelledby="devices-title">
+          <div class="workspace-heading">
+            <div><small data-i18n="serverAndDevices">Server & devices</small><h2 id="devices-title" data-i18n="connectedDevices">Connected devices</h2></div>
+            <span class="inline-status"><i></i><span data-i18n="signalingConnected">Signaling connected</span></span>
           </div>
-          <label class="operations-field admin-field">
-            <span data-i18n="wssEndpoint">WSS endpoint</span>
-            <input data-ws-url type="url" placeholder="wss://signal.example.com/ws">
-          </label>
-          <label class="operations-field admin-field">
-            <span data-i18n="clientName">Client name</span>
-            <input data-client-name type="text" maxlength="60" value="Admin Test Device">
-          </label>
-          <div class="button-row">
-            <button class="primary-button" type="button" data-action="ws-connect" data-i18n="connect">Connect</button>
-            <button type="button" data-action="ws-ping" data-i18n="ping">Ping</button>
-            <button type="button" data-action="ws-disconnect" data-i18n="disconnect">Disconnect</button>
+          <div class="device-list-head" aria-hidden="true">
+            <span data-i18n="device">Device</span><span data-i18n="platform">Platform</span><span data-i18n="lastSeen">Last seen</span>
           </div>
-          <dl class="session-facts" data-session-facts>
-            <div>
-              <dt data-i18n="clientId">Client id</dt>
-              <dd data-session-client>Not connected</dd>
-            </div>
-            <div>
-              <dt data-i18n="sessionId">Session id</dt>
-              <dd data-session-id>Not connected</dd>
-            </div>
-            <div>
-              <dt data-i18n="turnAccessToken">TURN access token</dt>
-              <dd data-session-turn-token>Not issued</dd>
-            </div>
-          </dl>
-          <div class="device-table" data-device-table>
-            <p class="empty-note">No live signaling peers yet.</p>
+          <div class="device-list" data-device-list>
+            <p class="empty-row" data-i18n="noDevices">No physical devices are connected.</p>
           </div>
-          <pre class="event-log" data-ws-log aria-live="polite"></pre>
-        </article>
+          <p class="list-footer"><span data-device-count-copy>0 devices</span><span data-i18n="selectDeviceHelp">Select a device to inspect it</span></p>
+        </section>
 
-        <article class="operations-panel admin-card">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow" data-i18n="server">Server</p>
-              <h3 data-i18n="apiProbes">API probes</h3>
-            </div>
+        <section class="workspace-section monitor-section" aria-labelledby="monitor-title">
+          <div class="workspace-heading">
+            <div><small data-i18n="acousticInspection">Acoustic inspection</small><h2 id="monitor-title" data-i18n="continuousMonitor">Continuous ultrasonic monitor</h2></div>
+            <span class="monitor-status" data-monitor-status="idle"><i></i><span data-monitor-status-copy data-i18n="idle">Idle</span></span>
           </div>
-          <label class="operations-field admin-field">
-            <span data-i18n="httpBase">HTTP base</span>
-            <input data-http-base type="url" placeholder="https://signal.example.com">
-          </label>
-          <label class="operations-field admin-field">
-            <span data-i18n="bearerToken">Bearer token</span>
-            <input data-bearer-token type="password" placeholder="optional">
-          </label>
-          <div class="button-row">
-            <button class="primary-button" type="button" data-action="probe-health" data-i18n="health">Health</button>
-            <button type="button" data-action="probe-ready" data-i18n="readiness">Readiness</button>
-            <button type="button" data-action="probe-ice" data-i18n="iceServers">ICE servers</button>
-            <button type="button" data-action="probe-metrics" data-i18n="metrics">Metrics</button>
+          <div class="monitor-controls">
+            <label>
+              <span data-i18n="selectConnectedDevice">Select a connected device</span>
+              <select data-monitor-device>
+                <option value="" data-i18n="chooseDevice">Choose a device</option>
+              </select>
+            </label>
+            <button class="start-button" type="button" data-action="monitor-start"><span aria-hidden="true">▶</span><span data-i18n="startMonitoring">Start monitoring</span></button>
+            <button class="stop-button" type="button" data-action="monitor-stop" disabled><span aria-hidden="true">■</span><span data-i18n="stop">Stop</span></button>
           </div>
-          <pre class="event-log compact" data-api-output></pre>
-        </article>
+          <p class="monitor-explainer" data-monitor-explainer data-i18n="monitorExplainer">The selected phone must have opened WebDrop audio from a user tap. Monitoring continues until Stop is pressed.</p>
+          <div class="frequency-lane" data-frequency-lane>
+            <span class="frequency-band" style="--start:20%;--width:27%"></span>
+            <div><b>18 kHz</b><b>19 kHz</b><b>20 kHz</b><b>21 kHz</b></div>
+          </div>
+          <div class="metric-table" data-monitor-metrics></div>
+          <div class="metric-legend">
+            <span data-tone="good"><i></i><span data-i18n="goodRange">Good: within expected range</span></span>
+            <span data-tone="warn"><i></i><span data-i18n="marginalRange">Marginal: check conditions</span></span>
+            <span data-tone="bad"><i></i><span data-i18n="poorRange">Poor: investigate</span></span>
+          </div>
+        </section>
 
-        <article class="operations-panel admin-card">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow">ICE</p>
-              <h3 data-i18n="candidateLab">Candidate lab</h3>
-            </div>
-            <span class="status-pill" data-ice-status>Idle</span>
+        <section class="workspace-section timeline-section" aria-labelledby="timeline-title">
+          <div class="workspace-heading">
+            <div><small data-i18n="recentActivity">Recent activity</small><h2 id="timeline-title" data-i18n="eventTimeline">Event timeline</h2></div>
+            <button class="quiet-button" type="button" data-action="timeline-clear" data-i18n="clear">Clear</button>
           </div>
-          <label class="operations-field admin-field">
-            <span data-i18n="iceServerUrl">ICE server URL</span>
-            <input data-ice-url type="text" value="stun:stun.l.google.com:19302">
-          </label>
-          <button class="primary-button" type="button" data-action="ice-gather" data-i18n="gatherCandidates">Gather candidates</button>
-          <div class="candidate-list" data-candidate-list>
-            <p class="empty-note">Candidate type, protocol, IP family, and relay/direct hints appear here.</p>
+          <div class="event-timeline" data-event-timeline>
+            <p class="empty-row" data-i18n="noEvents">No events yet.</p>
           </div>
-        </article>
-
-        <article class="operations-panel admin-card span-2">
-          <div class="card-head">
-            <div>
-              <p class="eyebrow" data-i18n="transfer">Transfer</p>
-              <h3 data-i18n="transferSimulator">File manifest and speed simulator</h3>
-            </div>
-            <span class="status-pill" data-transfer-status>Idle</span>
-          </div>
-          <label class="file-drop">
-            <input data-file-input type="file" multiple>
-            <span data-i18n="selectTestFiles">Select test files</span>
-            <small data-i18n="selectTestFilesHelp">Builds the same kind of manifest WebDrop sends before DataChannel chunks.</small>
-          </label>
-          <div class="button-row">
-            <button class="primary-button" type="button" data-action="simulate-transfer" data-i18n="simulateTransfer">Simulate transfer</button>
-            <button type="button" data-action="reset-transfer" data-i18n="reset">Reset</button>
-          </div>
-          <div class="transfer-meter">
-            <span data-transfer-bar></span>
-          </div>
-          <div class="transfer-summary" data-transfer-summary></div>
-        </article>
+        </section>
       </div>
+
+      <section class="session-section" aria-labelledby="sessions-title">
+        <div class="workspace-heading">
+          <div><small data-i18n="physicalMatching">Physical matching</small><h2 id="sessions-title" data-i18n="activeSessions">Active proximity sessions</h2></div>
+          <span data-session-count>0 active</span>
+        </div>
+        <div class="session-table" data-session-table>
+          <p class="empty-row" data-i18n="noSessions">No active proximity sessions.</p>
+        </div>
+      </section>
     </section>
+
+    <footer class="admin-footer">
+      <span><i></i><span data-i18n="pollingEverySecond">Live data refreshes every second</span></span>
+      <span><span data-i18n="serverTime">Server time</span> <strong data-server-time>--:--:--</strong></span>
+    </footer>
+    <p class="page-error" data-admin-error hidden></p>
   </main>
 
-  <script src="../js/config/runtime-config.js?v=1.0.77"></script>
-  <script src="../js/admin/readiness.js?v=1.0.77" type="module"></script>
+  <script src="../js/config/runtime-config.js?v=1.0.78"></script>
+  <script src="../js/admin/readiness.js?v=1.0.78" type="module"></script>
 </body>
 </html>
