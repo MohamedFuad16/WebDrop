@@ -81,3 +81,19 @@ test("TURN provider throws instead of falling back when fallback is disabled", a
     /Cloudflare TURN credential request failed with 400/
   );
 });
+
+test("TURN credential cache sweeps expired entries and stays bounded", () => {
+  const provider = new TurnConfigProvider({ env: baseEnv });
+
+  provider.cache.set("stale", { iceServers: [], expiresAt: Date.now() - 1000 });
+  provider.lastPruneAt = 0;
+  provider.rememberIceServers("fresh", [{ urls: ["stun:stun.cloudflare.com:3478"] }], 30);
+
+  assert.equal(provider.cache.has("stale"), false);
+  assert.equal(provider.cache.has("fresh"), true);
+
+  for (let index = 0; index < 6000; index += 1) {
+    provider.rememberIceServers(`client-${index}`, [{ urls: ["stun:stun.cloudflare.com:3478"] }], 30);
+  }
+  assert.ok(provider.cache.size <= 5000, `cache should be bounded, saw ${provider.cache.size}`);
+});

@@ -1,6 +1,37 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateRoutedMessage } from "../src/message-schema.js";
+import { parseJsonMessage, ProtocolError, validateRoutedMessage } from "../src/message-schema.js";
+
+test("parseJsonMessage enforces the JSON byte cap and rejects non-JSON frames", () => {
+  const maxBytes = 256;
+  const fits = JSON.stringify({ type: "client:ping", payload: { pad: "x".repeat(64) } });
+  assert.ok(Buffer.byteLength(fits, "utf8") <= maxBytes);
+  assert.deepEqual(parseJsonMessage(fits, maxBytes).type, "client:ping");
+
+  const oversized = JSON.stringify({ type: "client:ping", payload: { pad: "x".repeat(maxBytes) } });
+  assert.throws(() => parseJsonMessage(oversized, maxBytes), (error) => {
+    assert.ok(error instanceof ProtocolError);
+    assert.equal(error.code, "message_too_large");
+    return true;
+  });
+
+  assert.throws(() => parseJsonMessage(Buffer.from("{}"), maxBytes), (error) => {
+    assert.equal(error.code, "binary_not_allowed");
+    return true;
+  });
+  assert.throws(() => parseJsonMessage("not json", maxBytes), (error) => {
+    assert.equal(error.code, "invalid_json");
+    return true;
+  });
+  assert.throws(() => parseJsonMessage("[]", maxBytes), (error) => {
+    assert.equal(error.code, "invalid_message");
+    return true;
+  });
+  assert.throws(() => parseJsonMessage(JSON.stringify({ payload: {} }), maxBytes), (error) => {
+    assert.equal(error.code, "missing_type");
+    return true;
+  });
+});
 
 test("rtc:signal SDP preserves line boundaries and avoids truncation", () => {
   const mediaLines = Array.from({ length: 700 }, (_, index) => `a=x-webdrop-test-${index}:0123456789`);

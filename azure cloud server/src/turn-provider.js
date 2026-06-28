@@ -1,6 +1,8 @@
 const CLOUDFLARE_TURN_URL = "https://rtc.live.cloudflare.com/v1/turn/keys";
 const DEFAULT_TTL_SECONDS = 86400;
 const MAX_TTL_SECONDS = 172800;
+const MAX_CACHE_ENTRIES = 5000;
+const CACHE_PRUNE_INTERVAL_MS = 30000;
 
 export class TurnConfigProvider {
   constructor({ env = process.env, fetchImpl = fetch, logger } = {}) {
@@ -8,6 +10,7 @@ export class TurnConfigProvider {
     this.fetchImpl = fetchImpl;
     this.logger = logger;
     this.cache = new Map();
+    this.lastPruneAt = 0;
   }
 
   async getIceServers({ customIdentifier } = {}) {
@@ -55,11 +58,30 @@ export class TurnConfigProvider {
       throw new Error("Cloudflare TURN response did not include iceServers.");
     }
 
-    this.cache.set(cacheKey, {
-      iceServers: data.iceServers,
-      expiresAt: Date.now() + cacheSeconds * 1000
-    });
+    this.rememberIceServers(cacheKey, data.iceServers, cacheSeconds);
     return data.iceServers;
+  }
+
+  // Keeps the per-identifier credential cache from growing without bound. Expired
+  // entries are swept on a throttle, and a hard ceiling evicts the oldest entries
+  // (Map preserves insertion order) so a churn of unique client ids cannot leak.
+  rememberIceServers(cacheKey, iceServers, cacheSeconds) {
+    const now = Date.now();
+    if (now - this.lastPruneAt > CACHE_PRUNE_INTERVAL_MS) {
+      for (const [key, entry] of this.cache) {
+        if (entry.expiresAt <= now) this.cache.delete(key);
+      }
+      this.lastPruneAt = now;
+    }
+    this.cache.set(cacheKey, {
+      iceServers,
+      expiresAt: now + cacheSeconds * 1000
+    });
+    while (this.cache.size > MAX_CACHE_ENTRIES) {
+      const oldest = this.cache.keys().next().value;
+      if (oldest === undefined) break;
+      this.cache.delete(oldest);
+    }
   }
 
   getRelayPolicy() {

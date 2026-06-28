@@ -54,7 +54,10 @@ export class SignalingHub {
   constructor({ server, path = "/ws", logger, maxJsonBytes = 131072, heartbeatIntervalMs = 25000, sessionTtlMs = 900000, pairingTtlMs = 120000, proximityAnalyzer, qrTokenProvider, metrics } = {}) {
     this.wss = new WebSocketServer({
       noServer: true,
-      maxPayload: maxJsonBytes * 4
+      // Enforce the JSON size cap at the protocol layer so oversized or binary
+      // frames are rejected by ws before they are buffered/stringified, instead
+      // of allowing several times the documented limit through to the app check.
+      maxPayload: maxJsonBytes
     });
     this.path = path;
     this.logger = logger;
@@ -66,6 +69,7 @@ export class SignalingHub {
     this.qrTokenProvider = qrTokenProvider;
     this.metrics = metrics;
     this.clients = new Map();
+    this.turnTokens = new Map();
     this.pendingInvites = new Map();
     this.activePairs = new Map();
     this.proximityDecisions = new Map();
@@ -207,6 +211,7 @@ export class SignalingHub {
     };
     this.clients.set(client.id, client);
     this.socketToClient.set(socket, client);
+    this.turnTokens.set(client.turnAccessToken, client);
     this.metrics?.recordEvent("client:joined", {
       clientId: client.id,
       deviceName: client.deviceName,
@@ -1035,14 +1040,12 @@ export class SignalingHub {
 
   authenticateTurnRequest(token, clientId) {
     if (!token) return null;
-    for (const client of this.clients.values()) {
-      if (client.turnAccessToken !== token) continue;
-      if (clientId && client.id !== clientId) return null;
-      client.lastSeenAt = Date.now();
-      if (client.pairingId) this.touchPair(client.pairingId);
-      return client;
-    }
-    return null;
+    const client = this.turnTokens.get(token);
+    if (!client || this.clients.get(client.id) !== client) return null;
+    if (clientId && client.id !== clientId) return null;
+    client.lastSeenAt = Date.now();
+    if (client.pairingId) this.touchPair(client.pairingId);
+    return client;
   }
 
   clearPair(pairingId) {
@@ -1175,14 +1178,23 @@ export class SignalingHub {
   }
 
   broadcast(type, payload, { exceptId } = {}) {
+    // Serialize the frame once instead of re-stringifying the (potentially large)
+    // peer list for every recipient. This keeps fan-out broadcasts O(n) rather
+    // than O(n^2) on the hot join/leave path.
+    const frame = JSON.stringify({ type, payload });
     for (const client of this.clients.values()) {
-      if (client.id !== exceptId) this.send(client.socket, type, payload);
+      if (client.id === exceptId) continue;
+      const socket = client.socket;
+      if (socket.readyState === WebSocket.OPEN) socket.send(frame);
     }
   }
 
   removeClient(socket, reason) {
     const client = this.socketToClient.get(socket);
     if (!client) return;
+    if (this.turnTokens.get(client.turnAccessToken) === client) {
+      this.turnTokens.delete(client.turnAccessToken);
+    }
     if (this.clients.get(client.id) !== client) {
       this.socketToClient.delete(socket);
       return;
@@ -1292,6 +1304,12 @@ export class SignalingHub {
 
   close() {
     clearInterval(this.heartbeatTimer);
+    for (const session of this.proximitySessions.values()) {
+      clearTimeout(session.timer);
+      clearTimeout(session.failTimer);
+    }
+    this.proximitySessions.clear();
+    this.openProximitySessionId = null;
     this.adminMonitors.clear();
     for (const client of this.clients.values()) client.socket.close();
     this.wss.close();

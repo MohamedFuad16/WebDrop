@@ -6,7 +6,7 @@ const REDACTED_KEYS = new Set([
   "turnApiToken",
   "apiToken"
 ]);
-const SECRET_KEY_PATTERN = /(authorization|bearer|token|secret|credential|password|iceServers)/i;
+const SECRET_KEY_PATTERN = /(authorization|bearer|token|secret|credential|password|iceServers|sdp)/i;
 
 export function createLogger(scope = "webdrop") {
   return {
