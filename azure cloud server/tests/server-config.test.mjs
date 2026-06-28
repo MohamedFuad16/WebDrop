@@ -53,7 +53,7 @@ test("enabled metrics require a non-placeholder token", () => {
   );
 });
 
-test("diagnostics snapshot keeps private auth and exposes safe public status", async () => {
+test("consolidated diagnostics endpoint rejects un-tokened reads and serves the bounded payload with the metrics token", async () => {
   const { server, hub } = createWebDropServer({
     env: {
       NODE_ENV: "test",
@@ -67,21 +67,27 @@ test("diagnostics snapshot keeps private auth and exposes safe public status", a
   const address = server.address();
   const base = `http://127.0.0.1:${address.port}`;
   try {
-    const publicSnapshot = await fetch(`${base}/api/diagnostics-public`);
-    assert.equal(publicSnapshot.status, 200);
-    const publicBody = await publicSnapshot.json();
-    assert.deepEqual(publicBody.signaling.clients, []);
-    assert.deepEqual(publicBody.signaling.pairs, []);
-    assert.deepEqual(publicBody.signaling.proximitySessions, []);
-    assert.equal(publicBody.signaling.protocol.scoreMinimum, 0.55);
-    assert.equal(publicBody.signaling.protocol.maxClients, 6);
-    assert.equal(publicBody.signaling.protocol.acousticSlotCorrelationMin, 0.2);
-    assert.ok(Array.isArray(publicBody.metrics.recentEvents));
-
-    const unauthorized = await fetch(`${base}/api/diagnostics-snapshot`);
+    // No bearer token: the once-public diagnostics route now demands the same
+    // metrics token family as /api/metrics-summary.
+    const unauthorized = await fetch(`${base}/api/diagnostics-public`);
     assert.equal(unauthorized.status, 401);
+    const unauthorizedBody = await unauthorized.json();
+    assert.equal(unauthorizedBody.error, "unauthorized");
 
-    const authorized = await fetch(`${base}/api/diagnostics-snapshot`, {
+    const wrongToken = await fetch(`${base}/api/diagnostics-public`, {
+      headers: { Authorization: "Bearer not-the-token" }
+    });
+    assert.equal(wrongToken.status, 401);
+
+    // The legacy duplicate endpoint is gone; both names used to return the same
+    // shape, so only one authed route remains.
+    const retiredSnapshot = await fetch(`${base}/api/diagnostics-snapshot`, {
+      headers: { Authorization: "Bearer test-observability-token" }
+    });
+    assert.equal(retiredSnapshot.status, 404);
+
+    // Valid token from any source IP: bounded, metadata-only payload.
+    const authorized = await fetch(`${base}/api/diagnostics-public`, {
       headers: { Authorization: "Bearer test-observability-token" }
     });
     assert.equal(authorized.status, 200);
@@ -89,6 +95,9 @@ test("diagnostics snapshot keeps private auth and exposes safe public status", a
     assert.deepEqual(body.signaling.clients, []);
     assert.deepEqual(body.signaling.pairs, []);
     assert.deepEqual(body.signaling.proximitySessions, []);
+    assert.equal(body.signaling.protocol.scoreMinimum, 0.55);
+    assert.equal(body.signaling.protocol.maxClients, 6);
+    assert.equal(body.signaling.protocol.acousticSlotCorrelationMin, 0.2);
     assert.equal(body.signaling.protocol.acousticBandStartHz, 18600);
     assert.equal(body.signaling.protocol.acousticBandEndHz, 19400);
     assert.ok(Array.isArray(body.metrics.recentEvents));
@@ -98,11 +107,33 @@ test("diagnostics snapshot keeps private auth and exposes safe public status", a
   }
 });
 
-test("public diagnostics remain available when private metrics are disabled", async () => {
+test("per-IP HTTP rate limiting rejects a burst on /api endpoints", async () => {
+  const { server, hub } = createWebDropServer({
+    env: { NODE_ENV: "test", REQUIRE_TURN_AUTH: "false" },
+    logger: { info() {}, warn() {}, error() {} }
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const responses = await Promise.all(
+      Array.from({ length: 80 }, () => fetch(`${base}/api/relay-policy`))
+    );
+    const statuses = responses.map((response) => response.status);
+    await Promise.all(responses.map((response) => response.body?.cancel?.()));
+    assert.ok(statuses.includes(429), "expected at least one rate-limited response");
+    assert.ok(statuses.includes(200), "expected at least one allowed response");
+  } finally {
+    hub.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("diagnostics endpoint is gated by ENABLE_METRICS_ENDPOINT", async () => {
   const { server, hub } = createWebDropServer({
     env: {
       NODE_ENV: "test",
       ENABLE_METRICS_ENDPOINT: "false",
+      METRICS_API_TOKEN: "test-observability-token",
       REQUIRE_TURN_AUTH: "false"
     },
     logger: { info() {}, warn() {}, error() {} }
@@ -111,11 +142,15 @@ test("public diagnostics remain available when private metrics are disabled", as
   const address = server.address();
   const base = `http://127.0.0.1:${address.port}`;
   try {
-    const publicSnapshot = await fetch(`${base}/api/diagnostics-public`);
-    assert.equal(publicSnapshot.status, 200);
+    // With metrics disabled the diagnostics feed is not mounted at all, even
+    // with a valid token, so the dashboard reports the route as undeployed.
+    const withToken = await fetch(`${base}/api/diagnostics-public`, {
+      headers: { Authorization: "Bearer test-observability-token" }
+    });
+    assert.equal(withToken.status, 404);
 
-    const privateSnapshot = await fetch(`${base}/api/diagnostics-snapshot`);
-    assert.equal(privateSnapshot.status, 404);
+    const withoutToken = await fetch(`${base}/api/diagnostics-public`);
+    assert.equal(withoutToken.status, 404);
   } finally {
     hub.close();
     await new Promise((resolve) => server.close(resolve));

@@ -26,6 +26,10 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
   const metrics = new ServerMetrics();
   const allowedOrigins = parseAllowedOrigins(env.ALLOWED_ORIGINS);
   const httpRateLimits = new TokenBucket({ capacity: 60, refillPerSecond: 10 });
+  // The per-IP HTTP rate-limit map would otherwise accumulate one entry per
+  // distinct source address forever; sweep idle buckets periodically.
+  const httpRateLimitSweeper = setInterval(() => httpRateLimits.sweep(), 60000);
+  httpRateLimitSweeper.unref?.();
 
   const server = http.createServer(async (request, response) => {
     try {
@@ -136,15 +140,15 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
         return;
       }
 
-      if (request.method === "GET" && url.pathname === "/api/diagnostics-public") {
-        sendJson(response, 200, diagnosticsPayload({ hub, metrics }), {
-          "Cache-Control": "no-store",
-          ...(corsHeaders || {})
-        });
-        return;
-      }
-
-      if (request.method === "GET" && url.pathname === "/api/diagnostics-snapshot" && env.ENABLE_METRICS_ENDPOINT === "true") {
+      // Bounded operations diagnostics for the admin dashboard. This route was
+      // previously split into an UNAUTHENTICATED `/api/diagnostics-public` and a
+      // token-gated `/api/diagnostics-snapshot` that returned the identical
+      // payload. They are consolidated into this single endpoint, which now
+      // always requires the metrics bearer token. There is intentionally no IP
+      // allowlist: any source address may read it *with* a valid token. The
+      // payload stays metadata-only (no TURN credentials, QR tokens, raw
+      // microphone samples, or file bytes).
+      if (request.method === "GET" && url.pathname === "/api/diagnostics-public" && env.ENABLE_METRICS_ENDPOINT === "true") {
         if (!hasMetricsAuthorization(request, env.METRICS_API_TOKEN)) {
           sendJson(response, 401, { error: "unauthorized" }, corsHeaders || {});
           return;
@@ -166,6 +170,8 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
       }, allowedOriginHeaders(request.headers.origin, allowedOrigins) || {});
     }
   });
+
+  server.on("close", () => clearInterval(httpRateLimitSweeper));
 
   let hub;
   hub = new SignalingHub({

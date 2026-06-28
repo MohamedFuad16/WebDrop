@@ -22,9 +22,9 @@ Use [deployment-sizing.md](deployment-sizing.md) before selecting an Azure VM si
 
 - Enable `ENABLE_METRICS_ENDPOINT=true` on the signaling server.
 - Set a strong, non-placeholder `METRICS_API_TOKEN`.
-- Open `/admin/diagnostics.html`. The production signaling base is derived from runtime configuration and requires no browser-entered token.
-- `/api/diagnostics-public` exposes bounded device, pairing, proximity-session, protocol, event, and acoustic telemetry for the live operations page.
-- `/api/metrics-summary` and `/api/diagnostics-snapshot` remain protected by `METRICS_API_TOKEN`.
+- Open `/admin/` (the old `/admin/diagnostics.html` redirects to the live testing tab). The production signaling base is derived from runtime configuration.
+- `/api/diagnostics-public` exposes bounded device, pairing, proximity-session, protocol, event, and acoustic telemetry for the live operations page. It and `/api/metrics-summary` both require the `METRICS_API_TOKEN` bearer token (no IP allowlist; the old unauthenticated/duplicate `/api/diagnostics-snapshot` route was consolidated into `/api/diagnostics-public`).
+- The dashboard auto-fills the token on the operator's machine from the gitignored `js/config/local-admin-token.js`. Operators on another machine paste the token once when prompted; it is stored only in `sessionStorage` and never committed.
 - The dashboard never requests its own microphone. It shows only bounded telemetry reported by connected devices, and raw microphone samples never leave those devices.
 
 Edit only `js/config/runtime-config.js`:

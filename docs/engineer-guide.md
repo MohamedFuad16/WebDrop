@@ -106,4 +106,4 @@ For future runtime edits, verify:
 - Configure long-lived Cloudflare TURN credentials only in the Azure VM environment file.
 - Run physical iOS/Android calibration before enabling proximity enforcement server-side.
 - Keep any WebSocket message additions schema-validated and metadata-only.
-- Keep `/api/diagnostics-snapshot` behind `METRICS_API_TOKEN`. `/api/diagnostics-public` may be unauthenticated only because it returns bounded metadata and never raw microphone audio.
+- Keep `/api/diagnostics-public` behind `METRICS_API_TOKEN` (same token family as `/api/metrics-summary`). It returns bounded metadata only and never raw microphone audio. The duplicate `/api/diagnostics-snapshot` route was consolidated into it; do not reintroduce an unauthenticated diagnostics route.

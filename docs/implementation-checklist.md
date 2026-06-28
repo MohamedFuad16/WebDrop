@@ -71,7 +71,7 @@ This is the source of truth for the production-readiness package. `Ready, live` 
 | Cloudflare temporary TURN credentials | Ready, live | `azure cloud server/src/turn-provider.js`, `azure cloud server/tests/turn-provider.test.mjs`, live relay E2E |
 | Direct/relay path metrics | Ready, live | `azure cloud server/src/metrics.js`, `azure cloud server/src/signaling-hub.js` |
 | Payload-safe observability | Ready, live | `azure cloud server/src/logger.js`, protected metrics endpoint |
-| Public bounded operations diagnostics | Ready, live | `/api/diagnostics-public`, `admin/diagnostics.html`, `js/admin/diagnostics.js` |
+| Token-gated bounded operations diagnostics | Ready, live | `/api/diagnostics-public` (metrics token), `admin/index.html`, `js/admin/readiness.js`, `js/admin/diagnostics-api.js` |
 | Shared English/Japanese operations UI | Ready, live | `css/operations.css`, `js/admin/operations-i18n.js`, admin E2E coverage |
 | nginx, Certbot, systemd, Azure VM scripts, and load-test assets | Ready, unconfigured | `azure cloud server/nginx/`, `systemd/`, `scripts/`, `load/` |
 

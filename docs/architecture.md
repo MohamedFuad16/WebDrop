@@ -57,13 +57,14 @@ The WebSocket lane owns:
 
 It must reject binary payloads, cap message sizes, validate origin/session tokens, and rate-limit pairing attempts.
 
-The public `/api/diagnostics-public` endpoint powers the operations dashboard
-with bounded metadata only: connected-client summaries, proximity-session
-state, acoustic capabilities and decoded evidence, protocol thresholds, and
-recent event summaries. The protected `/api/diagnostics-snapshot`
-endpoint keeps the same metadata shape behind the metrics bearer token used by
-`/api/metrics-summary`. Neither endpoint exposes TURN credentials, QR tokens,
-raw microphone samples, or transferred file bytes.
+The `/api/diagnostics-public` endpoint powers the operations dashboard with
+bounded metadata only: connected-client summaries, proximity-session state,
+acoustic capabilities and decoded evidence, protocol thresholds, and recent
+event summaries. It now requires the metrics bearer token used by
+`/api/metrics-summary` (the previously separate, identically-shaped
+`/api/diagnostics-snapshot` route was folded into it). There is no IP allowlist:
+any source address may read it with a valid token. The endpoint never exposes
+TURN credentials, QR tokens, raw microphone samples, or transferred file bytes.
 
 ### Data lane
 
