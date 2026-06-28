@@ -187,6 +187,32 @@ while the configuration that points at the live server stays current.
 socket; either side can send a message at any time. `wss://` is just WebSocket
 over TLS (encrypted), the way `https://` is HTTP over TLS.
 
+**How the upgrade works (on the wire).** A WebSocket begins life as a normal HTTP
+request that asks to be "upgraded":
+
+```http
+GET /ws HTTP/1.1
+Host: webdrop-wss-0618.japaneast.cloudapp.azure.com
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+Sec-WebSocket-Version: 13
+```
+
+The server proves it understood the protocol by hashing that key into a reply and
+switching protocols:
+
+```http
+HTTP/1.1 101 Switching Protocols
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
+```
+
+After the `101`, the same TCP connection is no longer HTTP — it carries
+WebSocket *frames* both ways until either side closes. With `wss://`, TLS wraps
+the whole exchange and the edge proxy (nginx) handles the certificate.
+
 **How WebDrop uses it.** The browser opens `wss://…/ws`
 (`js/services/websocket-signaling.js`). On the server, **nginx terminates TLS**
 and forwards the upgraded connection to the Node process bound to
@@ -234,18 +260,33 @@ them:
 - `srflx` (server-reflexive) — your public address as seen by a **STUN** server.
 - `relay` — an address on a **TURN** relay server.
 
+ICE then runs in three phases: (1) **gather** the candidates above and trickle
+them to the peer as they appear; (2) **connectivity checks** — probe every
+local↔remote candidate pair with STUN binding requests (the outgoing probe is
+what punches the NAT hole the reply needs); (3) **nominate** the highest-priority
+pair that works, preferring `host`/`srflx` over `relay`, and fail over if it
+dies. **NAT type decides whether direct works:** full/restricted-cone NATs reuse
+one public port and are direct-friendly, but **symmetric NAT** (a fresh public
+port per destination) defeats hole-punching and is the classic reason a call
+falls back to a `relay`.
+
 WebDrop fetches its ICE servers from `GET /api/ice-servers` (authenticated with
 the ephemeral token). The backend (`turn-provider.js`) asks Cloudflare to mint
 **short-lived** TURN credentials, so the long-lived Cloudflare key never reaches
 the browser. If the backend is unreachable, `turn-config.js` falls back to
 Cloudflare **STUN only** (`stun:stun.cloudflare.com:3478`). After connecting,
-`classifyPathFromStats()` labels the path `direct` or `relay`, and the UI caps
-relay transfers at 500 MB (relay bandwidth is metered).
+`classifyPathFromStats()` inspects the selected candidate pair and labels the
+path `direct` or `relay`, and the UI caps relay transfers at 500 MB (relay
+bandwidth is metered).
 
-**DTLS/SCTP encryption.** WebRTC data channels run SCTP over DTLS — meaning
-every byte is encrypted in transit by the browser stack, automatically. WebDrop
-still layers its own manifests, byte-count checks, and SHA-256 on top, because
-encryption doesn't define *file boundaries* or *integrity*.
+**DTLS/SCTP encryption.** Once ICE picks a path, the browsers run a **DTLS
+handshake** (TLS for datagrams): they exchange certificates and verify each
+other's fingerprint — and that fingerprint was already pinned inside the SDP
+`a=fingerprint` line, so a tamperer can't slip in. **SCTP** then runs over that
+encrypted channel to give ordered, reliable, message-framed delivery. So every
+byte is encrypted in transit by the browser stack, automatically. WebDrop still
+layers its own manifests, byte-count checks, and per-file SHA-256 on top, because
+encryption protects the *pipe*, not the *file boundaries* or *integrity*.
 
 **Why WebRTC:** it is the only widely-supported browser API for direct,
 encrypted, peer-to-peer byte transfer, and it keeps file bytes off the server.
@@ -272,6 +313,23 @@ receiver byte-count/`file:verified` confirmation. Each send and receive session
 is capped at 500 MB (`DEFAULT_SESSION_CAP_BYTES`). **Why 256 KiB:** small enough
 to keep buffering and retry bookkeeping cheap on mobile, large enough to avoid
 per-message overhead.
+
+**Backpressure, worked.** A 250 MB file at 256 KiB/chunk is ~1,000 chunks. Naively
+calling `channel.send()` 1,000 times in a loop would queue all 250 MB in the
+browser's send buffer and can crash the tab. Instead the sender pushes chunks
+until `bufferedAmount` crosses a high-water mark, pauses, and resumes on the
+`bufferedamountlow` event (fired when the backlog drains below
+`bufferedAmountLowThreshold`):
+
+```js
+if (channel.bufferedAmount > HIGH_WATER) {
+  await once(channel, "bufferedamountlow"); // let the network drain
+}
+channel.send(chunk);
+```
+
+So only a few chunks are ever in flight, regardless of file size — RAM stays
+bounded and the receiver/storage are never overrun.
 
 ### 4.7 IndexedDB receive ladder + StreamSaver
 
@@ -351,6 +409,20 @@ slot and back off on collision; WebDrop instead *reserves* slots centrally, whic
 is strictly more reliable for a small, known, server-coordinated cohort. (Framed
 Slotted Aloha remains a conceivable fallback if there were ever no coordinator.)
 
+**Worked schedule.** The 3,600 ms ceremony window is split into ~600 ms slots (a
+~520 ms coded chirp + ~80 ms guard). Each phone records the *whole* window but
+emits only in its own slot:
+
+```text
+Window:  |<-------------------- 3,600 ms -------------------->|
+Slot 1:  [ A emits | B,C,D listen ]
+Slot 2:               [ B emits | A,C,D listen ]
+Slot 3:                            [ C emits | A,B,D listen ]
+Slot 4:                                         [ D emits | ... ]
+```
+
+`floor(3600 / 600) = 6` slots fit, which is exactly why the per-cohort cap is 6.
+
 **Why:** it lets up to a per-cohort cap of devices chirp in one room without
 colliding, and it scales by opening **many concurrent bounded cohorts** (see
 §7.3).
@@ -366,6 +438,30 @@ generates codes with `qrcode-generator`.
 (`js/ui/dynamic-island.js`), and the server verifies issuer, scanner, expiry, and
 replay before creating the pair. **Why:** QR needs only a camera and a screen, so
 it is the universal fallback when the acoustic/motion ceremony can't run.
+
+### 4.12 The permissions model (mic / motion / camera)
+
+**What it is.** Browsers gate "powerful" sensors — microphone (`getUserMedia`),
+iOS device motion (`DeviceMotionEvent.requestPermission`), and camera — behind an
+explicit user gesture on a secure (HTTPS) origin. You cannot prompt for them from
+a timer or on page load.
+
+**How WebDrop uses it.** Permissions are requested **only** from the Connect/Scan
+gesture, then reused for the rest of the page load:
+
+- `ensureProximityPermissions` (`controller.js`) caches a single in-flight
+  request promise and persists results, so repeated ceremonies don't re-prompt.
+- The mic stream is kept **warm**: `stopAcousticCapture({ releaseStream: false })`
+  leaves the granted stream open between ceremonies, avoiding repeated
+  `getUserMedia()` calls.
+- iOS motion is **re-validated after a reload** only:
+  `MotionProximitySensor.restorePermission` resets a previously-granted state to
+  `"unknown"` on load (keeping `denied`/`unsupported`), matching iOS's rule that
+  motion must be re-confirmed from a fresh gesture after a reload.
+
+**Why:** this respects the platform's consent rules while avoiding a prompt storm,
+and it is why QR (camera, or even just a displayed code) is always the dependable
+fallback when mic/motion are denied or unsupported.
 
 ---
 
@@ -510,6 +606,28 @@ one room are acoustically reliable is a physical-device question. The path to
 10,000 is a config bump plus Redis/shared presence + sticky multi-node WS
 balancing (`azure cloud server/README.md`).
 
+**Why distant cohorts don't interfere.** Two reasons. (1) **Logical:** pairing is
+decided by *reciprocal coded signatures* + a winner margin, not by loudness or
+"who's nearby", so a stray chirp from another group carries the wrong signature
+and fails the match — cross-pairing is impossible by construction. (2)
+**Physical:** ultrasound (~18.6–19.4 kHz) is directional and attenuates fast, and
+concurrent cohorts are start-staggered (and sub-banded when the band is wide
+enough), so a group across the room is usually below threshold anyway. The only
+genuinely contended case is *many pairs in one small room on one band*.
+
+**Tuning knobs (and what each one trades).**
+
+| Knob | Default | Effect of raising it |
+| --- | ---: | --- |
+| `MAX_TOTAL_PROXIMITY_PARTICIPANTS` | 100 | More concurrent participants; only meaningful past ~one node with Redis + multi-node WS |
+| `MAX_PROXIMITY_SESSION_CLIENTS` | 6 | No effect unless the window grows — it is clamped to `floor(window / ~600 ms)` |
+| `PROXIMITY_SESSION_DURATION_MS` | 3,600 ms | Adds slots so bigger cohorts become legal; slower ceremony (4,800 ms ⇒ ceiling 8) |
+| `ACOUSTIC_SESSION_STAGGER_MS` | 600 ms | Spreads simultaneous cohort starts so they don't all chirp at once |
+| `ACOUSTIC_MAX_CONCURRENT_SUBBANDS` | 4 | Splits cohorts across frequency lanes — a no-op until the band is widened past ~420 Hz |
+
+Re-measure on real phones after changing any acoustic knob; band/gain/slot
+effects are physical-device dependent.
+
 ### 7.4 Proximity enforcement and the fail-safe winner-margin guard
 
 With `ENABLE_PROXIMITY_ANALYSIS=true` (live), the server blocks RTC/chat/path/
@@ -567,10 +685,18 @@ Health checks on the VM: `GET /healthz`, `GET /readyz`, `wss://…/ws`,
 - `output/screenshots/ui-elements-{en,ja}/` — UI captures used by
   `webdrop-complete-guide.md`, produced by `scripts/capture-ui-elements.cjs`.
   The UI hasn't changed materially; **do not** regenerate these for a docs pass.
-- `output/pdf/webdrop-demo-{en,ja}.pdf` — **demo transfer payloads** (sample
-  files to send during testing), generated by `scripts/generate-demo-pdfs.py`.
-  These are not the rendered guide.
-- The complete guide can be exported to PDF by rendering its Markdown with a
+- `output/pdf/webdrop-demo-{en,ja}.pdf` — the **rendered in-depth WebDrop guide**
+  (English + Japanese), generated by `scripts/generate-demo-pdfs.py` (reportlab).
+  It deepens this document and the concepts revision guide into a designed,
+  bilingual reference: first-principles explainers of every technology, the
+  three-lane architecture diagram, the UI state machine, the reservation-TDMA
+  schedule, the proximity scoring tables, the concurrent-cohort capacity model,
+  the multi-device pairing Q&A, and the UI catalog. The Japanese edition embeds
+  `assets/fonts/SourceHanSansJP-Normal-static.ttf` so CJK glyphs render. The same
+  polished PDF doubles as a realistic sample payload to send during demos.
+- `scripts/render_pdf_pages.py` renders any PDF's pages to PNGs (via `pypdfium2`)
+  for visual QA, per `docs`/the PDF skill.
+- The complete guide can also be exported to PDF by rendering its Markdown with a
   pipeline that honours its `page-break` CSS (see its "Print and PDF Render
   Guidance" section); there is no committed script for that export.
 
