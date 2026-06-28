@@ -9,6 +9,11 @@ const POLL_INTERVAL_MS = 1000;
 const MONITOR_INTERVAL_MS = 1000;
 const MONITOR_START_HZ = 18_600;
 const MONITOR_END_HZ = 19_400;
+// The diagnostics feed requires the metrics bearer token. On the operator's own
+// machine it is auto-loaded from the gitignored js/config/local-admin-token.js;
+// remote operators paste it once (kept only in sessionStorage, never committed).
+const ADMIN_TOKEN_STORAGE_KEY = "webdrop.adminToken";
+const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.86", import.meta.url);
 
 const ADMIN_MESSAGES = {
   en: {
@@ -43,7 +48,6 @@ const ADMIN_MESSAGES = {
     lastSeen: "Last seen",
     noDevices: "No physical devices are connected.",
     selectDeviceHelp: "Select a device to inspect it",
-    acousticInspection: "Acoustic inspection",
     continuousMonitor: "Continuous ultrasonic monitor",
     liveFrequencyMap: "Live frequency map",
     liveFrequencyMapCopy: "Actual microphone energy reported by the selected phone",
@@ -69,13 +73,33 @@ const ADMIN_MESSAGES = {
     eventTimeline: "Event timeline",
     clear: "Clear",
     noEvents: "No events yet.",
-    physicalMatching: "Physical matching",
     activeSessions: "Active proximity sessions",
     recentSessions: "Recent slot attempts",
     recentSessionCopy: "Finished sessions stay here briefly so you can inspect slots, evidence, and failure reasons.",
     singleDeviceTesting: "Single-device test",
     multiDeviceTesting: "Multi-device sessions",
     noSessions: "No active proximity sessions.",
+    sessionColumn: "Session",
+    phaseColumn: "Phase",
+    devicesColumn: "Devices",
+    scoreColumn: "Score & band",
+    timingColumn: "Timing",
+    scoreLabel: "score",
+    slot: "slot",
+    emitted: "emitted",
+    silent: "silent",
+    heard: "heard",
+    missed: "missed",
+    insufficient: "insufficient",
+    micReady: "mic",
+    evidenceLabel: "evidence",
+    soundShort: "snd",
+    bumpShort: "bump",
+    tiltShort: "tilt",
+    startedAgo: "started {age}",
+    endsIn: "ends in {seconds}s",
+    completing: "completing",
+    joinedAgo: "joined {age}",
     pollingEverySecond: "Live data refreshes every second",
     serverTime: "Server time",
     readyColumn: "Ready",
@@ -87,6 +111,17 @@ const ADMIN_MESSAGES = {
     connected: "Connected",
     offline: "Offline",
     turnReady: "TURN ready",
+    statusLive: "Live",
+    statusReady: "Ready",
+    statusProof: "Needs proof",
+    statusLater: "Later",
+    serverUnreachable: "Production server",
+    serverUnreachableCopy: "The diagnostics endpoint is not reachable from this browser.",
+    diagnosticsProtected: "Diagnostics need the operations token. Paste a valid token to continue.",
+    diagnosticsMissing: "The signaling server does not have the diagnostics route deployed yet.",
+    tokenPrompt: "Enter the WebDrop operations token to read live diagnostics:",
+    diagnosticsUnreachable: "The signaling server could not be reached. Check connectivity and allowed origins.",
+    phonesCount: "{count} phones",
     physicalDevices: "{count} physical devices",
     devicesCount: "{count} devices",
     activeCount: "{count} active",
@@ -151,11 +186,11 @@ const ADMIN_MESSAGES = {
       ["Admin operations shell", "This page now uses the production diagnostics feed and live WebSocket monitor.", "live"]
     ],
     proofItems: [
-      ["Proximity ceremony", "Not signed off. Ultrasound interpretation still needs real iPhone/Android proof.", "needs proof"],
-      ["iPhone acoustic calibration", "Need repeated live tests to confirm emitted slots are heard on the other phone.", "needs proof"],
-      ["Android acoustic calibration", "Android is no longer labeled unknown, but acoustic capture still needs real-device proof.", "needs proof"],
-      ["WebRTC file transfer", "Needs same-room direct and TURN relay proof after proximity pairing is stable.", "needs proof"],
-      ["View/download behavior", "Needs Android receive proof; iPhone behavior has been separately checked before.", "needs proof"]
+      ["Proximity ceremony", "Not signed off. Ultrasound interpretation still needs real iPhone/Android proof.", "proof"],
+      ["iPhone acoustic calibration", "Need repeated live tests to confirm emitted slots are heard on the other phone.", "proof"],
+      ["Android acoustic calibration", "Android is no longer labeled unknown, but acoustic capture still needs real-device proof.", "proof"],
+      ["WebRTC file transfer", "Needs same-room direct and TURN relay proof after proximity pairing is stable.", "proof"],
+      ["View/download behavior", "Needs Android receive proof; iPhone behavior has been separately checked before.", "proof"]
     ],
     laterItems: [
       ["10,000-client load testing", "Run after the physical handshake is stable.", "later"],
@@ -195,7 +230,6 @@ const ADMIN_MESSAGES = {
     lastSeen: "最終確認",
     noDevices: "物理端末は接続されていません。",
     selectDeviceHelp: "端末を選ぶと監視できます",
-    acousticInspection: "音響検査",
     continuousMonitor: "超音波の継続モニター",
     liveFrequencyMap: "ライブ周波数マップ",
     liveFrequencyMapCopy: "選択端末のマイクが報告した実際の音響エネルギー",
@@ -221,13 +255,33 @@ const ADMIN_MESSAGES = {
     eventTimeline: "イベントタイムライン",
     clear: "クリア",
     noEvents: "イベントはまだありません。",
-    physicalMatching: "物理マッチング",
     activeSessions: "近接セッション",
     recentSessions: "直近のスロット試行",
     recentSessionCopy: "終了したセッションも短時間ここに残し、スロット、証拠、失敗理由を確認できます。",
     singleDeviceTesting: "単体端末テスト",
     multiDeviceTesting: "複数端末セッション",
     noSessions: "アクティブな近接セッションはありません。",
+    sessionColumn: "セッション",
+    phaseColumn: "フェーズ",
+    devicesColumn: "端末",
+    scoreColumn: "スコアと帯域",
+    timingColumn: "タイミング",
+    scoreLabel: "スコア",
+    slot: "スロット",
+    emitted: "送信",
+    silent: "無音",
+    heard: "受信",
+    missed: "未受信",
+    insufficient: "不十分",
+    micReady: "マイク",
+    evidenceLabel: "証拠",
+    soundShort: "音",
+    bumpShort: "バンプ",
+    tiltShort: "傾き",
+    startedAgo: "{age}開始",
+    endsIn: "残り{seconds}秒",
+    completing: "完了処理中",
+    joinedAgo: "{age}参加",
     pollingEverySecond: "ライブデータは 1 秒ごとに更新されます",
     serverTime: "サーバー時刻",
     readyColumn: "準備済み",
@@ -239,6 +293,17 @@ const ADMIN_MESSAGES = {
     connected: "接続済み",
     offline: "オフライン",
     turnReady: "TURN 準備済み",
+    statusLive: "稼働中",
+    statusReady: "準備済み",
+    statusProof: "要実機",
+    statusLater: "後で",
+    serverUnreachable: "本番サーバー",
+    serverUnreachableCopy: "このブラウザから診断エンドポイントに到達できません。",
+    diagnosticsProtected: "診断には運用トークンが必要です。有効なトークンを貼り付けてください。",
+    diagnosticsMissing: "シグナリングサーバーに診断ルートがまだありません。",
+    tokenPrompt: "ライブ診断を表示するには WebDrop の運用トークンを入力してください:",
+    diagnosticsUnreachable: "シグナリングサーバーに到達できません。接続と許可オリジンを確認してください。",
+    phonesCount: "{count} 台",
     physicalDevices: "物理端末 {count} 台",
     devicesCount: "{count} 台",
     activeCount: "{count} 件",
@@ -303,16 +368,16 @@ const ADMIN_MESSAGES = {
       ["管理オペレーション画面", "このページは本番診断フィードとライブ WebSocket 監視を使います。", "live"]
     ],
     proofItems: [
-      ["近接セレモニー", "未完了。超音波の解釈は実機 iPhone/Android で証明が必要です。", "要実機"],
-      ["iPhone 音響調整", "送信スロットが相手端末で聞こえるか、繰り返しライブ確認が必要です。", "要実機"],
-      ["Android 音響調整", "Android は Unknown 表示にしませんが、音響キャプチャは実機証明が必要です。", "要実機"],
-      ["WebRTC ファイル転送", "近接ペアリング安定後に直接/TURN リレー転送の証明が必要です。", "要実機"],
-      ["表示/ダウンロード挙動", "Android 受信の証明が必要です。iPhone 側は以前に確認済みです。", "要実機"]
+      ["近接セレモニー", "未完了。超音波の解釈は実機 iPhone/Android で証明が必要です。", "proof"],
+      ["iPhone 音響調整", "送信スロットが相手端末で聞こえるか、繰り返しライブ確認が必要です。", "proof"],
+      ["Android 音響調整", "Android は Unknown 表示にしませんが、音響キャプチャは実機証明が必要です。", "proof"],
+      ["WebRTC ファイル転送", "近接ペアリング安定後に直接/TURN リレー転送の証明が必要です。", "proof"],
+      ["表示/ダウンロード挙動", "Android 受信の証明が必要です。iPhone 側は以前に確認済みです。", "proof"]
     ],
     laterItems: [
-      ["1 万クライアント負荷試験", "物理ハンドシェイクが安定してから実施します。", "後で"],
-      ["複数ノード化", "水平スケール前に共有状態またはスティッキーセッションが必要です。", "後で"],
-      ["長時間の音響調整", "複数機種と騒音環境のサンプルを集めます。", "後で"]
+      ["1 万クライアント負荷試験", "物理ハンドシェイクが安定してから実施します。", "later"],
+      ["複数ノード化", "水平スケール前に共有状態またはスティッキーセッションが必要です。", "later"],
+      ["長時間の音響調整", "複数機種と騒音環境のサンプルを集めます。", "later"]
     ]
   }
 };
@@ -331,7 +396,9 @@ const state = {
   adminId: `admin-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`,
   snapshot: null,
   readyz: null,
+  serverReachable: null,
   pollTimer: 0,
+  errorTimer: 0,
   polling: true,
   selectedDeviceId: "",
   activeMonitor: null,
@@ -340,7 +407,8 @@ const state = {
   monitorTelemetryByDevice: new Map(),
   ignoredMonitorIds: new Set(),
   localEvents: [],
-  clearEventsBefore: 0
+  clearEventsBefore: 0,
+  tokenPromptDismissed: false
 };
 
 const i18n = createOperationsI18n(ADMIN_MESSAGES, {
@@ -349,14 +417,62 @@ const i18n = createOperationsI18n(ADMIN_MESSAGES, {
 
 init();
 
-function init() {
+async function init() {
   $("[data-admin-version]").textContent = APP_VERSION;
   bindEvents();
   activateTab(new URLSearchParams(location.search).get("tab") === "live" ? "live" : "readiness");
   renderAll();
   connectAdminSocket();
+  diagnostics.configure({ token: await resolveAdminToken() });
   refreshDiagnostics();
   schedulePoll();
+}
+
+async function resolveAdminToken() {
+  const fromGlobal = typeof globalThis.WEBDROP_ADMIN_TOKEN === "string" ? globalThis.WEBDROP_ADMIN_TOKEN.trim() : "";
+  if (fromGlobal) return fromGlobal;
+  const fromSession = storedAdminToken();
+  if (fromSession) return fromSession;
+  return fetchLocalAdminToken();
+}
+
+function storedAdminToken() {
+  try {
+    return (globalThis.sessionStorage?.getItem(ADMIN_TOKEN_STORAGE_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+async function fetchLocalAdminToken() {
+  // Silent best-effort read of the gitignored local token file. A 404 (the file
+  // is absent on shared/remote machines) resolves to an empty string without a
+  // console error, so remote operators simply fall through to the paste prompt.
+  try {
+    const response = await fetch(LOCAL_ADMIN_TOKEN_URL, { cache: "no-store" });
+    if (!response.ok) return "";
+    const text = await response.text();
+    const match = text.match(/WEBDROP_ADMIN_TOKEN\s*=\s*["'`]([^"'`]+)["'`]/);
+    return match ? match[1].trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+function promptForAdminToken() {
+  if (state.tokenPromptDismissed || typeof globalThis.prompt !== "function") return "";
+  const entered = globalThis.prompt(i18n.t("tokenPrompt"));
+  const token = typeof entered === "string" ? entered.trim() : "";
+  if (!token) {
+    state.tokenPromptDismissed = true;
+    return "";
+  }
+  try {
+    globalThis.sessionStorage?.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+  } catch {
+    /* sessionStorage may be unavailable; keep the token in memory via configure */
+  }
+  return token;
 }
 
 function bindEvents() {
@@ -366,6 +482,7 @@ function bindEvents() {
   $("[data-live-poll]")?.addEventListener("change", (event) => {
     state.polling = event.target.checked;
     if (state.polling) schedulePoll();
+    else globalThis.clearTimeout(state.pollTimer);
   });
   $("[data-monitor-device]")?.addEventListener("change", (event) => {
     selectDevice(event.target.value);
@@ -388,7 +505,12 @@ function bindEvents() {
 }
 
 function activateTab(name) {
-  $$("[data-admin-tab]").forEach((button) => button.classList.toggle("is-active", button.dataset.adminTab === name));
+  $$("[data-admin-tab]").forEach((button) => {
+    const isActive = button.dataset.adminTab === name;
+    button.classList.toggle("is-active", isActive);
+    if (isActive) button.setAttribute("aria-current", "true");
+    else button.removeAttribute("aria-current");
+  });
   $$("[data-admin-panel]").forEach((panel) => panel.classList.toggle("is-active", panel.dataset.adminPanel === name));
   const url = new URL(location.href);
   url.searchParams.set("tab", name);
@@ -438,7 +560,7 @@ function connectAdminSocket() {
     socket.addEventListener("error", () => setSocketState("offline"));
   } catch (error) {
     setSocketState("offline");
-    showError(error.message || String(error));
+    showError(friendlyError(error));
   }
 }
 
@@ -565,11 +687,20 @@ async function refreshDiagnostics() {
     ]);
     state.readyz = readyz;
     state.snapshot = snapshot;
+    state.serverReachable = true;
     renderAll();
   } catch (error) {
+    if (error.message === "unauthorized") {
+      const token = promptForAdminToken();
+      if (token) {
+        diagnostics.configure({ token });
+        return refreshDiagnostics();
+      }
+    }
+    state.serverReachable = false;
     state.readyz = { ok: false, error: error.message };
     setSocketState("offline");
-    showError(error.message || String(error));
+    showError(friendlyError(error));
     renderAll();
   }
 }
@@ -590,20 +721,30 @@ function renderAll() {
   renderMonitor();
   renderTimeline();
   renderSessions();
-  const generatedAt = state.snapshot?.generatedAt ? new Date(state.snapshot.generatedAt) : new Date();
-  $("[data-snapshot-time]").textContent = generatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  $("[data-server-time]").textContent = generatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const generatedClock = formatClock(state.snapshot?.generatedAt || Date.now());
+  $("[data-snapshot-time]").textContent = generatedClock;
+  $("[data-server-time]").textContent = generatedClock;
 }
 
 function renderSummary() {
   const devices = physicalDevices();
   const pairs = state.snapshot?.signaling?.pairs || [];
   const connected = isServerHealthy();
+  const unreachable = state.serverReachable === false;
   const connection = $("[data-server-connection]");
-  connection.dataset.state = connected ? "connected" : state.socketState;
-  connection.querySelector("span").textContent = connected ? i18n.t("connected") : i18n.t("checkingServer");
-  $("[data-summary-server]").textContent = connected ? i18n.t("connected") : i18n.t("offline");
+  connection.dataset.state = connected ? "connected" : unreachable ? "offline" : "checking";
+  connection.querySelector("span").textContent = connected
+    ? i18n.t("connected")
+    : unreachable ? i18n.t("offline") : i18n.t("checkingServer");
+  $("[data-summary-server]").textContent = connected
+    ? i18n.t("connected")
+    : unreachable ? i18n.t("offline") : i18n.t("checkingServer");
   $("[data-summary-server-detail]").textContent = connected ? `${i18n.t("azureSignaling")} · ${i18n.t("turnReady")}` : httpBase;
+  const serverIcon = $("[data-summary-server]").closest("article")?.querySelector(".summary-icon");
+  if (serverIcon) {
+    serverIcon.dataset.tone = connected ? "green" : unreachable ? "red" : "amber";
+    serverIcon.textContent = connected ? "✓" : unreachable ? "!" : "·";
+  }
   $("[data-summary-devices]").textContent = String(devices.length);
   $("[data-summary-devices-detail]").textContent = i18n.t("physicalDevices", { count: devices.length });
   $("[data-summary-pairs]").textContent = String(pairs.length);
@@ -615,8 +756,8 @@ function renderSummary() {
 function renderReadinessBoard() {
   const connected = isServerHealthy();
   const blockedItems = connected
-    ? [[i18n.t("noBlockers"), i18n.t("openPhoneHint"), i18n.t("none")]]
-    : [["Production server", "The diagnostics endpoint is not reachable from this browser.", "blocked"]];
+    ? [[i18n.t("noBlockers"), i18n.t("openPhoneHint"), "none"]]
+    : [[i18n.t("serverUnreachable"), i18n.t("serverUnreachableCopy"), "blocked"]];
   const columns = [
     { key: "ready", title: i18n.t("readyColumn"), icon: "✓", items: i18n.t("readyItems") },
     { key: "proof", title: i18n.t("proofColumn"), icon: "!", items: i18n.t("proofItems") },
@@ -636,17 +777,31 @@ function renderReadinessBoard() {
 }
 
 function renderReadinessRow([title, copy, status]) {
+  const icon = status === "live" || status === "ready" ? "✓" : status === "blocked" ? "!" : "•";
   return `
     <article class="readiness-row">
-      <i aria-hidden="true">${status === "live" || status === "ready" ? "✓" : status === "blocked" ? "!" : "•"}</i>
+      <i aria-hidden="true">${icon}</i>
       <div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(copy)}</small></div>
-      <span>${escapeHtml(status)}</span>
+      <span>${escapeHtml(readinessStatusLabel(status))}</span>
     </article>
   `;
 }
 
+function readinessStatusLabel(status) {
+  const labels = {
+    live: i18n.t("statusLive"),
+    ready: i18n.t("statusReady"),
+    proof: i18n.t("statusProof"),
+    later: i18n.t("statusLater"),
+    blocked: i18n.t("blocked"),
+    none: i18n.t("none")
+  };
+  return labels[status] || status;
+}
+
 function renderDevices() {
   const devices = physicalDevices();
+  pruneDisconnectedDevices(devices);
   if (!state.selectedDeviceId && devices[0]) state.selectedDeviceId = devices[0].id;
   if (state.selectedDeviceId && !devices.some((device) => device.id === state.selectedDeviceId)) {
     state.selectedDeviceId = devices[0]?.id || "";
@@ -1009,40 +1164,136 @@ function renderSessions() {
     table.innerHTML = `<p class="empty-row">${escapeHtml(i18n.t("noSessions"))}</p>`;
     return;
   }
-  table.innerHTML = [
-    ...sessions.map((session) => {
-    const participants = session.participants || [];
-    const score = Math.max(...participants.map((participant) => Number(participant.telemetry?.score || 0)), 0);
-    const acoustic = participants.map((participant) => participant.telemetry?.acoustic).find(Boolean);
-    const participantRows = participants.map((participant) => {
-      const telemetry = participant.telemetry || {};
-      const acousticEvidence = telemetry.acoustic || {};
-      const motion = telemetry.physicalEvidence || telemetry.motion || {};
-      return `<small>${escapeHtml(participant.deviceName || participant.clientId || "device")} · audio ${formatNumber(acousticEvidence.correlation, 2)} · bump ${formatNumber(motion.bumpCorrelation ?? motion.bumpPoints, 1)} · tilt ${formatNumber(motion.tiltDegrees ?? motion.maxTiltDeg, 0)}°</small>`;
-    }).join("");
-    return `
-      <article class="session-row">
-        <strong>${escapeHtml(session.id)}</strong>
-        <span>${escapeHtml(i18n.t(session.phase || "joining"))}</span>
-        <span>${escapeHtml(`${participants.length} phones`)}</span>
-        <span>${escapeHtml(`score ${Math.round(score * 100)} · ${formatFrequency(acoustic?.startFrequencyHz, acoustic?.endFrequencyHz)}`)}</span>
-        ${participantRows}
-      </article>
-    `;
-    }),
-    ...recent.map((session) => `
-      <article class="session-row session-row--recent">
-        <strong>${escapeHtml(session.id)}</strong>
-        <span>${escapeHtml(session.result)}</span>
-        <span>${escapeHtml(`${session.participants.length} phones`)}</span>
-        <span>${escapeHtml(`score ${Math.round(session.score * 100)} · ${session.reason || session.method || "recent"}`)}</span>
-        <small>${escapeHtml(i18n.t("recentSessionCopy"))}</small>
-        ${session.participants.map((participant) => `
-          <small>${escapeHtml(participant.deviceName || participant.clientId || "device")} · slot ${escapeHtml(participant.slotLabel)} · ${participant.emitted ? "emitted" : "silent"} · ${participant.detected ? "heard" : "missed"} · corr ${formatNumber(participant.correlation, 2)} · peak ${formatNumber(participant.peak, 3)} · ${escapeHtml(participant.method || "n/a")}</small>
-        `).join("")}
-      </article>
-    `)
+  const now = Date.now();
+  const header = `
+    <div class="session-row session-head" aria-hidden="true">
+      <span>${escapeHtml(i18n.t("sessionColumn"))}</span>
+      <span>${escapeHtml(i18n.t("phaseColumn"))}</span>
+      <span>${escapeHtml(i18n.t("devicesColumn"))}</span>
+      <span>${escapeHtml(i18n.t("scoreColumn"))}</span>
+      <span>${escapeHtml(i18n.t("timingColumn"))}</span>
+    </div>`;
+  table.innerHTML = header + [
+    ...sessions.map((session) => renderActiveSessionRow(session, now)),
+    ...recent.map((session) => renderRecentSessionRow(session))
   ].join("");
+}
+
+function renderActiveSessionRow(session, now) {
+  const participants = session.participants || [];
+  const score = participants.reduce((max, participant) => Math.max(max, Number(participant.telemetry?.score || 0)), 0);
+  const band = participants.map((participant) => participant.telemetry?.acoustic || participant.signature).find(Boolean);
+  return `
+    <article class="session-row">
+      <strong class="session-id" title="${escapeHtml(session.id)}">${escapeHtml(shortSessionId(session.id))}</strong>
+      <span class="session-phase" data-phase="${escapeHtml(session.phase || "joining")}">${escapeHtml(i18n.t(session.phase || "joining"))}</span>
+      <span>${escapeHtml(i18n.t("phonesCount", { count: participants.length }))}</span>
+      <span>${escapeHtml(`${i18n.t("scoreLabel")} ${Math.round(score * 100)} · ${formatFrequency(band?.startFrequencyHz, band?.endFrequencyHz)}`)}</span>
+      <span>${escapeHtml(formatSessionTiming(session, now))}</span>
+      ${participants.map((participant) => renderActiveParticipant(participant)).join("")}
+    </article>
+  `;
+}
+
+function renderActiveParticipant(participant) {
+  const name = participant.deviceName || participant.clientId || i18n.t("device");
+  const slot = participantSlotLabel(participant);
+  if (!participant.telemetry) {
+    const capabilities = participant.acousticCapabilities || {};
+    const sampleRate = Number(capabilities.sampleRate)
+      ? `${Math.round(Number(capabilities.sampleRate) / 1000)} kHz`
+      : i18n.t("unknown");
+    const mic = `${i18n.t("micReady")} ${capabilities.microphoneReady ? i18n.t("yes") : i18n.t("no")}`;
+    const detail = [name, `${i18n.t("slot")} ${slot}`, i18n.t("waiting"), sampleRate, mic].join(" · ");
+    return `<small class="session-participant">${escapeHtml(detail)}</small>`;
+  }
+  const telemetry = participant.telemetry;
+  const acoustic = telemetry.acoustic || {};
+  const margin = Number.isFinite(Number(acoustic.marginDb)) ? `${formatNumber(acoustic.marginDb, 1)} dB` : i18n.t("unknown");
+  const detail = [
+    name,
+    `${i18n.t("slot")} ${slot}`,
+    acoustic.emitted ? i18n.t("emitted") : i18n.t("silent"),
+    acoustic.detected ? i18n.t("heard") : i18n.t("missed"),
+    margin,
+    evidenceSummary(telemetry.physicalEvidence),
+    i18n.t(telemetry.decision === "verified" ? "verified" : "insufficient")
+  ].join(" · ");
+  return `<small class="session-participant" data-decision="${escapeHtml(telemetry.decision || "")}">${escapeHtml(detail)}</small>`;
+}
+
+function renderRecentSessionRow(session) {
+  return `
+    <article class="session-row session-row--recent">
+      <strong class="session-id" title="${escapeHtml(session.id)}">${escapeHtml(shortSessionId(session.id))}</strong>
+      <span class="session-phase" data-phase="${escapeHtml(session.statusKey || "recent")}">${escapeHtml(session.result)}</span>
+      <span>${escapeHtml(i18n.t("phonesCount", { count: session.participants.length }))}</span>
+      <span>${escapeHtml(`${i18n.t("scoreLabel")} ${Math.round(session.score * 100)} · ${session.reason || session.method || i18n.t("recentSessions")}`)}</span>
+      <span>${escapeHtml(formatClock(session.at))}</span>
+      <small class="session-note">${escapeHtml(i18n.t("recentSessionCopy"))}</small>
+      ${session.participants.map((participant) => {
+        const detail = [
+          participant.deviceName || participant.clientId || i18n.t("device"),
+          `${i18n.t("slot")} ${participant.slotLabel}`,
+          participant.emitted ? i18n.t("emitted") : i18n.t("silent"),
+          participant.detected ? i18n.t("heard") : i18n.t("missed"),
+          `corr ${formatNumber(participant.correlation, 2)}`,
+          `peak ${formatNumber(participant.peak, 3)}`,
+          participant.method || i18n.t("none")
+        ].join(" · ");
+        return `<small class="session-participant">${escapeHtml(detail)}</small>`;
+      }).join("")}
+    </article>
+  `;
+}
+
+function evidenceSummary(evidence = {}) {
+  const mark = (ok) => (ok ? "✓" : "✗");
+  return `${i18n.t("evidenceLabel")} ${i18n.t("soundShort")}${mark(evidence.ultrasound)} ${i18n.t("bumpShort")}${mark(evidence.bump)} ${i18n.t("tiltShort")}${mark(evidence.tilt)}`;
+}
+
+function participantSlotLabel(participant) {
+  const signatureSlot = Number(participant.signature?.slot);
+  const acoustic = participant.telemetry?.acoustic || {};
+  const acousticSlotCount = Number(acoustic.slotCount);
+  if (Number.isFinite(signatureSlot) && signatureSlot > 0) {
+    return acousticSlotCount ? `${signatureSlot}/${acousticSlotCount}` : String(signatureSlot);
+  }
+  if (Number.isFinite(Number(acoustic.slot))) {
+    const slot = Number(acoustic.slot) + 1;
+    return acousticSlotCount ? `${slot}/${acousticSlotCount}` : String(slot);
+  }
+  return "—";
+}
+
+function shortSessionId(id = "") {
+  const text = String(id);
+  return text.length <= 16 ? text : `${text.slice(0, 5)}…${text.slice(-6)}`;
+}
+
+function formatSessionTiming(session, now) {
+  if (session.phase === "running") {
+    const startAt = Number(session.startAt);
+    const startedAge = Number.isFinite(startAt) ? formatAge(now - startAt, i18n.locale) : "";
+    const remainingMs = Number(session.endsAt) - now;
+    const ends = Number.isFinite(remainingMs)
+      ? remainingMs > 0
+        ? i18n.t("endsIn", { seconds: Math.ceil(remainingMs / 1000) })
+        : i18n.t("completing")
+      : "";
+    return [startedAge && i18n.t("startedAgo", { age: startedAge }), ends].filter(Boolean).join(" · ");
+  }
+  const createdMs = Date.parse(session.createdAt);
+  return Number.isFinite(createdMs)
+    ? i18n.t("joinedAgo", { age: formatAge(now - createdMs, i18n.locale) })
+    : i18n.t("joining");
+}
+
+function formatClock(value) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime())
+    ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : "—";
 }
 
 function recentSessionSummaries(activeSessions = []) {
@@ -1057,6 +1308,7 @@ function recentSessionSummaries(activeSessions = []) {
       id: sessionId,
       at: event.at,
       result: i18n.t("recentSessions"),
+      statusKey: "recent",
       reason: "",
       score: 0,
       method: "",
@@ -1065,12 +1317,31 @@ function recentSessionSummaries(activeSessions = []) {
     summary.at = event.at || summary.at;
     if (event.type === "proximity:session:matched") {
       summary.result = i18n.t("verified");
+      summary.statusKey = "verified";
       summary.score = Math.max(summary.score, Number(detail.score || 0));
     }
     if (event.type === "proximity:session:failed") {
       summary.result = i18n.t("failed");
+      summary.statusKey = "failed";
       summary.reason = detail.reason || summary.reason;
       summary.score = Math.max(summary.score, Number(detail.score || 0));
+      // A failed event may be the only record for a session that never reported
+      // telemetry. Capture its device so the row is not misreported as 0 phones.
+      if (detail.clientId && !summary.participants.has(detail.clientId)) {
+        summary.participants.set(detail.clientId, {
+          clientId: detail.clientId,
+          deviceName: detail.deviceName || "",
+          slotLabel: detail.acousticSlotCount
+            ? `${Number(detail.acousticSlot || 0) + 1}/${detail.acousticSlotCount}`
+            : String(Number(detail.acousticSlot || 0) + 1),
+          emitted: Boolean(detail.acousticEmitted),
+          detected: Boolean(detail.acousticDetected),
+          correlation: Number(detail.acousticCorrelation || 0),
+          peak: Number(detail.acousticRecordingPeak || 0),
+          method: detail.acousticDetectionMethod || "",
+          reason: detail.acousticReason || detail.reason || ""
+        });
+      }
     }
     if (event.type === "proximity:session:telemetry") {
       summary.score = Math.max(summary.score, Number(detail.score || 0));
@@ -1161,6 +1432,16 @@ function physicalDevices() {
 
 function selectedDevice() {
   return physicalDevices().find((device) => device.id === state.selectedDeviceId) || null;
+}
+
+function pruneDisconnectedDevices(devices) {
+  if (!state.snapshot) return;
+  const liveIds = new Set(devices.map((device) => device.id));
+  for (const id of [...state.monitorTelemetryByDevice.keys()]) {
+    if (!liveIds.has(id) && !state.activeMonitors.has(id)) {
+      state.monitorTelemetryByDevice.delete(id);
+    }
+  }
 }
 
 function normalizedDeviceFamily(device) {
@@ -1278,7 +1559,7 @@ function latestMonitorTelemetry() {
 }
 
 function isServerHealthy() {
-  return Boolean(state.readyz?.ok || state.snapshot?.generatedAt);
+  return Boolean(state.serverReachable && (state.readyz?.ok || state.snapshot?.generatedAt));
 }
 
 function firstNumber(...values) {
@@ -1378,8 +1659,15 @@ function friendlyEventDetail(type, detail = {}) {
     const tilt = Number.isFinite(Number(detail.tiltDegrees)) ? formatNumber(detail.tiltDegrees, 0) : "--";
     return `${detail.deviceName || detail.clientId || "device"} · ${detail.status || "active"} · ${detail.emitted ? "emitted" : "silent"} · ${detail.detected ? "heard" : "missed"} · ${formatNumber(detail.marginDb, 1)} dB · bump ${bump} · tilt ${tilt}°`;
   }
+  if (type === "proximity:session:matched") {
+    const peers = Array.isArray(detail.clientIds) ? detail.clientIds.join(" + ") : i18n.t("verified");
+    return `${peers} · ${i18n.t("scoreLabel")} ${Math.round(Number(detail.score || 0) * 100)}`;
+  }
+  if (type === "proximity:session:failed") {
+    return `${detail.deviceName || detail.clientId || "device"} · ${detail.reason || i18n.t("failed")}`;
+  }
   if (type === "proximity:session:telemetry") {
-    return `${detail.deviceName || detail.clientId || "device"} · score ${Math.round(Number(detail.score || 0) * 100)} · ${formatFrequency(detail.acousticStartFrequencyHz, detail.acousticEndFrequencyHz)}`;
+    return `${detail.deviceName || detail.clientId || "device"} · ${i18n.t("scoreLabel")} ${Math.round(Number(detail.score || 0) * 100)} · ${formatFrequency(detail.acousticStartFrequencyHz, detail.acousticEndFrequencyHz)}`;
   }
   if (type === "proximity:session:diagnostic") {
     return `${detail.deviceName || detail.clientId || "device"} · ${detail.phase || "diagnostic"} · ${detail.reason || detail.message || "reported"}`;
@@ -1392,12 +1680,21 @@ function friendlyEventDetail(type, detail = {}) {
   return JSON.stringify(detail).slice(0, 220);
 }
 
+function friendlyError(error) {
+  const message = error?.message || String(error);
+  if (message === "unauthorized") return i18n.t("diagnosticsProtected");
+  if (message === "not_found") return i18n.t("diagnosticsMissing");
+  if (message === "Failed to fetch") return i18n.t("diagnosticsUnreachable");
+  return message;
+}
+
 function showError(message) {
   const node = $("[data-admin-error]");
   if (!node) return;
   node.textContent = message;
   node.hidden = false;
-  globalThis.setTimeout(() => {
+  globalThis.clearTimeout(state.errorTimer);
+  state.errorTimer = globalThis.setTimeout(() => {
     node.hidden = true;
   }, 5000);
 }

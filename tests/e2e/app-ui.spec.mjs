@@ -1014,9 +1014,17 @@ test("opens a received file in a new tab on iPhone WebKit without leaving WebDro
   await expect(page.locator("#app")).toHaveAttribute("data-mode", "connected");
 });
 
-test("admin readiness uses public diagnostics without token entry fields", async ({ page }) => {
+test("admin readiness auto-sends the local operations token without manual entry fields", async ({ page }) => {
   let readinessRequest = null;
   let diagnosticsRequest = null;
+  // Stand in for the gitignored js/config/local-admin-token.js so the dashboard
+  // auto-fills the bearer token on this machine.
+  await page.route("**/js/config/local-admin-token.js*", async (route) => {
+    await route.fulfill({
+      contentType: "application/javascript",
+      body: `globalThis.WEBDROP_ADMIN_TOKEN = "local-ops-token";`
+    });
+  });
   await page.route("https://webdrop-wss-0618.japaneast.cloudapp.azure.com/readyz", async (route) => {
     readinessRequest = {
       method: route.request().method(),
@@ -1054,13 +1062,14 @@ test("admin readiness uses public diagnostics without token entry fields", async
   await expect(page.locator("[data-http-base]")).toHaveCount(0);
   await expect(page.locator("[data-bearer-token]")).toHaveCount(0);
   await expect(page.locator("[data-action='probe-ready']")).toHaveCount(0);
+  // /readyz stays public; the consolidated diagnostics feed is read with the token.
   expect(readinessRequest).toEqual({
     method: "GET",
     authorization: null
   });
   expect(diagnosticsRequest).toEqual({
     method: "GET",
-    authorization: null
+    authorization: "Bearer local-ops-token"
   });
 });
 

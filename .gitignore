@@ -5,6 +5,9 @@ __pycache__/
 *.pyo
 .env
 .env.*
+# Local-only admin bearer token for the operations dashboard. Auto-fills the
+# diagnostics token on the dev machine; must never be committed.
+js/config/local-admin-token.js
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

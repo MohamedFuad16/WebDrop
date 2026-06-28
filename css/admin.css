@@ -145,6 +145,11 @@
   color: var(--ops-amber);
 }
 
+.summary-icon[data-tone="red"] {
+  border-color: #efb0ad;
+  color: var(--ops-red);
+}
+
 .summary-strip div {
   min-width: 0;
   display: grid;
@@ -927,20 +932,93 @@
 
 .session-row {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) 90px 90px minmax(160px, 1.2fr);
-  gap: 12px;
+  grid-template-columns: minmax(120px, 1.1fr) 92px 78px minmax(150px, 1.3fr) minmax(118px, .95fr);
+  gap: 6px 12px;
+  align-items: center;
   padding: 10px 0;
   border-top: 1px solid var(--ops-line);
   font-size: 11px;
 }
 
 .session-row span {
+  overflow: hidden;
   color: var(--ops-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-head {
+  padding: 6px 0;
+  color: var(--ops-muted);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.session-head span {
+  color: var(--ops-muted);
+}
+
+.session-id {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-phase {
+  justify-self: start;
+  padding: 2px 9px;
+  border: 1px solid var(--ops-line-strong);
+  border-radius: 999px;
+  color: var(--ops-muted) !important;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.session-phase[data-phase="running"],
+.session-phase[data-phase="verified"] {
+  border-color: #9ed9b6;
+  color: var(--ops-green) !important;
+  background: #f2fbf5;
+}
+
+.session-phase[data-phase="joining"] {
+  border-color: #f2ce7d;
+  color: var(--ops-amber) !important;
+  background: #fffaf0;
+}
+
+.session-phase[data-phase="failed"] {
+  border-color: #efc0bd;
+  color: var(--ops-red) !important;
+  background: #fff6f5;
 }
 
 .session-row small {
   grid-column: 1 / -1;
   color: var(--ops-muted);
+}
+
+.session-participant {
+  padding-left: 14px;
+  border-left: 2px solid var(--ops-line);
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.session-participant[data-decision="verified"] {
+  border-left-color: var(--ops-green);
+}
+
+.session-participant[data-decision="insufficient"] {
+  border-left-color: var(--ops-amber);
+}
+
+.session-note {
+  font-style: italic;
 }
 
 .session-row--recent {
@@ -1094,6 +1172,10 @@
 
   .session-row {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .session-head {
+    display: none;
   }
 
   .admin-footer {

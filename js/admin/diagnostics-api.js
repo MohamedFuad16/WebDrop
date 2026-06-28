@@ -19,12 +19,12 @@ export class DiagnosticsApi {
   }
 
   async snapshot() {
-    try {
-      return await this.request("/api/diagnostics-public", { authenticated: false });
-    } catch (error) {
-      if (error.message !== "not_found") throw error;
-      return this.request("/api/diagnostics-snapshot", { authenticated: true });
-    }
+    // Single authed diagnostics endpoint. The server consolidated the old
+    // unauthenticated `/api/diagnostics-public` and token-gated
+    // `/api/diagnostics-snapshot` into one route that always requires the metrics
+    // bearer token. A missing/invalid token surfaces as `unauthorized`, which the
+    // dashboard handles by prompting for a token.
+    return this.request("/api/diagnostics-public", { authenticated: true });
   }
 
   async request(path, { authenticated = false } = {}) {

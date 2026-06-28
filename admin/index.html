@@ -124,7 +124,7 @@
             <button class="start-button start-button--all" type="button" data-action="monitor-start-all"><span aria-hidden="true">▦</span><span data-i18n="startAllMonitoring">Start all</span></button>
             <button class="stop-button stop-button--all" type="button" data-action="monitor-stop-all" disabled><span aria-hidden="true">■</span><span data-i18n="stopAllMonitoring">Stop all</span></button>
           </div>
-          <p class="monitor-explainer" data-monitor-explainer data-i18n="monitorExplainer">The selected phone must have opened WebDrop audio from a user tap. Monitoring continues until Stop is pressed.</p>
+          <p class="monitor-explainer" data-monitor-explainer data-i18n="monitorExplainer" aria-live="polite">The selected phone must have opened WebDrop audio from a user tap. Monitoring continues until Stop is pressed.</p>
           <div class="frequency-spectrum" data-frequency-spectrum>
             <div class="frequency-spectrum-heading">
               <div>
@@ -169,7 +169,7 @@
       <span><i></i><span data-i18n="pollingEverySecond">Live data refreshes every second</span></span>
       <span><span data-i18n="serverTime">Server time</span> <strong data-server-time>--:--:--</strong></span>
     </footer>
-    <p class="page-error" data-admin-error hidden></p>
+    <p class="page-error" data-admin-error role="alert" aria-live="assertive" hidden></p>
   </main>
 
   <script src="../js/config/runtime-config.js?v=1.0.86"></script>
