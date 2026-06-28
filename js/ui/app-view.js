@@ -2,6 +2,7 @@ import { Emitter } from "../utils/emitter.js?v=1.0.86";
 import { formatBytes } from "../utils/format.js?v=1.0.86";
 import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.86";
 import { translate } from "../config/i18n.js?v=1.0.86";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.86";
 import { DynamicIsland } from "./dynamic-island.js?v=1.0.86";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
@@ -749,7 +750,7 @@ export class AppView extends Emitter {
     if (connected) {
       const peer = state.peers.find((item) => item.id === state.connectedPeerId);
       this.nodes.connectedPeer.innerHTML = peer ? staticAvatarMarkup(peerDisplayAvatar(peer, 0)) : "";
-      const firstName = peer?.name.split(" ")[0] || "peer";
+      const firstName = peer?.name?.split(" ")[0] || "peer";
       this.nodes.sendTitle.textContent = this.translate("sendTo", { name: firstName });
       this.nodes.sendCopy.textContent = this.translate("sendCopy");
       this.nodes.chatTitle.textContent = this.translate("chatWith", { name: firstName });
@@ -1357,13 +1358,6 @@ function receivedActionMarkup(view, item) {
   `;
 }
 
-function isPreviewableReceivedItem(item = {}) {
-  const type = String(item.type || "").toLowerCase();
-  const name = String(item.name || item.downloadName || "").toLowerCase();
-  if (type.startsWith("image/") || type.startsWith("video/") || type === "application/pdf") return true;
-  return /\.(png|jpe?g|gif|webp|avif|pdf|mp4|mov|webm)$/i.test(name);
-}
-
 function normalizedPeerStage(peer, state) {
   if (state.connectedPeerId === peer.id) return "near";
   if (state.mode === "connected") return "lobby";
@@ -1415,12 +1409,6 @@ function peerRankScore(peer, state) {
   return Math.max(0, Math.min(100, base + stageBonus + distanceBonus + recentBonus + sameDeviceBonus));
 }
 
-function matchesNearbyFilter(peer, state, filter) {
-  if (filter === "recent") return peerPreviouslyConnected(peer);
-  if (filter === "same-device") return selfDeviceFamily(state) === peerDeviceFamily(peer);
-  return true;
-}
-
 function peerPreviouslyConnected(peer) {
   return Boolean(peer.connectedBefore || peer.lastConnectedAt || Number(peer.previousConnections || 0) > 0);
 }
@@ -1446,20 +1434,6 @@ function familyLabel(family) {
     watchos: "Watch",
     ipad: "iPad"
   }[family] || "Device";
-}
-
-function peerDistanceKey(peer) {
-  return {
-    immediate: "distanceImmediate",
-    near: "distanceNear",
-    room: "distanceRoom",
-    building: "distanceBuilding",
-    far: "distanceFar"
-  }[peer.distanceBucket || peer.proximity?.bucket] || "distanceNear";
-}
-
-function normalizeSearch(value) {
-  return String(value || "").trim().toLocaleLowerCase();
 }
 
 function visibleReceivedItems(state) {

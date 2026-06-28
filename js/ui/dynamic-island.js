@@ -941,16 +941,6 @@ function renderAnonymousAvatar(node) {
   node.replaceChildren(mark);
 }
 
-function escapeHtml(text) {
-  return String(text ?? "").replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;"
-  }[character]));
-}
-
 function formatAcousticStatus(acoustic = {}, { fallback, translate }) {
   const mode = acoustic?.mode;
   const slotLabel = formatAcousticSlot(acoustic);

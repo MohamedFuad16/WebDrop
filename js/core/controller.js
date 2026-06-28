@@ -1,4 +1,5 @@
 import { formatBytes } from "../utils/format.js?v=1.0.86";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.86";
 import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.86";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
@@ -902,6 +903,7 @@ export function createController({
     }
     const islandRetracted = await view.finishIslandConnectionTransition();
     if (!islandRetracted || store.getState().mode !== "verifying") return;
+    revokeReceivedItemUrls(store.getState().receivedItems);
     store.patch({
       mode: "connected",
       connectedPeerId: peer.id,
@@ -1116,6 +1118,7 @@ export function createController({
     }
     const islandRetracted = await view.finishIslandConnectionTransition();
     if (!islandRetracted || !isCurrentProximitySession(sessionId)) return;
+    revokeReceivedItemUrls(store.getState().receivedItems);
     store.patch({
       mode: "connected",
       connectedPeerId: peer.id,
@@ -1257,6 +1260,7 @@ export function createController({
     if (!isCurrentVerification(peerId)) return;
     const islandRetracted = await view.finishIslandConnectionTransition();
     if (!islandRetracted || !isCurrentVerification(peerId)) return;
+    revokeReceivedItemUrls(store.getState().receivedItems);
     store.patch({
       mode: "connected",
       connectedPeerId: peerId,
@@ -2146,25 +2150,6 @@ export function createController({
     return replaced.some((candidate) => candidate.id === normalized.id) ? replaced : [...replaced, normalized];
   }
 
-  function closestAvailablePeer() {
-    const distanceRank = {
-      immediate: 5,
-      near: 4,
-      room: 3,
-      building: 2,
-      far: 1
-    };
-    return [...store.getState().peers]
-      .filter((peer) => peer?.online !== false && !peer?.connected)
-      .sort((a, b) => {
-        const proximityDelta = Number(b.proximityScore || 0) - Number(a.proximityScore || 0);
-        if (proximityDelta) return proximityDelta;
-        const distanceDelta = (distanceRank[b.distanceBucket] || 0) - (distanceRank[a.distanceBucket] || 0);
-        if (distanceDelta) return distanceDelta;
-        return String(a.name || "").localeCompare(String(b.name || ""));
-      })[0] || null;
-  }
-
   function sanitizePeers(peers = []) {
     const state = store.getState();
     const seen = new Set();
@@ -2495,13 +2480,6 @@ function triggerBrowserDownload(url, name) {
   document.body.append(anchor);
   anchor.click();
   window.setTimeout(() => anchor.remove(), 1000);
-}
-
-function isPreviewableReceivedItem(item = {}) {
-  const type = String(item.type || "").toLowerCase();
-  const name = String(item.name || item.downloadName || "").toLowerCase();
-  if (type.startsWith("image/") || type.startsWith("video/") || type === "application/pdf") return true;
-  return /\.(png|jpe?g|gif|webp|avif|pdf|mp4|mov|webm)$/i.test(name);
 }
 
 function revokeReceivedItemUrls(items = []) {
