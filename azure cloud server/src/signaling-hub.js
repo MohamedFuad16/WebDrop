@@ -27,16 +27,51 @@ const PROXIMITY_GATED_TYPES = new Set([
   "transfer:manifest",
   "transfer:control"
 ]);
-const SESSION_JOIN_WINDOW_MS = 1800;
-const SESSION_START_DELAY_MS = 1200;
-const SESSION_DURATION_MS = 3600;
-const SESSION_TTL_MS = 15000;
-const SESSION_MATCH_SLOP_MS = 4000;
+// Ceremony timing defaults. Each is overridable per-instance (env-tunable via
+// server.js) so the operator can adjust caps and intervals live. They are
+// DEFAULTS only; the hub reads the resolved values from instance fields.
+const DEFAULT_SESSION_JOIN_WINDOW_MS = 1800;
+const DEFAULT_SESSION_START_DELAY_MS = 1200;
+const DEFAULT_SESSION_DURATION_MS = 3600;
+const DEFAULT_PROXIMITY_SESSION_TTL_MS = 15000;
+const DEFAULT_SESSION_MATCH_SLOP_MS = 4000;
 const SESSION_SCORE_MINIMUM = 0.55;
-const MAX_PROXIMITY_SESSION_CLIENTS = 6;
+
+// Acoustic ceremony slot floor. A single coded ultrasonic chirp needs roughly
+// this much airtime to be correlated reliably. These MUST stay in sync with the
+// client scheduler in js/services/proximity-engine.js
+// (ACOUSTIC_MIN_SLOT_MS + ACOUSTIC_SLOT_GUARD_MS). The per-session acoustic
+// cohort is bounded so that, inside the ceremony window, every time slot stays
+// at or above this floor — the system NEVER schedules sub-floor slots; instead
+// it clamps cohort size and opens additional concurrent sessions.
+const ACOUSTIC_MIN_SLOT_MS = 520;
+const ACOUSTIC_SLOT_GUARD_MS = 80;
+const ACOUSTIC_CEREMONY_SLOT_FLOOR_MS = ACOUSTIC_MIN_SLOT_MS + ACOUSTIC_SLOT_GUARD_MS; // 600ms
+
+// Capacity defaults. The per-session cohort default is derived from the slot
+// floor below (clamped in the constructor); the global cap defaults to 100 for
+// the physical test and is the only knob that needs raising toward 10,000 (the
+// data structures already support many concurrent small cohorts — see README
+// "10,000-user readiness" for the Redis/shared-presence multi-node path).
+const DEFAULT_MAX_TOTAL_PROXIMITY_PARTICIPANTS = 100;
+
+// Defensive cap on how many per-peer acoustic detections we retain/echo. It is
+// bounded by the cohort but kept as its own constant so detection plumbing does
+// not silently change when the cohort cap is tuned.
+const MAX_ACOUSTIC_DETECTIONS = 8;
+
 const ACOUSTIC_BAND_START_HZ = 18_600;
 const ACOUSTIC_BAND_END_HZ = 19_400;
 const ACOUSTIC_MIN_BANDWIDTH_HZ = 420;
+
+// Cross-session acoustic de-confliction knobs (all env-tunable). With the
+// default 18.6-19.4 kHz band only one >=420 Hz sub-band fits, so sub-band
+// splitting is a no-op until the band is widened via ACOUSTIC_BAND_END_HZ; the
+// start stagger spreads concurrent cohorts across a few time phases so cohorts
+// that fill at the same instant do not all begin chirping simultaneously.
+const DEFAULT_ACOUSTIC_SESSION_STAGGER_MS = 600;
+const DEFAULT_ACOUSTIC_SESSION_STAGGER_PHASES = 3;
+const DEFAULT_ACOUSTIC_MAX_CONCURRENT_SUBBANDS = 4;
 // Minimum separation (correlation units, 0..1) the strongest heard signature must
 // hold over the runner-up before a reciprocal pair is trusted. Tuning knob for
 // physical devices: raise to reject ambiguous/crowded rooms more aggressively,
@@ -56,7 +91,31 @@ const DETAILED_METRIC_TYPES = new Set([
 ]);
 
 export class SignalingHub {
-  constructor({ server, path = "/ws", logger, maxJsonBytes = 131072, heartbeatIntervalMs = 25000, sessionTtlMs = 900000, pairingTtlMs = 120000, proximityAnalyzer, qrTokenProvider, metrics } = {}) {
+  constructor({
+    server,
+    path = "/ws",
+    logger,
+    maxJsonBytes = 131072,
+    heartbeatIntervalMs = 25000,
+    sessionTtlMs = 900000,
+    pairingTtlMs = 120000,
+    proximityAnalyzer,
+    qrTokenProvider,
+    metrics,
+    maxProximitySessionClients,
+    maxTotalProximityParticipants,
+    proximitySessionJoinWindowMs,
+    proximitySessionStartDelayMs,
+    proximitySessionDurationMs,
+    proximitySessionTtlMs,
+    proximitySessionMatchSlopMs,
+    acousticBandStartHz,
+    acousticBandEndHz,
+    acousticMinBandwidthHz,
+    acousticSessionStaggerMs,
+    acousticSessionStaggerPhases,
+    acousticMaxConcurrentSubBands
+  } = {}) {
     this.wss = new WebSocketServer({
       noServer: true,
       // Enforce the JSON size cap at the protocol layer so oversized or binary
@@ -81,8 +140,48 @@ export class SignalingHub {
     this.proximityReady = new Map();
     this.proximitySessions = new Map();
     this.adminMonitors = new Map();
-    this.openProximitySessionId = null;
+    // Multiple sessions can be open (accepting joiners) at once. New joiners are
+    // routed into any open cohort that still has room; when none has room a new
+    // concurrent cohort is opened (subject to the global participant cap).
+    this.openProximitySessionIds = new Set();
+    // Monotonic counters used to spread concurrent cohorts across stagger time
+    // phases and acoustic sub-bands. Modulo arithmetic keeps them bounded.
+    this.proximityStartCounter = 0;
+    this.proximityBandCounter = 0;
     this.socketToClient = new WeakMap();
+
+    // Resolve env-tunable ceremony timings (caps + intervals adjustable live).
+    this.proximityJoinWindowMs = configuredPositive(proximitySessionJoinWindowMs, DEFAULT_SESSION_JOIN_WINDOW_MS);
+    this.proximityStartDelayMs = configuredPositive(proximitySessionStartDelayMs, DEFAULT_SESSION_START_DELAY_MS);
+    this.proximityDurationMs = configuredPositive(proximitySessionDurationMs, DEFAULT_SESSION_DURATION_MS);
+    this.proximitySessionTtlMs = configuredPositive(proximitySessionTtlMs, DEFAULT_PROXIMITY_SESSION_TTL_MS);
+    this.proximityMatchSlopMs = configuredPositive(proximitySessionMatchSlopMs, DEFAULT_SESSION_MATCH_SLOP_MS);
+
+    // The cohort ceiling is the largest number of time slots that still keep
+    // every slot at/above the acoustic floor inside the ceremony window. The
+    // requested per-session cap is clamped to this ceiling so a misconfiguration
+    // can never schedule sub-floor slots. Raising the cohort requires extending
+    // the ceremony window (proximitySessionDurationMs), not just the cap.
+    this.proximityCohortCeiling = Math.max(2, Math.floor(this.proximityDurationMs / ACOUSTIC_CEREMONY_SLOT_FLOOR_MS));
+    const requestedCohort = configuredPositive(maxProximitySessionClients, this.proximityCohortCeiling);
+    this.maxProximitySessionClients = Math.max(2, Math.min(this.proximityCohortCeiling, Math.floor(requestedCohort)));
+    if (Math.floor(requestedCohort) > this.proximityCohortCeiling) {
+      this.logger?.warn("Clamping per-session acoustic cohort to the slot-floor ceiling.", {
+        requested: Math.floor(requestedCohort),
+        ceiling: this.proximityCohortCeiling,
+        ceremonyWindowMs: this.proximityDurationMs,
+        slotFloorMs: ACOUSTIC_CEREMONY_SLOT_FLOOR_MS
+      });
+    }
+    this.maxTotalProximityParticipants = configuredPositive(maxTotalProximityParticipants, DEFAULT_MAX_TOTAL_PROXIMITY_PARTICIPANTS);
+
+    // Acoustic band + cross-session de-confliction knobs.
+    this.acousticBandStartHz = configuredPositive(acousticBandStartHz, ACOUSTIC_BAND_START_HZ);
+    this.acousticBandEndHz = Math.max(this.acousticBandStartHz + 1, configuredPositive(acousticBandEndHz, ACOUSTIC_BAND_END_HZ));
+    this.acousticMinBandwidthHz = configuredPositive(acousticMinBandwidthHz, ACOUSTIC_MIN_BANDWIDTH_HZ);
+    this.acousticSessionStaggerMs = configuredNonNegative(acousticSessionStaggerMs, DEFAULT_ACOUSTIC_SESSION_STAGGER_MS);
+    this.acousticSessionStaggerPhases = Math.max(1, Math.floor(configuredPositive(acousticSessionStaggerPhases, DEFAULT_ACOUSTIC_SESSION_STAGGER_PHASES)));
+    this.acousticMaxConcurrentSubBands = Math.max(1, Math.floor(configuredPositive(acousticMaxConcurrentSubBands, DEFAULT_ACOUSTIC_MAX_CONCURRENT_SUBBANDS)));
     this.rateLimits = new TokenBucket({ capacity: 90, refillPerSecond: 30 });
     this.ipRateLimits = new TokenBucket({ capacity: 120, refillPerSecond: 20 });
 
@@ -581,30 +680,41 @@ export class SignalingHub {
       return;
     }
     const now = Date.now();
-    let session = this.openProximitySessionId ? this.proximitySessions.get(this.openProximitySessionId) : null;
-    if (!session || session.started || session.expiresAt <= now || session.clients.size >= MAX_PROXIMITY_SESSION_CLIENTS) {
-      session = {
-        id: `prox-${randomUUID()}`,
-        clients: new Set(),
-        nonces: new Map(),
-        acousticCapabilities: new Map(),
-        signatures: new Map(),
-        signatureDetails: new Map(),
-        telemetry: new Map(),
-        createdAt: now,
-        expiresAt: now + SESSION_TTL_MS,
-        joinUntil: now + SESSION_JOIN_WINDOW_MS,
-        joinExtensions: 0,
-        started: false,
-        matched: new Set(),
-        timer: null,
-        failTimer: null
-      };
-      this.proximitySessions.set(session.id, session);
-      this.openProximitySessionId = session.id;
-      session.timer = setTimeout(() => this.startProximitySession(session.id), SESSION_JOIN_WINDOW_MS);
-      session.timer.unref?.();
+
+    // Idempotent re-join: a client already inside an open (not yet started)
+    // cohort is re-acknowledged in place rather than double-counted against the
+    // global cap or split across two cohorts.
+    const existing = this.findProximitySessionForClient(sender.id);
+    if (existing && !existing.started && existing.expiresAt > now) {
+      existing.nonces.set(sender.id, message.payload.clientNonce);
+      this.send(sender.socket, "proximity:session:joined", {
+        sessionId: existing.id,
+        clientNonce: message.payload.clientNonce,
+        joinUntil: existing.joinUntil,
+        participantCount: existing.clients.size
+      });
+      return;
     }
+
+    // Enforce the global participant cap before admitting a NEW participant into
+    // any cohort (existing-open or freshly-opened). Rejections are clean: the
+    // client receives proximity:session:failed and is not added anywhere.
+    const totalParticipants = this.totalProximityParticipants();
+    if (totalParticipants >= this.maxTotalProximityParticipants) {
+      this.metrics?.recordEvent("proximity:session:rejected", {
+        clientId: sender.id,
+        reason: "capacity_reached",
+        totalParticipants,
+        maxTotalParticipants: this.maxTotalProximityParticipants
+      });
+      this.send(sender.socket, "proximity:session:failed", {
+        reason: "capacity_reached",
+        maxTotalParticipants: this.maxTotalProximityParticipants
+      });
+      return;
+    }
+
+    const session = this.findOpenProximitySession(now) || this.openProximitySession(now);
     session.clients.add(sender.id);
     session.nonces.set(sender.id, message.payload.clientNonce);
     session.acousticCapabilities ||= new Map();
@@ -612,7 +722,9 @@ export class SignalingHub {
     this.metrics?.recordEvent("proximity:session:joined", {
       sessionId: session.id,
       clientId: sender.id,
-      participantCount: session.clients.size
+      participantCount: session.clients.size,
+      openSessions: this.openProximitySessionIds.size,
+      totalParticipants: this.totalProximityParticipants()
     });
     this.send(sender.socket, "proximity:session:joined", {
       sessionId: session.id,
@@ -624,11 +736,65 @@ export class SignalingHub {
       clearTimeout(session.timer);
       session.timer = setTimeout(() => this.startProximitySession(session.id), 300);
       session.timer.unref?.();
-    } else if (session.clients.size >= MAX_PROXIMITY_SESSION_CLIENTS && !session.started) {
+    } else if (session.clients.size >= this.maxProximitySessionClients && !session.started) {
+      // The cohort is full: close it to new joiners so the next joiner opens a
+      // fresh concurrent cohort, and start the ceremony shortly.
+      this.openProximitySessionIds.delete(session.id);
       clearTimeout(session.timer);
       session.timer = setTimeout(() => this.startProximitySession(session.id), 100);
       session.timer.unref?.();
     }
+  }
+
+  totalProximityParticipants() {
+    let total = 0;
+    for (const session of this.proximitySessions.values()) total += session.clients.size;
+    return total;
+  }
+
+  findProximitySessionForClient(clientId) {
+    for (const session of this.proximitySessions.values()) {
+      if (session.clients.has(clientId)) return session;
+    }
+    return null;
+  }
+
+  findOpenProximitySession(now) {
+    for (const sessionId of [...this.openProximitySessionIds]) {
+      const session = this.proximitySessions.get(sessionId);
+      if (!session || session.started || session.expiresAt <= now || session.clients.size >= this.maxProximitySessionClients) {
+        this.openProximitySessionIds.delete(sessionId);
+        continue;
+      }
+      return session;
+    }
+    return null;
+  }
+
+  openProximitySession(now) {
+    const session = {
+      id: `prox-${randomUUID()}`,
+      clients: new Set(),
+      nonces: new Map(),
+      acousticCapabilities: new Map(),
+      signatures: new Map(),
+      signatureDetails: new Map(),
+      telemetry: new Map(),
+      createdAt: now,
+      expiresAt: now + this.proximitySessionTtlMs,
+      joinUntil: now + this.proximityJoinWindowMs,
+      joinExtensions: 0,
+      started: false,
+      matched: new Set(),
+      bandIndex: this.proximityBandCounter++,
+      timer: null,
+      failTimer: null
+    };
+    this.proximitySessions.set(session.id, session);
+    this.openProximitySessionIds.add(session.id);
+    session.timer = setTimeout(() => this.startProximitySession(session.id), this.proximityJoinWindowMs);
+    session.timer.unref?.();
+    return session;
   }
 
   startProximitySession(sessionId) {
@@ -638,9 +804,9 @@ export class SignalingHub {
     if (session.clients.size < 2) {
       if ((session.joinExtensions || 0) < 1 && session.expiresAt > Date.now()) {
         session.joinExtensions = (session.joinExtensions || 0) + 1;
-        session.joinUntil = Date.now() + SESSION_JOIN_WINDOW_MS;
-        this.openProximitySessionId = sessionId;
-        session.timer = setTimeout(() => this.startProximitySession(sessionId), SESSION_JOIN_WINDOW_MS);
+        session.joinUntil = Date.now() + this.proximityJoinWindowMs;
+        this.openProximitySessionIds.add(sessionId);
+        session.timer = setTimeout(() => this.startProximitySession(sessionId), this.proximityJoinWindowMs);
         session.timer.unref?.();
         return;
       }
@@ -649,14 +815,21 @@ export class SignalingHub {
         if (client) this.send(client.socket, "proximity:session:failed", { sessionId, reason: "no_nearby_partner" });
       }
       this.proximitySessions.delete(sessionId);
+      this.openProximitySessionIds.delete(sessionId);
       return;
     }
     session.started = true;
-    if (this.openProximitySessionId === sessionId) this.openProximitySessionId = null;
-    const startAt = Date.now() + SESSION_START_DELAY_MS;
+    this.openProximitySessionIds.delete(sessionId);
+    // Stagger concurrent cohorts across a few time phases so cohorts that fill
+    // at the same instant do not all begin chirping simultaneously. Phase 0 has
+    // no offset, so the first/only cohort is unaffected.
+    const staggerMs = this.nextProximityStaggerMs();
+    session.staggerMs = staggerMs;
+    const startAt = Date.now() + this.proximityStartDelayMs + staggerMs;
     session.startAt = startAt;
-    session.endsAt = startAt + SESSION_DURATION_MS;
-    const acousticBand = selectSharedAcousticBand(session);
+    session.endsAt = startAt + this.proximityDurationMs;
+    const acousticBand = this.selectSessionAcousticBand(session);
+    session.acousticBand = acousticBand;
     const acousticPlan = [...session.clients].map((clientId, index) => {
       const signature = {
         id: `sig-${randomUUID()}`,
@@ -678,11 +851,15 @@ export class SignalingHub {
       this.send(client.socket, "proximity:session:start", {
         sessionId,
         startAt,
-        durationMs: SESSION_DURATION_MS,
+        durationMs: this.proximityDurationMs,
         acousticSlot: slot,
         acousticSignatureId: acousticPlan[slot]?.id,
         acousticPlan,
         acousticAvailable: acousticBand.available,
+        // New, additive fields describing the cohort's assigned sub-band so the
+        // client/admin can show which frequency lane this cohort is using.
+        acousticBandIndex: acousticBand.index,
+        acousticBandCount: acousticBand.count,
         participantCount: session.clients.size
       });
       slot += 1;
@@ -691,13 +868,61 @@ export class SignalingHub {
       sessionId,
       participantCount: session.clients.size,
       startAt,
-      durationMs: SESSION_DURATION_MS
+      durationMs: this.proximityDurationMs,
+      staggerMs,
+      acousticBandIndex: acousticBand.index,
+      acousticBandCount: acousticBand.count,
+      acousticStartFrequencyHz: acousticBand.startFrequencyHz,
+      acousticEndFrequencyHz: acousticBand.endFrequencyHz
     });
     session.failTimer = setTimeout(
       () => this.failUnmatchedProximitySession(sessionId),
-      SESSION_START_DELAY_MS + SESSION_DURATION_MS + SESSION_MATCH_SLOP_MS
+      this.proximityStartDelayMs + staggerMs + this.proximityDurationMs + this.proximityMatchSlopMs
     );
     session.failTimer.unref?.();
+  }
+
+  nextProximityStaggerMs() {
+    if (this.acousticSessionStaggerMs <= 0 || this.acousticSessionStaggerPhases <= 1) return 0;
+    const phase = this.proximityStartCounter % this.acousticSessionStaggerPhases;
+    this.proximityStartCounter += 1;
+    return phase * this.acousticSessionStaggerMs;
+  }
+
+  // Pick the acoustic band for one cohort. All participants in a cohort share
+  // ONE band and are separated by time slots (code = slot index). Concurrent
+  // cohorts are pinned to different sub-bands (round-robin by creation order)
+  // when the usable hardware range is wide enough to fit more than one
+  // >= min-bandwidth lane; otherwise every cohort shares the full band.
+  selectSessionAcousticBand(session) {
+    const sampleRates = [...(session.acousticCapabilities?.values() || [])]
+      .map((capability) => Number(capability?.sampleRate))
+      .filter((sampleRate) => Number.isFinite(sampleRate) && sampleRate > 0);
+    const safeMaximum = sampleRates.length
+      ? Math.min(...sampleRates.map((sampleRate) => sampleRate * 0.45 - 100))
+      : this.acousticBandEndHz;
+    const bandEndHz = Math.min(this.acousticBandEndHz, Math.floor(safeMaximum));
+    const totalWidth = bandEndHz - this.acousticBandStartHz;
+    if (totalWidth < this.acousticMinBandwidthHz) {
+      return {
+        available: false,
+        index: 0,
+        count: 1,
+        startFrequencyHz: this.acousticBandStartHz,
+        endFrequencyHz: this.acousticBandStartHz + this.acousticMinBandwidthHz
+      };
+    }
+    const maxByWidth = Math.max(1, Math.floor(totalWidth / this.acousticMinBandwidthHz));
+    const count = Math.max(1, Math.min(this.acousticMaxConcurrentSubBands, maxByWidth));
+    const index = count > 1 ? ((Number(session.bandIndex) || 0) % count) : 0;
+    const subBandWidth = Math.floor(totalWidth / count);
+    const startFrequencyHz = this.acousticBandStartHz + index * subBandWidth;
+    const endFrequencyHz = index === count - 1 ? bandEndHz : startFrequencyHz + subBandWidth;
+    return { available: true, index, count, startFrequencyHz, endFrequencyHz };
+  }
+
+  hasValidCeremonyTiming(session, timing = {}) {
+    return ceremonyTimingValid(session, timing, this.proximityMatchSlopMs);
   }
 
   pruneProximitySessionClients(session) {
@@ -744,7 +969,7 @@ export class SignalingHub {
       this.send(sender.socket, "proximity:session:failed", { sessionId, reason: "session_nonce_mismatch" });
       return;
     }
-    if (!hasValidCeremonyTiming(session, message.payload.timing)) {
+    if (!this.hasValidCeremonyTiming(session, message.payload.timing)) {
       this.send(sender.socket, "proximity:session:failed", { sessionId, reason: "timing_out_of_window" });
       return;
     }
@@ -781,7 +1006,7 @@ export class SignalingHub {
       acousticSignatureId: message.payload.metrics?.acousticSignatureId || null,
       heardAcousticSignatureId: message.payload.metrics?.heardAcousticSignatureId || null,
       acousticDetections: Array.isArray(message.payload.metrics?.acousticDetections)
-        ? message.payload.metrics.acousticDetections.slice(0, MAX_PROXIMITY_SESSION_CLIENTS)
+        ? message.payload.metrics.acousticDetections.slice(0, MAX_ACOUSTIC_DETECTIONS)
         : [],
       bumpCorrelation: Number(message.payload.metrics?.bumpCorrelation || message.payload.metrics?.bump || 0),
       tiltMatch: Number(message.payload.metrics?.tiltMatch || message.payload.metrics?.tilt || 0),
@@ -827,7 +1052,7 @@ export class SignalingHub {
         const a = candidates[i];
         const b = candidates[j];
         const delta = Math.abs(Number(a.timing?.bumpAt || a.receivedAt) - Number(b.timing?.bumpAt || b.receivedAt));
-        if (delta > SESSION_MATCH_SLOP_MS || !hasReciprocalAcousticEvidence(session, a, b)) continue;
+        if (delta > this.proximityMatchSlopMs || !hasReciprocalAcousticEvidence(session, a, b)) continue;
         if (!best || delta < best.delta) best = { a, b, delta };
       }
     }
@@ -868,6 +1093,7 @@ export class SignalingHub {
       clearTimeout(session.timer);
       clearTimeout(session.failTimer);
       this.proximitySessions.delete(session.id);
+      this.openProximitySessionIds.delete(session.id);
     }
   }
 
@@ -895,6 +1121,7 @@ export class SignalingHub {
     clearTimeout(session.timer);
     clearTimeout(session.failTimer);
     this.proximitySessions.delete(sessionId);
+    this.openProximitySessionIds.delete(sessionId);
   }
 
   cancelProximitySession(sender, message) {
@@ -907,7 +1134,7 @@ export class SignalingHub {
       clearTimeout(session.timer);
       clearTimeout(session.failTimer);
       this.proximitySessions.delete(sessionId);
-      if (this.openProximitySessionId === sessionId) this.openProximitySessionId = null;
+      this.openProximitySessionIds.delete(sessionId);
     }
   }
 
@@ -1115,16 +1342,24 @@ export class SignalingHub {
     const now = Date.now();
     return {
       protocol: {
-        joinWindowMs: SESSION_JOIN_WINDOW_MS,
-        startDelayMs: SESSION_START_DELAY_MS,
-        sessionDurationMs: SESSION_DURATION_MS,
-        sessionTtlMs: SESSION_TTL_MS,
-        matchSlopMs: SESSION_MATCH_SLOP_MS,
+        joinWindowMs: this.proximityJoinWindowMs,
+        startDelayMs: this.proximityStartDelayMs,
+        sessionDurationMs: this.proximityDurationMs,
+        sessionTtlMs: this.proximitySessionTtlMs,
+        matchSlopMs: this.proximityMatchSlopMs,
         scoreMinimum: SESSION_SCORE_MINIMUM,
-        maxClients: MAX_PROXIMITY_SESSION_CLIENTS,
-        acousticBandStartHz: ACOUSTIC_BAND_START_HZ,
-        acousticBandEndHz: ACOUSTIC_BAND_END_HZ,
-        acousticMinBandwidthHz: ACOUSTIC_MIN_BANDWIDTH_HZ,
+        maxClients: this.maxProximitySessionClients,
+        cohortCeiling: this.proximityCohortCeiling,
+        slotFloorMs: ACOUSTIC_CEREMONY_SLOT_FLOOR_MS,
+        maxTotalParticipants: this.maxTotalProximityParticipants,
+        openSessions: this.openProximitySessionIds.size,
+        totalParticipants: this.totalProximityParticipants(),
+        acousticSessionStaggerMs: this.acousticSessionStaggerMs,
+        acousticSessionStaggerPhases: this.acousticSessionStaggerPhases,
+        acousticMaxConcurrentSubBands: this.acousticMaxConcurrentSubBands,
+        acousticBandStartHz: this.acousticBandStartHz,
+        acousticBandEndHz: this.acousticBandEndHz,
+        acousticMinBandwidthHz: this.acousticMinBandwidthHz,
         acousticWinnerMargin: ACOUSTIC_WINNER_MARGIN,
         acousticMinCorrelation: ACOUSTIC_MIN_CORRELATION,
         acousticSlotCorrelationMin: ACOUSTIC_SLOT_CORRELATION_MIN,
@@ -1160,6 +1395,15 @@ export class SignalingHub {
         createdAt: new Date(session.createdAt).toISOString(),
         startAt: session.startAt || null,
         endsAt: session.endsAt || null,
+        staggerMs: session.staggerMs || 0,
+        acousticBand: session.acousticBand
+          ? {
+            index: session.acousticBand.index,
+            count: session.acousticBand.count,
+            startFrequencyHz: session.acousticBand.startFrequencyHz,
+            endFrequencyHz: session.acousticBand.endFrequencyHz
+          }
+          : null,
         participants: [...session.clients].map((clientId) => {
           const client = this.clients.get(clientId);
           const telemetry = session.telemetry.get(clientId);
@@ -1220,7 +1464,7 @@ export class SignalingHub {
         clearTimeout(session.timer);
         clearTimeout(session.failTimer);
         this.proximitySessions.delete(sessionId);
-        if (this.openProximitySessionId === sessionId) this.openProximitySessionId = null;
+        this.openProximitySessionIds.delete(sessionId);
       }
     }
     if (client.pairingId) {
@@ -1314,7 +1558,7 @@ export class SignalingHub {
       clearTimeout(session.failTimer);
     }
     this.proximitySessions.clear();
-    this.openProximitySessionId = null;
+    this.openProximitySessionIds.clear();
     this.adminMonitors.clear();
     for (const client of this.clients.values()) client.socket.close();
     this.wss.close();
@@ -1356,7 +1600,7 @@ function sessionAnalysis(analyzer, metrics = {}) {
   };
 }
 
-function hasValidCeremonyTiming(session, timing = {}) {
+function ceremonyTimingValid(session, timing = {}, matchSlopMs = DEFAULT_SESSION_MATCH_SLOP_MS) {
   const startedAt = Number(timing?.startedAt);
   const bumpAt = Number(timing?.bumpAt);
   const completedAt = Number(timing?.completedAt);
@@ -1365,9 +1609,9 @@ function hasValidCeremonyTiming(session, timing = {}) {
   if (Date.now() < session.startAt - 250) return false;
   return Math.abs(startedAt - session.startAt) <= 250
     && bumpAt >= session.startAt - 250
-    && bumpAt <= session.endsAt + SESSION_MATCH_SLOP_MS
+    && bumpAt <= session.endsAt + matchSlopMs
     && completedAt >= bumpAt
-    && completedAt <= session.endsAt + SESSION_MATCH_SLOP_MS;
+    && completedAt <= session.endsAt + matchSlopMs;
 }
 
 function hasReciprocalAcousticEvidence(session, first, second) {
@@ -1412,22 +1656,6 @@ function hasUsableAcousticDetection(detection) {
   return Boolean(detection?.energyAssisted || detection?.detectionMethod === "energy-assisted")
     && correlation >= ACOUSTIC_ENERGY_ASSISTED_MIN_CORRELATION
     && marginDb >= ACOUSTIC_ENERGY_ASSISTED_MIN_MARGIN_DB;
-}
-
-function selectSharedAcousticBand(session) {
-  const sampleRates = [...(session.acousticCapabilities?.values() || [])]
-    .map((capability) => Number(capability?.sampleRate))
-    .filter((sampleRate) => Number.isFinite(sampleRate) && sampleRate > 0);
-  const safeMaximum = sampleRates.length
-    ? Math.min(...sampleRates.map((sampleRate) => sampleRate * 0.45 - 100))
-    : ACOUSTIC_BAND_END_HZ;
-  const endFrequencyHz = Math.min(ACOUSTIC_BAND_END_HZ, Math.floor(safeMaximum));
-  const available = endFrequencyHz - ACOUSTIC_BAND_START_HZ >= ACOUSTIC_MIN_BANDWIDTH_HZ;
-  return {
-    available,
-    startFrequencyHz: ACOUSTIC_BAND_START_HZ,
-    endFrequencyHz: available ? endFrequencyHz : ACOUSTIC_BAND_START_HZ + ACOUSTIC_MIN_BANDWIDTH_HZ
-  };
 }
 
 function fallbackSessionAnalysis(metrics = {}) {
@@ -1477,7 +1705,7 @@ function acousticDiagnostics(metrics = {}) {
     confidenceMargin: finiteOrNull(metrics.acousticConfidenceMargin),
     runnerUpCorrelation: finiteOrNull(metrics.acousticRunnerUpCorrelation),
     detections: Array.isArray(metrics.acousticDetections)
-      ? metrics.acousticDetections.slice(0, MAX_PROXIMITY_SESSION_CLIENTS)
+      ? metrics.acousticDetections.slice(0, MAX_ACOUSTIC_DETECTIONS)
       : [],
     reason: metrics.acousticReason || null
   };
@@ -1504,4 +1732,18 @@ function proximityFailureReason(analysis) {
 function finiteOrNull(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+// Resolve an env/option override, falling back to the default when the value is
+// missing or invalid. `configuredPositive` requires a strictly positive number;
+// `configuredNonNegative` allows 0 (used so a stagger of 0 explicitly disables
+// the cross-session start offset rather than reverting to the default).
+function configuredPositive(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : fallback;
+}
+
+function configuredNonNegative(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : fallback;
 }

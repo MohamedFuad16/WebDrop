@@ -181,6 +181,23 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
     heartbeatIntervalMs: parsePositiveInt(env.HEARTBEAT_INTERVAL_MS, 25000),
     sessionTtlMs: parsePositiveInt(env.SESSION_TTL_MS, 900000),
     pairingTtlMs: parsePositiveInt(env.PAIRING_TTL_MS, 120000),
+    // Proximity scaling knobs. Unset values fall back to the hub's defaults
+    // (per-session cohort = slot-floor ceiling, global cap = 100). The cohort
+    // cap is clamped to the floor-derived ceiling inside the hub so it can never
+    // schedule sub-floor acoustic slots.
+    maxProximitySessionClients: parsePositiveInt(env.MAX_PROXIMITY_SESSION_CLIENTS, undefined),
+    maxTotalProximityParticipants: parsePositiveInt(env.MAX_TOTAL_PROXIMITY_PARTICIPANTS, undefined),
+    proximitySessionJoinWindowMs: parsePositiveInt(env.PROXIMITY_SESSION_JOIN_WINDOW_MS, undefined),
+    proximitySessionStartDelayMs: parsePositiveInt(env.PROXIMITY_SESSION_START_DELAY_MS, undefined),
+    proximitySessionDurationMs: parsePositiveInt(env.PROXIMITY_SESSION_DURATION_MS, undefined),
+    proximitySessionTtlMs: parsePositiveInt(env.PROXIMITY_SESSION_TTL_MS, undefined),
+    proximitySessionMatchSlopMs: parsePositiveInt(env.PROXIMITY_SESSION_MATCH_SLOP_MS, undefined),
+    acousticBandStartHz: parsePositiveInt(env.ACOUSTIC_BAND_START_HZ, undefined),
+    acousticBandEndHz: parsePositiveInt(env.ACOUSTIC_BAND_END_HZ, undefined),
+    acousticMinBandwidthHz: parsePositiveInt(env.ACOUSTIC_MIN_BANDWIDTH_HZ, undefined),
+    acousticSessionStaggerMs: parseNonNegativeInt(env.ACOUSTIC_SESSION_STAGGER_MS, undefined),
+    acousticSessionStaggerPhases: parsePositiveInt(env.ACOUSTIC_SESSION_STAGGER_PHASES, undefined),
+    acousticMaxConcurrentSubBands: parsePositiveInt(env.ACOUSTIC_MAX_CONCURRENT_SUBBANDS, undefined),
     proximityAnalyzer,
     qrTokenProvider,
     metrics
@@ -243,6 +260,11 @@ function diagnosticsPayload({ hub, metrics }) {
 function parsePositiveInt(value, fallback) {
   const number = Number(value);
   return Number.isSafeInteger(number) && number > 0 ? number : fallback;
+}
+
+function parseNonNegativeInt(value, fallback) {
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number >= 0 ? number : fallback;
 }
 
 function parseAllowedOrigins(value) {

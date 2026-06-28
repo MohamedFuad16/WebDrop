@@ -77,12 +77,12 @@ test("close clears pending proximity session timers and state", () => {
   });
 
   assert.equal(hub.proximitySessions.size, 1);
-  assert.ok(hub.openProximitySessionId);
+  assert.equal(hub.openProximitySessionIds.size, 1);
 
   hub.close();
 
   assert.equal(hub.proximitySessions.size, 0);
-  assert.equal(hub.openProximitySessionId, null);
+  assert.equal(hub.openProximitySessionIds.size, 0);
 });
 
 function createHub() {

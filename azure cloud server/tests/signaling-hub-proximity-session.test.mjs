@@ -310,12 +310,12 @@ test("a one-client session extends once and accepts a slightly late partner", ()
   const session = createSession(hub, [clientA]);
   session.started = false;
   session.joinExtensions = 0;
-  hub.openProximitySessionId = session.id;
+  hub.openProximitySessionIds.add(session.id);
 
   hub.startProximitySession(session.id);
   assert.equal(session.started, false);
   assert.equal(session.joinExtensions, 1);
-  assert.equal(hub.openProximitySessionId, session.id);
+  assert.ok(hub.openProximitySessionIds.has(session.id));
 
   hub.joinProximitySession(clientB, {
     payload: { clientNonce: `nonce-${clientB.id}` }
