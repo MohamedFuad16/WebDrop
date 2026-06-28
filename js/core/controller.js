@@ -1633,7 +1633,6 @@ export function createController({
       }, 120);
       const result = await proximity.runRealCeremony({
         acoustic: microphonePermission.granted && audioOutputPermission.granted,
-        acousticRole: Number(startPayload.acousticSlot || 0) % 2 === 0 ? "emit" : "detect",
         acousticPlan: startPayload.acousticPlan,
         acousticSignatureId: startPayload.acousticSignatureId,
         startAt: startPayload.startAt,

@@ -257,6 +257,52 @@ test("proximity session rejects reciprocal signatures with an ambiguous winner m
   hub.close();
 });
 
+test("proximity session rejects reciprocal signatures with no reported winner margin", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  const session = createSession(hub, [clientA, clientB]);
+  const noMargin = {
+    acoustic: true,
+    soundCorrelation: 1,
+    motionCorrelation: 1,
+    bump: true,
+    tilt: true
+  };
+
+  hub.recordProximitySessionTelemetry(clientA, sessionMessage(session, clientA, noMargin, 1000, clientB));
+  hub.recordProximitySessionTelemetry(clientB, sessionMessage(session, clientB, noMargin, 1020, clientA));
+
+  assert.equal(session.telemetry.get(clientA.id).analysis.acousticConfidenceMargin, null);
+  assert.equal(clientA.pairingId, null);
+  assert.equal(clientB.pairingId, null);
+  assert.equal(messagesOf(clientA, "proximity:match").length, 0);
+  assert.equal(messagesOf(clientB, "proximity:match").length, 0);
+
+  hub.close();
+});
+
+test("proximity session rejects a non-reciprocal cross configuration", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  const clientC = addClient(hub, "client-c");
+  const session = createSession(hub, [clientA, clientB, clientC]);
+
+  hub.recordProximitySessionTelemetry(clientA, sessionMessage(session, clientA, verifiedMetrics(), 1000, clientB));
+  hub.recordProximitySessionTelemetry(clientB, sessionMessage(session, clientB, verifiedMetrics(), 1010, clientC));
+  hub.recordProximitySessionTelemetry(clientC, sessionMessage(session, clientC, verifiedMetrics(), 1020, clientA));
+
+  assert.equal(clientA.pairingId, null);
+  assert.equal(clientB.pairingId, null);
+  assert.equal(clientC.pairingId, null);
+  assert.equal(messagesOf(clientA, "proximity:match").length, 0);
+  assert.equal(messagesOf(clientB, "proximity:match").length, 0);
+  assert.equal(messagesOf(clientC, "proximity:match").length, 0);
+
+  hub.close();
+});
+
 test("a one-client session extends once and accepts a slightly late partner", () => {
   const hub = createTestHub();
   const clientA = addClient(hub, "client-a");
@@ -539,7 +585,8 @@ function verifiedMetrics() {
     soundCorrelation: 1,
     motionCorrelation: 1,
     bump: true,
-    tilt: true
+    tilt: true,
+    acousticConfidenceMargin: 0.5
   };
 }
 

@@ -336,6 +336,11 @@ async function exchangeSignatureChirps(acoustic, {
 
   detections.sort((a, b) => b.marginDb - a.marginDb || b.correlation - a.correlation);
   const strongest = detections[0] || null;
+  const rankedByCorrelation = [...detections].sort((a, b) => (b.correlation || 0) - (a.correlation || 0));
+  const runnerUpCorrelation = rankedByCorrelation[1]?.correlation || 0;
+  const confidenceMargin = strongest
+    ? Math.max(0, (rankedByCorrelation[0]?.correlation || 0) - runnerUpCorrelation)
+    : 0;
   const summary = strongest
     ? {
       mode: "detected",
@@ -355,6 +360,8 @@ async function exchangeSignatureChirps(acoustic, {
     emittedCount,
     detected: Boolean(strongest),
     correlation: strongest?.correlation || 0,
+    confidenceMargin,
+    runnerUpCorrelation,
     ownSignatureId,
     heardSignatureId: strongest?.signatureId || null,
     detections,

@@ -841,6 +841,99 @@ test("anonymous acoustic plans keep listening briefly for a late peer signature"
   assert.equal(result.metrics.heardAcousticSignatureId, "late-peer");
 });
 
+test("iPhone continuous-capture ceremony reports a finite winner-confidence margin", async () => {
+  const acoustic = {
+    async startCeremonyCapture() {
+      return { started: true, sampleRate: 48_000 };
+    },
+    async emitChirp() {
+      return { emitted: true, sampleRate: 48_000 };
+    },
+    stopCeremonyCapture() {
+      return { samples: new Float32Array(64), sampleRate: 48_000, durationMs: 1, rms: 0.01, peak: 0.05 };
+    },
+    decodeCeremonyCapture(_recording, plan) {
+      return plan.slice(1).map((signature, index) => ({
+        signatureId: signature.id,
+        slot: index + 2,
+        slotCount: plan.length,
+        startFrequencyHz: signature.startFrequencyHz,
+        endFrequencyHz: signature.endFrequencyHz,
+        detected: true,
+        correlation: index === 0 ? 0.9 : 0.5,
+        marginDb: index === 0 ? 26 : 12,
+        sampleOffset: 100 + index
+      }));
+    },
+    close() {}
+  };
+  const motion = {
+    getSnapshot() { return { bump: true, tilted: true, samples: 4 }; },
+    stopCapture() {}
+  };
+  const engine = new ProximityEngine({ enabled: true, acoustic, motion });
+  const plan = [
+    { id: "self-signature", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 0 },
+    { id: "peer-strong", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 1 },
+    { id: "peer-faint", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 2 }
+  ];
+
+  const result = await engine.runRealCeremony({
+    acousticPlan: plan,
+    acousticSignatureId: "self-signature",
+    acousticOptions: { intervalMs: 1000 },
+    startAt: Date.now(),
+    ceremonyDurationMs: 80
+  });
+
+  const margin = result.metrics.acousticConfidenceMargin;
+  assert.equal(Number.isFinite(margin), true);
+  assert.ok(Math.abs(margin - 0.4) < 1e-9);
+  assert.equal(result.metrics.heardAcousticSignatureId, "peer-strong");
+  assert.equal(result.metrics.acousticRunnerUpCorrelation, 0.5);
+});
+
+test("slot-by-slot fallback ceremony reports a finite winner-confidence margin", async () => {
+  const acoustic = {
+    async emitChirp() {
+      return { emitted: true };
+    },
+    async detectChirp(options) {
+      const strongPeer = options.startFrequencyHz === 19020;
+      return {
+        detected: true,
+        correlation: strongPeer ? 0.84 : 0.5,
+        band: { marginDb: strongPeer ? 31 : 18 }
+      };
+    }
+  };
+  const motion = {
+    getSnapshot() { return { bump: true, tilted: true, samples: 4 }; },
+    stopCapture() {}
+  };
+  const engine = new ProximityEngine({ enabled: true, acoustic, motion });
+  const plan = [
+    { id: "self-signature", startFrequencyHz: 18600, endFrequencyHz: 18820 },
+    { id: "peer-strong", startFrequencyHz: 19020, endFrequencyHz: 19240 },
+    { id: "peer-faint", startFrequencyHz: 19300, endFrequencyHz: 19400 }
+  ];
+
+  const result = await engine.runRealCeremony({
+    acousticPlan: plan,
+    acousticSignatureId: "self-signature",
+    acousticOptions: { intervalMs: 500 },
+    startAt: Date.now() + 5,
+    ceremonyDurationMs: 1260
+  });
+
+  const margin = result.metrics.acousticConfidenceMargin;
+  assert.equal(Number.isFinite(margin), true);
+  assert.ok(margin >= 0.04);
+  assert.ok(Math.abs(margin - 0.34) < 1e-9);
+  assert.equal(result.metrics.heardAcousticSignatureId, "peer-strong");
+  assert.equal(result.metrics.acousticRunnerUpCorrelation, 0.5);
+});
+
 function createVirtualAcousticMedium() {
   const pulses = new Map();
   const detections = new Set();

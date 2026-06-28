@@ -37,6 +37,11 @@ const MAX_PROXIMITY_SESSION_CLIENTS = 6;
 const ACOUSTIC_BAND_START_HZ = 18_600;
 const ACOUSTIC_BAND_END_HZ = 19_400;
 const ACOUSTIC_MIN_BANDWIDTH_HZ = 420;
+// Minimum separation (correlation units, 0..1) the strongest heard signature must
+// hold over the runner-up before a reciprocal pair is trusted. Tuning knob for
+// physical devices: raise to reject ambiguous/crowded rooms more aggressively,
+// lower to ease legitimate pairing. A device that never reports a margin fails
+// this check rather than passing it (see hasSufficientWinnerMargin).
 const ACOUSTIC_WINNER_MARGIN = 0.04;
 const ACOUSTIC_MIN_CORRELATION = 0.3;
 const ACOUSTIC_SLOT_CORRELATION_MIN = 0.2;
@@ -1377,8 +1382,16 @@ function hasReciprocalAcousticEvidence(session, first, second) {
     && second.analysis?.heardAcousticSignatureId === firstSignature
     && hasUsableAcousticDetection(firstDetection)
     && hasUsableAcousticDetection(secondDetection)
-    && Number(first.analysis?.acousticConfidenceMargin ?? 1) >= ACOUSTIC_WINNER_MARGIN
-    && Number(second.analysis?.acousticConfidenceMargin ?? 1) >= ACOUSTIC_WINNER_MARGIN);
+    && hasSufficientWinnerMargin(first.analysis)
+    && hasSufficientWinnerMargin(second.analysis));
+}
+
+// Fail safe: a missing or non-finite margin is treated as a failed winner-margin
+// check, never an automatic pass, so a device that never measured signature
+// separation cannot be matched by default.
+function hasSufficientWinnerMargin(analysis) {
+  const margin = Number(analysis?.acousticConfidenceMargin);
+  return Number.isFinite(margin) && margin >= ACOUSTIC_WINNER_MARGIN;
 }
 
 function acousticDetectionFor(analysis, signatureId) {

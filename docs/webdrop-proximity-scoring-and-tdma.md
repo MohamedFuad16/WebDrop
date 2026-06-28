@@ -151,7 +151,7 @@ The production target is currently:
 The default chirp lasts approximately:
 
 ```text
-96 ms
+112 ms
 ```
 
 The app requests raw microphone processing:
@@ -267,7 +267,7 @@ Current sensor thresholds:
 
 | Signal | Threshold |
 | --- | ---: |
-| Linear acceleration | 14 |
+| Linear acceleration | 10 |
 | Gravity-vector change | 3.5 |
 
 A bump is accepted when either threshold is reached.
