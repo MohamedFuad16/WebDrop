@@ -1,7 +1,7 @@
 # WebDrop Production Implementation Checklist
 
-Updated: June 24, 2026
-App version: 1.0.73
+Updated: June 29, 2026
+App version: 1.0.86
 
 This is the source of truth for the production-readiness package. `Ready, live` means the implementation is active in the current runtime. `Ready, disabled` means the implementation is wired to the frontend but cannot become effective unless its runtime flag and infrastructure are enabled. `Ready, unconfigured` means the code exists but requires deployment secrets or infrastructure. `External verification` means the code is ready but requires Azure, Cloudflare, or physical devices.
 
@@ -67,11 +67,15 @@ This is the source of truth for the production-readiness package. `Ready, live` 
 | Origin and rate-limit policy | Ready | `azure cloud server/src/server.js`, `azure cloud server/src/signaling-hub.js` |
 | Ephemeral invites and pairing sessions | Ready | `azure cloud server/src/signaling-hub.js` |
 | Coordinated proximity start and enforced verified state | Ready, live | `azure cloud server/src/signaling-hub.js`, `ENABLE_PROXIMITY_ANALYSIS=true` on live readiness |
+| Concurrent bounded proximity cohorts + global cap | Ready, live | `openProximitySessionIds`, `MAX_TOTAL_PROXIMITY_PARTICIPANTS` (100), `MAX_PROXIMITY_SESSION_CLIENTS` (clamped to slot-floor ceiling), `tests/signaling-hub-proximity-scaling.test.mjs` |
+| Fail-safe ultrasonic winner-margin guard | Ready, live | `hasSufficientWinnerMargin`, `ACOUSTIC_WINNER_MARGIN=0.04`, `azure cloud server/src/signaling-hub.js` |
 | Server-issued QR one-time tokens | Ready | `azure cloud server/src/qr-token-provider.js` |
 | Cloudflare temporary TURN credentials | Ready, live | `azure cloud server/src/turn-provider.js`, `azure cloud server/tests/turn-provider.test.mjs`, live relay E2E |
 | Direct/relay path metrics | Ready, live | `azure cloud server/src/metrics.js`, `azure cloud server/src/signaling-hub.js` |
 | Payload-safe observability | Ready, live | `azure cloud server/src/logger.js`, protected metrics endpoint |
-| Token-gated bounded operations diagnostics | Ready, live | `/api/diagnostics-public` (metrics token), `admin/index.html`, `js/admin/readiness.js`, `js/admin/diagnostics-api.js` |
+| Single token-gated operations diagnostics endpoint | Ready, live | `/api/diagnostics-public` (requires `METRICS_API_TOKEN`; old `/api/diagnostics-snapshot` merged in), `admin/index.html`, `js/admin/readiness.js`, `js/admin/diagnostics-api.js` |
+| Backend resource-leak / oversized-frame hardening | Ready, live | `ws maxPayload=MAX_JSON_BYTES`, swept HTTP rate-limit map, pruned/capped TURN cache, O(n) broadcast, O(1) TURN auth, timers cleared on shutdown, `sdp` log redaction |
+| XSS-safe received-file previews + object-URL cleanup | Ready, live | `js/utils/received-files.js`, `js/ui/app-view.js` (dangerous MIME is download-only) |
 | Shared English/Japanese operations UI | Ready, live | `css/operations.css`, `js/admin/operations-i18n.js`, admin E2E coverage |
 | nginx, Certbot, systemd, Azure VM scripts, and load-test assets | Ready, unconfigured | `azure cloud server/nginx/`, `systemd/`, `scripts/`, `load/` |
 
@@ -97,8 +101,9 @@ This is the source of truth for the production-readiness package. `Ready, live` 
 ## Remaining before production launch
 
 1. Run two-physical-device over-air proximity calibration with representative iPhones and Android devices; record emitted/listening/detected slot text, margin, bump, tilt, score, and false-positive/false-negative outcomes.
-2. Verify direct and TURN file-transfer behavior on physical devices with representative files below and near the 500 MB cap.
-3. Continue monitoring Japan East health, WSS, ICE, allowed origins, protected metrics access, TLS renewal, systemd restart behavior, and firewall rules on the live VM.
-4. Load-test signaling toward the documented 10,000-client target.
-5. Add stronger client identity authentication and shared state before horizontally scaling beyond one signaling instance.
-6. Keep the regenerated English and Japanese screenshot inventories and PDF guides aligned with the current app version.
+2. Run multi-device calibration of the concurrent-cohort model: confirm that several 6-person cohorts in one room actually pair reliably under shared/sub-banded ultrasonic conditions. The software allows up to ~50 pairs (100 participants), but real acoustic reliability is physical-device dependent.
+3. Verify direct and TURN file-transfer behavior on physical devices with representative files below and near the 500 MB cap.
+4. Continue monitoring Japan East health, WSS, ICE, allowed origins, protected metrics access, TLS renewal, systemd restart behavior, and firewall rules on the live VM.
+5. Load-test signaling toward the documented 10,000-client target. Reaching 10,000 proximity participants is a config bump (`MAX_TOTAL_PROXIMITY_PARTICIPANTS`) plus the Redis/shared-presence multi-node path.
+6. Add stronger client identity authentication and shared state before horizontally scaling beyond one signaling instance.
+7. Keep the regenerated English and Japanese screenshot inventories and PDF guides aligned with the current app version.

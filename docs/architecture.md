@@ -5,12 +5,13 @@
 This checkout now contains a first-run static, modular WebDrop v2 app plus architecture notes.
 
 - `index.html` is the active static app shell.
-- The current app/package/service-worker version is `1.0.73`.
+- The current app/package/service-worker version is `1.0.86`.
 - The earlier `proximity_architecture_monkeytype_v2.html` page was removed during the corrected rebuild.
 - `docs/implementation-checklist.md` is the current production-readiness source of truth.
+- For a from-scratch tour of the app and the underlying technologies, see `docs/webdrop-app-documentation.md` (how the app is built) and `docs/webdrop-concepts-revision-guide.md` (study/revise the concepts + multi-device pairing Q&A).
 - `js/` contains the app state machine, controller, adapters, proximity, transport, transfer, storage client, and UI renderer.
-- `js/admin/` contains the readiness console, shared operations localization, and the dedicated live diagnostics renderer.
-- `admin/diagnostics.html` is the public operational view for signaling clients, active pairs, proximity sessions, protocol thresholds, bounded device acoustic telemetry, and failure analysis. It does not request this browser's microphone or run a local loopback lab.
+- `js/admin/` contains the readiness/live-testing console (`readiness.js`), the shared operations localization (`operations-i18n.js`), and the authenticated diagnostics client (`diagnostics-api.js`). The orphaned legacy `js/admin/diagnostics.js` module and `css/diagnostics.css` were removed; do not reintroduce them.
+- `admin/index.html` is the operator dashboard (Readiness + Live testing tabs). It reads bounded operational metadata — signaling clients, active pairs, proximity sessions, protocol thresholds, device acoustic telemetry, and failure analysis — from the single authenticated `/api/diagnostics-public` endpoint. `admin/diagnostics.html` is now only a redirect to `admin/index.html?tab=live`. The dashboard never requests this browser's microphone and never runs a local loopback lab.
 - `css/operations.css` and `js/admin/operations-i18n.js` are the shared visual and English/Japanese foundation for both admin pages.
 - `js/storage/storage-client.js` contains the active receive-side storage ladder: deferred IndexedDB chunks with StreamSaver export on Download, iPhone/iPad Blob fallback, direct-stream compatibility fallback, and a 500 MB receive-session cap.
 - `azure cloud server/` contains the deployable signaling backend package for WSS metadata, QR token issuance, TURN credential proxying, and enforcement policy.
@@ -29,6 +30,48 @@ The product separates three concerns:
 3. Payload transport: encrypted browser-to-browser file chunks over WebRTC `RTCDataChannel`.
 
 The signaling server is a coordinator, not a file server. It must never accept or relay file bytes.
+
+## System architecture diagram
+
+```mermaid
+flowchart TB
+  subgraph L1["Lane 1 - Static delivery (HTTPS)"]
+    HOST["Static host / CDN<br/>index.html, admin/, js/ ES modules,<br/>css/, service-worker.js (offline cache)"]
+  end
+
+  subgraph L2["Lane 2 - Signaling and coordination (WSS, metadata only)"]
+    NGINX["nginx on Azure VM<br/>TLS termination - upgrades ws to wss - /ws"]
+    NODE["Node signaling hub (127.0.0.1:8080)<br/>presence - invites - SDP/ICE relay -<br/>QR tokens - concurrent proximity cohorts - TURN cred proxy"]
+    NGINX <--> NODE
+  end
+
+  CF["Cloudflare TURN<br/>STUN (free) + relay (metered)"]
+  ADM["Operator dashboard<br/>admin/index.html"]
+  A["Peer A browser"]
+  B["Peer B browser"]
+
+  A -->|loads static app| HOST
+  B -->|loads static app| HOST
+  A <-->|"client:hello, invite, proximity, SDP, ICE"| NGINX
+  B <-->|"client:hello, invite, proximity, SDP, ICE"| NGINX
+  NODE -->|"server-side: mint ephemeral ICE creds"| CF
+
+  A <==>|"Lane 3 - WebRTC RTCDataChannel (encrypted DTLS/SCTP)<br/>direct path via STUN-discovered host/srflx, 256 KiB chunks"| B
+  A -. "relay fallback when direct ICE fails" .-> CF
+  CF -. "relay fallback" .-> B
+
+  ADM -.->|"GET /api/diagnostics-public + /api/metrics-summary<br/>Authorization: Bearer METRICS_API_TOKEN"| NGINX
+```
+
+The three lanes are independent: the static lane delivers code, the signaling
+lane (`ws://` upgraded to `wss://` at nginx) carries only small JSON metadata,
+and the data lane carries encrypted file bytes peer-to-peer. STUN is used to
+discover a direct path; Cloudflare TURN relays only when the direct path fails.
+The operator dashboard reads bounded diagnostics over a single token-gated
+endpoint. Proximity pairing runs as many concurrent bounded acoustic cohorts
+(see "Proximity and trust"). The committed SVGs under `assets/diagrams/`
+(`webdrop-system-map.svg` and friends) remain valid high-level views; this
+Mermaid diagram is the current canonical architecture reference.
 
 ## Runtime lanes
 
@@ -77,6 +120,25 @@ The data lane uses WebRTC:
 
 Direct WebRTC can allow larger transfers after receiver storage checks. TURN relay mode should be visible to users and capped because relay traffic has server bandwidth cost.
 
+## Backend hardening (current)
+
+The signaling backend was hardened against resource leaks and oversized frames:
+
+- The WebSocket payload cap is enforced at the protocol layer: `ws` is created with `maxPayload: MAX_JSON_BYTES`, so oversized or binary frames are rejected before buffering instead of allowing several times the documented limit through to the app check.
+- The per-IP HTTP rate-limit map is swept periodically (`TokenBucket.sweep` on a 60 s interval) so it cannot accumulate one entry per source address forever.
+- The Cloudflare TURN credential cache is pruned and capped.
+- Peer-list broadcast serializes the frame once (`broadcast()` is O(n), not O(n²)); TURN-token authentication is an O(1) `Map` lookup.
+- Proximity-session timers (`timer`, `failTimer`) are cleared on shutdown (`close()`), and the cohort sets are emptied.
+- `sdp` is in the logger's redaction pattern, alongside `authorization`, `token`, `secret`, `credential`, `iceServers`, etc.
+
+These are implemented in `azure cloud server/src/{server.js,signaling-hub.js,turn-provider.js,logger.js}` and covered by the backend tests.
+
+## Frontend hardening (current)
+
+- Received-file previews are XSS-safe: peer-declared dangerous MIME types (`text/html`, `image/svg+xml`, any `text/*`, XML) are **download-only** and never opened in-page. The shared policy is `js/utils/received-files.js` (`isPreviewableReceivedItem`).
+- The received-file object-URL leak was fixed (URLs are revoked).
+- Dead code was removed: the orphaned `js/admin/diagnostics.js` and `css/diagnostics.css`, and their entries in `service-worker.js`.
+
 ## Orbital UI contract
 
 The orbital UI is a state machine, not decorative motion.
@@ -113,17 +175,45 @@ QR should remain the reliable fallback when microphone, motion, or audio playbac
 Acoustic verification uses a coded, device-negotiated high-frequency band. The
 current server policy allocates the `18.6-19.4 kHz` range for physical iPhone
 testing, with guarded transmit slots and per-device chirp codes. Anonymous
-sessions continuously record one ceremony buffer and allocate up to six
-transmit slots in the shared band. Each participant emits only in its slot and
-decodes all peer slots after the frame. The server pairs devices only when
-strongest-signature reports are reciprocal, winner confidence is unambiguous,
-and bump timestamps are inside the match window.
+sessions continuously record one ceremony buffer and allocate one transmit slot
+per cohort participant in the shared band. Each participant emits only in its
+slot and decodes all peer slots after the frame. The server pairs devices only
+when strongest-signature reports are reciprocal, winner confidence is
+unambiguous, and bump timestamps are inside the match window. The winner-margin
+guard fails safe: a missing/non-finite confidence margin fails the check rather
+than passing by default (`ACOUSTIC_WINNER_MARGIN = 0.04`).
 The score threshold is necessary but not sufficient: server verification also
 requires explicit ultrasound, bump, and tilt evidence, and rejects bump timing
 outside the server-issued ceremony window.
 If the initial anonymous join window contains only one device, the server keeps
 that identity-hidden session open for one short grace window and starts it
 quickly when a slightly late second device arrives.
+
+### Concurrent proximity cohorts (capacity model)
+
+The hub supports MANY concurrent proximity sessions rather than one global
+session (`openProximitySessionIds`, commit `25acf17`). Each cohort is kept small
+so its acoustic time slots stay reliable, and a global cap bounds the total:
+
+- `MAX_TOTAL_PROXIMITY_PARTICIPANTS` (default **100**): a global cap; joins
+  beyond it are rejected cleanly with `proximity:session:failed`
+  `reason: "capacity_reached"`.
+- `MAX_PROXIMITY_SESSION_CLIENTS` (default 6): the per-cohort cap, **clamped** to
+  a slot-floor-derived ceiling. A coded chirp needs ~520 ms + 80 ms guard, so the
+  3,600 ms `PROXIMITY_SESSION_DURATION_MS` window fits ~6 slots; raising the cap
+  above that ceiling has no effect unless the window grows.
+- New additive wire fields `acousticBandIndex` / `acousticBandCount` on
+  `proximity:session:start`, plus cross-cohort start staggering
+  (`ACOUSTIC_SESSION_STAGGER_MS`) and optional sub-band splitting
+  (`ACOUSTIC_MAX_CONCURRENT_SUBBANDS`) when the band is wide enough.
+
+So 100 participants ≈ 17 concurrent 6-person cohorts ≈ up to ~50 pairs. The
+software allows this, but ~50 co-located pairs sharing one ~800 Hz band in one
+room is acoustically contended; real reliability is a physical-device question.
+The path to 10,000 is a config bump plus Redis/shared presence and multi-node
+sticky WS balancing (see `azure cloud server/README.md`). The exact scoring,
+slot floor, and de-confliction rules are in
+`docs/webdrop-proximity-scoring-and-tdma.md`.
 
 ### Dynamic Island ceremony
 

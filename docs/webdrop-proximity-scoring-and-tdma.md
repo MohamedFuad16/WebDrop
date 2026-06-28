@@ -11,6 +11,13 @@ It is written at two levels:
 1. A simple explanation that can be understood without networking knowledge.
 2. The exact technical behavior currently implemented by WebDrop.
 
+> Related reading: [`webdrop-concepts-revision-guide.md`](webdrop-concepts-revision-guide.md)
+> explains TDMA, Aloha, ultrasonic chirps, and NAT/STUN/TURN from first
+> principles and answers the multi-device pairing questions; this document is the
+> precise scoring/scheduling reference.
+> [`webdrop-app-documentation.md`](webdrop-app-documentation.md) shows how the
+> whole app is built.
+
 ## The Short Version
 
 Imagine six children standing in a room. Each child has:
@@ -67,19 +74,21 @@ The client sends the server:
 
 No other person's name or avatar is selected at this stage.
 
-### 3. The server briefly collects nearby participants
+### 3. The server briefly collects nearby participants into a bounded cohort
 
-Current production values:
+Current production values (`azure cloud server/.env.example`,
+`azure cloud server/src/signaling-hub.js`):
 
-| Setting | Current value |
-| --- | ---: |
-| Initial join window | 1,800 ms |
-| One-person extension | One additional 1,800 ms window |
-| Maximum devices in one session | 6 |
-| Delay before the ceremony starts | 1,200 ms |
-| Acoustic ceremony duration | 3,600 ms |
-| Server session lifetime | 15,000 ms |
-| Allowed bump-time difference | 4,000 ms |
+| Setting | Env knob | Current value |
+| --- | --- | ---: |
+| Initial join window | `PROXIMITY_SESSION_JOIN_WINDOW_MS` | 1,800 ms |
+| One-person extension | (built in) | One additional 1,800 ms window |
+| Per-cohort device cap | `MAX_PROXIMITY_SESSION_CLIENTS` | 6 (clamped — see below) |
+| Global participant cap | `MAX_TOTAL_PROXIMITY_PARTICIPANTS` | 100 |
+| Delay before the ceremony starts | `PROXIMITY_SESSION_START_DELAY_MS` | 1,200 ms |
+| Acoustic ceremony duration | `PROXIMITY_SESSION_DURATION_MS` | 3,600 ms |
+| Server session lifetime | `PROXIMITY_SESSION_TTL_MS` | 15,000 ms |
+| Allowed bump-time difference | `PROXIMITY_SESSION_MATCH_SLOP_MS` | 4,000 ms |
 
 If only one phone joins after the extension, the normal pairing ceremony ends
 with `no_nearby_partner`. This is correct for pairing, because one phone cannot
@@ -88,6 +97,55 @@ pair with itself.
 The admin **single-device diagnostic mode** is different. It can test one
 phone's speaker, microphone, bump sensor, and tilt sensor without creating a
 pairing session.
+
+### 3a. Many concurrent cohorts, not one global session
+
+WebDrop no longer keeps a single open proximity session. The hub tracks a set
+of open cohorts (`openProximitySessionIds`). When a phone joins:
+
+1. If it is already inside an open (not-yet-started) cohort, it is
+   re-acknowledged in place (idempotent re-join — it is not double-counted).
+2. Otherwise, if the global participant count has reached
+   `MAX_TOTAL_PROXIMITY_PARTICIPANTS` (default **100**), the join is rejected
+   cleanly with `proximity:session:failed` and `reason: "capacity_reached"`.
+3. Otherwise it is placed into any open cohort that still has room, or a fresh
+   concurrent cohort is opened for it.
+4. When a cohort reaches its per-cohort cap it is closed to new joiners (removed
+   from the open set) and its ceremony starts shortly; the next joiner opens a
+   new concurrent cohort.
+
+**Why the per-cohort cap is clamped.** Every device in one cohort shares one
+acoustic band and is separated by *time slots*. A single coded chirp needs about
+`ACOUSTIC_MIN_SLOT_MS` (520 ms) plus an `ACOUSTIC_SLOT_GUARD_MS` (80 ms) guard,
+so the slot floor is ~600 ms. Inside the 3,600 ms ceremony window only
+`floor(3600 / 600) = 6` slots fit. The hub computes this `cohortCeiling` from the
+ceremony window and **clamps** `MAX_PROXIMITY_SESSION_CLIENTS` to it, so a
+misconfiguration can never schedule sub-floor slots. Raising the real per-cohort
+size therefore requires extending `PROXIMITY_SESSION_DURATION_MS`, not just the
+cap (`proximitySessionDurationMs: 4800` → ceiling 8, verified in
+`tests/signaling-hub-proximity-scaling.test.mjs`).
+
+So with the current defaults, 100 participants resolve to roughly
+`100 / 6 ≈ 17` concurrent 6-person cohorts, i.e. up to ~50 simultaneous pairs.
+
+**Cross-cohort de-confliction.** Concurrent cohorts that fill at the same instant
+are spread across a few start-time phases (`ACOUSTIC_SESSION_STAGGER_MS`,
+`ACOUSTIC_SESSION_STAGGER_PHASES`) so they do not all begin chirping at once. If
+the usable hardware band is wide enough to fit more than one `>=`
+`ACOUSTIC_MIN_BANDWIDTH_HZ` lane, concurrent cohorts are also pinned to different
+acoustic sub-bands (`ACOUSTIC_MAX_CONCURRENT_SUBBANDS`, round-robin by creation
+order). With the default 18.6–19.4 kHz band only one ≥420 Hz lane fits, so
+sub-band splitting is a no-op until the band is widened. The cohort's assigned
+lane is reported to clients as the additive `acousticBandIndex` /
+`acousticBandCount` fields on `proximity:session:start`.
+
+> **Honest reliability note (physical-device dependent).** The software *allows*
+> ~50 co-located pairs, and time-slotting/staggering/sub-banding reduce
+> contention, but ~50 pairs sharing one ~800 Hz ultrasonic band in one physical
+> room is acoustically crowded. Whether that many pairs reliably hear each other
+> is an empirical, hardware-and-room question that must be measured on real
+> phones — it is not something the scheduler can guarantee. See "Path to 10,000"
+> in `azure cloud server/README.md`.
 
 ## Why WebDrop Uses Reservation TDMA
 
@@ -251,7 +309,14 @@ For A and B to match:
 - Both detections must pass an accepted correlation or energy rule.
 - The winning signature must be sufficiently clearer than competing signatures.
 
-The current winner-confidence margin is `0.04`.
+The current winner-confidence margin is `ACOUSTIC_WINNER_MARGIN = 0.04`
+(`azure cloud server/src/signaling-hub.js`). This guard now **fails safe**: a
+device that reports a missing or non-finite `acousticConfidenceMargin` *fails*
+the winner-margin check rather than passing it by default
+(`hasSufficientWinnerMargin`). Both ceremony paths in
+`js/services/proximity-engine.js` (the per-slot listen path and the
+continuous-capture decode path) compute and report a real confidence margin, so
+the server always evaluates an actual separation value.
 
 This reciprocal requirement helps prevent a third nearby phone from being
 selected by mistake.
@@ -274,15 +339,17 @@ A bump is accepted when either threshold is reached.
 
 ### Current bump score
 
-For the present testing build:
+For the present build (`BUMP_SCORE_POINTS = 20` in
+`js/services/proximity-engine.js`, commit "Award twenty points for valid bumps"):
 
 ```text
-Detected bump = 10 points
+Detected bump = 20 points
 No bump       = 0 points
 ```
 
-This was intentionally reduced from the earlier 20-point test presentation.
-The complete connection threshold remains 55 points.
+The complete connection threshold remains 55 points. A detected bump alone is
+never sufficient: the server also requires explicit ultrasound, bump, and tilt
+evidence (see "The Current Score" below).
 
 The server also requires explicit bump evidence. A high total produced by
 unrelated signals cannot silently replace the missing bump.
@@ -318,21 +385,19 @@ WebDrop currently has two representations of the same evidence:
 | --- | ---: |
 | Ultrasonic sound match | 34 |
 | Combined motion correlation | 26 |
-| Bump | 10 |
+| Bump | 20 |
 | Tilt | 12 |
 | QR metric in the generic analyzer | 8 |
-| Total | 90 |
+| Total | 100 |
 
-The client-side point model currently has a maximum of 90. It is shown in a
-100-style UI scale, but the final ten points are not assigned to any evidence.
-
-The client formula is:
+The client-side point model has a maximum of 100. The client formula
+(`proximityScore` in `js/services/proximity-engine.js`) is:
 
 ```text
 score =
   sound x 34
   + motion correlation x 26
-  + bump x 10
+  + bump x 20
   + tilt x 12
   + QR x 8
 ```
@@ -341,25 +406,24 @@ Every input is normalized between 0 and 1.
 
 ### Server percentage
 
-The server divides each configured weight by the total configured weight,
-which is currently `0.90`.
+The server (`azure cloud server/src/proximity-score.js`) uses the same weights
+expressed as fractions that sum to 1.0, then normalizes them (the sum is already
+1.0, so the effective weights are unchanged):
 
-The effective server percentage weights are:
-
-| Evidence | Effective percentage weight |
-| --- | ---: |
-| Ultrasonic sound | 37.78% |
-| Combined motion correlation | 28.89% |
-| Bump | 11.11% |
-| Tilt | 13.33% |
-| QR metric | 8.89% |
-| Total | 100% |
+| Evidence | Configured weight | Effective percentage weight |
+| --- | ---: | ---: |
+| Ultrasonic sound | 0.34 | 34% |
+| Combined motion correlation | 0.26 | 26% |
+| Bump | 0.20 | 20% |
+| Tilt | 0.12 | 12% |
+| QR metric | 0.08 | 8% |
+| Total | 1.00 | 100% |
 
 This is why complete physical evidence without QR is:
 
 ```text
-82 raw client points
-91.1% normalized server score
+92 raw client points
+92% normalized server score
 ```
 
 ### Motion correlation
@@ -402,12 +466,12 @@ For bump-mode pairing, the server requires all of the following:
 ```text
 Sound:             1.0 x 34 = 34
 Motion correlation 1.0 x 26 = 26
-Bump:              1.0 x 10 = 10
+Bump:              1.0 x 20 = 20
 Tilt:              1.0 x 12 = 12
 QR:                0.0 x  8 =  0
                                  --
-Raw client total                 82
-Normalized server score         91.1%
+Raw client total                 92
+Normalized server score          92%
 ```
 
 Both score forms pass their threshold, and all required physical signals are
@@ -420,12 +484,14 @@ The server still verifies reciprocal signatures and timing before connecting.
 ```text
 Sound:             0
 Motion correlation 26
-Bump:              10
+Bump:              20
 Tilt:              12
-Total:             48
+Total:             58
 ```
 
-This fails the score and the mandatory ultrasound requirement.
+The raw score (58) is above 55, but this still **fails**: the server requires
+mandatory ultrasound evidence, and `physicalEvidence.ultrasound` is false. Score
+alone never authorizes a pairing.
 
 ### Example C: ultrasound and ordinary motion, but no bump or tilt
 
@@ -532,6 +598,7 @@ Reciprocal acoustic proof still requires a real two-device ceremony.
 | Failure | Meaning |
 | --- | --- |
 | `device-tap-required` | iOS still needs a local user gesture to unlock audio or motion |
+| `capacity_reached` | The global participant cap (`MAX_TOTAL_PROXIMITY_PARTICIPANTS`, default 100) was already full; the join was rejected before any cohort change |
 | `no_nearby_partner` | Only one phone joined a normal pairing session |
 | `acoustic_not_detected` | Required ultrasonic evidence was missing |
 | `bump_not_detected` | Required bump evidence was missing |
@@ -540,6 +607,7 @@ Reciprocal acoustic proof still requires a real two-device ceremony.
 | `timing_out_of_window` | Motion or completion timing did not fit the issued ceremony |
 | `ambiguous_or_nonreciprocal_match` | Phones did not clearly recognize one another |
 | `session_nonce_mismatch` | Telemetry did not belong to the issued client session |
+| `already_connected` | The joining client is already in an active pair |
 
 ## End-to-End Sequence
 

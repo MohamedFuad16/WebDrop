@@ -42,6 +42,17 @@ Source: [nginx core module](https://nginx.org/en/docs/ngx_core_module.html)
 5. Stop the test if errors, reconnect storms, event-loop delay, or memory growth exceed the operating budget.
 6. Move presence, pairing, and session routing to shared state before running multiple signaling nodes.
 
+## Proximity pairing capacity
+
+Proximity pairing has its own capacity model, separate from raw WebSocket fan-out. The hub runs many concurrent bounded acoustic cohorts:
+
+- `MAX_TOTAL_PROXIMITY_PARTICIPANTS` (default **100**) caps the total participants across all concurrent cohorts; joins beyond it are rejected cleanly (`proximity:session:failed`, `reason: "capacity_reached"`).
+- `MAX_PROXIMITY_SESSION_CLIENTS` (default 6) caps each cohort and is clamped to a slot-floor-derived ceiling so acoustic time slots never drop below ~600 ms inside the ceremony window.
+
+At the default 100/6, that is roughly 17 concurrent 6-person cohorts, i.e. up to ~50 simultaneous pairs. **This is a software allowance, not a proven acoustic capacity:** ~50 co-located pairs sharing one ~800 Hz ultrasonic band in one physical room is contended, and real reliability depends on devices, room acoustics, and noise. Measure it on real phones.
+
+Reaching the documented 10,000-client target for proximity pairing is a config bump (`MAX_TOTAL_PROXIMITY_PARTICIPANTS`) plus the shared-state/multi-node path described in `../azure cloud server/README.md` (Redis/shared presence + sticky/session-routed WebSocket balancing + staged load testing).
+
 ## TURN capacity boundary
 
 Cloudflare requires the long-term TURN key to remain server-side while the backend issues short-lived `iceServers` credentials. Cloudflare currently documents free unlimited STUN, a 1,000 GB monthly TURN free tier, and then `$0.05/GB` for data sent from Cloudflare to TURN clients.

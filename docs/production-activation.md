@@ -68,6 +68,17 @@ When enabled, a peer swipe triggers permission calls while the user gesture is s
 
 With `ENABLE_PROXIMITY_ANALYSIS=true`, the server blocks RTC signaling, chat, path metrics, and transfer metadata until both peers receive a `verified` proximity decision. File bytes never pass through WebSocket.
 
+### Proximity capacity knobs
+
+The pairing layer runs many concurrent bounded acoustic cohorts. The relevant env knobs (all optional; unset uses safe defaults) live in `azure cloud server/.env.example`:
+
+- `MAX_TOTAL_PROXIMITY_PARTICIPANTS` (default `100`): global cap; joins beyond it fail with `reason: "capacity_reached"`.
+- `MAX_PROXIMITY_SESSION_CLIENTS` (default `6`): per-cohort cap, clamped to the slot-floor ceiling derived from `PROXIMITY_SESSION_DURATION_MS` (a coded chirp needs ~520 ms + 80 ms guard, so a 3,600 ms window fits ~6 slots). Raising it above the ceiling has no effect unless the window grows.
+- `ACOUSTIC_SESSION_STAGGER_MS` / `ACOUSTIC_SESSION_STAGGER_PHASES`: spread concurrent cohorts that fill simultaneously across start-time phases.
+- `ACOUSTIC_MAX_CONCURRENT_SUBBANDS` and `ACOUSTIC_BAND_START_HZ` / `ACOUSTIC_BAND_END_HZ`: split concurrent cohorts into different frequency lanes when the band is wide enough (a no-op at the default 18.6–19.4 kHz band, where only one ≥420 Hz lane fits).
+
+Reaching 10,000 participants is a config bump plus the Redis/shared-presence multi-node path in `azure cloud server/README.md`. ~50 co-located pairs sharing one ~800 Hz band is acoustically contended; treat large-cohort reliability as physical-device-dependent and calibrate it.
+
 ## Real-device validation
 
 Use two physical HTTPS-capable devices. Test:
@@ -81,9 +92,9 @@ Use two physical HTTPS-capable devices. Test:
 
 Real-device acoustic thresholds and timing may require tuning after measurements. If false-positive or false-negative behavior appears on physical devices, disable enforcement, keep QR available, and re-enable only after telemetry proves the adjusted threshold.
 
-## Verified through June 24, 2026
+## Verified through June 29, 2026
 
-- The current app/cache key is `1.0.73`.
+- The current app/cache key is `1.0.86`.
 - Japan East `/readyz` reported production healthy with `proximityAnalysisEnabled:true`.
 - Azure `signaling-hub.js` matched the local source hash.
 - Public WSS assigns unique coded anonymous acoustic signatures for up to six clients and matches only reciprocal, unambiguous pairs.

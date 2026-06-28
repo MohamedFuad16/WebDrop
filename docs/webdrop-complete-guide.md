@@ -1,10 +1,19 @@
 # WebDrop Complete Technical Guide
 
-Version: WebDrop v2 production-readiness handoff for app version 1.0.73
+Version: WebDrop v2 production-readiness handoff for app version 1.0.86
 Scope: `/Users/mfuad16/Documents/web_drop_v2`
 Primary app entrypoint: `index.html` and `js/app.js`
 
 ![WebDrop system map](../assets/diagrams/webdrop-system-map.svg)
+
+> Companion docs: [`webdrop-app-documentation.md`](webdrop-app-documentation.md)
+> is the beginner-friendly "what the app does and how every technology works"
+> guide (with a current Mermaid architecture diagram), and
+> [`webdrop-concepts-revision-guide.md`](webdrop-concepts-revision-guide.md) is a
+> first-principles revision guide for the underlying technologies plus a
+> multi-device pairing Q&A. This guide remains the detailed engineering/QA/handoff
+> reference. The canonical architecture diagram is in
+> [`architecture.md`](architecture.md#system-architecture-diagram).
 
 ## How to read this guide
 
@@ -14,12 +23,13 @@ The current repository ships a static browser application plus an Azure signalin
 
 ### Production readiness status
 
-- App/package/service-worker version: `1.0.73`.
+- App/package/service-worker version: `1.0.86`.
 - Default frontend runtime: production signaling, real proximity, peerless QR, and real transfer are enabled for `webdrop-wss-0618.japaneast.cloudapp.azure.com`.
 - Effective feature gating: `js/config/runtime-flags.js` refuses to enable real proximity, real transfer, or QR pairing unless production signaling is enabled with a valid WSS URL.
 - Backend package: `azure cloud server/` contains the Node WebSocket signaling service, QR token provider, TURN credential proxy, nginx/systemd/deploy assets, and load-test assets.
-- Verified through June 22, 2026: public `/readyz`, public WSS anonymous proximity sessions, reciprocal coded-signature matching for six-client cohorts, rejection of ambiguous or physically incomplete telemetry, peerless QR, WebKit iPhone UI/permission regressions, authenticated Cloudflare TURN credential issuance, simultaneous bidirectional DataChannel file transfer, and forced TURN relay transfer using 256 KiB chunks.
-- Still external: physical-device over-air proximity calibration, physical-device direct/TURN file-transfer testing near the 500 MB cap, load testing, and any horizontal-scaling state store.
+- Proximity pairing now runs many concurrent bounded acoustic cohorts (global cap `MAX_TOTAL_PROXIMITY_PARTICIPANTS=100`, per-cohort cap clamped to a slot-floor ceiling of ~6), and the operations dashboard reads a single token-gated diagnostics endpoint.
+- Verified through June 29, 2026: public `/readyz`, public WSS anonymous proximity sessions, reciprocal coded-signature matching for bounded cohorts, the fail-safe winner-margin guard, concurrent-cohort scaling and the `capacity_reached` cap, rejection of ambiguous or physically incomplete telemetry, peerless QR, WebKit iPhone UI/permission regressions, authenticated Cloudflare TURN credential issuance, simultaneous bidirectional DataChannel file transfer, and forced TURN relay transfer using 256 KiB chunks.
+- Still external: physical-device over-air proximity calibration (including multi-cohort acoustic reliability in one room), physical-device direct/TURN file-transfer testing near the 500 MB cap, load testing, and any horizontal-scaling state store.
 
 The production roadmap sections describe the backend and browser-work needed to turn those boundaries into a real multi-device transfer system.
 
@@ -75,13 +85,13 @@ The active implementation is static and module-based. These are the files most d
 | Controller | `js/core/controller.js` | event handling, UI state transitions, connection gate, file selection, mock send, disconnect |
 | UI renderer | `js/ui/app-view.js` | DOM rendering, sheet animation, peer orbit placement, swipe controls, translations |
 | Capabilities | `js/services/capabilities.js` | detects secure context, mic, motion, WebRTC, and browser support |
-| Proximity | `js/services/proximity-engine.js`, `js/services/acoustic-proximity.js`, `js/services/motion-proximity.js` | default mock scoring plus disabled-gated real microphone chirp and motion ceremony |
-| QR/Dynamic Island | `js/ui/dynamic-island.js`, `js/core/controller.js` | disabled-gated iPhone QR display/scan ceremony using backend one-time tokens |
+| Proximity | `js/services/proximity-engine.js`, `js/services/acoustic-proximity.js`, `js/services/motion-proximity.js` | flag-gated real microphone chirp + motion ceremony (enabled in production), with a mock scoring path for `?runtime=mock` |
+| QR/Dynamic Island | `js/ui/dynamic-island.js`, `js/core/controller.js` | flag-gated iPhone QR display/scan ceremony using backend one-time tokens (enabled in production) |
 | Signaling mock | `js/services/mock-signaling.js` | supplies demo peers and emits invite/accept telemetry events |
 | Signaling production | `js/services/websocket-signaling.js` | WebSocket adapter with reconnect, routed RTC/QR/transfer/chat messages, and TURN access token handling |
 | TURN/STUN | `js/services/turn-config.js` | uses Cloudflare STUN by default and fetches ephemeral TURN credentials only from the configured backend |
-| WebRTC | `js/services/webrtc-transport.js` | disabled-gated offer/answer/ICE exchange, receiver data channels, path stats, and control/file channels |
-| Transfer | `js/services/transfer-engine.js`, `js/services/data-channel-transfer-protocol.js` | mock progress by default; disabled-gated real manifests, chunks, ACKs, cancel, retry, and completion ACK |
+| WebRTC | `js/services/webrtc-transport.js` | flag-gated offer/answer/ICE exchange, receiver data channels, path stats, and control/file channels (enabled in production) |
+| Transfer | `js/services/transfer-engine.js`, `js/services/data-channel-transfer-protocol.js` | flag-gated real manifests, 256 KiB chunks, ACKs, cancel, retry, and completion ACK (enabled in production); mock progress for `?runtime=mock` |
 | Storage client | `js/storage/storage-client.js` | deferred IndexedDB receive chunks, explicit-Save StreamSaver export, iPhone/iPad Blob fallback, quota/cap checks, abort, and cleanup |
 | StreamSaver helper | `vendor/streamsaver/` | self-hosted MITM page and service worker invoked after Save to stream deferred chunks into a browser download |
 | Offline cache | `service-worker.js` | caches static files and demo PDFs outside localhost |
@@ -727,13 +737,13 @@ WebRTC solves this with ICE, which stands for Interactive Connectivity Establish
 
 ### STUN
 
-STUN helps a browser discover how it appears from the public internet. The current `TurnConfigProvider.getIceServers()` returns:
+STUN helps a browser discover how it appears from the public internet. When the backend ICE endpoint is unavailable, the current `TurnConfigProvider.getIceServers()` falls back to Cloudflare STUN:
 
 ```js
-[{ urls: "stun:stun.l.google.com:19302" }]
+[{ urls: ["stun:stun.cloudflare.com:3478", "stun:stun.cloudflare.com:53"] }]
 ```
 
-That is useful for prototypes, but production should use an owned or managed STUN/TURN provider. Free public STUN should not be the only operational dependency.
+In the production path the browser instead fetches a full `iceServers` set (STUN + ephemeral TURN credentials) from the backend `/api/ice-servers` endpoint, so the long-lived Cloudflare TURN key never ships to the client. The hard-coded list is only the STUN-only fallback.
 
 ### TURN
 
@@ -1124,7 +1134,7 @@ These metrics tell the team whether the product is actually reliable across real
 
 ## 21. Current Production Status
 
-The current app is a polished static demo with disabled-gated production transfer code. The codebase is ready for deployment experiments, but it is not yet a proven production service.
+The current app ships the production paths **enabled** against the live Japan East signaling endpoint: production signaling, real proximity ceremony, peerless QR, and real WebRTC transfer are all on (`js/config/runtime-config.js`), and the live VM runs with `ENABLE_PROXIMITY_ANALYSIS=true`. The remaining gap is physical-device calibration and load testing, not feature wiring. `?runtime=mock` on localhost still opts into the deterministic offline demo.
 
 ### Implemented and available in the default app
 
@@ -1152,19 +1162,24 @@ The current app is a polished static demo with disabled-gated production transfe
 - Cloudflare TURN credential proxy with bearer access bound to the live signaling session.
 - Transfer failure, retry, and receive-completion protocol events.
 
-### Implemented but intentionally disabled
+### Enabled in production (live behind deployment + calibration gates)
 
-- Backend-issued QR tokens and frontend Dynamic Island QR display/scan flow.
-- Real microphone chirp and motion evidence ceremony.
-- Proximity enforcement; the backend currently exposes report-only policy.
+- Backend-issued QR tokens and the frontend Dynamic Island QR display/scan flow (peerless QR).
+- Real microphone chirp and motion evidence ceremony, run as concurrent bounded acoustic cohorts with a global `capacity_reached` cap and a fail-safe winner-margin guard.
+- Proximity enforcement: with `ENABLE_PROXIMITY_ANALYSIS=true` the backend analyzes telemetry and blocks RTC signaling, chat, path metrics, and transfer metadata until both peers receive a `verified` decision. (The policy endpoint reports `report-only` only when analysis is disabled.)
+
+### Recent hardening reflected here
+
+- WebSocket payload cap enforced at the protocol layer (`ws maxPayload = MAX_JSON_BYTES`); swept per-IP HTTP rate-limit map; pruned/capped TURN credential cache; O(n) peer broadcast; O(1) TURN-token auth; proximity timers cleared on shutdown; `sdp` added to log redaction.
+- XSS-safe received-file previews (dangerous MIME is download-only via `js/utils/received-files.js`); received-file object-URL leak fixed; orphaned `js/admin/diagnostics.js` + `css/diagnostics.css` removed (and from `service-worker.js`).
 
 ### Remaining before production launch
 
-1. Start or redeploy the existing Azure VM and verify public `/healthz`, `/readyz`, `/ws`, and `/api/ice-servers`.
-2. Copy the validated local server environment to `/etc/webdrop/signaling.env` without exposing its long-lived Cloudflare token.
-3. Run physical-device calibration for iOS Safari and Android Chrome across QR, microphone, motion, denied-permission, noisy-room, and fallback cases.
+1. Keep monitoring the live Azure VM: public `/healthz`, `/readyz`, `/ws`, `/api/ice-servers`, allowed origins, TLS renewal, systemd restarts, and firewall rules.
+2. Keep the long-lived Cloudflare token only in `/etc/webdrop/signaling.env`; keep `METRICS_API_TOKEN` reconciled between the VM, `azure cloud server/.env`, and `js/config/local-admin-token.js`.
+3. Run physical-device calibration for iOS Safari and Android Chrome across QR, microphone, motion, denied-permission, noisy-room, and fallback cases — including multi-cohort acoustic reliability in one room.
 4. Repeat the proven two-browser direct and TURN transfers over the public backend, including cancellation, retry, receiver storage exhaustion, and files near the 500 MB session cap.
-5. Load-test signaling toward the 10,000-client target and add Redis/shared presence before horizontal scaling beyond one Node signaling process.
+5. Load-test signaling toward the 10,000-client target; for 10,000 proximity participants, bump `MAX_TOTAL_PROXIMITY_PARTICIPANTS` and add Redis/shared presence + sticky WS balancing before running more than one Node signaling process.
 6. Regenerate the English and Japanese screenshot inventories and PDF guides whenever visible UI or app versioning changes.
 
 ### Documentation stance
@@ -1213,8 +1228,9 @@ The guide references existing screenshots from both English and Japanese capture
 | Transfer flow | `assets/diagrams/webdrop-transfer-flow.svg` |
 | Storage ladder | `assets/diagrams/webdrop-storage-ladder.svg` |
 | Signaling boundary | `assets/diagrams/webdrop-signaling-boundary.svg` |
+| Canonical system architecture (current) | Mermaid block in [`architecture.md`](architecture.md#system-architecture-diagram), also embedded in [`webdrop-app-documentation.md`](webdrop-app-documentation.md) |
 
-All diagrams are SVG files committed as source assets. Mermaid is not required to render the production diagrams.
+The committed SVG files remain valid high-level views and do not require Mermaid to render. The Mermaid block in `architecture.md` is the current canonical architecture diagram (three lanes, the WS→WSS upgrade at nginx, STUN-direct vs TURN-relay, the token-gated diagnostics, and the concurrent-cohort proximity model).
 
 <div class="page-break" style="page-break-after: always;"></div>
 

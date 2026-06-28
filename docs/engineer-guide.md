@@ -17,12 +17,12 @@ The deployed site at `https://web-drop-lyart.vercel.app/` may be used as a produ
 As of this pass:
 
 - The active local runnable artifact is `index.html`.
-- The visible app/package/service-worker version is `1.0.73`.
+- The visible app/package/service-worker version is `1.0.86`.
 - The old architecture HTML page was deleted during the corrected rebuild.
 - `js/app.js` boots the modular static app.
-- `js/admin/readiness.js` boots the production-readiness console.
-- `js/admin/diagnostics.js` and `diagnostics-api.js` own the live diagnostics page without coupling it to the main app controller.
-- `js/admin/operations-i18n.js` and `css/operations.css` keep readiness, live testing, and diagnostics on one English/Japanese operations system.
+- `js/admin/readiness.js` boots the operator dashboard (Readiness + Live testing tabs) and reads bounded telemetry through `js/admin/diagnostics-api.js` from the single authenticated `/api/diagnostics-public` endpoint, without coupling to the main app controller.
+- The orphaned legacy `js/admin/diagnostics.js` module and `css/diagnostics.css` were removed (and dropped from `service-worker.js`); do not reintroduce them.
+- `js/admin/operations-i18n.js` and `css/operations.css` keep readiness and live testing on one English/Japanese operations system.
 - Live acoustic debugging comes from bounded device telemetry in the server snapshot. The removed browser-local acoustic lab must not be reintroduced as a substitute for physical phone evidence.
 - `js/core/controller.js` owns the state transitions that gate file controls.
 - `js/storage/storage-client.js` owns deferred IndexedDB receive chunks, byte-count checks, StreamSaver export on Save, iPhone/iPad Blob fallback, cleanup, and the 500 MB receive-session cap.
@@ -86,8 +86,9 @@ Keep these boundaries stable:
 - TURN is fallback transport, not the default happy path.
 - Relay mode should be capped and disclosed.
 - Receiver storage defers DataChannel chunks in IndexedDB where supported, exports them only after Download, and uses capped Blob assembly on iPhone/iPad.
-- Large received files are capped at 500 MB per receive session.
+- Large received files are capped at 500 MB per receive session (256 KiB chunks).
 - QR remains the universal fallback when audio or motion permissions are unavailable.
+- Received-file previews are XSS-safe: peer-declared dangerous MIME types (`text/html`, `image/svg+xml`, any `text/*`, XML) are download-only via the shared `js/utils/received-files.js` policy; object URLs are revoked to avoid leaks.
 
 ## Verification checklist
 
@@ -102,8 +103,8 @@ For future runtime edits, verify:
 
 ## Production handoff reminders
 
-- Keep `productionSignaling=false` and production URLs blank until the Azure signaling service is deployed.
+- `js/config/runtime-config.js` currently points at the live Japan East endpoint with `productionSignaling`, `realProximityCeremony`, `realTransfer`, and `qrPairing` all `true`. If you spin up a new environment, keep those URLs blank / flags off until that signaling service is deployed and health-checked. `js/config/runtime-flags.js` already refuses to enable proximity/transfer/QR unless production signaling is on with a valid WSS URL.
 - Configure long-lived Cloudflare TURN credentials only in the Azure VM environment file.
-- Run physical iOS/Android calibration before enabling proximity enforcement server-side.
-- Keep any WebSocket message additions schema-validated and metadata-only.
-- Keep `/api/diagnostics-public` behind `METRICS_API_TOKEN` (same token family as `/api/metrics-summary`). It returns bounded metadata only and never raw microphone audio. The duplicate `/api/diagnostics-snapshot` route was consolidated into it; do not reintroduce an unauthenticated diagnostics route.
+- Run physical iOS/Android calibration to confirm acoustic thresholds; proximity enforcement (`ENABLE_PROXIMITY_ANALYSIS=true`) is live on the VM, so keep QR fallback available and be ready to disable enforcement if real devices show false positives/negatives.
+- Keep any WebSocket message additions schema-validated and metadata-only (e.g. the additive `acousticBandIndex`/`acousticBandCount` cohort fields).
+- Keep `/api/diagnostics-public` behind `METRICS_API_TOKEN` (same token family as `/api/metrics-summary`). It returns bounded metadata only and never raw microphone audio. The duplicate `/api/diagnostics-snapshot` route was consolidated into it; do not reintroduce an unauthenticated diagnostics route. On the operator's machine the dashboard auto-fills the token from the gitignored `js/config/local-admin-token.js`; remote operators paste it (kept only in `sessionStorage`).

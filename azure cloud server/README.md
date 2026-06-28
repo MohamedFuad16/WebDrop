@@ -149,6 +149,13 @@ Supported routed types:
 - `transfer:control`
 - `peer:disconnect`
 
+Hub-handled (not peer-routed) proximity-session and operator types:
+
+- `proximity:session:join` / `proximity:session:telemetry` / `proximity:session:diagnostic` / `proximity:session:cancel` — the server-coordinated anonymous reservation-TDMA ceremony (see "Proximity Verification").
+- `admin:monitor:start` / `admin:monitor:stop` / `admin:monitor:telemetry` — single-device acoustic diagnostics for the operator dashboard.
+
+`rtc:signal`, `rtc:path-metric`, `chat:message`, `transfer:manifest`, and `transfer:control` are additionally proximity-gated when `ENABLE_PROXIMITY_ANALYSIS=true`: they are blocked until both peers in the pairing reach a `verified` decision.
+
 ## Chat Messages
 
 Chat messages are small signaling metadata:
@@ -220,13 +227,26 @@ Policy endpoint:
 GET /api/proximity-policy
 ```
 
-The default response reports:
+The response reports:
 
-- proximity scoring mode is `report-only`
+- proximity scoring mode is `analysis` when `ENABLE_PROXIMITY_ANALYSIS=true` (the live default) and `report-only` when it is disabled
 - microphone, motion, camera, and QR checks are client-side ceremonies
 - the server never requests browser permissions
-- connection acceptance is not gated by the proximity score
+- when analysis is enabled, RTC/chat/path/transfer routing is gated until a `verified` decision; when disabled, connection acceptance is not gated by the score
 - Node and nginx emit `Permissions-Policy` headers that keep microphone, camera, accelerometer, gyroscope, and magnetometer off by default
+
+### Concurrent bounded cohorts (capacity model)
+
+The server-coordinated ceremony runs MANY concurrent proximity sessions, each kept a SMALL acoustic cohort so per-session time slots stay reliable (`openProximitySessionIds` in `src/signaling-hub.js`):
+
+- `MAX_TOTAL_PROXIMITY_PARTICIPANTS` (default **100**): global cap across all concurrent cohorts. Joins beyond it are rejected cleanly with `proximity:session:failed` and `reason: "capacity_reached"`.
+- `MAX_PROXIMITY_SESSION_CLIENTS` (default 6): per-cohort cap, **clamped** to the slot-floor ceiling derived from the ceremony window. A coded chirp needs ~520 ms + 80 ms guard (~600 ms floor), so the 3,600 ms `PROXIMITY_SESSION_DURATION_MS` window fits ~6 slots. Raising the cap higher has no effect unless the window grows.
+- `ACOUSTIC_SESSION_STAGGER_MS` / `ACOUSTIC_SESSION_STAGGER_PHASES`: spread cohorts that fill at the same instant across start-time phases so they do not all chirp at once.
+- `ACOUSTIC_MAX_CONCURRENT_SUBBANDS` (+ `ACOUSTIC_BAND_START_HZ`/`ACOUSTIC_BAND_END_HZ`): pin concurrent cohorts to different frequency lanes when the usable band is wide enough (a no-op at the default 18.6–19.4 kHz band, where only one ≥420 Hz lane fits).
+
+`proximity:session:start` carries additive `acousticBandIndex` / `acousticBandCount` fields describing the cohort's assigned lane.
+
+So 100 participants ≈ 17 concurrent 6-person cohorts ≈ up to ~50 simultaneous pairs. The software allows this; whether ~50 co-located pairs sharing one ~800 Hz band in one room reliably hear each other is an empirical, physical-device question — calibrate it. The scoring/scheduling detail is in `../docs/webdrop-proximity-scoring-and-tdma.md`.
 
 Telemetry can be routed today:
 
@@ -293,6 +313,20 @@ The token pasted into the planning chat should be rotated before real deployment
 
 Cloudflare notes that TURN is usually enough for one-to-one WebRTC communication. STUN is free and unlimited. TURN has a 1,000 GB monthly free tier, then usage is charged on egress from Cloudflare to TURN clients.
 
+## Operations Diagnostics
+
+The operator dashboard (`admin/index.html`, driven by `js/admin/readiness.js` via `js/admin/diagnostics-api.js`) reads bounded operational metadata from a single authenticated endpoint:
+
+```text
+GET /api/diagnostics-public
+Authorization: Bearer <METRICS_API_TOKEN>
+```
+
+- This route now **always** requires the `METRICS_API_TOKEN` bearer (the same token as `/api/metrics-summary`). The previously separate, identically-shaped `/api/diagnostics-snapshot` route was consolidated into it; do not reintroduce an unauthenticated diagnostics route.
+- There is intentionally **no IP allowlist**: any source address may read it *with* a valid token.
+- The payload is metadata-only — connected-client summaries, active pairs, proximity-session/cohort state, protocol thresholds, bounded device acoustic telemetry, and recent events. It never exposes TURN credentials, QR tokens, raw microphone samples, or file bytes.
+- On the operator's machine the dashboard auto-fills the token from the gitignored frontend file `js/config/local-admin-token.js`; remote operators paste it once (kept only in `sessionStorage`). Keep that value reconciled with `azure cloud server/.env` and the VM's `/etc/webdrop/signaling.env`.
+
 ## Environment
 
 Copy `.env.example` to `/etc/webdrop/signaling.env` on Azure VM and edit values:
@@ -309,12 +343,25 @@ Important variables:
 - `PORT=8080`
 - `PUBLIC_ORIGIN=https://signal.webdrop.example.com`
 - `ALLOWED_ORIGINS=https://web-drop-lyart.vercel.app,https://webdrop.example.com`
-- `MAX_JSON_BYTES=65536`
+- `MAX_JSON_BYTES=65536` (also enforced at the `ws` protocol layer via `maxPayload`)
 - `ENABLE_PROXIMITY_ANALYSIS=true`
 - `CLOUDFLARE_TURN_KEY_ID=<turn-token-id>`
 - `CLOUDFLARE_TURN_API_TOKEN=<turn-api-token>`
 - `TURN_TTL_SECONDS=86400`
 - `ALLOW_STUN_FALLBACK=true`
+
+Proximity-pairing capacity + acoustic cohort tuning (optional; unset uses safe defaults):
+
+- `MAX_TOTAL_PROXIMITY_PARTICIPANTS=100` (global cap; `capacity_reached` beyond it)
+- `MAX_PROXIMITY_SESSION_CLIENTS=6` (per-cohort cap, clamped to the slot-floor ceiling)
+- `PROXIMITY_SESSION_JOIN_WINDOW_MS=1800`, `PROXIMITY_SESSION_START_DELAY_MS=1200`, `PROXIMITY_SESSION_DURATION_MS=3600`, `PROXIMITY_SESSION_TTL_MS=15000`, `PROXIMITY_SESSION_MATCH_SLOP_MS=4000`
+- `ACOUSTIC_BAND_START_HZ=18600`, `ACOUSTIC_BAND_END_HZ=19400`, `ACOUSTIC_MIN_BANDWIDTH_HZ=420`
+- `ACOUSTIC_SESSION_STAGGER_MS=600`, `ACOUSTIC_SESSION_STAGGER_PHASES=3`, `ACOUSTIC_MAX_CONCURRENT_SUBBANDS=4`
+
+Operations diagnostics + metrics (both endpoints require the same bearer token):
+
+- `ENABLE_METRICS_ENDPOINT=true`
+- `METRICS_API_TOKEN=<strong-random-token>` (e.g. `openssl rand -base64 32`; production startup rejects a placeholder value when metrics are enabled)
 
 ## Local Development
 
@@ -434,7 +481,8 @@ Start below 10,000 and increase gradually while watching:
 
 - Keep TLS termination at nginx.
 - Keep Node bound to `127.0.0.1`.
-- Do not log `iceServers`, TURN credentials, or bearer tokens.
-- Do not route files through WebSocket.
-- Keep the frontend’s chunk size modest, around 64 KiB, and use `RTCDataChannel.bufferedAmount` to prevent local queue bloat.
+- Do not log `iceServers`, TURN credentials, bearer tokens, or `sdp` (the logger redacts these keys automatically).
+- Do not route files through WebSocket. The `ws` server enforces `maxPayload = MAX_JSON_BYTES`, so oversized/binary frames are rejected before buffering.
+- The frontend `RTCDataChannel` uses 256 KiB chunks and watches `RTCDataChannel.bufferedAmount` for backpressure; the server is not involved in chunking.
+- Resource-leak hardening to preserve: the per-IP HTTP rate-limit map is swept, the TURN credential cache is pruned/capped, peer broadcast is O(n), TURN-token auth is O(1), and proximity-session timers are cleared on shutdown.
 - Treat the first Azure VM deployment as a hosted signaling test, not the final production architecture.
