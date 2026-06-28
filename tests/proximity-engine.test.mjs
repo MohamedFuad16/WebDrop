@@ -43,6 +43,66 @@ test("physical proximity uses a minimum score of 55", () => {
   assert.equal(PROXIMITY_SCORE_MINIMUM, 55);
 });
 
+test("a real ceremony rejects motion-only evidence so the client agrees with the server", async () => {
+  const motion = {
+    getSnapshot() {
+      return { bump: true, tilted: true, samples: 4 };
+    },
+    stopCapture() {}
+  };
+  const engine = new ProximityEngine({
+    enabled: true,
+    acoustic: { stopCapture() {}, async close() {} },
+    motion
+  });
+
+  const result = await engine.runRealCeremony({
+    acoustic: false,
+    startAt: Date.now(),
+    ceremonyDurationMs: 20
+  });
+
+  assert.equal(result.metrics.bump, true);
+  assert.equal(result.metrics.tilt, true);
+  assert.equal(result.metrics.acoustic, false);
+  assert.ok(result.score >= PROXIMITY_SCORE_MINIMUM);
+  assert.equal(result.passed, false);
+});
+
+test("a real ceremony passes once ultrasound, bump, and tilt are all present", async () => {
+  const acoustic = {
+    async emitChirp() {
+      return { emitted: true };
+    },
+    async detectChirp() {
+      return { detected: true, correlation: 0.84, band: { marginDb: 31 } };
+    }
+  };
+  const motion = {
+    getSnapshot() {
+      return { bump: true, tilted: true, samples: 4 };
+    },
+    stopCapture() {}
+  };
+  const engine = new ProximityEngine({ enabled: true, acoustic, motion });
+
+  const result = await engine.runRealCeremony({
+    acousticPlan: [
+      { id: "self-signature", startFrequencyHz: 18600, endFrequencyHz: 18820 },
+      { id: "peer-signature", startFrequencyHz: 19020, endFrequencyHz: 19240 }
+    ],
+    acousticSignatureId: "self-signature",
+    acousticOptions: { intervalMs: 500 },
+    startAt: Date.now() + 5,
+    ceremonyDurationMs: 840
+  });
+
+  assert.equal(result.metrics.acoustic, true);
+  assert.equal(result.metrics.bump, true);
+  assert.equal(result.metrics.tilt, true);
+  assert.equal(result.passed, true);
+});
+
 test("a raw acceleration value of 10 awards the full 20 bump points", async () => {
   const listeners = new Map();
   const target = {

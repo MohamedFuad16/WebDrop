@@ -179,7 +179,15 @@ export class ProximityEngine {
       lowRttHint: false
     };
     const score = proximityScore(metrics);
-    const passed = score >= PROXIMITY_SCORE_MINIMUM;
+    // Mirror the authoritative server gate (hasRequiredPhysicalEvidence in
+    // azure cloud server/src/signaling-hub.js): a real ceremony only passes when
+    // ultrasound, bump, and tilt are all present, never on motion alone. This
+    // keeps the local verdict from reporting "passed" for evidence the server
+    // will reject as insufficient.
+    const hasRequiredPhysicalEvidence = Boolean(metrics.acoustic)
+      && Boolean(metrics.bump)
+      && Boolean(metrics.tilt);
+    const passed = score >= PROXIMITY_SCORE_MINIMUM && hasRequiredPhysicalEvidence;
     onProgress({ phase: "score", state: passed ? "complete" : "failed", score, metrics, motion });
 
     return {
