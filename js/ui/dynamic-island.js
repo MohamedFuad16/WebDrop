@@ -2,7 +2,7 @@ import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.87";
 import { Emitter } from "../utils/emitter.js?v=1.0.87";
 import { formatBytes } from "../utils/format.js?v=1.0.87";
 import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.87";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.87";
+import { TileWave } from "./tile-wave.js?v=1.0.87";
 import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.87";
 
 export class DynamicIsland extends Emitter {
@@ -45,7 +45,7 @@ export class DynamicIsland extends Emitter {
       transferName: this.root?.querySelector("[data-island-transfer-name]")
     };
     try {
-      this.wave = this.nodes.wave ? new SiriWaveCore(this.nodes.wave) : null;
+      this.wave = this.nodes.wave ? new TileWave(this.nodes.wave) : null;
       if (this.wave?.canvas) this.nodes.wave = this.wave.canvas;
     } catch {
       this.wave = null;

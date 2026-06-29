@@ -383,9 +383,12 @@
   z-index: 1;
   width: 100%;
   height: 100%;
-  opacity: .98;
+  opacity: 1;
+  /* Screen blend lets the tile crest glow additively over the near-black island
+     while the dim tile floor sinks back into it; the canvas adds its own soft
+     bloom via shadowBlur. A light drop-shadow lifts the band off the panel. */
   mix-blend-mode: screen;
-  filter: saturate(1.18) contrast(1.08) drop-shadow(0 16px 28px rgba(56, 126, 246, .18));
+  filter: saturate(1.05) drop-shadow(0 8px 18px rgba(56, 126, 246, .16));
   backface-visibility: hidden;
   transform: translateZ(0);
 }
@@ -406,8 +409,8 @@
 }
 
 .webdrop-island[data-state="transfer"] .webdrop-island__wave {
-  opacity: .28;
-  filter: saturate(1.05) contrast(1.04) blur(.3px);
+  opacity: .3;
+  filter: saturate(1.04) blur(.3px);
 }
 
 .webdrop-island[data-state="transfer"] .webdrop-island__transfer {

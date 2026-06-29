@@ -39,6 +39,7 @@ const ASSETS = [
   "./js/ui/app-view.js",
   "./js/ui/dynamic-island.js",
   "./js/ui/siri-wave.js",
+  "./js/ui/tile-wave.js",
   "./js/vendor/jsqr.js",
   "./js/vendor/qrcode-generator.mjs",
   "./js/utils/emitter.js",
