@@ -1192,11 +1192,11 @@
   flex: 0 0 58px;
   width: 58px;
   height: 58px;
-  padding: 2px;
+  padding: 0;
   border: 0;
   border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 7px 18px color-mix(in srgb, var(--ink) 9%, transparent);
+  background: transparent;
+  box-shadow: none;
   cursor: pointer;
   scroll-snap-align: start;
   scroll-snap-stop: always;
@@ -1388,6 +1388,27 @@
 
 .selected-files:not([hidden]) + .send-swipe {
   margin-top: 10px;
+}
+
+.send-limit-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -2px 0 4px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.send-limit-hint svg {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .sheet-primary svg {

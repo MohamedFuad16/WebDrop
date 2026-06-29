@@ -6,7 +6,7 @@ Each module's responsibility, key file(s), and dependencies. Most classes extend
 | Component | File | Responsibility | Depends on | Used by |
 |---|---|---|---|---|
 | **AppView** | `js/ui/app-view.js` | Owns all DOM: orbital peer radar, bottom sheets (peer/connection-method/QR/settings/info/send/receive/chat), toasts, avatar picker+cropper, swipe-to-send, i18n render. Emits semantic UI events; exposes imperative methods the controller calls. | `emitter`, `format`, `avatar-options`, `i18n`, `received-files`, `dynamic-island` | `controller` (via `app.js`) |
-| **DynamicIsland** | `js/ui/dynamic-island.js` | iPhone-style status pill: ceremony progress, QR display + scanner, live transfer HUD, wave animation. | `qrcode-generator`, `emitter`, `format`, `avatar-options`, `tile-wave`, `proximity-engine` (`BUMP_SCORE_POINTS`) | `app-view` |
+| **DynamicIsland** | `js/ui/dynamic-island.js` | iPhone-style status pill: ceremony progress, QR display + scanner, live transfer HUD, wave animation. `drawQr(token, avatar)` renders the *display* QR at ECC level **H** with the user's avatar composited as a cached centre badge (see ADR-0006). | `qrcode-generator`, `emitter`, `format`, `avatar-options`, `tile-wave`, `proximity-engine` (`BUMP_SCORE_POINTS`) | `app-view` |
 | **TileWave** | `js/ui/tile-wave.js` | Canvas tile-wave animation in the island. | — | `dynamic-island` |
 | **SiriWaveCore** | `js/ui/siri-wave.js` | Siri-style wave animation. **Not statically imported by runtime modules** — referenced only by e2e tests + SW precache (see `errors.md`). | — | tests / SW |
 | HTML/CSS | `index.html`, `admin/*.html`, `css/*.css` | Markup + styling; JS binds via `[data-*]` selectors. | — | — |

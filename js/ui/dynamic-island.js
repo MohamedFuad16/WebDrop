@@ -1,9 +1,9 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.89";
-import { Emitter } from "../utils/emitter.js?v=1.0.89";
-import { formatBytes } from "../utils/format.js?v=1.0.89";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.89";
-import { TileWave } from "./tile-wave.js?v=1.0.89";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.89";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.90";
+import { Emitter } from "../utils/emitter.js?v=1.0.90";
+import { formatBytes } from "../utils/format.js?v=1.0.90";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.90";
+import { TileWave } from "./tile-wave.js?v=1.0.90";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.90";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -194,7 +194,7 @@ export class DynamicIsland extends Emitter {
     this.renderPeople(self, peer);
     this.setState("qr-display");
     this.setCopy("qrShowTitle", "qrShowStatus");
-    this.drawQr(token);
+    this.drawQr(token, self?.avatar);
   }
 
   showQrScanner({ self, peer, autoStartCamera = true }) {
@@ -678,13 +678,16 @@ export class DynamicIsland extends Emitter {
     }
   }
 
-  drawQr(token) {
+  drawQr(token, avatar) {
     if (!token || !this.nodes.canvas) return;
-    const qr = qrcode(0, "M");
-    qr.addData(token);
-    qr.make();
     const canvas = this.nodes.canvas;
     const context = canvas.getContext("2d");
+    if (!context) return;
+    // Level "H" (~30% error correction) so the centred avatar badge can sit on
+    // top of the code without ever making it unscannable.
+    const qr = qrcode(0, "H");
+    qr.addData(token);
+    qr.make();
     const count = qr.getModuleCount();
     context.imageSmoothingEnabled = false;
     const pad = 22;
@@ -704,6 +707,40 @@ export class DynamicIsland extends Emitter {
           Math.ceil(cell)
         );
       }
+    }
+
+    // Personalised centre badge: punch a rounded white quiet zone, then clip the
+    // user's avatar into it. Kept to ~24% of the code (well inside what level H
+    // can recover) and drawn synchronously from cache to avoid any scan delay.
+    this.currentQrToken = token;
+    const center = canvas.width / 2;
+    const badge = Math.round(size * 0.24);
+    const knockout = badge + Math.max(6, Math.round(cell * 1.4));
+    traceRoundedRect(context, center - knockout / 2, center - knockout / 2, knockout, knockout, knockout * 0.26);
+    context.fillStyle = "#ffffff";
+    context.fill();
+
+    const paintBadge = (image) => {
+      if (!image || this.state !== "qr-display" || this.currentQrToken !== token) return;
+      const origin = center - badge / 2;
+      context.save();
+      traceRoundedRect(context, origin, origin, badge, badge, badge * 0.3);
+      context.clip();
+      context.imageSmoothingEnabled = true;
+      try {
+        context.drawImage(image, origin, origin, badge, badge);
+      } catch {
+        /* tainted/broken source — leave the clean white badge in place */
+      }
+      context.restore();
+    };
+
+    const src = normalizeAvatarChoice(avatar);
+    const cached = qrLogoCache.get(src);
+    if (cached && cached.complete && cached.naturalWidth) {
+      paintBadge(cached);
+    } else {
+      loadQrLogo(src).then(paintBadge).catch(() => {});
     }
   }
 
@@ -984,6 +1021,46 @@ function qrFinderColor(row, column, count, colors) {
   if (row < 7 && column >= count - 7) return colors[1];
   if (row >= count - 7 && column < 7) return colors[2];
   return "";
+}
+
+// Decoded avatar images keyed by source so the QR badge is composited instantly
+// on repeat shows without re-fetching/decoding.
+const qrLogoCache = new Map();
+
+function loadQrLogo(src) {
+  if (!src || typeof Image === "undefined") return Promise.resolve(null);
+  const existing = qrLogoCache.get(src);
+  if (existing) {
+    if (existing.complete) return Promise.resolve(existing.naturalWidth ? existing : null);
+    return new Promise((resolve) => {
+      existing.addEventListener("load", () => resolve(existing.naturalWidth ? existing : null), { once: true });
+      existing.addEventListener("error", () => resolve(null), { once: true });
+    });
+  }
+  const image = new Image();
+  image.decoding = "async";
+  image.alt = "";
+  qrLogoCache.set(src, image);
+  const settled = new Promise((resolve) => {
+    image.addEventListener("load", () => resolve(image.naturalWidth ? image : null), { once: true });
+    image.addEventListener("error", () => {
+      qrLogoCache.delete(src);
+      resolve(null);
+    }, { once: true });
+  });
+  image.src = src;
+  return settled;
+}
+
+function traceRoundedRect(context, x, y, width, height, radius) {
+  const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.arcTo(x + width, y, x + width, y + height, r);
+  context.arcTo(x + width, y + height, x, y + height, r);
+  context.arcTo(x, y + height, x, y, r);
+  context.arcTo(x, y, x + width, y, r);
+  context.closePath();
 }
 
 function clampRatio(value) {

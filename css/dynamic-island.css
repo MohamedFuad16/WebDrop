@@ -364,20 +364,6 @@
   isolation: isolate;
 }
 
-.webdrop-island__flow::before {
-  content: "";
-  position: absolute;
-  inset: 8px -8px;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 50% 48%, rgba(55, 128, 255, .32), transparent 56%),
-    radial-gradient(circle at 45% 52%, rgba(98, 227, 213, .24), transparent 48%);
-  filter: blur(18px);
-  opacity: .88;
-  transform: translateZ(0);
-  will-change: opacity, transform;
-}
-
 .webdrop-island__wave {
   position: relative;
   z-index: 1;
@@ -385,10 +371,11 @@
   height: 100%;
   opacity: 1;
   /* Screen blend lets the tile crest glow additively over the near-black island
-     while the dim tile floor sinks back into it; the canvas adds its own soft
-     bloom via shadowBlur. A light drop-shadow lifts the band off the panel. */
+     while the dim tile floor sinks back into it; the canvas already supplies its
+     own soft per-tile bloom via shadowBlur, so the band stays clean on the dark
+     panel with no extra blurred halo behind it. */
   mix-blend-mode: screen;
-  filter: saturate(1.05) drop-shadow(0 8px 18px rgba(56, 126, 246, .16));
+  filter: saturate(1.05);
   backface-visibility: hidden;
   transform: translateZ(0);
 }
@@ -508,7 +495,8 @@
 
 .webdrop-island__qr-copy {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  align-content: center;
 }
 
 .webdrop-island__qr-copy strong {
@@ -528,15 +516,23 @@
 
 .webdrop-island__qr-copy button {
   width: fit-content;
-  min-height: 38px;
-  padding: 0 15px;
+  min-height: 44px;
+  margin-top: 2px;
+  padding: 0 20px;
   border: 0;
-  border-radius: 14px;
+  border-radius: 999px;
   color: #fff;
   background: var(--blue);
-  font-size: 12px;
+  box-shadow: 0 10px 24px rgba(52, 125, 245, .32);
+  font-size: 13px;
   font-weight: 760;
   cursor: pointer;
+  transition: transform 140ms var(--ease-out), box-shadow 140ms ease;
+}
+
+.webdrop-island__qr-copy button:active {
+  transform: scale(.97);
+  box-shadow: 0 6px 16px rgba(52, 125, 245, .3);
 }
 
 .webdrop-island[data-state="qr-display"] [data-island-camera] {
@@ -549,9 +545,11 @@
   aspect-ratio: 1;
   overflow: hidden;
   justify-self: end;
-  border-radius: 30px;
+  border-radius: 32px;
   background: #f4f5f7;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .8);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .8),
+    0 14px 32px rgba(0, 0, 0, .26);
 }
 
 .webdrop-island__scanner canvas,
@@ -600,26 +598,27 @@
 .webdrop-island__corner {
   position: absolute;
   z-index: 3;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   color: var(--blue);
+  filter: drop-shadow(0 2px 6px rgba(52, 125, 245, .45));
 }
 
-.webdrop-island__corner.corner-tl { top: 14px; left: 14px; border-top: 4px solid; border-left: 4px solid; border-radius: 12px 0 0; }
-.webdrop-island__corner.corner-tr { top: 14px; right: 14px; border-top: 4px solid; border-right: 4px solid; border-radius: 0 12px 0 0; }
-.webdrop-island__corner.corner-bl { bottom: 14px; left: 14px; border-bottom: 4px solid; border-left: 4px solid; border-radius: 0 0 0 12px; }
-.webdrop-island__corner.corner-br { right: 14px; bottom: 14px; border-right: 4px solid; border-bottom: 4px solid; border-radius: 0 0 12px; }
+.webdrop-island__corner.corner-tl { top: 16px; left: 16px; border-top: 3.5px solid; border-left: 3.5px solid; border-radius: 14px 0 0; }
+.webdrop-island__corner.corner-tr { top: 16px; right: 16px; border-top: 3.5px solid; border-right: 3.5px solid; border-radius: 0 14px 0 0; }
+.webdrop-island__corner.corner-bl { bottom: 16px; left: 16px; border-bottom: 3.5px solid; border-left: 3.5px solid; border-radius: 0 0 0 14px; }
+.webdrop-island__corner.corner-br { right: 16px; bottom: 16px; border-right: 3.5px solid; border-bottom: 3.5px solid; border-radius: 0 0 14px; }
 
 .webdrop-island__beam {
   position: absolute;
   z-index: 4;
-  top: 24px;
-  left: 18px;
-  right: 18px;
+  top: 26px;
+  left: 22px;
+  right: 22px;
   height: 2px;
   border-radius: 99px;
-  background: var(--blue);
-  box-shadow: 0 4px 12px rgba(52, 125, 245, .5);
+  background: linear-gradient(90deg, transparent, var(--blue) 22%, var(--blue) 78%, transparent);
+  box-shadow: 0 0 14px 1px rgba(52, 125, 245, .55);
   animation: islandScan 1800ms ease-in-out infinite alternate;
   will-change: transform;
 }

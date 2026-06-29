@@ -3,7 +3,7 @@
 Observed in the real code. "Resolution" = how the code already handles it or what to do.
 
 ## Build/tooling
-- **`?v=1.0.89` import query strings break static analyzers.** `madge`/`dependency-cruiser` resolve `./foo.js?v=…` to a non-existent path and report **empty** dependencies. *Resolution:* the graph in `agent/graph/` was built by reading imports directly; regenerate the same way. When bumping the version, change it in `package.json`, `service-worker.js` (`APP_VERSION`), `runtime-config.js`/`readiness.js`, **and** every `?v=` import suffix together.
+- **`?v=1.0.90` import query strings break static analyzers.** `madge`/`dependency-cruiser` resolve `./foo.js?v=…` to a non-existent path and report **empty** dependencies. *Resolution:* the graph in `agent/graph/` was built by reading imports directly; regenerate the same way. When bumping the version, change it in `package.json`, `service-worker.js` (`APP_VERSION`), `runtime-config.js`/`readiness.js`, **and** every `?v=` import suffix together.
 - **`js/ui/siri-wave.js` is effectively orphaned.** No runtime module statically imports it; it's only dynamically imported by `tests/e2e/app-ui.spec.mjs` and precached in `service-worker.js`. Don't assume it's dead — but also don't expect it on the main import graph.
 
 ## Signaling fallbacks & failure modes
@@ -35,6 +35,12 @@ Observed in the real code. "Resolution" = how the code already handles it or wha
 ## PWA / caching
 - **Service worker only registers off-localhost.** Local dev never gets SW caching (intentional). A `controllerchange` reload guard prevents infinite reloads on update.
 - **`runtime-config.js` is always fetched network-only** (`no-store`) so production toggles/URLs update without a cache bust.
+
+## UI / rendering
+- **Personalized QR depends on ECC level H.** `DynamicIsland.drawQr` overlays an avatar badge on the *display* QR, which only stays scannable because the code is rendered at level **H**. If you drop it back to "M"/"Q" or enlarge the badge/knockout, re-check `tests/qr-personalized.test.mjs` (it asserts `jsQR` still decodes the badged code). Badge ≈ 24% of the code; knockout = badge + ~1.4 modules.
+- **QR avatar images are cached in `qrLogoCache` (module-level `Map`).** A warm badge paints synchronously; a cold one paints on image `load`, guarded by `state === "qr-display"` + matching `currentQrToken` so a stale async load can't draw over a newer code.
+- **No white "halo" behind the island tile-wave.** The blurred radial glow (`.webdrop-island__flow::before`) and the wave `drop-shadow` were removed on purpose — the canvas already supplies per-tile bloom via `shadowBlur`. Don't reintroduce a blurred backdrop; it reads as a dirty halo on the near-black panel.
+- **Avatar-carousel icons have no frame disc.** `.avatar-carousel button` is intentionally `background: transparent; box-shadow: none` so the pastel avatar art sits clean on the (dark) settings sheet. The blue selection ring is the separate `::after`.
 
 ## Security/secrets gotcha
 - **`js/config/local-admin-token.js` currently holds a real metrics bearer token on this machine.** It is gitignored and must never be committed. See `secrets.md`. If it leaks, rotate `METRICS_API_TOKEN` on the server.
