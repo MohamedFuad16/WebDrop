@@ -20,10 +20,12 @@ export const CAPTURE_EXPANDED_CORRELATION_STEP = 32;
 export class AcousticProximitySensor {
   constructor({
     audioContextFactory = defaultAudioContextFactory,
-    mediaDevices = globalThis.navigator?.mediaDevices
+    mediaDevices = globalThis.navigator?.mediaDevices,
+    permissions = globalThis.navigator?.permissions
   } = {}) {
     this.audioContextFactory = audioContextFactory;
     this.mediaDevices = mediaDevices;
+    this.permissions = permissions;
     this.context = null;
     this.stream = null;
     this.source = null;
@@ -53,9 +55,18 @@ export class AcousticProximitySensor {
       return { granted: false, reason: "unsupported" };
     }
 
+    // Where the Permissions API is available (Android/desktop) a persisted grant
+    // lets getUserMedia resolve without a fresh prompt, and a persisted denial is
+    // surfaced without a doomed re-prompt. iOS Safari rejects the "microphone"
+    // descriptor, so this stays best-effort and never blocks the gesture path.
+    const permissionState = await queryMicrophonePermissionState(this.permissions);
+    if (permissionState === "denied") {
+      return { granted: false, reason: "denied", permissionState };
+    }
+
     try {
       this.stream = await mediaDevices.getUserMedia(constraints);
-      return { granted: true, stream: this.stream };
+      return { granted: true, stream: this.stream, permissionState };
     } catch (error) {
       return { granted: false, reason: permissionReason(error), error };
     }
@@ -609,6 +620,16 @@ function permissionReason(error) {
   if (error?.name === "NotAllowedError" || error?.name === "SecurityError") return "denied";
   if (error?.name === "NotFoundError") return "unavailable";
   return "error";
+}
+
+async function queryMicrophonePermissionState(permissions) {
+  if (!permissions?.query) return null;
+  try {
+    const status = await permissions.query({ name: "microphone" });
+    return status?.state || null;
+  } catch {
+    return null;
+  }
 }
 
 function nextPowerOfTwo(value, maximum) {

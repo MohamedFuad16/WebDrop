@@ -209,6 +209,76 @@ test("microphone permission requests raw audio suitable for iPhone ultrasound", 
   });
 });
 
+test("microphone permission honors a persisted Permissions API denial without re-prompting", async () => {
+  let getUserMediaCalls = 0;
+  let queriedName = null;
+  const sensor = new AcousticProximitySensor({
+    mediaDevices: {
+      async getUserMedia() {
+        getUserMediaCalls += 1;
+        return { active: true };
+      }
+    },
+    permissions: {
+      async query({ name }) {
+        queriedName = name;
+        return { state: "denied" };
+      }
+    }
+  });
+
+  const result = await sensor.requestMicrophonePermission();
+
+  assert.equal(queriedName, "microphone");
+  assert.equal(result.granted, false);
+  assert.equal(result.reason, "denied");
+  assert.equal(getUserMediaCalls, 0);
+});
+
+test("microphone permission acquires the stream when the Permissions API reports granted", async () => {
+  let getUserMediaCalls = 0;
+  const sensor = new AcousticProximitySensor({
+    mediaDevices: {
+      async getUserMedia() {
+        getUserMediaCalls += 1;
+        return { active: true };
+      }
+    },
+    permissions: {
+      async query() {
+        return { state: "granted" };
+      }
+    }
+  });
+
+  const result = await sensor.requestMicrophonePermission();
+
+  assert.equal(result.granted, true);
+  assert.equal(getUserMediaCalls, 1);
+});
+
+test("microphone permission ignores an unsupported Permissions API descriptor", async () => {
+  let getUserMediaCalls = 0;
+  const sensor = new AcousticProximitySensor({
+    mediaDevices: {
+      async getUserMedia() {
+        getUserMediaCalls += 1;
+        return { active: true };
+      }
+    },
+    permissions: {
+      async query() {
+        throw new TypeError("microphone is not a valid permission name");
+      }
+    }
+  });
+
+  const result = await sensor.requestMicrophonePermission();
+
+  assert.equal(result.granted, true);
+  assert.equal(getUserMediaCalls, 1);
+});
+
 test("microphone stream stays warm when acoustic capture stops without release", async () => {
   let getUserMediaCalls = 0;
   let stoppedTracks = 0;
