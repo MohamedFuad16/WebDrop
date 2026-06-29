@@ -1,0 +1,89 @@
+{
+  "_comment": "Deterministic ES-module dependency map for js/ (+ workers/). Built by reading real `import ... from` statements. madge/dependency-cruiser return empty edges here because imports carry `?v=1.0.89` cache-busting query strings that defeat path resolution. Keys are module paths; values are the modules they statically import.",
+  "_entryPoints": ["js/app.js", "js/admin/readiness.js", "js/config/runtime-config.js"],
+  "_orphans": ["js/ui/siri-wave.js"],
+  "modules": {
+    "js/app.js": [
+      "js/core/state.js",
+      "js/core/controller.js",
+      "js/services/capabilities.js",
+      "js/services/mock-signaling.js",
+      "js/services/websocket-signaling.js",
+      "js/services/turn-config.js",
+      "js/services/proximity-engine.js",
+      "js/services/webrtc-transport.js",
+      "js/services/transfer-engine.js",
+      "js/storage/storage-client.js",
+      "js/ui/app-view.js",
+      "js/config/avatar-options.js",
+      "js/config/runtime-flags.js"
+    ],
+    "js/core/controller.js": [
+      "js/utils/format.js",
+      "js/utils/received-files.js",
+      "js/services/proximity-engine.js"
+    ],
+    "js/core/state.js": [],
+    "js/services/webrtc-transport.js": [
+      "js/utils/emitter.js",
+      "js/services/data-channel-transfer-protocol.js"
+    ],
+    "js/services/websocket-signaling.js": ["js/utils/emitter.js"],
+    "js/services/mock-signaling.js": [
+      "js/utils/emitter.js",
+      "js/config/avatar-options.js"
+    ],
+    "js/services/transfer-engine.js": ["js/utils/emitter.js"],
+    "js/services/data-channel-transfer-protocol.js": [
+      "js/utils/emitter.js",
+      "workers/incremental-sha256.js"
+    ],
+    "js/services/proximity-engine.js": [
+      "js/services/acoustic-proximity.js",
+      "js/services/motion-proximity.js",
+      "js/services/proximity-token.js"
+    ],
+    "js/services/capabilities.js": [],
+    "js/services/turn-config.js": [],
+    "js/services/proximity-token.js": [],
+    "js/services/acoustic-proximity.js": [],
+    "js/services/motion-proximity.js": [],
+    "js/storage/storage-client.js": ["js/vendor/streamsaver-adapter.js"],
+    "js/ui/app-view.js": [
+      "js/utils/emitter.js",
+      "js/utils/format.js",
+      "js/config/avatar-options.js",
+      "js/config/i18n.js",
+      "js/utils/received-files.js",
+      "js/ui/dynamic-island.js"
+    ],
+    "js/ui/dynamic-island.js": [
+      "js/vendor/qrcode-generator.mjs",
+      "js/utils/emitter.js",
+      "js/utils/format.js",
+      "js/config/avatar-options.js",
+      "js/ui/tile-wave.js",
+      "js/services/proximity-engine.js"
+    ],
+    "js/ui/tile-wave.js": [],
+    "js/ui/siri-wave.js": [],
+    "js/config/avatar-options.js": [],
+    "js/config/i18n.js": [],
+    "js/config/runtime-flags.js": [],
+    "js/config/runtime-config.js": [],
+    "js/utils/emitter.js": [],
+    "js/utils/format.js": [],
+    "js/utils/received-files.js": [],
+    "js/admin/readiness.js": [
+      "js/admin/operations-i18n.js",
+      "js/admin/diagnostics-api.js",
+      "js/admin/shared.js"
+    ],
+    "js/admin/operations-i18n.js": [],
+    "js/admin/diagnostics-api.js": [],
+    "js/admin/shared.js": [],
+    "workers/incremental-sha256.js": [],
+    "js/vendor/streamsaver-adapter.js": [],
+    "js/vendor/qrcode-generator.mjs": []
+  }
+}

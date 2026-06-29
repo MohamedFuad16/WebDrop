@@ -1,0 +1,121 @@
+# WebDrop v2 architecture (D2 source).
+# Render: d2 --layout elk --pad 40 agent/graph/architecture.d2 agent/graph/architecture.svg
+#   (or: bash ~/.cursor/skills/agent-folder/scripts/render_diagram.sh)
+#
+# CLEAN-LAYOUT RULES applied here (ELK orthogonal routing, no overlaps):
+#   - direction: down; containers ordered top-to-bottom in data-flow order.
+#   - tightly-coupled nodes share a container; transfer-engine sits NEXT TO the
+#     transport/protocol nodes that call it (no long sweeping sendFiles edge).
+#   - controller is the central hub; short single-line labels; no manual `near`.
+#   - admin dashboard is a separate page placed beside the Azure server it polls
+#     (its only edges), so no long edge sweeps the canvas.
+
+vars: {
+  d2-config: {
+    layout-engine: elk
+    pad: 40
+    center: true
+  }
+}
+direction: down
+
+browser: Browser PWA (static, no build) {
+  style.fill: "#f4f7fb"
+
+  # 1. UI layer
+  ui: UI layer {
+    style.fill: "#e8f0fe"
+    appview: app-view.js
+    island: dynamic-island.js
+    waves: tile / siri-wave.js
+    appview -> island
+    island -> waves
+  }
+
+  # 2. Core / observable state (central hub)
+  core: Core / state {
+    style.fill: "#fde8e8"
+    controller: controller.js
+    store: state.js (store)
+    controller -> store
+  }
+
+  capabilities: capabilities.js
+  config: config/ (flags, i18n)
+
+  # 3. Proximity engine
+  proximity: Proximity engine {
+    style.fill: "#fef7e0"
+    engine: proximity-engine.js
+    acoustic: acoustic-proximity.js
+    motion: motion-proximity.js
+    token: proximity-token.js
+    engine -> acoustic
+    engine -> motion
+    engine -> token
+  }
+
+  # 4. WebRTC transport + transfer engine (kept adjacent)
+  transport: WebRTC transport {
+    style.fill: "#e8eaf6"
+    rtc: webrtc-transport.js
+    protocol: data-channel-protocol.js
+    rtc -> protocol
+  }
+  transfer: transfer-engine.js {
+    style.fill: "#e8eaf6"
+  }
+
+  # 5. Storage backends
+  storage: Storage client {
+    style.fill: "#f3e8fd"
+    sc: storage-client.js
+    opfs: OPFS / IndexedDB
+    blob: Blob (iOS)
+    stream: StreamSaver
+    sc -> opfs
+    sc -> blob
+    sc -> stream
+  }
+
+  # 6. Signaling (pluggable)
+  signaling: Signaling {
+    style.fill: "#e6f4ea"
+    wss: websocket-signaling.js
+    mock: mock-signaling.js
+    turn: turn-config.js
+  }
+
+  # data + control flow (short, downward)
+  ui.appview -> core.controller: user intent
+  core.controller -> ui.appview: render(state)
+  capabilities -> core.controller: caps
+  config -> core.controller: flags
+  core.controller -> proximity.engine: ceremony
+  core.controller -> transport.rtc: connect
+  core.controller -> transfer: send(files)
+  core.controller -> signaling.wss: invite / pairing
+  transfer -> transport.protocol: sendFiles
+  transport.protocol -> transfer: chunks / complete
+  transfer -> storage.sc: write / finalize
+  transport.rtc -> signaling.wss: SDP + ICE
+  signaling.turn -> transport.rtc: ICE servers
+  transport.rtc -> transport.rtc: P2P DataChannel
+}
+
+# 7. Azure Node server + the admin page that polls it (placed together)
+azure: Azure Node server {
+  style.fill: "#e0f2f1"
+  hub: signaling-hub.js
+  ice: /api/ice-servers
+  diag: /api/diagnostics
+}
+
+admin: Admin dashboard {
+  style.fill: "#fff3e0"
+}
+
+browser.signaling.wss <-> azure.hub: wss:// JSON
+browser.signaling.turn -> azure.ice: GET (Bearer)
+admin -> azure.hub: monitor
+admin -> azure.diag: poll
