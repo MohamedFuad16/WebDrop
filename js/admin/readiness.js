@@ -1,8 +1,8 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.86";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.86";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.86";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.87";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.87";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.87";
 
-const APP_VERSION = "1.0.86";
+const APP_VERSION = "1.0.87";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -13,7 +13,7 @@ const MONITOR_END_HZ = 19_400;
 // machine it is auto-loaded from the gitignored js/config/local-admin-token.js;
 // remote operators paste it once (kept only in sessionStorage, never committed).
 const ADMIN_TOKEN_STORAGE_KEY = "webdrop.adminToken";
-const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.86", import.meta.url);
+const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.87", import.meta.url);
 
 const ADMIN_MESSAGES = {
   en: {

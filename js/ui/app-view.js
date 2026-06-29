@@ -1,9 +1,9 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.86";
-import { formatBytes } from "../utils/format.js?v=1.0.86";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.86";
-import { translate } from "../config/i18n.js?v=1.0.86";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.86";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.86";
+import { Emitter } from "../utils/emitter.js?v=1.0.87";
+import { formatBytes } from "../utils/format.js?v=1.0.87";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.87";
+import { translate } from "../config/i18n.js?v=1.0.87";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.87";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.87";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;
@@ -95,7 +95,6 @@ export class AppView extends Emitter {
       receivedList: document.querySelector("[data-received-list]"),
       receiveBadge: document.querySelector("[data-receive-badge]"),
       chatBadge: document.querySelector("[data-chat-badge]"),
-      qrPreviewToggle: document.querySelector("[data-qr-preview-toggle]"),
       toast: document.querySelector("[data-toast]")
     };
     this.sheetHideTimers = new WeakMap();
@@ -120,13 +119,7 @@ export class AppView extends Emitter {
     this.chatViewportFrame = 0;
     this.dynamicIsland = new DynamicIsland(document, (key, params) => this.translate(key, params));
     this.dynamicIsland.on("detected", (token) => this.emit("island-qr-detected", token));
-    this.dynamicIsland.on("cancel", () => {
-      if (this.qrPreviewActive) {
-        this.closeQrScannerPreview();
-        return;
-      }
-      this.emit("island-cancel");
-    });
+    this.dynamicIsland.on("cancel", () => this.emit("island-cancel"));
     this.dynamicIsland.on("retry", () => this.emit("island-retry"));
     this.dynamicIsland.on("fallback", () => this.emit("island-fallback"));
     this.preloadCriticalAssets();
@@ -562,33 +555,6 @@ export class AppView extends Emitter {
   closeQrChoiceSheet() {
     if (!this.nodes.qrSheet) return Promise.resolve();
     return this.hideSheet(this.nodes.qrSheet);
-  }
-
-  toggleQrScannerPreview() {
-    if (this.qrPreviewActive) {
-      this.closeQrScannerPreview();
-      return;
-    }
-    const state = this.currentState;
-    if (!state) return;
-    const peer = state.peers[0] || {
-      name: this.translate("qrPreviewPeer"),
-      avatar: state.self.avatar
-    };
-    this.qrPreviewActive = true;
-    this.nodes.qrPreviewToggle?.setAttribute("aria-checked", "true");
-    this.hideSheet(
-      this.nodes.informationSheet,
-      () => this.dynamicIsland.showQrScanner({ self: state.self, peer })
-    );
-  }
-
-  async closeQrScannerPreview() {
-    if (!this.qrPreviewActive) return;
-    await this.dynamicIsland.close();
-    this.qrPreviewActive = false;
-    this.nodes.qrPreviewToggle?.setAttribute("aria-checked", "false");
-    this.showSheet(this.nodes.informationSheet);
   }
 
   renderLocale(state) {

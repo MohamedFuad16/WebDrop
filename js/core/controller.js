@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.86";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.86";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.86";
+import { formatBytes } from "../utils/format.js?v=1.0.87";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.87";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.87";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -632,7 +632,6 @@ export function createController({
   view.on("open-information", () => view.openInformation());
   view.on("back-to-settings", () => view.backToSettings());
   view.on("close-information", () => view.closeInformation());
-  view.on("toggle-qr-preview", () => view.toggleQrScannerPreview());
   view.on("close-sheet", async () => {
     if (incomingInvite?.peerId) {
       const invite = incomingInvite;

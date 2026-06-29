@@ -1,9 +1,9 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.86";
-import { Emitter } from "../utils/emitter.js?v=1.0.86";
-import { formatBytes } from "../utils/format.js?v=1.0.86";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.86";
-import { SiriWaveCore } from "./siri-wave.js?v=1.0.86";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.86";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.87";
+import { Emitter } from "../utils/emitter.js?v=1.0.87";
+import { formatBytes } from "../utils/format.js?v=1.0.87";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.87";
+import { SiriWaveCore } from "./siri-wave.js?v=1.0.87";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.87";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -644,15 +644,15 @@ export class DynamicIsland extends Emitter {
     this.transferTargetRatio = target;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const distance = Math.abs(target - start);
-    if (reduced || distance < 0.006 || target < start) {
+    if (reduced || distance < 0.004 || target < start) {
       this.paintTransferProgress(target);
       return;
     }
-    const duration = Math.min(680, Math.max(260, distance * 900));
+    const duration = Math.min(760, Math.max(300, distance * 1000));
     const startedAt = performance.now();
     const tick = (now) => {
       const elapsed = Math.min(1, (now - startedAt) / duration);
-      const eased = 1 - Math.pow(1 - elapsed, 3);
+      const eased = 1 - Math.pow(1 - elapsed, 4);
       const value = start + (target - start) * eased;
       this.paintTransferProgress(value);
       if (elapsed < 1 && this.transferTargetRatio === target) {
