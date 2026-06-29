@@ -1101,7 +1101,7 @@ function renderMetricRows(telemetry = state.monitorTelemetry || latestMonitorTel
         : Number.isFinite(telemetry?.maxAcceleration)
           ? `raw ${formatNumber(telemetry.maxAcceleration, 1)}`
           : i18n.t("unknown"),
-      tone: telemetry?.bumpDetected || Number(telemetry?.maxAcceleration) >= 10 ? "good" : telemetry ? "bad" : "idle"
+      tone: telemetry?.bumpDetected || Number(telemetry?.maxAcceleration) >= 6 ? "good" : telemetry ? "bad" : "idle"
     },
     {
       name: i18n.t("tiltEvidence"),

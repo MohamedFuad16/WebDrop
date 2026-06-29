@@ -36,6 +36,7 @@ export function createController({
   let proximitySessionStartResolver = null;
   let proximityMatchResolver = null;
   let proximitySessionFailedResolver = null;
+  let lastProximityFailure = null;
   let pendingTransferPatch = null;
   let transferPatchFrame = 0;
   let receivePresentationTimer = 0;
@@ -299,6 +300,11 @@ export function createController({
   });
 
   signaling.on("proximity:session:failed", (payload = {}) => {
+    // The server decides the authoritative failure reason (bump vs ultrasound vs
+    // non-reciprocal match). Hold onto it so the UI can report the REAL cause
+    // instead of the generic "no matching bump" string — critical when this
+    // device's own ceremony passed but the peer could not hear it.
+    lastProximityFailure = payload;
     proximitySessionFailedResolver?.(payload);
     proximitySessionFailedResolver = null;
     proximitySessionStartResolver?.(null);
@@ -1053,6 +1059,7 @@ export function createController({
       };
     }
     if (!isCurrentProximitySession(sessionId)) return;
+    lastProximityFailure = null;
     const match = waitForProximityMatch(sessionId, 30000);
     sendProximitySessionDiagnostic(startPayload, "ceremony:before-telemetry", {
       clientNonce,
@@ -1084,7 +1091,8 @@ export function createController({
     if (!matchPayload?.peerId || !matchPayload?.pairingId || !isCurrentProximitySession(sessionId)) {
       await failAnonymousVerification({
         score: result?.score || 0,
-        errors: proximityFailureMessages(result, { analysis: { score: (result?.score || 0) / 100 } })
+        errors: proximityFailureMessages(result, { analysis: { score: (result?.score || 0) / 100 } }),
+        serverReason: lastProximityFailure?.reason || null
       });
       return;
     }
@@ -1699,15 +1707,21 @@ export function createController({
     });
   }
 
-  async function failAnonymousVerification({ score = 0, errors = [] } = {}) {
+  async function failAnonymousVerification({ score = 0, errors = [], serverReason = null } = {}) {
     const sessionId = proximitySessionId;
     stopProximitySensors();
     clearProximitySessionWaiters();
     if (sessionId) await signaling.cancelProximitySession?.(sessionId).catch(() => {});
     proximitySessionId = null;
+    // Prefer concrete local errors; otherwise fall back to the server's
+    // authoritative reason so a device whose own ceremony passed (e.g. the peer
+    // simply could not hear its ultrasound) no longer claims a missing bump.
+    const resolvedErrors = errors.length
+      ? errors
+      : [view.translate(proximityServerReasonKey(serverReason))];
     await view.showIslandVerificationFailure({
       score,
-      errors: errors.length ? errors : [view.translate("proximityMatchFailed")]
+      errors: resolvedErrors
     });
     store.patch({
       mode: "lobby",
@@ -2296,6 +2310,26 @@ export function createController({
         samples: evidenceMotion.samples || (metrics.bump || metrics.tilt ? 1 : 0)
       }
     };
+  }
+
+  function proximityServerReasonKey(reason) {
+    switch (reason) {
+      case "acoustic_not_detected":
+        return "proximityErrorUltrasound";
+      case "bump_not_detected":
+        return "proximityErrorBump";
+      case "tilt_not_detected":
+        return "proximityErrorTilt";
+      case "score_too_low":
+        return "proximityMatchFailed";
+      // The local ceremony passed but the pair could not be confirmed because the
+      // acoustic handshake was not mutually heard (one phone never detected the
+      // other's chime). Tell the user to realign rather than to bump harder.
+      case "ambiguous_or_nonreciprocal_match":
+        return "proximityErrorReciprocal";
+      default:
+        return "proximityMatchFailed";
+    }
   }
 
   function proximityFailureMessages(result, decision) {
