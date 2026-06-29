@@ -1,5 +1,5 @@
 {
-  "_comment": "Deterministic ES-module dependency map for js/ (+ workers/). Built by reading real `import ... from` statements. madge/dependency-cruiser return empty edges here because imports carry `?v=1.0.90` cache-busting query strings that defeat path resolution. Keys are module paths; values are the modules they statically import.",
+  "_comment": "Deterministic ES-module dependency map for js/ (+ workers/). Built by reading real `import ... from` statements. madge/dependency-cruiser return empty edges here because imports carry `?v=1.0.91` cache-busting query strings that defeat path resolution. Keys are module paths; values are the modules they statically import.",
   "_entryPoints": ["js/app.js", "js/admin/readiness.js", "js/config/runtime-config.js"],
   "_orphans": ["js/ui/siri-wave.js"],
   "modules": {

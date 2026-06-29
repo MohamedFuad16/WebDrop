@@ -1,9 +1,9 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.90";
-import { Emitter } from "../utils/emitter.js?v=1.0.90";
-import { formatBytes } from "../utils/format.js?v=1.0.90";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.90";
-import { TileWave } from "./tile-wave.js?v=1.0.90";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.90";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.91";
+import { Emitter } from "../utils/emitter.js?v=1.0.91";
+import { formatBytes } from "../utils/format.js?v=1.0.91";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.91";
+import { TileWave } from "./tile-wave.js?v=1.0.91";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.91";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -204,6 +204,11 @@ export class DynamicIsland extends Emitter {
     this.setState("qr-scan");
     this.setCopy("qrScanTitle", "qrScanStatus");
     this.nodes.scanner?.classList.remove("is-success", "is-live");
+    // Clear any QR left over from a prior "show" so the scan frame doesn't show a
+    // stale code behind the viewfinder while the camera comes up. (Detection uses
+    // the separate offscreen scanCanvas, so clearing the display canvas is safe.)
+    const displayCanvas = this.nodes.canvas;
+    displayCanvas?.getContext("2d")?.clearRect(0, 0, displayCanvas.width, displayCanvas.height);
     this.nodes.cancel?.focus({ preventScroll: true });
     if (autoStartCamera) {
       this.cameraStartTimer = this.scheduleTimeout(() => {

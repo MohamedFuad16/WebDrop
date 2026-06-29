@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.90";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.90";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.90";
+import { formatBytes } from "../utils/format.js?v=1.0.91";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.91";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.91";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;

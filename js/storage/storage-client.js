@@ -1,4 +1,4 @@
-import { createStreamSaverAdapter, isStreamSaverSupported } from "../vendor/streamsaver-adapter.js?v=1.0.90";
+import { createStreamSaverAdapter, isStreamSaverSupported } from "../vendor/streamsaver-adapter.js?v=1.0.91";
 
 const DEFAULT_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const DEFAULT_BLOB_FALLBACK_CAP_BYTES = 128 * 1024 * 1024;

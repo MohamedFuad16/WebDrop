@@ -153,7 +153,7 @@
   border: 3px solid #ffffff;
   border-radius: inherit;
   background: #ffffff;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--ink) 15%, transparent);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow-ink) 15%, transparent);
   backface-visibility: hidden;
   transform: translateZ(0);
 }
@@ -217,7 +217,7 @@
   height: var(--connected-avatar);
   z-index: 2;
   border: 0;
-  box-shadow: 0 16px 38px color-mix(in srgb, var(--ink) 15%, transparent);
+  box-shadow: 0 16px 38px color-mix(in srgb, var(--shadow-ink) 15%, transparent);
 }
 
 .avatar--self::before {
@@ -254,7 +254,7 @@
   border-radius: 50%;
   color: transparent;
   background: var(--panel-solid);
-  box-shadow: 0 14px 30px color-mix(in srgb, var(--ink) 12%, transparent);
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--shadow-ink) 12%, transparent);
   cursor: pointer;
   transform: translateX(0);
 }

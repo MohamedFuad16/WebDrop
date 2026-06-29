@@ -2,7 +2,7 @@
 
 Human-readable companion to [`dependencies.dot`](dependencies.dot) / [`dependencies.json`](dependencies.json) and the architecture diagram [`architecture.svg`](architecture.svg) (source [`architecture.d2`](architecture.d2)).
 
-> **Note on generation:** `madge` and `dependency-cruiser` return **empty** edges for this repo because imports carry `?v=1.0.90` cache-busting query strings (e.g. `import {X} from "./foo.js?v=1.0.90"`) that defeat path resolution. The graph below was therefore built **deterministically by reading the real `import … from` statements** across `js/` + `workers/`. Regenerate the same way (or strip `?v=` before running a tool). `architecture.svg` was rendered with `d2 0.7.1`.
+> **Note on generation:** `madge` and `dependency-cruiser` return **empty** edges for this repo because imports carry `?v=1.0.91` cache-busting query strings (e.g. `import {X} from "./foo.js?v=1.0.91"`) that defeat path resolution. The graph below was therefore built **deterministically by reading the real `import … from` statements** across `js/` + `workers/`. Regenerate the same way (or strip `?v=` before running a tool). `architecture.svg` was rendered with `d2 0.7.1`.
 
 ## Entry points
 - `js/app.js` — main app (loaded by `index.html` as a module).
