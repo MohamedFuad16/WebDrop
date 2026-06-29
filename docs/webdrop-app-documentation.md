@@ -1,6 +1,6 @@
 # WebDrop App Documentation
 
-App version: `1.0.86`
+App version: `1.0.87`
 Repository: `/Users/mfuad16/Documents/web_drop_v2`
 Primary entrypoints: `index.html` + `js/app.js` (app), `admin/index.html` + `js/admin/readiness.js` (operations)
 
@@ -163,7 +163,7 @@ and `<script type="module">` loads the graph.
 **How WebDrop uses it.** `index.html` loads `js/app.js`, which imports the store,
 the view, the services, the transport, and the controller, then wires them
 together — no webpack/rollup step. You will notice query-string versions in
-imports, e.g. `import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.86"`.
+imports, e.g. `import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.87"`.
 That `?v=` is a cache-buster tied to the app version. **Why:** a small static app
 doesn't need a build pipeline, and native modules give clean dependency
 boundaries.
@@ -171,10 +171,12 @@ boundaries.
 ### 4.3 Service worker and offline
 
 **What it is.** A background script the browser keeps even when the page is
-closed; it can intercept network requests.
+closed; it can intercept network requests — like a building receptionist who
+keeps copies of common documents, so you get them instantly even when the post
+office is closed.
 
 **How WebDrop uses it.** `service-worker.js` pre-caches the app shell
-(`CACHE_NAME = webdrop-v2-static-1.0.86`) on install, serves code assets
+(`CACHE_NAME = webdrop-v2-static-1.0.87`) on install, serves code assets
 network-first with a cache fallback, and **always** fetches
 `js/config/runtime-config.js` fresh (`cache: "no-store"`) so the live endpoint
 URLs are never stale. The orphaned diagnostics module/CSS were removed from its
@@ -184,8 +186,9 @@ while the configuration that points at the live server stays current.
 ### 4.4 WebSocket and the WSS/TLS upgrade
 
 **What it is.** A WebSocket is a long-lived, two-way connection over a single TCP
-socket; either side can send a message at any time. `wss://` is just WebSocket
-over TLS (encrypted), the way `https://` is HTTP over TLS.
+socket — like an open phone line both people can speak on at once — and either
+side can send a message at any time. `wss://` is just WebSocket over TLS
+(encrypted), the way `https://` is HTTP over TLS.
 
 **How the upgrade works (on the wire).** A WebSocket begins life as a normal HTTP
 request that asks to be "upgraded":
@@ -252,13 +255,18 @@ The signaling server just relays these blobs between the two paired clients; it
 never originates them.
 
 **ICE / NAT / STUN / TURN.** Most devices sit behind NAT (a router sharing one
-public IP), which blocks unsolicited inbound traffic. ICE (Interactive
+public IP among many devices — like an office with one street address and an
+internal switchboard), which blocks unsolicited inbound traffic. ICE (Interactive
 Connectivity Establishment) solves this by gathering **candidates** and testing
-them:
+them — in effect trying every door (LAN, public, relay) and keeping whichever
+opens:
 
 - `host` — your local LAN address.
-- `srflx` (server-reflexive) — your public address as seen by a **STUN** server.
-- `relay` — an address on a **TURN** relay server.
+- `srflx` (server-reflexive) — your public address as seen by a **STUN** server
+  (STUN is like asking a friend "what address do you see when I call you?").
+- `relay` — an address on a **TURN** relay server (a TURN relay is like a
+  post-office forwarding service that passes your data along when no direct path
+  works).
 
 ICE then runs in three phases: (1) **gather** the candidates above and trickle
 them to the peer as they appear; (2) **connectivity checks** — probe every
@@ -283,8 +291,10 @@ bandwidth is metered).
 handshake** (TLS for datagrams): they exchange certificates and verify each
 other's fingerprint — and that fingerprint was already pinned inside the SDP
 `a=fingerprint` line, so a tamperer can't slip in. **SCTP** then runs over that
-encrypted channel to give ordered, reliable, message-framed delivery. So every
-byte is encrypted in transit by the browser stack, automatically. WebDrop still
+encrypted channel to give ordered, reliable, message-framed delivery — like a
+locked courier pouch (DTLS) whose contents are numbered so nothing is lost or
+reordered (SCTP). So every byte is encrypted in transit by the browser stack,
+automatically. WebDrop still
 layers its own manifests, byte-count checks, and per-file SHA-256 on top, because
 encryption protects the *pipe*, not the *file boundaries* or *integrity*.
 
@@ -332,6 +342,11 @@ So only a few chunks are ever in flight, regardless of file size — RAM stays
 bounded and the receiver/storage are never overrun.
 
 ### 4.7 IndexedDB receive ladder + StreamSaver
+
+**What it is.** IndexedDB is the browser's built-in on-disk database for large
+binary data, and StreamSaver pipes saved bytes straight into the browser's
+download — together they work like a parcel locker: incoming chunks pile up
+safely until you choose to collect them.
 
 **The problem.** The sender can stream a file from disk without loading it all,
 but the **receiver** must avoid assembling a multi-hundred-MB file in RAM, and a
@@ -390,6 +405,11 @@ that's hard to trigger by accident, which raises confidence that the right two
 phones are pairing.
 
 ### 4.10 Reservation TDMA (and why it's "Aloha-family")
+
+**What it is.** TDMA (Time Division Multiple Access) is a way for many devices to
+share one channel by taking turns in assigned time slots — like a roll-call where
+each person speaks only when their number is called, so nobody talks over anyone
+else.
 
 **The problem.** If several nearby phones all chirp at once, their sounds collide
 and nobody decodes cleanly — the classic *multiple access* problem on a shared

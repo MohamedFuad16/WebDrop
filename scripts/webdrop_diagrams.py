@@ -156,6 +156,18 @@ def _head(draw, tip, ang, color, head):
     )
 
 
+def poly_arrow(draw, points, color, width=2.0, head=8.0, dashed=False):
+    """Orthogonal/elbow connector through a list of points with one arrowhead at the end."""
+    for a, b in zip(points, points[1:]):
+        if dashed:
+            _dashed_line(draw, a, b, color, width)
+        else:
+            draw.line([S(a[0]), S(a[1]), S(b[0]), S(b[1])], fill=color, width=S(width))
+    p_prev, p_end = points[-2], points[-1]
+    ang = math.atan2(p_end[1] - p_prev[1], p_end[0] - p_prev[0])
+    _head(draw, p_end, ang, color, head)
+
+
 def _dashed_line(draw, p1, p2, color, width, dash=7, gap=5):
     x1, y1 = p1
     x2, y2 = p2
@@ -202,7 +214,7 @@ def _save(img, name):
 # --------------------------------------------------------------------------- #
 def architecture(locale: str) -> Path:
     ja = locale == "ja"
-    W, H = 600, 462
+    W, H = 600, 380
     img, d = _canvas(W, H)
 
     tl = {
@@ -225,7 +237,7 @@ def architecture(locale: str) -> Path:
         "mint": ("mint ephemeral ICE creds", "一時 ICE 認証情報を発行"),
         "relay": ("relay fallback when direct ICE fails", "直接ICE失敗時はリレーへ"),
         "adm": ("Operator dashboard (admin/)", "運用ダッシュボード (admin/)"),
-        "diag": ("GET /api/diagnostics-public - Bearer METRICS", "GET /api/diagnostics-public - Bearer METRICS"),
+        "diag": ("GET /api/diagnostics-public", "GET /api/diagnostics-public"),
         "title": ("WebDrop three-lane architecture", "WebDrop の3レーン構成"),
     }
     t = (lambda k: tl[k][1 if ja else 0])
@@ -233,47 +245,50 @@ def architecture(locale: str) -> Path:
     f_title = font(13)
     f_lbl = font(7.6)
 
-    label(d, W / 2, 14, t("title"), f_title, INK)
+    label(d, W / 2, 12, t("title"), f_title, INK)
 
-    # Peers
-    titled_box(d, 26, 42, 150, 46, t("peerA"), "", WHITE, BLUE, BLUE, 11, 8)
-    titled_box(d, 424, 42, 150, 46, t("peerB"), "", WHITE, BLUE, BLUE, 11, 8)
+    # Peers (top row)
+    titled_box(d, 26, 40, 150, 48, t("peerA"), "", WHITE, BLUE, BLUE, 11, 8)
+    titled_box(d, 424, 40, 150, 48, t("peerB"), "", WHITE, BLUE, BLUE, 11, 8)
 
-    # Lane 3 P2P arrow between peers
-    arrow(d, (176, 65), (424, 65), MINT, width=3.2, head=11, double=True)
-    label(d, 300, 40, t("lane3a"), f_lbl, MINT)
-    label(d, 300, 70, t("lane3b"), font(7), MUTED)
+    # Lane 3 P2P double arrow between the peers, labels in the clear centre gap
+    arrow(d, (176, 64), (424, 64), MINT, width=3.2, head=11, double=True)
+    label(d, 300, 44, t("lane3a"), f_lbl, MINT)
+    label(d, 300, 72, t("lane3b"), font(7), MUTED)
 
-    # Lane 1 band
-    box(d, 26, 116, 548, 60, BLUE_SOFT, BLUE, radius=12, width=1.4)
-    label(d, 38, 121, t("lane1"), font(8), BLUE, center=False)
-    titled_box(d, 150, 134, 300, 36, t("host"), t("hostb"), WHITE, LINE, INK, 9.5, 7.2)
-    arrow(d, (300, 88), (300, 134), BLUE, width=2.0, head=8)
-    label(d, 366, 100, t("loads"), font(7), MUTED)
+    # Lane 1 band (label starts right of the left-column arrows so nothing crosses it)
+    box(d, 26, 108, 548, 60, BLUE_SOFT, BLUE, radius=12, width=1.4)
+    label(d, 132, 114, t("lane1"), font(8), BLUE, center=False)
+    titled_box(d, 180, 126, 240, 38, t("host"), t("hostb"), WHITE, LINE, INK, 9.5, 7.2)
+    # host delivers the app up to the browsers (centre column, clear of everything)
+    arrow(d, (300, 126), (300, 90), BLUE, width=2.0, head=8)
+    label(d, 314, 100, t("loads"), font(7), MUTED, center=False)
 
     # Lane 2 band
-    box(d, 26, 196, 548, 92, MINT_SOFT, MINT, radius=12, width=1.4)
-    label(d, 38, 201, t("lane2"), font(8), MINT, center=False)
-    titled_box(d, 44, 220, 196, 58, t("nginx"), t("nginxb"), WHITE, LINE, INK, 10, 7.4)
-    titled_box(d, 300, 216, 250, 66, t("node"), t("nodeb"), WHITE, LINE, INK, 9.6, 7.0)
-    arrow(d, (240, 249), (300, 249), MUTED, width=2.0, head=8, double=True)
-    # WSS from browser stack to nginx (label sits in the gap between lane 1 and lane 2)
-    arrow(d, (300, 170), (142, 220), BLUE, width=2.0, head=8)
-    label(d, 345, 181, t("wss"), font(7.2), BLUE)
+    box(d, 26, 190, 548, 96, MINT_SOFT, MINT, radius=12, width=1.4)
+    label(d, 132, 196, t("lane2"), font(8), MINT, center=False)
+    titled_box(d, 40, 206, 200, 64, t("nginx"), t("nginxb"), WHITE, LINE, INK, 10, 7.4)
+    titled_box(d, 310, 204, 250, 68, t("node"), t("nodeb"), WHITE, LINE, INK, 9.6, 7.0)
+    arrow(d, (240, 238), (310, 238), MUTED, width=2.0, head=8, double=True)
+    # WSS: browser (Peer A) down to nginx - a clean near-vertical line in the left
+    # column (clear of the host box and the centred lane labels); label sits to its
+    # right in the band gap.
+    arrow(d, (101, 90), (101, 206), BLUE, width=2.0, head=8)
+    label(d, 116, 180, t("wss"), font(7.2), BLUE, center=False)
 
-    # Cloudflare TURN
-    titled_box(d, 300, 312, 250, 44, t("turn"), t("turnb"), AMBER_SOFT, AMBER, AMBER, 10, 7.4)
-    arrow(d, (425, 282), (425, 312), AMBER, width=2.0, head=8)
-    label(d, 425, 294, t("mint"), font(6.8), AMBER)
+    # Cloudflare TURN (below the Node hub)
+    titled_box(d, 310, 300, 250, 46, t("turn"), t("turnb"), AMBER_SOFT, AMBER, AMBER, 10, 7.4)
+    arrow(d, (420, 272), (420, 300), AMBER, width=2.0, head=8)
+    label(d, 432, 284, t("mint"), font(6.8), AMBER, center=False)
 
-    # Operator dashboard
-    titled_box(d, 26, 312, 210, 44, t("adm"), "", WHITE, LILAC, LILAC, 9.6, 7)
-    arrow(d, (131, 312), (150, 278), LILAC, width=2.0, head=8)
-    label(d, 60, 300, t("diag"), font(6.6), LILAC, center=False)
+    # Operator dashboard (below nginx)
+    titled_box(d, 26, 300, 220, 46, t("adm"), "", WHITE, LILAC, LILAC, 9.6, 7)
+    arrow(d, (62, 300), (62, 270), LILAC, width=2.0, head=8)
+    label(d, 76, 284, t("diag"), font(6.6), LILAC, center=False)
 
-    # Relay fallback (dotted) up the clear right margin to Peer B; label below TURN
-    arrow(d, (566, 312), (566, 92), AMBER, width=1.8, head=8, dashed=True)
-    label(d, 425, 364, t("relay"), font(7), AMBER)
+    # Relay fallback (dashed) up the clear right margin to Peer B; label below TURN
+    arrow(d, (566, 300), (566, 90), AMBER, width=1.8, head=8, dashed=True)
+    label(d, 435, 360, t("relay"), font(7), AMBER)
 
     return _save(img, f"diagram-architecture-{locale}.png")
 
@@ -311,10 +326,10 @@ def state_machine(locale: str) -> Path:
     }
     t = (lambda k: tl[k][1 if ja else 0])
 
-    label(d, W / 2, 16, t("title"), font(13), INK)
+    label(d, W / 2, 14, t("title"), font(13), INK)
 
-    # node rows: top row main flow
-    y0 = 64
+    # top row main flow
+    y0 = 58
     nodes = [
         (26, y0, 120, 56, t("lobby"), t("lobbyb"), WHITE, INK),
         (170, y0, 120, 56, t("intent"), t("intentb"), WHITE, INK),
@@ -324,40 +339,43 @@ def state_machine(locale: str) -> Path:
     for (x, y, w, h, ti, bo, fill, accent) in nodes:
         titled_box(d, x, y, w, h, ti, bo, fill, accent, accent, 12, 7.6)
 
-    # transferring (below connected)
-    titled_box(d, 462, 180, 124, 52, t("transfer"), t("transferb"), AMBER_SOFT, AMBER, AMBER, 11, 7.4)
-    # disconnecting (below verifying/connected center)
-    titled_box(d, 300, 180, 138, 52, t("disc"), t("discb"), ROSE_SOFT, ROSE, ROSE, 11, 7.4)
+    my = y0 + 28  # vertical mid-line of the top row
+    # transferring (directly below connected) and disconnecting (below verifying)
+    titled_box(d, 462, 176, 124, 52, t("transfer"), t("transferb"), AMBER_SOFT, AMBER, AMBER, 11, 7.4)
+    titled_box(d, 300, 176, 138, 52, t("disc"), t("discb"), ROSE_SOFT, ROSE, ROSE, 11, 7.4)
 
-    # transitions across top row (arrows in the gaps, labels above the boxes)
-    arrow(d, (146, y0 + 28), (170, y0 + 28), INK, width=2, head=8)
-    label(d, 158, 48, t("e_select"), font(6.8), MUTED)
-    arrow(d, (290, y0 + 28), (314, y0 + 28), INK, width=2, head=8)
-    label(d, 302, 48, t("e_swipe"), font(6.8), MUTED)
-    arrow(d, (438, y0 + 28), (462, y0 + 28), INK, width=2, head=8)
-    label(d, 450, 48, t("e_match"), font(6.6), MUTED)
+    # forward transitions across the top row (arrows in the gaps, labels above)
+    arrow(d, (146, my), (170, my), INK, width=2, head=8)
+    label(d, 158, 44, t("e_select"), font(6.8), MUTED)
+    arrow(d, (290, my), (314, my), INK, width=2, head=8)
+    label(d, 302, 44, t("e_swipe"), font(6.8), MUTED)
+    arrow(d, (438, my), (462, my), INK, width=2, head=8)
+    label(d, 450, 44, t("e_match"), font(6.6), MUTED)
 
-    # connected -> transferring -> connected (vertical loop on the right)
-    arrow(d, (524, y0 + 56), (524, 180), AMBER, width=2, head=8, double=True)
-    label(d, 556, 150, t("e_send"), font(6.8), AMBER)
+    # connected <-> transferring (vertical loop on the right); label clear to the right
+    arrow(d, (524, y0 + 56), (524, 176), AMBER, width=2, head=8, double=True)
+    label(d, 556, 140, t("e_send"), font(6.8), AMBER)
 
-    # connected -> disconnecting
-    arrow(d, (490, y0 + 56), (430, 180), ROSE, width=2, head=8)
-    label(d, 442, 150, t("e_disc"), font(6.6), ROSE)
+    # connected -> disconnecting (diagonal); label parked left of the line, clear of it
+    arrow(d, (488, y0 + 56), (420, 176), ROSE, width=2, head=8)
+    label(d, 300, 150, t("e_disc"), font(6.6), ROSE, center=False)
 
-    # disconnecting -> lobby (dashed return, lower-left)
-    arrow(d, (300, 188), (86, 120), ROSE, width=2, head=8, dashed=True)
+    # verifying -> lobby (ceremony fails): orthogonal dashed return in a clear channel,
+    # label sits above the horizontal segment (never on the line)
+    poly_arrow(d, [(376, 114), (376, 140), (86, 140), (86, 114)], MUTED,
+               width=1.8, head=8, dashed=True)
+    label(d, 231, 129, t("e_fail"), font(6.6), MUTED)
 
-    # verifying -> lobby (fail, routed below the top row)
-    arrow(d, (360, 132), (120, 132), MUTED, width=1.8, head=8, dashed=True)
-    label(d, 240, 138, t("e_fail"), font(6.6), MUTED)
+    # disconnecting -> lobby (release): orthogonal dashed return routed in the left margin
+    poly_arrow(d, [(300, 202), (14, 202), (14, 100), (26, 100)], ROSE,
+               width=1.8, head=8, dashed=True)
 
     # gate note
-    box(d, 26, 268, 560, 70, PAPER, LINE, radius=12, width=1.4)
-    d.rounded_rectangle([S(40), S(282), S(48), S(324)], radius=S(4), fill=BLUE)
+    box(d, 26, 258, 560, 74, PAPER, LINE, radius=12, width=1.4)
+    d.rounded_rectangle([S(40), S(273), S(48), S(317)], radius=S(4), fill=BLUE)
     gx = 62
-    d.text((S(gx), S(284)), t("gate"), font=font(8.2), fill=INK)
-    d.text((S(gx), S(304)), t("gate2"), font=font(8.2), fill=MUTED)
+    d.text((S(gx), S(275)), t("gate"), font=font(8.2), fill=INK)
+    d.text((S(gx), S(297)), t("gate2"), font=font(8.2), fill=MUTED)
 
     return _save(img, f"diagram-state-machine-{locale}.png")
 
@@ -409,10 +427,10 @@ def tdma(locale: str) -> Path:
             if active:
                 lab = f"{names[row]} {t('emit')}"
                 label(d, cx + slot_w / 2, ry + rh / 2 - 6, lab, font(8.2), accent)
-        # slot index header on first row
+        # slot index header (sits above the container, not cramped on its border)
     for col in range(n):
         cx = x0 + col * slot_w + slot_w / 2
-        label(d, cx, yb - 4, f"{t('slot')} {col + 1}", font(7), MUTED)
+        label(d, cx, yb - 17, f"{t('slot')} {col + 1}", font(7), MUTED)
 
     label(d, W / 2, 214, t("record"), font(7.8), MUTED)
     box(d, 40, 236, 520, 44, AMBER_SOFT, AMBER, radius=10, width=1.4)

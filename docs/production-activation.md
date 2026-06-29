@@ -94,7 +94,7 @@ Real-device acoustic thresholds and timing may require tuning after measurements
 
 ## Verified through June 29, 2026
 
-- The current app/cache key is `1.0.86`.
+- The current app/cache key is `1.0.87`.
 - Japan East `/readyz` reported production healthy with `proximityAnalysisEnabled:true`.
 - Azure `signaling-hub.js` matched the local source hash.
 - Public WSS assigns unique coded anonymous acoustic signatures for up to six clients and matches only reciprocal, unambiguous pairs.

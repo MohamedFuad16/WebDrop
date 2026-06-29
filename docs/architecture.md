@@ -5,7 +5,7 @@
 This checkout now contains a first-run static, modular WebDrop v2 app plus architecture notes.
 
 - `index.html` is the active static app shell.
-- The current app/package/service-worker version is `1.0.86`.
+- The current app/package/service-worker version is `1.0.87`.
 - The earlier `proximity_architecture_monkeytype_v2.html` page was removed during the corrected rebuild.
 - `docs/implementation-checklist.md` is the current production-readiness source of truth.
 - For a from-scratch tour of the app and the underlying technologies, see `docs/webdrop-app-documentation.md` (how the app is built) and `docs/webdrop-concepts-revision-guide.md` (study/revise the concepts + multi-device pairing Q&A).

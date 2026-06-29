@@ -27,7 +27,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 import webdrop_diagrams as diagrams
 
-APP_VERSION = "1.0.86"
+APP_VERSION = "1.0.87"
 
 ROOT = Path(__file__).resolve().parents[1]
 SCREENSHOT_ROOT = ROOT / "output/screenshots"
@@ -217,9 +217,9 @@ class Doc:
         self.y -= 6
 
     def h2(self, text: str, accent: Color = INK) -> None:
-        self.y -= 16
-        self.space(24)
-        self.y -= 16
+        self.y -= 11
+        self.space(22)
+        self.y -= 10
         self.c.setFont(self.bold, 13)
         self.c.setFillColor(accent)
         self.c.drawString(MARGIN, self.y, text)
@@ -1123,6 +1123,14 @@ def foundations_section(doc: Doc) -> None:
         ),
     )
     doc.h2(doc.t("Static HTML / CSS / JS over HTTPS", "HTTPS 上の静的 HTML / CSS / JS"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "three plain text files the browser downloads and runs - HTML (structure), CSS "
+        "(looks), JavaScript (behaviour) - with nothing to install; HTTPS is just the "
+        "encrypted version of that download. Like a pop-up book: HTML is the pages, CSS "
+        "the art, JS the pull-tabs that make things move.",
+        "ブラウザがダウンロードして実行する3つのテキストファイル - HTML(構造)・CSS(見た目)・"
+        "JavaScript(振る舞い) - で、インストールは不要です。HTTPS はその通信を暗号化しただけの"
+        "ものです。飛び出す絵本のように、HTML はページ、CSS は挿絵、JS は仕掛けを動かすつまみです。"))
     doc.para(doc.t(
         "Three text files - structure (HTML), looks (CSS), behaviour (JS) - that the "
         "browser downloads and runs, with nothing installed. index.html is a fixed DOM "
@@ -1134,27 +1142,50 @@ def foundations_section(doc: Doc) -> None:
         "data-mode や data-theme などの属性を切り替え、CSS が反応します。理由: アプリを小さく"
         "高速に保て、強力なセンサー API のためにも HTTPS は必須だからです。"))
     doc.h2(doc.t("ES modules", "ES モジュール"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "JavaScript's built-in way to split code across files that import and export "
+        "pieces from each other - like labelled Lego bricks that each declare what they "
+        "offer and what they need, snapped together by the browser.",
+        "JavaScript 標準の仕組みで、コードをファイルに分け、互いに import / export します - "
+        "それぞれが「提供するもの」と「必要なもの」を書いたラベル付きのレゴブロックのようで、"
+        "ブラウザが組み合わせます。"))
     doc.para(doc.t(
         "Native import/export with <script type=\"module\">. js/app.js imports the store, "
         "view, services, transport, and controller - no webpack/rollup. Imports carry a "
-        "?v=1.0.86 cache-buster tied to the app version. Why: a small static app does not "
+        "?v=1.0.87 cache-buster tied to the app version. Why: a small static app does not "
         "need a build pipeline, and native modules give clean dependency boundaries.",
         "<script type=\"module\"> によるネイティブな import/export です。js/app.js がストア・"
         "ビュー・サービス・トランスポート・コントローラを取り込みます(webpack/rollup なし)。import "
-        "には ?v=1.0.86 というアプリ版に紐づくキャッシュバスターが付きます。理由: 小さな静的アプリに"
+        "には ?v=1.0.87 というアプリ版に紐づくキャッシュバスターが付きます。理由: 小さな静的アプリに"
         "ビルド工程は不要で、ネイティブモジュールは依存関係の境界を明確にします。"))
     doc.h2(doc.t("Service worker and offline", "Service Worker とオフライン"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "a small background script the browser keeps running even after the page closes, "
+        "able to answer the page's network requests - like an office receptionist who "
+        "keeps copies of common documents, so you get them instantly even when the post "
+        "office is shut.",
+        "ページを閉じてもブラウザが動かし続ける小さな背景スクリプトで、ページのネットワーク要求に"
+        "応答できます - よくある書類の控えを持つ受付係のようなもので、郵便局が閉まっていても即座に"
+        "渡してくれます。"))
     doc.para(doc.t(
         "A background script the browser keeps even when the page is closed; it can answer "
         "network requests. service-worker.js pre-caches the app shell (CACHE_NAME = "
-        "webdrop-v2-static-1.0.86) and always fetches runtime-config.js fresh so the live "
+        "webdrop-v2-static-1.0.87) and always fetches runtime-config.js fresh so the live "
         "server URL is never stale. Why: the UI loads instantly and works offline while the "
         "config that points at the live server stays current.",
         "ページを閉じてもブラウザが保持する背景スクリプトで、ネットワーク要求に応答できます。"
-        "service-worker.js はアプリシェルを事前キャッシュし(CACHE_NAME = webdrop-v2-static-1.0.86)、"
+        "service-worker.js はアプリシェルを事前キャッシュし(CACHE_NAME = webdrop-v2-static-1.0.87)、"
         "runtime-config.js は常に最新を取得して稼働サーバー URL が古くならないようにします。理由: UI が"
         "即座に読み込まれオフラインでも動き、稼働サーバーを指す設定は最新に保たれます。"))
     doc.h2(doc.t("WebSocket and the WSS/TLS upgrade", "WebSocket と WSS/TLS 昇格"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "a WebSocket is one long-lived connection both sides can talk over at any moment, "
+        "instead of asking again and again - like leaving a phone line open rather than "
+        "mailing postcards back and forth. WSS is just the encrypted (TLS) version: "
+        "wss:// is to ws:// what https:// is to http://.",
+        "WebSocket は1本の長寿命な接続で、両者がいつでも話せます - 何度も問い合わせる代わりに、"
+        "はがきのやり取りではなく電話線を開いたままにする感じです。WSS はその暗号化(TLS)版で、"
+        "ws:// に対する wss:// は、http:// に対する https:// と同じ関係です。"))
     doc.para(doc.t(
         "A WebSocket is a long-lived, two-way connection over one TCP socket. It is born as "
         "an ordinary HTTP request that asks to be upgraded; the server proves it understood "
@@ -1203,6 +1234,14 @@ def webrtc_section(doc: Doc) -> None:
         ),
     )
     doc.h2(doc.t("WebRTC and the SDP offer/answer", "WebRTC と SDP のオファー/アンサー"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "WebRTC is the browser's built-in way for two devices to talk directly to each "
+        "other - audio, video, or (here) raw data - with no server in the middle. SDP is "
+        "the short text 'business card' each side swaps first: here is what I support and "
+        "how to reach me.",
+        "WebRTC はブラウザ標準の仕組みで、2つの端末が間にサーバーを挟まず直接やり取りします - "
+        "音声・映像、ここでは生データです。SDP は最初に交換する短いテキストの「名刺」で、"
+        "「自分が対応する内容と到達方法」を伝えます。"))
     doc.para(doc.t(
         "An RTCPeerConnection manages the whole link: describing capabilities, gathering "
         "candidates, testing paths, and hosting data channels. SDP is a small text blob - "
@@ -1216,6 +1255,14 @@ def webrtc_section(doc: Doc) -> None:
         "createAnswer() で返します。サーバーはこれらを rtc:signal として中継するだけです。SDP の "
         "a=fingerprint 行が後で暗号化チャネルを認証します。"))
     doc.h2(doc.t("NAT and why some calls need a relay", "NAT と、リレーが要る理由"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "NAT (Network Address Translation) lets many home or office devices share one "
+        "public internet address, hiding them behind it - like one company phone number "
+        "with an internal switchboard. Good for privacy, but it means outsiders cannot "
+        "simply dial a specific device directly.",
+        "NAT(ネットワークアドレス変換)は、多数の家庭・オフィスの端末が1つのグローバルアドレスを"
+        "共有し、その裏に隠れる仕組みです - 内線交換台を持つ1つの代表電話番号のようなものです。"
+        "プライバシーには良い反面、外部から特定の端末へ直接「電話」できません。"))
     doc.para(doc.t(
         "NAT shares one public IP among many devices and blocks unsolicited inbound traffic, "
         "so two NATed peers cannot simply dial each other. Full/restricted-cone NATs reuse "
@@ -1227,6 +1274,16 @@ def webrtc_section(doc: Doc) -> None:
         "接続向きです。対称 NAT は宛先ごとに別のポートを割り当てるため穴あけが失敗し、これが TURN "
         "リレーへ落ちる典型的な理由です。"))
     doc.h2(doc.t("STUN, TURN, and ICE", "STUN・TURN・ICE"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "STUN is a quick way to ask 'what does my public address look like from outside?' "
+        "- like asking a friend across the room to read your name tag. TURN is a relay "
+        "that forwards your data when no direct path works - a post office that re-mails "
+        "parcels for you. ICE is the process that tries every option and picks the best "
+        "one that works.",
+        "STUN は「外から自分のアドレスはどう見えるか?」を手早く尋ねる方法です - 部屋の向こうの"
+        "友人に名札を読んでもらう感じです。TURN は直接経路が無いときデータを中継するリレーで、"
+        "荷物を転送してくれる郵便局のようなものです。ICE は全選択肢を試し、最良の有効な経路を"
+        "選ぶ手続きです。"))
     doc.para(doc.t(
         "STUN tells you your own public address (a srflx candidate) - cheap and stateless. "
         "TURN is a relay that forwards your data when no direct path works - it needs "
@@ -1243,6 +1300,14 @@ def webrtc_section(doc: Doc) -> None:
         "WebDrop は GET /api/ice-servers から ICE サーバーを取得し、接続後 classifyPathFromStats() が"
         "経路を direct か relay と判定して、UI はリレー転送を 500 MB に制限します。"))
     doc.h2(doc.t("DTLS / SCTP - the encrypted data channel", "DTLS / SCTP - 暗号化データチャネル"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "DTLS is TLS - the same padlock encryption as HTTPS - applied to the small packets "
+        "WebRTC sends, so every byte is scrambled in transit. SCTP rides on top to deliver "
+        "those packets in order and without loss. Together they are like a sealed, "
+        "numbered courier pouch.",
+        "DTLS は TLS(HTTPS と同じ鍵マークの暗号)を、WebRTC が送る小さなパケット向けにしたもので、"
+        "転送中の全バイトを暗号化します。SCTP はその上で、パケットを順序どおり欠落なく届けます。"
+        "両者を合わせると、封緘され番号の付いた宅配袋のようなものです。"))
     doc.para(doc.t(
         "Once ICE picks a path, the browsers run a DTLS handshake (TLS for datagrams), "
         "exchanging certificates and verifying the fingerprint that was pinned in the SDP - "
@@ -1271,6 +1336,14 @@ def data_section(doc: Doc) -> None:
         ),
     )
     doc.h2(doc.t("Two ordered channels + 256 KiB chunks", "2本の順序付きチャネル + 256 KiB チャンク"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "an RTCDataChannel is the WebRTC pipe that carries arbitrary data - not just "
+        "audio/video - between the two browsers, ordered and reliable like a TCP "
+        "connection. A 'chunk' is just one bite-sized piece of a big file: sending a book "
+        "one page at a time rather than all at once.",
+        "RTCDataChannel は WebRTC のパイプで、音声・映像だけでなく任意のデータを2つのブラウザ間で"
+        "運びます - TCP のように順序保証・信頼性があります。「チャンク」は大きなファイルを一口大に"
+        "切った1片で、本を一度にではなく1ページずつ送るようなものです。"))
     doc.para(doc.t(
         "WebDrop opens two ordered channels (webdrop-control-v1 and webdrop-file-v1). "
         "The sender slices each File into 256 KiB chunks (DEFAULT_CHUNK_SIZE), sends a "
@@ -1285,6 +1358,13 @@ def data_section(doc: Doc) -> None:
         "500 MB(DEFAULT_SESSION_CAP_BYTES)に制限されます。256 KiB は、モバイルで再送管理を"
         "軽く保つには十分小さく、メッセージ毎のオーバーヘッドを避けるには十分大きいサイズです。"))
     doc.h2(doc.t("Backpressure, worked", "バックプレッシャーの実際"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "backpressure means slowing the sender when the receiver or network buffer is "
+        "filling up, so nothing overflows - like pausing while pouring water into a cup so "
+        "it never spills over the rim.",
+        "バックプレッシャーとは、受信側やネットワークのバッファが一杯になりかけたら送信を緩める"
+        "仕組みで、あふれを防ぎます - コップに水を注ぐとき、縁からこぼれないよう一旦止めるのと"
+        "同じです。"))
     doc.para(doc.t(
         "A 250 MB file at 256 KiB/chunk is ~1,000 chunks. Calling send() 1,000 times in a "
         "loop would queue all 250 MB in the browser send buffer and can crash the tab. "
@@ -1300,6 +1380,13 @@ def data_section(doc: Doc) -> None:
         "}\n"
         "channel.send(chunk);")
     doc.h2(doc.t("The receive ladder", "受信ラダー"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "IndexedDB is a small database built into the browser for storing data on the "
+        "device; StreamSaver streams incoming bytes straight into the browser's normal "
+        "download. Together they mean a huge file never has to sit in memory all at once.",
+        "IndexedDB はブラウザ内蔵の小さなデータベースで、端末上にデータを保存します。StreamSaver は"
+        "受信バイトをブラウザ通常のダウンロードへ直接流し込みます。両者により、巨大ファイルを一度に"
+        "メモリへ載せずに済みます。"))
     doc.para(doc.t(
         "The receiver must avoid assembling a multi-hundred-MB file in RAM, and a web page "
         "cannot silently write to disk. storage-client.js climbs a ladder, in order of "
@@ -1348,6 +1435,14 @@ def sensing_section(doc: Doc) -> None:
         ),
     )
     doc.h2(doc.t("Ultrasonic chirps (Web Audio)", "超音波チャープ(Web Audio)"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "the Web Audio API lets a web page generate and analyse sound through the speaker "
+        "and microphone. A 'chirp' here is a short tone that sweeps a near-ultrasonic band "
+        "- high enough that people barely hear it, but a nearby phone's mic can. Like two "
+        "crickets recognising each other's call.",
+        "Web Audio API は、ウェブページがスピーカーとマイクで音を生成・分析できる仕組みです。"
+        "ここでの「チャープ」は近接超音波帯を掃引する短い音で、人にはほぼ聞こえませんが、近くの"
+        "端末のマイクは拾えます - 2匹のコオロギが互いの鳴き声を認識するようなものです。"))
     doc.para(doc.t(
         "acoustic-proximity.js emits a coded chirp in a near-ultrasonic band (DEFAULT_CHIRP: "
         "18,600-19,400 Hz) and records the mic with echo cancellation, noise suppression, and "
@@ -1359,6 +1454,14 @@ def sensing_section(doc: Doc) -> None:
         "エネルギーを消させないためです。音は近距離で指向性があるため、相手の符号化チャープが"
         "聞こえることは2台が物理的に近い良い証拠になります。"))
     doc.h2(doc.t("Bump and tilt (DeviceMotion)", "バンプと傾き(DeviceMotion)"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "DeviceMotion is the browser API that reads a phone's accelerometer - the same "
+        "sensor that knows which way is down and feels a shake. WebDrop uses it to feel "
+        "two phones physically tapped together and tilted, a gesture that is deliberate "
+        "and hard to fake.",
+        "DeviceMotion は、端末の加速度センサー(どちらが下かを知り、揺れを感じる同じセンサー)を"
+        "ブラウザから読む API です。WebDrop はこれで、2台を物理的に軽くぶつけて傾ける動きを感じ"
+        "取ります - 意図的で偽装しにくいジェスチャーです。"))
     doc.para(doc.t(
         "motion-proximity.js detects a bump when linear acceleration >= "
         "BUMP_ACCELERATION_THRESHOLD (10) or the gravity-vector change >= 3.5, and a tilt "
@@ -1370,6 +1473,13 @@ def sensing_section(doc: Doc) -> None:
         "検出します。これらは近接スコアに寄与し、サーバー側の必須証拠でもあります。端末を軽く"
         "ぶつける動作は意図的で、偶然には起こりにくいものです。"))
     doc.h2(doc.t("Detection, not loudness", "検出は音量ではない"))
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "correlation is a math check that asks 'how closely does this recording match the "
+        "exact pattern we sent?' (1.0 = perfect), rather than 'how loud was it?' - like "
+        "recognising one specific melody in a noisy room, not just hearing noise.",
+        "相関とは、「録音が、送った正確なパターンにどれだけ一致するか」を測る計算で(1.0=完全一致)、"
+        "「どれだけ大きかったか」ではありません - 騒がしい部屋で、ただの雑音ではなく特定の"
+        "メロディを聞き分けるのに似ています。"))
     doc.para(doc.t(
         "Detection is not \"was it loud?\" but \"did the recording contain this specific coded "
         "sweep, clearly above the background?\". Correlation slides the expected template over "
@@ -1412,6 +1522,13 @@ def tdma_section(doc: Doc) -> None:
                 caption=doc.t("Figure 2 - Reservation TDMA schedule",
                               "図2 - 予約型TDMA スケジュール"),
                 max_h=235)
+    doc.lead_para(doc.t("What it is:", "これは何か:"), doc.t(
+        "TDMA (Time Division Multiple Access) means several senders share one channel by "
+        "each taking a turn in its own time slot - like people in a meeting agreeing to "
+        "speak one at a time instead of all at once.",
+        "TDMA(時分割多元接続)とは、複数の送信者が1つのチャネルを、それぞれ自分の時間スロットで"
+        "順番に使って共有する方式です - 会議で全員が同時にではなく一人ずつ話すと決めるのに"
+        "似ています。"))
     doc.para(doc.t(
         "This is reservation TDMA (Time Division Multiple Access): every phone records the "
         "whole 3,600 ms window but emits only in its own slot, then decodes all peers "

@@ -17,7 +17,7 @@ The deployed site at `https://web-drop-lyart.vercel.app/` may be used as a produ
 As of this pass:
 
 - The active local runnable artifact is `index.html`.
-- The visible app/package/service-worker version is `1.0.86`.
+- The visible app/package/service-worker version is `1.0.87`.
 - The old architecture HTML page was deleted during the corrected rebuild.
 - `js/app.js` boots the modular static app.
 - `js/admin/readiness.js` boots the operator dashboard (Readiness + Live testing tabs) and reads bounded telemetry through `js/admin/diagnostics-api.js` from the single authenticated `/api/diagnostics-public` endpoint, without coupling to the main app controller.

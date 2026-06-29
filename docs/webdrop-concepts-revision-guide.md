@@ -1,6 +1,6 @@
 # WebDrop Concepts & Technology Revision Guide
 
-App version: `1.0.86`
+App version: `1.0.87`
 
 This is a **study guide**. It explains every concept, protocol, and method
 WebDrop relies on **from first principles** — with a plain-language analogy, a
@@ -47,7 +47,7 @@ code with file citations.
 - **Tiny example:** `export function add(a,b){return a+b}` ↔
   `import { add } from "./math.js"`.
 - **In WebDrop:** `js/app.js` imports the store, view, services, and controller —
-  no bundler. (`?v=1.0.86` on imports is a cache-buster.)
+  no bundler. (`?v=1.0.87` on imports is a cache-buster.)
 
 ### 3. Service worker & offline cache
 
