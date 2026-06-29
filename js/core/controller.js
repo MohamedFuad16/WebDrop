@@ -1746,14 +1746,7 @@ export function createController({
     const audioOutputPromise = proximity.prepareAudioOutput();
     const microphonePromise = storedPermissions.microphone === "denied"
       ? Promise.resolve({ granted: false, reason: "denied", cached: true })
-      : proximity.requestMicrophonePermission({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false
-        },
-        video: false
-      });
+      : proximity.requestMicrophonePermission();
     permissionRequestPromise = Promise.all([motionPromise, audioOutputPromise, microphonePromise]).then(([
       motion,
       audioOutput,

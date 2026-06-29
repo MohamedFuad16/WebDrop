@@ -3,7 +3,7 @@ export const DEFAULT_CHIRP = Object.freeze({
   startFrequencyHz: 18600,
   endFrequencyHz: 19400,
   code: 0,
-  gain: 0.24
+  gain: 0.45
 });
 
 export const MIN_INAUDIBLE_FREQUENCY_HZ = 18500;
@@ -39,7 +39,9 @@ export class AcousticProximitySensor {
     audio: {
       echoCancellation: false,
       noiseSuppression: false,
-      autoGainControl: false
+      autoGainControl: false,
+      channelCount: { ideal: 1 },
+      sampleRate: { ideal: 48000 }
     },
     video: false
   }) {

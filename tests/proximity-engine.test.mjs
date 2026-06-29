@@ -201,7 +201,9 @@ test("microphone permission requests raw audio suitable for iPhone ultrasound", 
     audio: {
       echoCancellation: false,
       noiseSuppression: false,
-      autoGainControl: false
+      autoGainControl: false,
+      channelCount: { ideal: 1 },
+      sampleRate: { ideal: 48000 }
     },
     video: false
   });
@@ -315,6 +317,14 @@ test("chirp output does not filter out its own frequency band", async () => {
   assert.equal(result.gain, DEFAULT_CHIRP.gain);
   assert.equal(outputConnected, true);
   assert.equal(filterCreated, false);
+});
+
+test("chirp emits louder for weak hearers while staying below digital clipping", () => {
+  assert.ok(DEFAULT_CHIRP.gain >= 0.4);
+  const samples = createChirpSamples(48_000, DEFAULT_CHIRP);
+  const bufferPeak = samples.reduce((max, sample) => Math.max(max, Math.abs(sample)), 0);
+  assert.ok(bufferPeak <= 1);
+  assert.ok(bufferPeak * DEFAULT_CHIRP.gain < 1);
 });
 
 test("inaudible ultrasound band detection tolerates phone speaker distortion", () => {
