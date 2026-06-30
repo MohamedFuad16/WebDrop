@@ -29,8 +29,14 @@ const SAT = 0.62;
 const LIGHT_PEAK = 0.6;
 const LIGHT_DIM = 0.1;
 
+// "Remaining track" look for tiles past the transfer progress front: low
+// saturation + brightness and no glow, so the lit region reads as filled.
+const REMAINING_SAT = 0.1;
+const REMAINING_LIGHT = 0.16;
+
 const TWO_PI = Math.PI * 2;
 const frac = (x) => x - Math.floor(x);
+const clampUnit = (value) => (Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0);
 
 function supportsRoundRect(ctx) {
   return typeof ctx.roundRect === "function";
@@ -85,6 +91,8 @@ export class TileWave {
     }
 
     this.direction = 1; // 1 = left->right, -1 = right->left (receive)
+    this.transferMode = false; // when true, tiles past `progress` render as a dim track
+    this.progress = 1; // 0..1 lit fraction along the sweep direction
     this.running = false; // desired state (stays true while tab is hidden)
     this.frameId = 0;
     this.startedAt = 0;
@@ -139,6 +147,27 @@ export class TileWave {
 
   setDirection(direction) {
     this.direction = direction < 0 ? -1 : 1;
+  }
+
+  setTransferMode(on) {
+    const next = Boolean(on);
+    if (this.transferMode === next) return;
+    this.transferMode = next;
+    this.#repaintIfStatic();
+  }
+
+  setProgress(ratio) {
+    const next = clampUnit(ratio);
+    if (next === this.progress) return;
+    this.progress = next;
+    this.#repaintIfStatic();
+  }
+
+  #repaintIfStatic() {
+    // While the rAF loop runs it already honours progress every frame; only the
+    // static/reduced-motion/paused paths need a manual redraw.
+    if (!this.ctx || this.running) return;
+    this.renderOnce();
   }
 
   setRunning(running) {
@@ -265,16 +294,23 @@ export class TileWave {
 
         const u = sweepCol / cols - t * HUE_DRIFT;
         const hue = this.#hue(u);
-        const light = (LIGHT_DIM + (LIGHT_PEAK - LIGHT_DIM) * b) * 100;
-        const fill = `hsl(${hue} ${SAT * 100}% ${light}%)`;
 
-        ctx.fillStyle = fill;
-        // Glow scales with brightness^2 so only the crest blooms (subtle, not neon).
-        if (b > 0.35) {
-          ctx.shadowColor = fill;
-          ctx.shadowBlur = b * b * tile * 0.8;
-        } else {
+        if (this.transferMode && (sweepCol + 1) / cols > this.progress) {
+          // Past the progress front: render as a dim, desaturated "remaining
+          // track" with no glow so the lit region visibly fills as ratio climbs.
+          ctx.fillStyle = `hsl(${hue} ${REMAINING_SAT * 100}% ${REMAINING_LIGHT * 100}%)`;
           ctx.shadowBlur = 0;
+        } else {
+          const light = (LIGHT_DIM + (LIGHT_PEAK - LIGHT_DIM) * b) * 100;
+          const fill = `hsl(${hue} ${SAT * 100}% ${light}%)`;
+          ctx.fillStyle = fill;
+          // Glow scales with brightness^2 so only the crest blooms (subtle, not neon).
+          if (b > 0.35) {
+            ctx.shadowColor = fill;
+            ctx.shadowBlur = b * b * tile * 0.8;
+          } else {
+            ctx.shadowBlur = 0;
+          }
         }
 
         const x = originX + c * pitchX;
@@ -298,13 +334,18 @@ export class TileWave {
     const useRoundRect = supportsRoundRect(ctx);
     const b = 0.55; // constant mid brightness, no pulse/jitter/glow
 
+    const light = (LIGHT_DIM + (LIGHT_PEAK - LIGHT_DIM) * b) * 100;
     ctx.clearRect(0, 0, w, h);
     ctx.shadowBlur = 0;
     for (let r = 0; r < ROWS; r += 1) {
       for (let c = 0; c < cols; c += 1) {
-        const hue = this.#hue(c / cols);
-        const light = (LIGHT_DIM + (LIGHT_PEAK - LIGHT_DIM) * b) * 100;
-        ctx.fillStyle = `hsl(${hue} ${SAT * 100}% ${light}%)`;
+        const sweepCol = this.direction >= 0 ? c : cols - 1 - c;
+        const hue = this.#hue(sweepCol / cols);
+        if (this.transferMode && (sweepCol + 1) / cols > this.progress) {
+          ctx.fillStyle = `hsl(${hue} ${REMAINING_SAT * 100}% ${REMAINING_LIGHT * 100}%)`;
+        } else {
+          ctx.fillStyle = `hsl(${hue} ${SAT * 100}% ${light}%)`;
+        }
         const x = originX + c * pitchX;
         const y = originY + r * pitchY;
         if (useRoundRect) {

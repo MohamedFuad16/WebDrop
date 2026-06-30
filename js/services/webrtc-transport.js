@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.91";
+import { Emitter } from "../utils/emitter.js?v=1.0.92";
 import {
   DATA_CHANNEL_LABELS,
   DataChannelTransferProtocol
@@ -154,6 +154,10 @@ export class WebRtcTransport extends Emitter {
     this.protocol?.setChunkHandler(this.chunkHandler);
   }
 
+  sendControlMessage(message) {
+    return this.protocol?.sendControl(message) ?? false;
+  }
+
   async handleSignal(payload) {
     if (!this.enabled) {
       this.emit("signal-ignored", { reason: "transport-disabled", payload });
@@ -291,7 +295,8 @@ export class WebRtcTransport extends Emitter {
         "complete",
         "canceled",
         "failed",
-        "retry-requested"
+        "retry-requested",
+        "control"
       ]) {
         this.protocol.on(type, (payload) => this.emit(type, payload));
       }

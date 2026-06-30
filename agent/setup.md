@@ -34,7 +34,7 @@ Behavior is controlled at **runtime**, not build time:
 No environment variables are read by the frontend. See `secrets.md` for where URLs/tokens live and `api.md` for the backend.
 
 ## Service worker / PWA
-`service-worker.js` (registered only when **not** on localhost) precaches the app shell (`ASSETS` list) under a versioned cache `webdrop-v2-static-<APP_VERSION>`. Bump `APP_VERSION` (currently `1.0.91`, matching `package.json` `version` and the `?v=1.0.91` import query strings) when shipping cache-affecting changes. Code assets use network-first with cache fallback; `runtime-config.js` is always network-only.
+`service-worker.js` (registered only when **not** on localhost) precaches the app shell (`ASSETS` list) under a versioned cache `webdrop-v2-static-<APP_VERSION>`. Bump `APP_VERSION` (currently `1.0.92`, matching `package.json` `version` and the `?v=1.0.92` import query strings) when shipping cache-affecting changes. Code assets use network-first with cache fallback; `runtime-config.js` is always network-only.
 
 ## Quality / verification scripts (from `package.json`)
 ```bash

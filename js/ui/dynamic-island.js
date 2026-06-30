@@ -1,9 +1,9 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.91";
-import { Emitter } from "../utils/emitter.js?v=1.0.91";
-import { formatBytes } from "../utils/format.js?v=1.0.91";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.91";
-import { TileWave } from "./tile-wave.js?v=1.0.91";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.91";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.92";
+import { Emitter } from "../utils/emitter.js?v=1.0.92";
+import { formatBytes } from "../utils/format.js?v=1.0.92";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.92";
+import { TileWave } from "./tile-wave.js?v=1.0.92";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.92";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -41,7 +41,6 @@ export class DynamicIsland extends Emitter {
       transfer: this.root?.querySelector("[data-island-transfer]"),
       transferLabel: this.root?.querySelector("[data-island-transfer-label]"),
       transferPercent: this.root?.querySelector("[data-island-transfer-percent]"),
-      transferBar: this.root?.querySelector("[data-island-transfer-bar]"),
       transferName: this.root?.querySelector("[data-island-transfer-name]")
     };
     try {
@@ -394,6 +393,8 @@ export class DynamicIsland extends Emitter {
     const motionPaused = appShell?.dataset.motion === "paused";
     const waveState = ["connecting", "connected", "transfer"].includes(state);
     const shouldShowWave = waveState && !motionPaused;
+    // The tiles themselves are the transfer progress bar: fill grows with ratio.
+    this.wave?.setTransferMode(state === "transfer");
     if (!shouldShowWave) {
       this.cancelWaveStabilize();
       this.wave?.setRunning(false);
@@ -564,6 +565,14 @@ export class DynamicIsland extends Emitter {
     else renderAvatar(this.nodes.peerAvatar, peer.avatar);
   }
 
+  updatePeerProfile(peer) {
+    if (!peer || this.currentConnectedPeerId !== peer.id) return;
+    if (!["connecting", "connected", "transfer"].includes(this.state)) return;
+    if (this.nodes.peerName) this.nodes.peerName.textContent = peer.name;
+    if (peer.anonymous) renderAnonymousAvatar(this.nodes.peerAvatar);
+    else renderAvatar(this.nodes.peerAvatar, peer.avatar);
+  }
+
   resetCeremony() {
     if (this.nodes.ceremonyStage) this.nodes.ceremonyStage.textContent = this.translate("ceremonyPermissions");
     if (this.nodes.ceremonyScore) {
@@ -625,9 +634,6 @@ export class DynamicIsland extends Emitter {
       ? `${formatBytes(transfer.transferredBytes)} / ${formatBytes(transfer.totalBytes)}`
       : "";
     if (this.nodes.transferLabel) this.nodes.transferLabel.textContent = this.translate(directionKey);
-    if (this.nodes.transferBar) {
-      this.nodes.transferBar.style.transformOrigin = receiving ? "right center" : "left center";
-    }
     if (this.nodes.transferName) {
       this.nodes.transferName.textContent = [name, bytes].filter(Boolean).join(" · ");
     }
@@ -673,13 +679,11 @@ export class DynamicIsland extends Emitter {
   paintTransferProgress(ratio) {
     const value = clampRatio(ratio);
     this.transferDisplayRatio = value;
+    // The animated tiles are the progress visual now — grow their lit region.
+    this.wave?.setProgress(value);
     if (this.nodes.transferPercent) {
       this.nodes.transferPercent.textContent = `${Math.round(value * 100)}%`;
       this.nodes.transferPercent.style.setProperty("--transfer-progress", value.toFixed(4));
-    }
-    if (this.nodes.transferBar) {
-      this.nodes.transferBar.style.transform = `scaleX(${value})`;
-      this.nodes.transferBar.style.setProperty("--transfer-progress", value.toFixed(4));
     }
   }
 

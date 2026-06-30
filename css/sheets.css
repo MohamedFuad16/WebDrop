@@ -719,21 +719,21 @@
 }
 
 .swipe-control--vertical {
-  height: 132px;
+  height: 110px;
   margin-top: 14px;
   align-items: start;
-  padding: 16px 16px 0;
+  padding: 12px 14px 0;
 }
 
 .swipe-control--vertical:not(.is-ready) {
-  height: 86px;
+  height: 76px;
   align-items: center;
   padding-bottom: 0;
-  background: color-mix(in srgb, var(--panel-solid) 72%, transparent);
+  background: color-mix(in srgb, var(--panel-solid) 60%, transparent);
 }
 
 .swipe-control--vertical::before {
-  background: linear-gradient(0deg, color-mix(in srgb, var(--blue) 18%, transparent), transparent 68%);
+  background: linear-gradient(0deg, color-mix(in srgb, var(--blue) 12%, transparent), transparent 74%);
   transform: scaleY(.72);
   transform-origin: center bottom;
 }
@@ -745,10 +745,11 @@
 
 .swipe-control--vertical .swipe-text {
   position: absolute;
-  top: 15px;
+  top: 12px;
   left: 18px;
   right: 18px;
   width: auto;
+  font-size: 13px;
 }
 
 .swipe-control--vertical:not(.is-ready) .swipe-text {
@@ -814,7 +815,7 @@
   border-radius: 17px;
   color: #fff;
   background: var(--blue);
-  box-shadow: 0 10px 24px rgba(52, 125, 245, .28);
+  box-shadow: 0 4px 12px rgba(52, 125, 245, .2);
   cursor: grab;
   transform: translate3d(var(--swipe-x, 0px), var(--swipe-y, 0px), 0);
   transition: transform 220ms var(--ease-out), background var(--motion-control) ease;
@@ -857,9 +858,9 @@
   right: 12px;
   width: auto;
   top: auto;
-  bottom: 10px;
-  height: 58px;
-  border-radius: 20px;
+  bottom: 9px;
+  height: 50px;
+  border-radius: 18px;
   transform: translate3d(0, var(--swipe-y, 0px), 0);
 }
 

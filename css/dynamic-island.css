@@ -383,11 +383,13 @@
 .webdrop-island__transfer {
   position: absolute;
   z-index: 2;
-  inset: 13px 0 0;
-  display: grid;
-  align-content: center;
-  gap: 7px;
-  min-width: min(176px, 24vw);
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 6px 8px;
   opacity: 0;
   transform: translateY(8px) scale(.96);
   transition: opacity 240ms ease, transform 320ms var(--ease-out);
@@ -395,9 +397,12 @@
   will-change: opacity, transform;
 }
 
-.webdrop-island[data-state="transfer"] .webdrop-island__wave {
-  opacity: .3;
-  filter: saturate(1.04) blur(.3px);
+.webdrop-island__transfer-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  max-width: 100%;
 }
 
 .webdrop-island[data-state="transfer"] .webdrop-island__transfer {
@@ -407,11 +412,13 @@
 
 .webdrop-island__transfer span,
 .webdrop-island__transfer small {
+  max-width: 100%;
   overflow: hidden;
   color: var(--island-muted);
   font-size: 11px;
   font-weight: 760;
   text-align: center;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, .55);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -423,58 +430,9 @@
   line-height: 1;
   text-align: center;
   letter-spacing: 0;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, .6);
   transform: translateZ(0) scale(calc(.992 + var(--transfer-progress, 0) * .008));
   transition: transform 220ms var(--ease-out);
-}
-
-.webdrop-island__meter {
-  position: relative;
-  width: min(160px, 100%);
-  height: 9px;
-  overflow: hidden;
-  justify-self: center;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--island-ink) 16%, transparent);
-  box-shadow: inset 0 1px 1px rgba(0, 0, 0, .22);
-}
-
-/*
- * The fill is driven frame-by-frame from JS (paintTransferProgress) so the bar
- * and the percentage count up in lockstep. No CSS transition here on purpose —
- * it would lag the rAF updates and reintroduce the janky jump.
- */
-.webdrop-island__meter span {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #62e3d5, #347df5 56%, #9c7bff);
-  box-shadow: 0 0 14px color-mix(in srgb, #4f95ff calc(var(--transfer-progress, 0) * 70%), transparent);
-  transform: scaleX(0);
-  transform-origin: left center;
-  will-change: transform;
-}
-
-.webdrop-island__meter span::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, #ffffff 55%, transparent) 50%,
-    transparent
-  );
-  transform: translateX(-130%);
-  animation: islandMeterShimmer 1600ms var(--ease-out) infinite;
-  pointer-events: none;
-}
-
-@keyframes islandMeterShimmer {
-  0% { transform: translateX(-130%); }
-  55%, 100% { transform: translateX(130%); }
 }
 
 .webdrop-island__qr {
@@ -720,8 +678,6 @@
   }
 
   .webdrop-island__wave,
-  .webdrop-island__meter span,
-  .webdrop-island__meter span::after,
   .webdrop-island__beam {
     animation: none;
     transition-duration: 80ms;

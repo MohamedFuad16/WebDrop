@@ -1170,15 +1170,14 @@ test("connects from the global proximity button, selects a file, and shows Dynam
     percent: node.querySelector("[data-island-transfer-percent]")?.textContent,
     label: node.querySelector("[data-island-transfer-label]")?.textContent,
     name: node.querySelector("[data-island-transfer-name]")?.textContent,
-    bar: node.querySelector("[data-island-transfer-bar]")?.style.transform,
-    barTransition: getComputedStyle(node.querySelector("[data-island-transfer-bar]")).transitionTimingFunction,
+    hasMeter: Boolean(node.querySelector("[data-island-transfer-bar]")),
     percentNumeric: getComputedStyle(node.querySelector("[data-island-transfer-percent]")).fontVariantNumeric
   }));
 
   expect(island.label).toMatch(/Sending|送信中/);
   expect(island.name).toContain("webdrop-transfer-proof.bin");
-  expect(island.bar).toContain("scaleX");
-  expect(island.barTransition).toContain("cubic-bezier");
+  expect(island.percent).toMatch(/%/);
+  expect(island.hasMeter).toBe(false);
   expect(island.percentNumeric).toContain("tabular-nums");
   expect(consoleProblems).toEqual([]);
 });

@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.91";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.91";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.91";
+import { formatBytes } from "../utils/format.js?v=1.0.92";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.92";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.92";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_SCORE_MINIMUM = 55;
@@ -550,6 +550,78 @@ export function createController({
     return Math.max(Math.abs(Number(tilt.beta || 0)), Math.abs(Number(tilt.gamma || 0)));
   }
 
+  transport.on?.("control", (message) => {
+    if (message?.type !== "profile:update") return;
+    applyPeerProfileUpdate(message.profile);
+  });
+
+  function applyPeerProfileUpdate(profile) {
+    const patch = sanitizeIncomingProfile(profile);
+    if (!patch) return;
+    const peerId = store.getState().connectedPeerId;
+    if (!peerId) return;
+    let updatedPeer = null;
+    store.update((current) => {
+      const peers = current.peers.map((peer) => {
+        if (peer.id !== peerId) return peer;
+        updatedPeer = { ...peer, ...patch };
+        return updatedPeer;
+      });
+      return { ...current, peers };
+    });
+    if (updatedPeer) view.updateIslandPeerProfile?.(updatedPeer);
+  }
+
+  function sanitizeIncomingProfile(profile) {
+    if (!profile || typeof profile !== "object") return null;
+    const patch = {};
+    if (typeof profile.name === "string" && profile.name.trim()) {
+      patch.name = profile.name.slice(0, 22);
+    }
+    const avatar = isAllowedAvatarChoice(profile.avatar)
+      ? profile.avatar
+      : isAllowedAvatarChoice(profile.avatarId)
+        ? profile.avatarId
+        : null;
+    if (avatar) {
+      patch.avatar = avatar;
+      patch.avatarId = isAllowedAvatarChoice(profile.avatarId) ? profile.avatarId : avatar;
+    }
+    if (typeof profile.ringColor === "string" && /^#[0-9a-f]{6}$/i.test(profile.ringColor)) {
+      patch.ringColor = profile.ringColor;
+    }
+    return Object.keys(patch).length ? patch : null;
+  }
+
+  let profileBroadcastTimer = 0;
+  let lastBroadcastProfileKey = null;
+
+  function broadcastSelfProfile() {
+    globalThis.clearTimeout(profileBroadcastTimer);
+    profileBroadcastTimer = globalThis.setTimeout(() => {
+      profileBroadcastTimer = 0;
+      flushSelfProfileBroadcast();
+    }, 250);
+  }
+
+  function flushSelfProfileBroadcast() {
+    const self = store.getState().self;
+    const profile = {
+      name: self.name,
+      avatar: self.avatar,
+      avatarId: self.avatarId,
+      ringColor: self.ringColor
+    };
+    const key = JSON.stringify(profile);
+    if (key === lastBroadcastProfileKey) return;
+    lastBroadcastProfileKey = key;
+    const { connectedPeerId, mode } = store.getState();
+    if (connectedPeerId && mode !== "disconnecting") {
+      transport.sendControlMessage?.({ type: "profile:update", profile });
+    }
+    signaling.updateProfile?.(self);
+  }
+
   transfer.on?.("receive-ready", ({ transferId, manifest }) => {
     globalThis.clearTimeout(receivePresentationTimer);
     receivePresentationTimer = 0;
@@ -726,11 +798,13 @@ export function createController({
     if (!isAllowedAvatarChoice(avatar)) return;
     localStorage.setItem("webdrop.avatarChoice", avatar);
     store.update((state) => ({ ...state, self: { ...state.self, avatar, avatarId: avatar } }));
+    broadcastSelfProfile();
   });
   view.on("select-ring", (ringColor) => {
     if (!/^#[0-9a-f]{6}$/i.test(ringColor || "")) return;
     localStorage.setItem("webdrop.ringColor", ringColor);
     store.update((state) => ({ ...state, self: { ...state.self, ringColor } }));
+    broadcastSelfProfile();
   });
 
   view.on("name-change", (name) => {
@@ -741,6 +815,7 @@ export function createController({
       localStorage.removeItem("webdrop.deviceName");
     }
     store.update((state) => ({ ...state, self: { ...state.self, name: clean } }));
+    broadcastSelfProfile();
   });
 
   view.on("connect-nearby", startNearbyConnectionFromUi);

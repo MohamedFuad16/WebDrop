@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.91";
+import { Emitter } from "../utils/emitter.js?v=1.0.92";
 
 export class WebSocketSignalingAdapter extends Emitter {
   constructor({
@@ -134,6 +134,16 @@ export class WebSocketSignalingAdapter extends Emitter {
     this.stopHeartbeat();
     this.socket?.close();
     this.socket = null;
+  }
+
+  // Best-effort presence re-announce so nearby (non-connected) devices can pick
+  // up an updated avatar/name/ring. Reuses the cached capabilities from connect()
+  // and no-ops when the socket is closed.
+  updateProfile(self) {
+    if (!self || !this.lastConnectPayload) return false;
+    this.lastConnectPayload = { ...this.lastConnectPayload, self };
+    this.selfId = self.id || this.selfId;
+    return this.send({ type: "client:hello", payload: this.lastConnectPayload });
   }
 
   async sendInvite(targetId, { method = "proximity", qrRole = null } = {}) {
