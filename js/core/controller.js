@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.95";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.95";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.95";
+import { formatBytes } from "../utils/format.js?v=1.0.96";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.96";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.96";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";

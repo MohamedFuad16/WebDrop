@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
   <title>WebDrop Admin</title>
-  <link rel="stylesheet" href="../css/operations.css?v=1.0.95">
-  <link rel="stylesheet" href="../css/admin.css?v=1.0.95">
+  <link rel="stylesheet" href="../css/operations.css?v=1.0.96">
+  <link rel="stylesheet" href="../css/admin.css?v=1.0.96">
 </head>
 <body>
   <main class="operations-shell admin-shell">
@@ -29,10 +29,6 @@
             <option value="ja">日本語</option>
           </select>
         </label>
-        <span class="connection-label" data-server-connection>
-          <i aria-hidden="true"></i>
-          <span data-i18n="checkingServer">Checking server</span>
-        </span>
       </div>
     </header>
 
@@ -56,7 +52,7 @@
         </article>
         <article>
           <span class="summary-icon" aria-hidden="true">◇</span>
-          <div><small data-i18n="appVersion">App version</small><strong data-admin-version>1.0.95</strong><span data-i18n="productionFrontend">Production frontend</span></div>
+          <div><small data-i18n="appVersion">App version</small><strong data-admin-version>1.0.96</strong><span data-i18n="productionFrontend">Production frontend</span></div>
         </article>
       </section>
       <div class="section-intro">
@@ -87,17 +83,13 @@
           <h1 id="live-title" data-i18n="liveTitle">Live testing</h1>
           <p data-i18n="liveCopy">Watch connected phones, inspect one device continuously, and understand each signal without reading raw logs.</p>
         </div>
-        <label class="poll-control">
-          <input data-live-poll type="checkbox" checked>
-          <span data-i18n="liveUpdates">Live updates</span>
-        </label>
       </div>
 
       <div class="live-stack">
         <section class="workspace-section devices-section" aria-labelledby="devices-title">
           <div class="workspace-heading">
             <div><small data-i18n="serverAndDevices">Server &amp; devices</small><h2 id="devices-title" data-i18n="connectedDevices">Connected devices</h2></div>
-            <span class="inline-status" data-devices-live><i></i><span data-i18n="signalingConnected">Signaling connected</span> · <span data-session-count>0 active</span></span>
+            <span class="inline-status" data-server-connection><i aria-hidden="true"></i><span data-i18n="checkingServer">Checking server</span></span>
           </div>
           <div class="device-list-head" aria-hidden="true">
             <span data-i18n="device">Device</span><span data-i18n="pairingState">Pairing</span><span data-i18n="lastSeen">Last seen</span>
@@ -105,7 +97,7 @@
           <div class="device-list" data-device-list>
             <p class="empty-row" data-i18n="noDevices">No physical devices are connected.</p>
           </div>
-          <p class="list-footer"><span data-device-count-copy>0 devices</span><span data-i18n="selectDeviceHelp">Select a device to inspect it</span></p>
+          <p class="list-footer"><span data-device-count-copy>0 devices</span><span><span data-session-count>0 active</span> · <span data-i18n="selectDeviceHelp">Select a device to inspect it</span></span></p>
         </section>
 
         <section class="workspace-section monitor-section" aria-labelledby="monitor-title">
@@ -113,7 +105,7 @@
             <div><small data-i18n="singleDeviceTesting">Single-device test</small><h2 id="monitor-title" data-i18n="continuousMonitor">Continuous ultrasonic monitor</h2></div>
             <span class="monitor-status" data-monitor-status="idle"><i></i><span data-monitor-status-copy data-i18n="idle">Idle</span></span>
           </div>
-          <p class="section-hint" data-i18n="singleDeviceHint">Confirms one phone in isolation: can its mic hear a valid chirp, and are bump/tilt sensors working. Reciprocal pairing checks are in the two-device test below.</p>
+          <p class="section-hint" data-i18n="singleDeviceHint">Confirms what one phone can prove on its own: it emits the coded chirp in-band, its mic samples fast enough, and its bump/tilt sensors fire. A lone phone can't judge "did it hear a partner" (it only hears its own signal) — those reciprocal checks live in the two-device test below.</p>
           <div class="monitor-controls">
             <label>
               <span data-i18n="selectConnectedDevice">Select a connected device</span>
@@ -150,7 +142,7 @@
             <div><small data-i18n="multiDeviceTesting">Two-device test</small><h2 id="multi-title" data-i18n="twoDeviceTitle">Two-device pairing</h2></div>
             <span class="monitor-status" data-multi-status="idle"><i></i><span data-multi-status-copy data-i18n="idle">Idle</span></span>
           </div>
-          <p class="section-hint" data-i18n="twoDeviceHint">Pick two connected phones to watch side-by-side and see the live pairing outcome (did each hear the other, bump-time gap, pass/fail).</p>
+          <p class="section-hint" data-i18n="twoDeviceHint">Pick two connected phones. Each one's live frequency map and full signal readout show side-by-side, plus the reciprocal pairing outcome (did each hear the other, bump-time gap, pass/fail).</p>
           <div class="multi-controls">
             <label><span data-i18n="deviceA">Device A</span>
               <select data-multi-a><option value="" data-i18n="chooseDevice">Choose a device</option></select>
@@ -194,58 +186,65 @@
             <small data-i18n="proximityPolicy">Proximity policy</small>
             <h2 id="tuning-title" data-i18n="proximityTuning">Proximity tuning</h2>
           </div>
-          <span class="policy-revision"><span data-i18n="policyRevision">Policy revision</span> <strong data-policy-revision>—</strong></span>
         </div>
         <form class="tuning-form" data-tuning-form>
           <fieldset class="tuning-group tuning-group--scores">
             <legend data-i18n="scoreWeights">Score weights</legend>
             <p data-i18n="scoreWeightsCopy">Adjust evidence points. The five weights must total exactly 100.</p>
             <div class="tuning-score-grid">
-              <label><span data-i18n="sound">Sound</span><input name="sound" data-policy-weight="sound" type="number" min="0" max="100" step="1" inputmode="decimal"></label>
-              <label><span data-i18n="motion">Motion</span><input name="motion" data-policy-weight="motion" type="number" min="0" max="100" step="1" inputmode="decimal"></label>
-              <label><span data-i18n="bump">Bump</span><input name="bump" data-policy-weight="bump" type="number" min="0" max="100" step="1" inputmode="decimal"></label>
-              <label><span data-i18n="tilt">Tilt</span><input name="tilt" data-policy-weight="tilt" type="number" min="0" max="100" step="1" inputmode="decimal"></label>
-              <label><span data-i18n="qr">QR</span><input name="qr" data-policy-weight="qr" type="number" min="0" max="100" step="1" inputmode="decimal"></label>
-              <output class="weight-total" data-policy-weight-total data-valid="true">100</output>
+              <label><span data-i18n="sound">Sound</span><input name="sound" data-policy-weight="sound" type="number" min="0" max="100" step="1" inputmode="numeric"></label>
+              <label><span data-i18n="motion">Motion</span><input name="motion" data-policy-weight="motion" type="number" min="0" max="100" step="1" inputmode="numeric"></label>
+              <label><span data-i18n="bump">Bump</span><input name="bump" data-policy-weight="bump" type="number" min="0" max="100" step="1" inputmode="numeric"></label>
+              <label><span data-i18n="tilt">Tilt</span><input name="tilt" data-policy-weight="tilt" type="number" min="0" max="100" step="1" inputmode="numeric"></label>
+              <label><span data-i18n="qr">QR</span><input name="qr" data-policy-weight="qr" type="number" min="0" max="100" step="1" inputmode="numeric"></label>
             </div>
-            <label class="minimum-score-control"><span data-i18n="minimumScore">Minimum score</span><input data-policy-minimum type="number" min="35" max="90" step="1" inputmode="decimal"><small>/ 100</small></label>
+            <div class="score-summary">
+              <div class="score-summary-item">
+                <span data-i18n="weightTotalLabel">Total</span>
+                <output class="weight-total" data-policy-weight-total data-valid="true">100</output>
+              </div>
+              <div class="score-summary-item minimum-score-control">
+                <span data-i18n="minimumScore">Minimum score</span>
+                <span class="minimum-score-field"><input data-policy-minimum type="number" min="35" max="90" step="1" inputmode="numeric"><small>/ 100</small></span>
+              </div>
+            </div>
           </fieldset>
           <fieldset class="tuning-group tuning-group--timing">
             <legend data-i18n="timingWindows">Timing windows</legend>
             <p data-i18n="timingWindowsCopy">New sessions snapshot these values; a running test is never changed halfway through.</p>
             <div class="timing-control-grid">
-              <label class="timing-control">
-                <span class="timing-name" data-i18n="lateTapGrace">Late-tap grace</span>
-                <span class="timing-input-row">
-                  <input class="timing-slider" data-policy-slider="lateTapGraceMs" type="range" min="2000" max="15000" step="250" aria-label="Late-tap grace slider">
-                  <span class="timing-number"><input data-policy-timing="lateTapGraceMs" type="number" min="2000" max="15000" step="250" inputmode="numeric"><small>ms</small></span>
-                </span>
-                <em class="timing-help" data-i18n="lateTapGraceHelp">How long the first person's tap waits for their partner to tap before the cohort starts. Bigger = more forgiving of human timing gaps.</em>
-                <small class="timing-range" data-i18n="lateTapGraceRange">Recommended 5000–8000 ms · allowed 2000–15000</small>
-              </label>
-              <label class="timing-control">
-                <span class="timing-name" data-i18n="acousticWindow">Acoustic exchange window</span>
-                <span class="timing-input-row">
-                  <input class="timing-slider" data-policy-slider="acousticWindowMs" type="range" min="2400" max="12000" step="250" aria-label="Acoustic exchange window slider">
-                  <span class="timing-number"><input data-policy-timing="acousticWindowMs" type="number" min="2400" max="12000" step="250" inputmode="numeric"><small>ms</small></span>
-                </span>
-                <em class="timing-help" data-i18n="acousticWindowHelp">How long the phones emit their coded ultrasonic chirp and keep listening. Bigger = more chances to hear each other, but a longer ceremony.</em>
-                <small class="timing-range" data-i18n="acousticWindowRange">Recommended 5000–8000 ms · allowed 2400–12000</small>
-              </label>
-              <label class="timing-control">
-                <span class="timing-name" data-i18n="matchSlop">Bump match slop</span>
-                <span class="timing-input-row">
-                  <input class="timing-slider" data-policy-slider="matchSlopMs" type="range" min="500" max="10000" step="250" aria-label="Bump match slop slider">
-                  <span class="timing-number"><input data-policy-timing="matchSlopMs" type="number" min="500" max="10000" step="250" inputmode="numeric"><small>ms</small></span>
-                </span>
-                <em class="timing-help" data-i18n="matchSlopHelp">After both phones prove they heard each other, how far apart their two bumps may be in time and still count as one bump. Bigger = easier to match, but looser.</em>
-                <small class="timing-range" data-i18n="matchSlopRange">Recommended 2500–5000 ms · allowed 500–10000</small>
-              </label>
+              <div class="timing-control">
+                <div class="timing-control-top">
+                  <span class="timing-name" data-i18n="lateTapGrace">Late-tap grace</span>
+                  <span class="timing-number"><input data-policy-timing="lateTapGraceMs" type="number" min="2000" max="15000" step="250" inputmode="numeric" aria-label="Late-tap grace milliseconds"><small>ms</small></span>
+                </div>
+                <input class="timing-slider" data-policy-slider="lateTapGraceMs" type="range" min="2000" max="15000" step="250" aria-label="Late-tap grace slider">
+                <p class="timing-help" data-i18n="lateTapGraceHelp">How long the first person's tap waits for their partner to tap before the cohort starts. Bigger = more forgiving of human timing gaps.</p>
+                <p class="timing-range"><span class="timing-range-tag" data-i18n="recommendedTag">Recommended</span> <span data-i18n="lateTapGraceRange">5000–8000 ms · allowed 2000–15000</span></p>
+              </div>
+              <div class="timing-control">
+                <div class="timing-control-top">
+                  <span class="timing-name" data-i18n="acousticWindow">Acoustic exchange window</span>
+                  <span class="timing-number"><input data-policy-timing="acousticWindowMs" type="number" min="2400" max="12000" step="250" inputmode="numeric" aria-label="Acoustic exchange window milliseconds"><small>ms</small></span>
+                </div>
+                <input class="timing-slider" data-policy-slider="acousticWindowMs" type="range" min="2400" max="12000" step="250" aria-label="Acoustic exchange window slider">
+                <p class="timing-help" data-i18n="acousticWindowHelp">How long the phones emit their coded ultrasonic chirp and keep listening. Bigger = more chances to hear each other, but a longer ceremony.</p>
+                <p class="timing-range"><span class="timing-range-tag" data-i18n="recommendedTag">Recommended</span> <span data-i18n="acousticWindowRange">5000–8000 ms · allowed 2400–12000</span></p>
+              </div>
+              <div class="timing-control">
+                <div class="timing-control-top">
+                  <span class="timing-name" data-i18n="matchSlop">Bump match slop</span>
+                  <span class="timing-number"><input data-policy-timing="matchSlopMs" type="number" min="500" max="10000" step="250" inputmode="numeric" aria-label="Bump match slop milliseconds"><small>ms</small></span>
+                </div>
+                <input class="timing-slider" data-policy-slider="matchSlopMs" type="range" min="500" max="10000" step="250" aria-label="Bump match slop slider">
+                <p class="timing-help" data-i18n="matchSlopHelp">After both phones prove they heard each other, how far apart their two bumps may be in time and still count as one bump. Bigger = easier to match, but looser.</p>
+                <p class="timing-range"><span class="timing-range-tag" data-i18n="recommendedTag">Recommended</span> <span data-i18n="matchSlopRange">2500–5000 ms · allowed 500–10000</span></p>
+              </div>
             </div>
           </fieldset>
           <div class="tuning-actions">
             <span data-policy-status data-state="idle" aria-live="polite">Loading server policy…</span>
-            <button class="apply-button" type="submit" data-i18n="applyToServer">Apply to server</button>
+            <button class="apply-button" type="submit" data-i18n="saveToServer">Save &amp; apply</button>
           </div>
         </form>
       </section>
@@ -307,13 +306,12 @@
     </section>
 
     <footer class="admin-footer">
-      <span><i></i><span data-i18n="pollingEverySecond">Live data refreshes every second</span></span>
       <span><span data-i18n="serverTime">Server time</span> <strong data-server-time>--:--:--</strong></span>
     </footer>
     <p class="page-error" data-admin-error role="alert" aria-live="assertive" hidden></p>
   </main>
 
-  <script src="../js/config/runtime-config.js?v=1.0.95"></script>
-  <script src="../js/admin/readiness.js?v=1.0.95" type="module"></script>
+  <script src="../js/config/runtime-config.js?v=1.0.96"></script>
+  <script src="../js/admin/readiness.js?v=1.0.96" type="module"></script>
 </body>
 </html>

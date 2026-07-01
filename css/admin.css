@@ -1794,25 +1794,29 @@
   border: 1px solid var(--ops-line); background: #fff;
   font-size: 10px; font-weight: 600; color: var(--ops-ink);
 }
-.multi-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.multi-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
 .multi-column {
   min-width: 0;
   border: 1px solid var(--ops-line); border-radius: 8px; padding: 12px;
+  display: grid; gap: 10px; align-content: start;
 }
-.multi-column-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.multi-column-head strong { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multi-column-head { display: flex; align-items: center; gap: 8px; }
+.multi-column-head strong { flex: 1; min-width: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multi-column-head .monitor-status { flex: none; }
 .multi-slot {
   width: 22px; height: 22px; flex: none;
   display: grid; place-items: center; border-radius: 6px;
   background: var(--ops-blue); color: #fff; font-size: 11px; font-weight: 700;
 }
-.multi-metric {
-  display: grid; grid-template-columns: 1fr auto 18px; gap: 8px; align-items: center;
-  min-height: 34px; border-top: 1px solid var(--ops-line);
-  font-size: 11px;
-}
-.multi-metric span:first-child { color: var(--ops-muted); }
-.multi-metric b { font-weight: 700; }
+.multi-column .frequency-spectrum { margin: 0; }
+.multi-column .metric-table { margin: 0; }
+/* Compact metric table inside a column: metric · current · status
+   (meaning/expected are already spelled out in the single-device test above). */
+.multi-column .metric-row { grid-template-columns: minmax(0, 1fr) auto auto !important; gap: 8px; }
+.multi-column .metric-row > span:nth-child(2),
+.multi-column .metric-row > span:nth-child(3) { display: none; }
+.multi-column .metric-row .metric-state { justify-self: end; }
+.multi-column .metric-row b { justify-self: end; }
 
 /* ---- Timeline show-more ---- */
 .timeline-toggle {
@@ -1823,25 +1827,47 @@
 }
 .timeline-toggle:hover { background: #f6f8fb; }
 
-/* ---- Settings: timing slider + number, aligned min-score, integer points ---- */
-.timing-control { display: grid; gap: 6px; }
-.timing-name { font-size: 11px; font-weight: 650; color: var(--ops-ink); }
-.timing-input-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
-.timing-slider { width: 100%; accent-color: var(--ops-blue); height: 22px; }
+/* ---- Settings refresh: score summary row + roomy timing cards ---- */
+.tuning-score-grid { grid-template-columns: repeat(5, minmax(52px, 1fr)) !important; }
+.score-summary {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ops-line);
+}
+.score-summary-item { display: flex; align-items: center; gap: 8px; }
+.score-summary-item > span { font-size: 11px; color: var(--ops-muted); font-weight: 600; }
+.weight-total {
+  min-height: 0 !important; border-left: 0 !important; border-top: 0 !important;
+  padding: 4px 14px; border-radius: 999px; place-items: center;
+  background: color-mix(in srgb, var(--ops-green) 12%, #fff);
+  display: inline-flex; align-items: center; font-size: 13px;
+}
+.weight-total[data-valid="false"] { background: color-mix(in srgb, var(--ops-red) 12%, #fff); }
+.minimum-score-control { display: flex !important; align-items: center; gap: 8px; margin: 0 !important; grid-template-columns: none !important; }
+.minimum-score-field { display: inline-flex; align-items: center; gap: 6px; }
+.minimum-score-field input { width: 66px; text-align: center; }
+.minimum-score-field small { color: var(--ops-muted); font-size: 11px; font-weight: 600; }
+
+.timing-control-grid { display: grid; grid-template-columns: 1fr !important; gap: 12px; }
+.timing-control {
+  display: grid; gap: 9px;
+  padding: 13px 14px; border: 1px solid var(--ops-line); border-radius: 9px; background: #fafbfc;
+}
+.timing-control-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.timing-name { font-size: 12.5px; font-weight: 700; color: var(--ops-ink); }
 .timing-number { display: inline-flex; align-items: center; gap: 5px; }
-.timing-number input { width: 78px; }
-.timing-help { font-style: normal; color: var(--ops-muted); font-size: 10px; line-height: 1.45; }
-.timing-range {
-  color: var(--ops-blue); font-size: 10px; font-weight: 600;
-  padding: 2px 0 0; border-top: 1px dashed var(--ops-line);
+.timing-number input { width: 78px; text-align: center; }
+.timing-number small { color: var(--ops-muted); font-size: 11px !important; font-weight: 600; }
+.timing-slider {
+  width: 100%; accent-color: var(--ops-blue); height: 20px;
+  min-height: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important;
 }
-.timing-control-grid { gap: 16px; }
-.minimum-score-control {
-  display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 12px;
+.timing-help { margin: 0; color: var(--ops-muted); font-size: 11px; line-height: 1.55; }
+.timing-range { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--ops-ink); flex-wrap: wrap; }
+.timing-range-tag {
+  padding: 2px 9px; border-radius: 999px; font-size: 10px; font-weight: 700; white-space: nowrap;
+  color: var(--ops-green); background: color-mix(in srgb, var(--ops-green) 13%, #fff);
 }
-.minimum-score-control span { font-size: 10px; color: var(--ops-muted); }
-.minimum-score-control input { width: 74px; }
-.weight-total { align-self: center; }
+.apply-button { min-width: 150px; }
 
 /* ---- Test cases: clearer detail card ---- */
 .test-case-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
@@ -1859,17 +1885,55 @@
 .test-case-steps li { font-size: 12px; line-height: 1.5; }
 .test-case-tabs button { min-height: 38px; }
 
+/* Test-case hold diagram (two-phone illustration) */
+.test-case-figure {
+  margin: 14px 0; padding: 14px; display: grid; gap: 10px; justify-items: center;
+  border: 1px solid var(--ops-line); border-radius: 10px;
+  background: linear-gradient(180deg, #fbfcfe, #f4f6f9);
+}
+.test-case-figure figcaption { color: var(--ops-muted); font-size: 11px; text-align: center; line-height: 1.5; }
+.hold-diagram { width: 100%; max-width: 300px; height: auto; }
+.hold-diagram .phone-body { fill: #fff; stroke: var(--ops-line-strong); stroke-width: 2; }
+.hold-diagram .phone-screen { fill: #eef2f6; }
+.hold-diagram .phone-cam { fill: var(--ops-muted); }
+.hold-diagram .phone-edge { stroke: var(--ops-blue); stroke-width: 4; stroke-linecap: round; }
+.hold-diagram .phone-label { fill: var(--ops-muted); font-size: 13px; font-weight: 700; text-anchor: middle; font-family: inherit; }
+.hold-diagram .phone-contact { fill: color-mix(in srgb, var(--ops-blue) 22%, transparent); }
+.hold-diagram .phone-isolate { stroke: var(--ops-red); stroke-width: 2; stroke-dasharray: 5 5; }
+
+/* Metric legend: even, wrap-friendly row */
+.metric-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.metric-legend > span { white-space: nowrap; }
+
+/* Info note icon must stay a circle even when the text wraps */
+.readiness-note > span { flex: none; }
+
+/* Devices heading connection chip */
+.devices-section .inline-status { white-space: nowrap; }
+.inline-status[data-state="offline"] { color: var(--ops-red); }
+.inline-status[data-state="checking"] { color: var(--ops-amber); }
+
 /* ---- Mobile ---- */
 @media (max-width: 760px) {
-  .admin-topbar { padding: 12px 14px; row-gap: 12px; }
-  .admin-tools { justify-content: space-between; width: 100%; }
+  /* Brand + language share the top row; tabs drop to their own row below. */
+  .admin-topbar {
+    grid-template-columns: 1fr auto !important;
+    align-items: center;
+    padding: 12px 14px; row-gap: 12px; column-gap: 12px;
+  }
+  .admin-brand { grid-row: 1; grid-column: 1; }
+  .admin-tools { grid-row: 1; grid-column: 2; justify-content: flex-end; width: auto; order: 0; }
+  .admin-tabs { grid-row: 2; grid-column: 1 / -1; order: 0; }
   .multi-controls { grid-template-columns: 1fr 1fr; }
   .multi-controls .start-button,
   .multi-controls .stop-button { grid-column: span 1; }
   .multi-compare { grid-template-columns: 1fr; }
-  .timing-control-grid { grid-template-columns: 1fr; }
+  .timing-control-grid { grid-template-columns: 1fr !important; }
+  .tuning-score-grid { grid-template-columns: repeat(3, 1fr) !important; }
+  .score-summary { justify-content: space-between; }
   .device-list-head,
   .device-row { grid-template-columns: minmax(0,1fr) auto !important; }
   .device-list-head span:nth-child(3),
   .device-row > span:last-child { display: none; }
+  .metric-legend { flex-direction: column; gap: 8px; }
 }

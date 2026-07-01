@@ -1,6 +1,6 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.95";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.95";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.95";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.96";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.96";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.96";
 import {
   TEST_CASES,
   createTestRun,
@@ -8,9 +8,9 @@ import {
   stopTestRun,
   summarizeTestRun,
   validateAssignments
-} from "./test-runs.js?v=1.0.95";
+} from "./test-runs.js?v=1.0.96";
 
-const APP_VERSION = "1.0.95";
+const APP_VERSION = "1.0.96";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -22,7 +22,7 @@ const MONITOR_END_HZ = 19_400;
 // remote operators paste it once (kept only in sessionStorage, never committed).
 const ADMIN_TOKEN_STORAGE_KEY = "webdrop.adminToken";
 const TEST_RUN_STORAGE_KEY = "webdrop.adminTestRuns.v1";
-const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.95", import.meta.url);
+const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.96", import.meta.url);
 
 const ADMIN_MESSAGES = {
   en: {
@@ -49,7 +49,6 @@ const ADMIN_MESSAGES = {
     physicalProofNote: "Items under Needs physical proof require two real devices and cannot be signed off by browser tests alone.",
     liveTitle: "Live testing",
     liveCopy: "Watch connected phones, inspect one device continuously, and understand each signal without reading raw logs.",
-    liveUpdates: "Live updates",
     serverAndDevices: "Server & devices",
     connectedDevices: "Connected devices",
     signalingConnected: "Signaling connected",
@@ -91,9 +90,9 @@ const ADMIN_MESSAGES = {
     recentSessionCopy: "Finished sessions stay here briefly so you can inspect slots, evidence, and failure reasons.",
     singleDeviceTesting: "Single-device test",
     multiDeviceTesting: "Two-device test",
-    singleDeviceHint: "Confirms one phone in isolation: can its mic hear a valid chirp, and are bump/tilt sensors working. Reciprocal pairing checks are in the two-device test below.",
+    singleDeviceHint: "Confirms what one phone can prove on its own: it emits the coded chirp in-band, its mic samples fast enough, and its bump/tilt sensors fire. A lone phone can't judge “did it hear a partner” (it only hears its own signal) — those reciprocal checks live in the two-device test below.",
     twoDeviceTitle: "Two-device pairing",
-    twoDeviceHint: "Pick two connected phones to watch side-by-side and see the live pairing outcome (did each hear the other, bump-time gap, pass/fail).",
+    twoDeviceHint: "Pick two connected phones. Each one's live frequency map and full signal readout show side-by-side, plus the reciprocal pairing outcome (did each hear the other, bump-time gap, pass/fail).",
     deviceA: "Device A",
     deviceB: "Device B",
     startBoth: "Start both",
@@ -132,7 +131,6 @@ const ADMIN_MESSAGES = {
     endsIn: "ends in {seconds}s",
     completing: "completing",
     joinedAgo: "joined {age}",
-    pollingEverySecond: "Live data refreshes every second",
     serverTime: "Server time",
     readyColumn: "Ready",
     proofColumn: "Needs physical proof",
@@ -242,18 +240,21 @@ const ADMIN_MESSAGES = {
     tilt: "Tilt",
     qr: "QR",
     minimumScore: "Minimum score",
+    weightTotalLabel: "Total",
+    recommendedTag: "Recommended",
+    saveToServer: "Save & apply",
     timingWindows: "Timing windows",
     timingWindowsCopy: "New sessions snapshot these values; a running test is never changed halfway through.",
     pointsUnit: "points",
     lateTapGrace: "Late-tap grace",
     lateTapGraceHelp: "How long the first person's tap waits for their partner to tap before the cohort starts. Bigger = more forgiving of human timing gaps.",
-    lateTapGraceRange: "Recommended 5000–8000 ms · allowed 2000–15000",
+    lateTapGraceRange: "5000–8000 ms · allowed 2000–15000",
     acousticWindow: "Acoustic exchange window",
     acousticWindowHelp: "How long the phones emit their coded ultrasonic chirp and keep listening. Bigger = more chances to hear each other, but a longer ceremony.",
-    acousticWindowRange: "Recommended 5000–8000 ms · allowed 2400–12000",
+    acousticWindowRange: "5000–8000 ms · allowed 2400–12000",
     matchSlop: "Bump match slop",
     matchSlopHelp: "After both phones prove they heard each other, how far apart their two bumps may be in time and still count as one bump. Bigger = easier to match, but looser.",
-    matchSlopRange: "Recommended 2500–5000 ms · allowed 500–10000",
+    matchSlopRange: "2500–5000 ms · allowed 500–10000",
     applyToServer: "Apply to server",
     testCasesTitle: "Test cases",
     testCasesCopy: "Assign the live phones, record a repeatable run, and keep every result tied to its exact server policy.",
@@ -267,6 +268,10 @@ const ADMIN_MESSAGES = {
     onePairBadge: "1 pair · 2 phones",
     twoPairsBadge: "2 pairs · 4 phones",
     attemptsBadge: "{count} attempts",
+    holdTopEdge: "Hold the two phones' top edges together (near the camera).",
+    holdSpeakerMic: "Put phone 1's bottom (speaker) edge against phone 2's top (mic) edge.",
+    holdCrossAngle: "Cross the side edges at about 45°, alternating which phone is on top.",
+    holdTwoPairs: "Run two pairs at once — keep each pair together and the pairs apart.",
     recording: "Recording",
     activeRun: "Active run",
     targetAttempts: "Target attempts",
@@ -304,7 +309,6 @@ const ADMIN_MESSAGES = {
     physicalProofNote: "実機証明が必要な項目は、2 台の実端末で確認するまで完了扱いにしません。",
     liveTitle: "ライブテスト",
     liveCopy: "接続中の端末を見て、1 台を継続監視し、専門用語なしで音響信号を確認します。",
-    liveUpdates: "ライブ更新",
     serverAndDevices: "サーバーと端末",
     connectedDevices: "接続中の端末",
     signalingConnected: "シグナリング接続済み",
@@ -346,9 +350,9 @@ const ADMIN_MESSAGES = {
     recentSessionCopy: "終了したセッションも短時間ここに残し、スロット、証拠、失敗理由を確認できます。",
     singleDeviceTesting: "単体端末テスト",
     multiDeviceTesting: "2端末テスト",
-    singleDeviceHint: "1台の端末を単独で確認します。マイクが有効なチャープを聞けるか、バンプ/傾きセンサーが動作するか。相互ペアリングの確認は下の2端末テストで行います。",
+    singleDeviceHint: "1台だけで確認できることを検証します。帯域内で符号化チャープを送信できるか、マイクの標本化が十分速いか、バンプ/傾きセンサーが反応するか。1台では「相手を聞けたか」は判断できません（自分の信号しか聞こえないため）。相互確認は下の2端末テストで行います。",
     twoDeviceTitle: "2端末ペアリング",
-    twoDeviceHint: "接続中の2台を選んで並べて監視し、ライブのペアリング結果（互いに聞こえたか、バンプ時刻差、合否）を確認します。",
+    twoDeviceHint: "接続中の2台を選ぶと、それぞれのライブ周波数マップと全信号の読み取りが並んで表示され、相互ペアリング結果（互いに聞こえたか、バンプ時刻差、合否）も確認できます。",
     deviceA: "端末A",
     deviceB: "端末B",
     startBoth: "両方開始",
@@ -387,7 +391,6 @@ const ADMIN_MESSAGES = {
     endsIn: "残り{seconds}秒",
     completing: "完了処理中",
     joinedAgo: "{age}参加",
-    pollingEverySecond: "ライブデータは 1 秒ごとに更新されます",
     serverTime: "サーバー時刻",
     readyColumn: "準備済み",
     proofColumn: "実機証明が必要",
@@ -482,18 +485,21 @@ const ADMIN_MESSAGES = {
     tilt: "傾き",
     qr: "QR",
     minimumScore: "最低スコア",
+    weightTotalLabel: "合計",
+    recommendedTag: "推奨",
+    saveToServer: "保存して適用",
     timingWindows: "時間枠",
     timingWindowsCopy: "実行中のテストは途中で変更せず、新しいセッションから値を固定して使用します。",
     pointsUnit: "点",
     lateTapGrace: "遅延タップ猶予",
     lateTapGraceHelp: "最初の人のタップが、相手がタップするまで待つ時間です。長いほど人の操作ずれに寛容になります。",
-    lateTapGraceRange: "推奨 5000〜8000 ms・許容 2000〜15000",
+    lateTapGraceRange: "5000〜8000 ms・許容 2000〜15000",
     acousticWindow: "音響交換時間",
     acousticWindowHelp: "各端末が符号化超音波チャープを送信し、聞き取りを続ける時間です。長いほど互いに聞こえる機会が増えますが、セレモニーも長くなります。",
-    acousticWindowRange: "推奨 5000〜8000 ms・許容 2400〜12000",
+    acousticWindowRange: "5000〜8000 ms・許容 2400〜12000",
     matchSlop: "バンプ時刻の許容差",
     matchSlopHelp: "両端末が相互に聞こえたと証明した後、2回のバンプの時刻差がどこまで離れても1回のバンプと見なすかです。大きいほど一致しやすいが緩くなります。",
-    matchSlopRange: "推奨 2500〜5000 ms・許容 500〜10000",
+    matchSlopRange: "2500〜5000 ms・許容 500〜10000",
     applyToServer: "サーバーへ適用",
     testCasesTitle: "テストケース",
     testCasesCopy: "接続中の端末を割り当て、再現可能な実験を記録し、結果をサーバーポリシーと一緒に保存します。",
@@ -507,6 +513,10 @@ const ADMIN_MESSAGES = {
     onePairBadge: "1ペア · 2台",
     twoPairsBadge: "2ペア · 4台",
     attemptsBadge: "{count} 回",
+    holdTopEdge: "2台の上端（カメラ側）どうしを合わせて持ちます。",
+    holdSpeakerMic: "端末1の下端（スピーカー）を端末2の上端（マイク）に当てます。",
+    holdCrossAngle: "側面を約45°で交差させ、上になる端末を交互に入れ替えます。",
+    holdTwoPairs: "2ペアを同時に実行し、各ペアはまとめ、ペア間は離します。",
     recording: "記録中",
     activeRun: "実行中のテスト",
     targetAttempts: "目標回数",
@@ -673,11 +683,6 @@ function bindEvents() {
   });
   $("[data-tuning-form]")?.addEventListener("submit", applyPolicyUpdate);
   $("[data-tuning-form] button[type='submit']")?.addEventListener("click", applyPolicyUpdate);
-  $("[data-live-poll]")?.addEventListener("change", (event) => {
-    state.polling = event.target.checked;
-    if (state.polling) schedulePoll();
-    else globalThis.clearTimeout(state.pollTimer);
-  });
   $("[data-monitor-device]")?.addEventListener("change", (event) => {
     selectDevice(event.target.value);
   });
@@ -968,10 +973,12 @@ function renderSummary() {
   const connected = isServerHealthy();
   const unreachable = state.serverReachable === false && !isSocketLive();
   const connection = $("[data-server-connection]");
-  connection.dataset.state = connected ? "connected" : unreachable ? "offline" : "checking";
-  connection.querySelector("span").textContent = connected
-    ? i18n.t("connected")
-    : unreachable ? i18n.t("offline") : i18n.t("checkingServer");
+  if (connection) {
+    connection.dataset.state = connected ? "connected" : unreachable ? "offline" : "checking";
+    connection.querySelector("span").textContent = connected
+      ? i18n.t("connected")
+      : unreachable ? i18n.t("offline") : i18n.t("checkingServer");
+  }
   $("[data-summary-server]").textContent = connected
     ? i18n.t("connected")
     : unreachable ? i18n.t("offline") : i18n.t("checkingServer");
@@ -1221,16 +1228,23 @@ function renderMonitor() {
 }
 
 function renderFrequencySpectrum(telemetry) {
+  const built = frequencyChannelsHtml(telemetry);
+  $("[data-frequency-target]").textContent = built.targetText;
+  $("[data-frequency-channels]").innerHTML = built.gridHtml;
+}
+
+// Pure builder: returns the target-band caption + the channel-grid HTML for a
+// given telemetry sample. Reused by the single-device monitor and by each column
+// of the two-device test so both show a real live frequency map.
+function frequencyChannelsHtml(telemetry) {
   const start = Number(telemetry?.startFrequencyHz || MONITOR_START_HZ);
   const end = Number(telemetry?.endFrequencyHz || MONITOR_END_HZ);
   const bands = monitorFrequencyBands().map((definition, index) => ({
     ...definition,
     ...matchingFrequencyBand(definition, telemetry?.bands, index)
   }));
-  $("[data-frequency-target]").textContent = i18n.t("targetBand", {
-    band: formatFrequency(start, end)
-  });
-  $("[data-frequency-channels]").innerHTML = bands.map((band, index) => {
+  const targetText = i18n.t("targetBand", { band: formatFrequency(start, end) });
+  const gridHtml = bands.map((band, index) => {
     const peakDb = Number(band.peakDb);
     const confidence = Number(band.confidence);
     const level = Number.isFinite(peakDb)
@@ -1261,6 +1275,23 @@ function renderFrequencySpectrum(telemetry) {
       </article>
     `;
   }).join("");
+  return { targetText, gridHtml };
+}
+
+// Full frequency-map block (heading + grid) for embedding inside a two-device
+// column.
+function frequencySpectrumBlockHtml(telemetry) {
+  const built = frequencyChannelsHtml(telemetry);
+  return `
+    <div class="frequency-spectrum">
+      <div class="frequency-spectrum-heading">
+        <div>
+          <strong>${escapeHtml(i18n.t("liveFrequencyMap"))}</strong>
+        </div>
+        <span class="frequency-target">${escapeHtml(built.targetText)}</span>
+      </div>
+      <div class="frequency-channel-grid">${built.gridHtml}</div>
+    </div>`;
 }
 
 function matchingFrequencyBand(definition, telemetryBands, index) {
@@ -1308,14 +1339,25 @@ function readinessSummary() {
 }
 
 function renderMetricRows(telemetry = state.monitorTelemetry || latestMonitorTelemetry()) {
-  const sessionEvidence = latestSessionEvidence();
-  const eventEvidence = latestEventEvidence();
+  // The single-device monitor drops the reciprocal-audio rows (heard signal,
+  // correlation, energy margin): a lone phone hears only its own emitted chirp,
+  // so those readings are self-noise, not a real result. It keeps what one phone
+  // can genuinely prove — that it emits in-band, its mic samples fast enough,
+  // and its bump/tilt sensors fire.
+  $("[data-monitor-metrics]").innerHTML = metricTableHtml(telemetry, "single", { deviceId: state.selectedDeviceId });
+}
+
+// pairOnly rows require a *partner* chirp to mean anything, so they are shown
+// only in the two-device test.
+function metricDefinitions(telemetry, deviceId) {
+  const sessionEvidence = latestSessionEvidence(deviceId);
+  const eventEvidence = latestEventEvidence(deviceId);
   const correlation = firstNumber(telemetry?.confidence, sessionEvidence?.acoustic?.correlation, eventEvidence?.acousticCorrelation);
   const marginDb = firstNumber(telemetry?.marginDb, sessionEvidence?.acoustic?.marginDb, eventEvidence?.acousticMarginDb);
-  const bump = firstNumber(telemetry?.bumpPoints, eventEvidence?.bumpCorrelation, sessionEvidence?.physicalEvidence?.bumpCorrelation);
   const tilt = firstNumber(telemetry?.tiltDegrees, eventEvidence?.tiltDegrees, sessionEvidence?.physicalEvidence?.tiltDegrees, eventEvidence?.tiltMatch);
-  const rows = [
+  return [
     {
+      pairOnly: true,
       name: i18n.t("heardSignal"),
       meaning: i18n.t("heardSignalMeaning"),
       expected: i18n.t("heardSignalExpected"),
@@ -1325,6 +1367,7 @@ function renderMetricRows(telemetry = state.monitorTelemetry || latestMonitorTel
       tone: telemetry?.status === "active" ? telemetryTone(telemetry) : "idle"
     },
     {
+      pairOnly: true,
       name: i18n.t("correlation"),
       meaning: i18n.t("correlationMeaning"),
       expected: i18n.t("correlationExpected"),
@@ -1332,6 +1375,7 @@ function renderMetricRows(telemetry = state.monitorTelemetry || latestMonitorTel
       tone: scoreTone(correlation, 0.30, 0.20)
     },
     {
+      pairOnly: true,
       name: i18n.t("energyMargin"),
       meaning: i18n.t("energyMarginMeaning"),
       expected: i18n.t("energyMarginExpected"),
@@ -1339,18 +1383,18 @@ function renderMetricRows(telemetry = state.monitorTelemetry || latestMonitorTel
       tone: scoreTone(marginDb, 8, 4.5)
     },
     {
-      name: i18n.t("sampleRate"),
-      meaning: i18n.t("sampleRateMeaning"),
-      expected: i18n.t("sampleRateExpected"),
-      value: telemetry?.sampleRate ? `${Math.round(telemetry.sampleRate / 1000)} kHz` : i18n.t("unknown"),
-      tone: sampleRateTone(telemetry?.sampleRate)
-    },
-    {
       name: i18n.t("emittedPacket"),
       meaning: i18n.t("emittedPacketMeaning"),
       expected: i18n.t("emittedPacketExpected"),
       value: telemetry?.status === "active" ? (telemetry.emitted ? i18n.t("yes") : i18n.t("no")) : i18n.t("waiting"),
       tone: telemetry?.status === "active" ? (telemetry.emitted ? "good" : "bad") : "idle"
+    },
+    {
+      name: i18n.t("sampleRate"),
+      meaning: i18n.t("sampleRateMeaning"),
+      expected: i18n.t("sampleRateExpected"),
+      value: telemetry?.sampleRate ? `${Math.round(telemetry.sampleRate / 1000)} kHz` : i18n.t("unknown"),
+      tone: sampleRateTone(telemetry?.sampleRate)
     },
     {
       name: i18n.t("bumpEvidence"),
@@ -1371,8 +1415,11 @@ function renderMetricRows(telemetry = state.monitorTelemetry || latestMonitorTel
       tone: Number.isFinite(tilt) ? ((tilt > 1 ? tilt : tilt * 90) > 30 ? "good" : "bad") : "idle"
     }
   ];
+}
 
-  $("[data-monitor-metrics]").innerHTML = `
+function metricTableHtml(telemetry, mode = "pair", { deviceId } = {}) {
+  const rows = metricDefinitions(telemetry, deviceId).filter((row) => mode === "pair" || !row.pairOnly);
+  return `
     <div class="metric-row" data-header="true">
       <span>${escapeHtml(i18n.t("metric"))}</span><span>${escapeHtml(i18n.t("meaning"))}</span><span>${escapeHtml(i18n.t("expected"))}</span><span>${escapeHtml(i18n.t("current"))}</span><span>${escapeHtml(i18n.t("status"))}</span>
     </div>
@@ -1496,28 +1543,19 @@ function renderMultiColumn(deviceId, slot) {
   }
   const device = physicalDevices().find((d) => d.id === deviceId);
   const telemetry = state.monitorTelemetryByDevice.get(deviceId);
-  const heard = telemetry?.status === "active"
-    ? `${Math.round(Number(telemetry.confidence || 0) * 100)}% · ${telemetry.detected ? i18n.t("yes") : i18n.t("no")}`
-    : i18n.t("waiting");
-  const heardTone = telemetry?.status === "active" ? telemetryTone(telemetry) : "idle";
-  const corr = firstNumber(telemetry?.confidence);
-  const bumpTone = telemetry?.bumpDetected || Number(telemetry?.maxAcceleration) >= 6 ? "good" : telemetry ? "bad" : "idle";
-  const tiltRaw = firstNumber(telemetry?.tiltDegrees);
-  const tiltDeg = Number.isFinite(tiltRaw) ? (tiltRaw > 1 ? tiltRaw : tiltRaw * 90) : NaN;
-  const rows = [
-    [i18n.t("heardSignal"), heard, heardTone],
-    [i18n.t("correlation"), Number.isFinite(corr) ? formatNumber(corr, 2) : i18n.t("unknown"), scoreTone(corr, 0.30, 0.20)],
-    [i18n.t("bumpEvidence"), telemetry?.bumpDetected ? `+${Math.round(Number(telemetry.bumpPoints || 20))}` : Number.isFinite(telemetry?.maxAcceleration) ? `raw ${formatNumber(telemetry.maxAcceleration, 1)}` : i18n.t("unknown"), bumpTone],
-    [i18n.t("tiltEvidence"), Number.isFinite(tiltDeg) ? `${formatNumber(tiltDeg, 0)}°` : i18n.t("unknown"), Number.isFinite(tiltDeg) ? (tiltDeg > 30 ? "good" : "bad") : "idle"]
-  ];
+  const monitor = state.activeMonitors.get(deviceId);
+  const statusKey = monitor?.status === "active" || monitor?.status === "starting" ? "active"
+    : monitor ? "waiting" : "idle";
+  // Full per-device panel: live frequency map + every metric (in the two-device
+  // test each phone genuinely hears the OTHER, so all reciprocal rows apply).
   return `
-    <div class="multi-column-head"><span class="multi-slot">${escapeHtml(slot)}</span><strong>${escapeHtml(device ? friendlyDeviceName(device) : deviceId)}</strong></div>
-    ${rows.map(([name, value, tone]) => `
-      <div class="multi-metric">
-        <span>${escapeHtml(name)}</span>
-        <b>${escapeHtml(value)}</b>
-        <span class="metric-state" data-tone="${escapeHtml(tone)}"><i></i></span>
-      </div>`).join("")}
+    <div class="multi-column-head">
+      <span class="multi-slot">${escapeHtml(slot)}</span>
+      <strong>${escapeHtml(device ? friendlyDeviceName(device) : deviceId)}</strong>
+      <span class="monitor-status" data-monitor-status="${statusKey}"><i></i><span>${escapeHtml(i18n.t(statusKey))}</span></span>
+    </div>
+    ${frequencySpectrumBlockHtml(telemetry)}
+    <div class="metric-table">${metricTableHtml(telemetry, "pair", { deviceId })}</div>
   `;
 }
 
@@ -1574,208 +1612,11 @@ function stopMultiDevice() {
   renderMultiDevice();
 }
 
-function renderActiveSessionRow(session, now) {
-  const participants = session.participants || [];
-  const score = participants.reduce((max, participant) => Math.max(max, Number(participant.telemetry?.score || 0)), 0);
-  const band = participants.map((participant) => participant.telemetry?.acoustic || participant.signature).find(Boolean);
-  return `
-    <article class="session-row">
-      <strong class="session-id" title="${escapeHtml(session.id)}">${escapeHtml(shortSessionId(session.id))}</strong>
-      <span class="session-phase" data-phase="${escapeHtml(session.phase || "joining")}">${escapeHtml(i18n.t(session.phase || "joining"))}</span>
-      <span>${escapeHtml(i18n.t("phonesCount", { count: participants.length }))}</span>
-      <span>${escapeHtml(`${i18n.t("scoreLabel")} ${Math.round(score * 100)} · ${formatFrequency(band?.startFrequencyHz, band?.endFrequencyHz)}`)}</span>
-      <span>${escapeHtml(formatSessionTiming(session, now))}</span>
-      ${participants.map((participant) => renderActiveParticipant(participant)).join("")}
-    </article>
-  `;
-}
-
-function renderActiveParticipant(participant) {
-  const name = participant.deviceName || participant.clientId || i18n.t("device");
-  const slot = participantSlotLabel(participant);
-  if (!participant.telemetry) {
-    const capabilities = participant.acousticCapabilities || {};
-    const sampleRate = Number(capabilities.sampleRate)
-      ? `${Math.round(Number(capabilities.sampleRate) / 1000)} kHz`
-      : i18n.t("unknown");
-    const mic = `${i18n.t("micReady")} ${capabilities.microphoneReady ? i18n.t("yes") : i18n.t("no")}`;
-    const detail = [name, `${i18n.t("slot")} ${slot}`, i18n.t("waiting"), sampleRate, mic].join(" · ");
-    return `<small class="session-participant">${escapeHtml(detail)}</small>`;
-  }
-  const telemetry = participant.telemetry;
-  const acoustic = telemetry.acoustic || {};
-  const margin = Number.isFinite(Number(acoustic.marginDb)) ? `${formatNumber(acoustic.marginDb, 1)} dB` : i18n.t("unknown");
-  const detail = [
-    name,
-    `${i18n.t("slot")} ${slot}`,
-    acoustic.emitted ? i18n.t("emitted") : i18n.t("silent"),
-    acoustic.detected ? i18n.t("heard") : i18n.t("missed"),
-    margin,
-    evidenceSummary(telemetry.physicalEvidence),
-    i18n.t(telemetry.decision === "verified" ? "verified" : "insufficient")
-  ].join(" · ");
-  return `<small class="session-participant" data-decision="${escapeHtml(telemetry.decision || "")}">${escapeHtml(detail)}</small>`;
-}
-
-function renderRecentSessionRow(session) {
-  return `
-    <article class="session-row session-row--recent">
-      <strong class="session-id" title="${escapeHtml(session.id)}">${escapeHtml(shortSessionId(session.id))}</strong>
-      <span class="session-phase" data-phase="${escapeHtml(session.statusKey || "recent")}">${escapeHtml(session.result)}</span>
-      <span>${escapeHtml(i18n.t("phonesCount", { count: session.participants.length }))}</span>
-      <span>${escapeHtml(`${i18n.t("scoreLabel")} ${Math.round(session.score * 100)} · ${session.reason || session.method || i18n.t("recentSessions")}`)}</span>
-      <span>${escapeHtml(formatClock(session.at))}</span>
-      <small class="session-note">${escapeHtml(i18n.t("recentSessionCopy"))}</small>
-      ${session.participants.map((participant) => {
-        const detail = [
-          participant.deviceName || participant.clientId || i18n.t("device"),
-          `${i18n.t("slot")} ${participant.slotLabel}`,
-          participant.emitted ? i18n.t("emitted") : i18n.t("silent"),
-          participant.detected ? i18n.t("heard") : i18n.t("missed"),
-          `corr ${formatNumber(participant.correlation, 2)}`,
-          `peak ${formatNumber(participant.peak, 3)}`,
-          participant.method || i18n.t("none")
-        ].join(" · ");
-        return `<small class="session-participant">${escapeHtml(detail)}</small>`;
-      }).join("")}
-    </article>
-  `;
-}
-
-function evidenceSummary(evidence = {}) {
-  const mark = (ok) => (ok ? "✓" : "✗");
-  return `${i18n.t("evidenceLabel")} ${i18n.t("soundShort")}${mark(evidence.ultrasound)} ${i18n.t("bumpShort")}${mark(evidence.bump)} ${i18n.t("tiltShort")}${mark(evidence.tilt)}`;
-}
-
-function participantSlotLabel(participant) {
-  const signatureSlot = Number(participant.signature?.slot);
-  const acoustic = participant.telemetry?.acoustic || {};
-  const acousticSlotCount = Number(acoustic.slotCount);
-  if (Number.isFinite(signatureSlot) && signatureSlot > 0) {
-    return acousticSlotCount ? `${signatureSlot}/${acousticSlotCount}` : String(signatureSlot);
-  }
-  if (Number.isFinite(Number(acoustic.slot))) {
-    const slot = Number(acoustic.slot) + 1;
-    return acousticSlotCount ? `${slot}/${acousticSlotCount}` : String(slot);
-  }
-  return "—";
-}
-
-function shortSessionId(id = "") {
-  const text = String(id);
-  return text.length <= 16 ? text : `${text.slice(0, 5)}…${text.slice(-6)}`;
-}
-
-function formatSessionTiming(session, now) {
-  if (session.phase === "running") {
-    const startAt = Number(session.startAt);
-    const startedAge = Number.isFinite(startAt) ? formatAge(now - startAt, i18n.locale) : "";
-    const remainingMs = Number(session.endsAt) - now;
-    const ends = Number.isFinite(remainingMs)
-      ? remainingMs > 0
-        ? i18n.t("endsIn", { seconds: Math.ceil(remainingMs / 1000) })
-        : i18n.t("completing")
-      : "";
-    return [startedAge && i18n.t("startedAgo", { age: startedAge }), ends].filter(Boolean).join(" · ");
-  }
-  const createdMs = Date.parse(session.createdAt);
-  return Number.isFinite(createdMs)
-    ? i18n.t("joinedAgo", { age: formatAge(now - createdMs, i18n.locale) })
-    : i18n.t("joining");
-}
-
 function formatClock(value) {
   const date = new Date(value);
   return Number.isFinite(date.getTime())
     ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : "—";
-}
-
-function recentSessionSummaries(activeSessions = []) {
-  const activeIds = new Set(activeSessions.map((session) => session.id));
-  const events = state.snapshot?.metrics?.recentEvents || [];
-  const sessions = new Map();
-  for (const event of events) {
-    const detail = event.detail || {};
-    const sessionId = detail.sessionId;
-    if (!sessionId || activeIds.has(sessionId)) continue;
-    const summary = sessions.get(sessionId) || {
-      id: sessionId,
-      at: event.at,
-      result: i18n.t("recentSessions"),
-      statusKey: "recent",
-      reason: "",
-      score: 0,
-      method: "",
-      participants: new Map()
-    };
-    summary.at = event.at || summary.at;
-    if (event.type === "proximity:session:matched") {
-      summary.result = i18n.t("verified");
-      summary.statusKey = "verified";
-      summary.score = Math.max(summary.score, Number(detail.score || 0));
-    }
-    if (event.type === "proximity:session:failed") {
-      summary.result = i18n.t("failed");
-      summary.statusKey = "failed";
-      summary.reason = detail.reason || summary.reason;
-      summary.score = Math.max(summary.score, Number(detail.score || 0));
-      // A failed event may be the only record for a session that never reported
-      // telemetry. Capture its device so the row is not misreported as 0 phones.
-      if (detail.clientId && !summary.participants.has(detail.clientId)) {
-        summary.participants.set(detail.clientId, {
-          clientId: detail.clientId,
-          deviceName: detail.deviceName || "",
-          slotLabel: detail.acousticSlotCount
-            ? `${Number(detail.acousticSlot || 0) + 1}/${detail.acousticSlotCount}`
-            : String(Number(detail.acousticSlot || 0) + 1),
-          emitted: Boolean(detail.acousticEmitted),
-          detected: Boolean(detail.acousticDetected),
-          correlation: Number(detail.acousticCorrelation || 0),
-          peak: Number(detail.acousticRecordingPeak || 0),
-          method: detail.acousticDetectionMethod || "",
-          reason: detail.acousticReason || detail.reason || ""
-        });
-      }
-    }
-    if (event.type === "proximity:session:telemetry") {
-      summary.score = Math.max(summary.score, Number(detail.score || 0));
-      summary.method = detail.acousticDetectionMethod || summary.method;
-      summary.participants.set(detail.clientId, {
-        clientId: detail.clientId,
-        deviceName: detail.deviceName || "",
-        slotLabel: detail.acousticSlotCount
-          ? `${Number(detail.acousticSlot || 0) + 1}/${detail.acousticSlotCount}`
-          : String(Number(detail.acousticSlot || 0) + 1),
-        emitted: Boolean(detail.acousticEmitted),
-        detected: Boolean(detail.acousticDetected),
-        correlation: Number(detail.acousticCorrelation || 0),
-        peak: Number(detail.acousticRecordingPeak || 0),
-        method: detail.acousticDetectionMethod || "",
-        reason: detail.acousticReason || ""
-      });
-    }
-    if (event.type === "proximity:session:diagnostic" && detail.clientId && !summary.participants.has(detail.clientId)) {
-      summary.participants.set(detail.clientId, {
-        clientId: detail.clientId,
-        deviceName: detail.deviceName || "",
-        slotLabel: detail.acoustic?.slotCount
-          ? `${Number(detail.acoustic?.slot || 0)}/${detail.acoustic?.slotCount}`
-          : String(Number(detail.acoustic?.slot || 0)),
-        emitted: detail.acoustic?.mode === "emit",
-        detected: detail.acoustic?.mode === "detected",
-        correlation: Number(detail.acoustic?.correlation || 0),
-        peak: 0,
-        method: detail.acoustic?.detectionMethod || detail.acoustic?.mode || "",
-        reason: detail.reason || ""
-      });
-    }
-    sessions.set(sessionId, summary);
-  }
-  return [...sessions.values()]
-    .map((session) => ({ ...session, participants: [...session.participants.values()] }))
-    .sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0))
-    .slice(0, 8);
 }
 
 function normalizePolicySnapshot(tuning, protocol = {}) {
@@ -1845,9 +1686,12 @@ function renderTuning() {
   for (const input of $$("[data-policy-timing]")) input.value = String(policy.timing[input.dataset.policyTiming]);
   for (const slider of $$("[data-policy-slider]")) slider.value = String(policy.timing[slider.dataset.policySlider]);
   $("[data-policy-minimum]").value = String(Math.round(policy.scoring.minimum));
-  $("[data-policy-revision]").textContent = state.policy
-    ? `${state.policy.revision}${state.policy.updatedAt ? ` · ${formatClock(state.policy.updatedAt)}` : ""}`
-    : "—";
+  const revisionNode = $("[data-policy-revision]");
+  if (revisionNode) {
+    revisionNode.textContent = state.policy
+      ? `${state.policy.revision}${state.policy.updatedAt ? ` · ${formatClock(state.policy.updatedAt)}` : ""}`
+      : "—";
+  }
   const validation = policyFormStatus(policy);
   const total = $("[data-policy-weight-total]");
   const totalText = Number.isInteger(validation.total)
@@ -1952,6 +1796,84 @@ function localizeCase(definition) {
   return overrides ? { ...definition, ...overrides } : definition;
 }
 
+// A single phone as an SVG group: rounded body, screen, camera dot, and one
+// highlighted edge (top/bottom/left/right) showing which edge makes contact.
+function phoneSvg({ x, y, rotate = 0, label = "", highlight = "top" }) {
+  const w = 46;
+  const h = 92;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const edges = {
+    top: `<line x1="${x + 7}" y1="${y}" x2="${x + w - 7}" y2="${y}" class="phone-edge"/>`,
+    bottom: `<line x1="${x + 7}" y1="${y + h}" x2="${x + w - 7}" y2="${y + h}" class="phone-edge"/>`,
+    left: `<line x1="${x}" y1="${y + 10}" x2="${x}" y2="${y + h - 10}" class="phone-edge"/>`,
+    right: `<line x1="${x + w}" y1="${y + 10}" x2="${x + w}" y2="${y + h - 10}" class="phone-edge"/>`
+  };
+  const camera = highlight === "bottom"
+    ? `<circle cx="${cx}" cy="${y + h - 7}" r="2.4" class="phone-cam"/>`
+    : `<circle cx="${cx}" cy="${y + 7}" r="2.4" class="phone-cam"/>`;
+  return `
+    <g transform="rotate(${rotate} ${cx} ${cy})">
+      <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="11" class="phone-body"/>
+      <rect x="${x + 4}" y="${y + 4}" width="${w - 8}" height="${h - 8}" rx="7" class="phone-screen"/>
+      ${camera}
+      ${edges[highlight] || edges.top}
+      ${label ? `<text x="${cx}" y="${cy + 4}" class="phone-label">${escapeHtml(label)}</text>` : ""}
+    </g>`;
+}
+
+function illustrationCaptionKey(id) {
+  const keys = {
+    "top-edge": "holdTopEdge",
+    "tap-delay": "holdTopEdge",
+    "noisy-room": "holdTopEdge",
+    "speaker-microphone": "holdSpeakerMic",
+    "cross-angle": "holdCrossAngle",
+    "simultaneous-pairs": "holdTwoPairs",
+    "negative-control": "holdTwoPairs"
+  };
+  return keys[id] || "holdTopEdge";
+}
+
+// Diagram of how to physically hold the phones for a given case.
+function testCaseIllustration(definition) {
+  const id = definition.id;
+  const contact = `<circle cx="130" cy="80" r="9" class="phone-contact"/>`;
+  if (id === "speaker-microphone") {
+    // Stacked: bottom (speaker) edge of top phone meets top (mic) edge of lower.
+    return `<svg class="hold-diagram" viewBox="0 0 260 172" role="img" aria-label="${escapeHtml(definition.title)}">
+      ${phoneSvg({ x: 107, y: 6, highlight: "bottom", label: "1" })}
+      <circle cx="130" cy="86" r="8" class="phone-contact"/>
+      ${phoneSvg({ x: 107, y: 96, highlight: "top", label: "2" })}
+    </svg>`;
+  }
+  if (id === "cross-angle") {
+    return `<svg class="hold-diagram" viewBox="0 0 260 172" role="img" aria-label="${escapeHtml(definition.title)}">
+      ${phoneSvg({ x: 70, y: 40, rotate: 45, highlight: "right", label: "A" })}
+      ${phoneSvg({ x: 144, y: 40, rotate: -45, highlight: "left", label: "B" })}
+      ${contact}
+    </svg>`;
+  }
+  if (id === "simultaneous-pairs" || id === "negative-control") {
+    const dashed = id === "negative-control";
+    return `<svg class="hold-diagram" viewBox="0 0 300 172" role="img" aria-label="${escapeHtml(definition.title)}">
+      ${phoneSvg({ x: 34, y: 40, rotate: 14, highlight: "top", label: "A" })}
+      ${phoneSvg({ x: 88, y: 40, rotate: -14, highlight: "top", label: "A" })}
+      <circle cx="86" cy="34" r="7" class="phone-contact"/>
+      ${phoneSvg({ x: 176, y: 40, rotate: 14, highlight: "top", label: "B" })}
+      ${phoneSvg({ x: 230, y: 40, rotate: -14, highlight: "top", label: "B" })}
+      <circle cx="228" cy="34" r="7" class="phone-contact"/>
+      ${dashed ? `<line x1="150" y1="20" x2="150" y2="152" class="phone-isolate"/>` : ""}
+    </svg>`;
+  }
+  // Default: top edge to top edge (tent).
+  return `<svg class="hold-diagram" viewBox="0 0 260 172" role="img" aria-label="${escapeHtml(definition.title)}">
+    ${phoneSvg({ x: 76, y: 46, rotate: 15, highlight: "top", label: "A" })}
+    ${phoneSvg({ x: 138, y: 46, rotate: -15, highlight: "top", label: "B" })}
+    <circle cx="130" cy="44" r="9" class="phone-contact"/>
+  </svg>`;
+}
+
 function renderTestCases() {
   const tabs = $("[data-test-case-tabs]");
   if (!tabs) return;
@@ -1981,6 +1903,10 @@ function renderTestCases() {
       </div>
     </div>
     <p class="test-case-purpose">${escapeHtml(definition.purpose)}</p>
+    <figure class="test-case-figure">
+      ${testCaseIllustration(definition)}
+      <figcaption>${escapeHtml(i18n.t(illustrationCaptionKey(definition.id)))}</figcaption>
+    </figure>
     <ol class="test-case-steps">
       <li>${escapeHtml(definition.procedure)}</li>
       <li>${escapeHtml(definition.pairCount === 2 ? i18n.t("assignPairsTwo") : i18n.t("assignPairsOne"))}</li>
@@ -2176,9 +2102,8 @@ function formatElapsed(milliseconds) {
 
 function setSocketState(nextState) {
   state.socketState = nextState;
-  const connected = nextState === "connected";
-  const inline = document.querySelector(".inline-status span");
-  if (inline) inline.textContent = connected ? i18n.t("signalingConnected") : i18n.t("signalingDisconnected");
+  // renderSummary owns the [data-server-connection] chip (connected/offline/
+  // checking); just refresh it here.
   renderSummary();
 }
 
@@ -2287,8 +2212,8 @@ function deviceInitials(device) {
   return name.slice(0, 2).toUpperCase() || "WD";
 }
 
-function latestSessionEvidence() {
-  const deviceId = state.selectedDeviceId;
+function latestSessionEvidence(deviceIdArg) {
+  const deviceId = deviceIdArg || state.selectedDeviceId;
   const participants = (state.snapshot?.signaling?.proximitySessions || [])
     .flatMap((session) => session.participants || [])
     .filter((participant) => participant.clientId === deviceId && participant.telemetry)
@@ -2296,8 +2221,8 @@ function latestSessionEvidence() {
   return participants[0]?.telemetry || null;
 }
 
-function latestEventEvidence() {
-  const deviceId = state.selectedDeviceId;
+function latestEventEvidence(deviceIdArg) {
+  const deviceId = deviceIdArg || state.selectedDeviceId;
   const events = state.snapshot?.metrics?.recentEvents || [];
   for (const event of events) {
     const detail = event.detail || {};
