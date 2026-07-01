@@ -1,6 +1,6 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.96";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.96";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.96";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.97";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.97";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.97";
 import {
   TEST_CASES,
   createTestRun,
@@ -8,9 +8,9 @@ import {
   stopTestRun,
   summarizeTestRun,
   validateAssignments
-} from "./test-runs.js?v=1.0.96";
+} from "./test-runs.js?v=1.0.97";
 
-const APP_VERSION = "1.0.96";
+const APP_VERSION = "1.0.97";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -22,7 +22,7 @@ const MONITOR_END_HZ = 19_400;
 // remote operators paste it once (kept only in sessionStorage, never committed).
 const ADMIN_TOKEN_STORAGE_KEY = "webdrop.adminToken";
 const TEST_RUN_STORAGE_KEY = "webdrop.adminTestRuns.v1";
-const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.96", import.meta.url);
+const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.97", import.meta.url);
 
 const ADMIN_MESSAGES = {
   en: {
@@ -270,8 +270,10 @@ const ADMIN_MESSAGES = {
     attemptsBadge: "{count} attempts",
     holdTopEdge: "Hold the two phones' top edges together (near the camera).",
     holdSpeakerMic: "Put phone 1's bottom (speaker) edge against phone 2's top (mic) edge.",
-    holdCrossAngle: "Cross the side edges at about 45°, alternating which phone is on top.",
+    holdCrossAngle: "Tilt each phone ~30° in opposite directions so they cross in an X, and bump where they meet.",
     holdTwoPairs: "Run two pairs at once — keep each pair together and the pairs apart.",
+    holdNegativeControl: "Pair A bumps and connects; Pair B joins but never bumps, so it must stay unpaired.",
+    holdNoisyRoom: "Same top-edge bump, but with music or conversation nearby — the pairing must still hold.",
     recording: "Recording",
     activeRun: "Active run",
     targetAttempts: "Target attempts",
@@ -515,8 +517,10 @@ const ADMIN_MESSAGES = {
     attemptsBadge: "{count} 回",
     holdTopEdge: "2台の上端（カメラ側）どうしを合わせて持ちます。",
     holdSpeakerMic: "端末1の下端（スピーカー）を端末2の上端（マイク）に当てます。",
-    holdCrossAngle: "側面を約45°で交差させ、上になる端末を交互に入れ替えます。",
+    holdCrossAngle: "2台を逆向きに約30°ずつ傾けてXの字に交差させ、交わる点でバンプします。",
     holdTwoPairs: "2ペアを同時に実行し、各ペアはまとめ、ペア間は離します。",
+    holdNegativeControl: "ペアAはバンプして接続し、ペアBは参加してもバンプしないため未接続のままにします。",
+    holdNoisyRoom: "同じ上端バンプを、音楽や会話がある環境で行い、それでもペアリングが成立することを確認します。",
     recording: "記録中",
     activeRun: "実行中のテスト",
     targetAttempts: "目標回数",
@@ -1762,7 +1766,7 @@ const TEST_CASE_I18N_JA = {
     shortTitle: "斜め接触",
     title: "斜め角度での接触",
     purpose: "正面ではなく斜めに接触したときの減衰を測定します。",
-    procedure: "両端末を約45度に保ち、側縁を交差させて Connect をタップし、一度きれいに接触させます。上側にする端末を交互に変えます。"
+    procedure: "2台を逆向きに約30度ずつ傾けてXの字に交差させ、Connect をタップして交わる点で一度バンプします。上側にする端末を交互に変えます。"
   },
   "tap-delay": {
     shortTitle: "タップ遅延",
@@ -1812,12 +1816,13 @@ function phoneSvg({ x, y, rotate = 0, label = "", highlight = "top" }) {
   const camera = highlight === "bottom"
     ? `<circle cx="${cx}" cy="${y + h - 7}" r="2.4" class="phone-cam"/>`
     : `<circle cx="${cx}" cy="${y + 7}" r="2.4" class="phone-cam"/>`;
+  const edge = highlight === "none" ? "" : (edges[highlight] || edges.top);
   return `
     <g transform="rotate(${rotate} ${cx} ${cy})">
       <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="11" class="phone-body"/>
       <rect x="${x + 4}" y="${y + 4}" width="${w - 8}" height="${h - 8}" rx="7" class="phone-screen"/>
       ${camera}
-      ${edges[highlight] || edges.top}
+      ${edge}
       ${label ? `<text x="${cx}" y="${cy + 4}" class="phone-label">${escapeHtml(label)}</text>` : ""}
     </g>`;
 }
@@ -1826,19 +1831,30 @@ function illustrationCaptionKey(id) {
   const keys = {
     "top-edge": "holdTopEdge",
     "tap-delay": "holdTopEdge",
-    "noisy-room": "holdTopEdge",
+    "noisy-room": "holdNoisyRoom",
     "speaker-microphone": "holdSpeakerMic",
     "cross-angle": "holdCrossAngle",
     "simultaneous-pairs": "holdTwoPairs",
-    "negative-control": "holdTwoPairs"
+    "negative-control": "holdNegativeControl"
   };
   return keys[id] || "holdTopEdge";
 }
 
 // Diagram of how to physically hold the phones for a given case.
+function noiseWavesSvg(cx, cy, dir) {
+  // Concentric arcs to suggest ambient sound coming from a point.
+  const arcs = [12, 20, 28].map((r) => {
+    const x1 = cx + dir * r * 0.5;
+    const y1 = cy - r;
+    const x2 = cx + dir * r * 0.5;
+    const y2 = cy + r;
+    return `<path d="M ${x1} ${y1} A ${r} ${r} 0 0 ${dir > 0 ? 1 : 0} ${x2} ${y2}" class="noise-wave"/>`;
+  }).join("");
+  return `<g class="noise-source">${arcs}</g>`;
+}
+
 function testCaseIllustration(definition) {
   const id = definition.id;
-  const contact = `<circle cx="130" cy="80" r="9" class="phone-contact"/>`;
   if (id === "speaker-microphone") {
     // Stacked: bottom (speaker) edge of top phone meets top (mic) edge of lower.
     return `<svg class="hold-diagram" viewBox="0 0 260 172" role="img" aria-label="${escapeHtml(definition.title)}">
@@ -1848,14 +1864,16 @@ function testCaseIllustration(definition) {
     </svg>`;
   }
   if (id === "cross-angle") {
-    return `<svg class="hold-diagram" viewBox="0 0 260 172" role="img" aria-label="${escapeHtml(definition.title)}">
-      ${phoneSvg({ x: 70, y: 40, rotate: 45, highlight: "right", label: "A" })}
-      ${phoneSvg({ x: 144, y: 40, rotate: -45, highlight: "left", label: "B" })}
-      ${contact}
+    // Two phones crossing like an X — each tilted ~30° from opposite directions,
+    // bumping where they cross.
+    return `<svg class="hold-diagram" viewBox="0 0 260 184" role="img" aria-label="${escapeHtml(definition.title)}">
+      ${phoneSvg({ x: 107, y: 46, rotate: -30, highlight: "top" })}
+      ${phoneSvg({ x: 107, y: 46, rotate: 30, highlight: "top" })}
+      <circle cx="130" cy="92" r="10" class="phone-contact"/>
     </svg>`;
   }
-  if (id === "simultaneous-pairs" || id === "negative-control") {
-    const dashed = id === "negative-control";
+  if (id === "simultaneous-pairs") {
+    // Two independent pairs (4 phones), each pair bumping, kept apart.
     return `<svg class="hold-diagram" viewBox="0 0 300 172" role="img" aria-label="${escapeHtml(definition.title)}">
       ${phoneSvg({ x: 34, y: 40, rotate: 14, highlight: "top", label: "A" })}
       ${phoneSvg({ x: 88, y: 40, rotate: -14, highlight: "top", label: "A" })}
@@ -1863,7 +1881,37 @@ function testCaseIllustration(definition) {
       ${phoneSvg({ x: 176, y: 40, rotate: 14, highlight: "top", label: "B" })}
       ${phoneSvg({ x: 230, y: 40, rotate: -14, highlight: "top", label: "B" })}
       <circle cx="228" cy="34" r="7" class="phone-contact"/>
-      ${dashed ? `<line x1="150" y1="20" x2="150" y2="152" class="phone-isolate"/>` : ""}
+    </svg>`;
+  }
+  if (id === "negative-control") {
+    // Pair A bumps and connects (contact dot). Pair B is present but never bumps
+    // — shown apart, not tented, with a "no connect" badge — so it must stay
+    // unpaired.
+    return `<svg class="hold-diagram" viewBox="0 0 340 176" role="img" aria-label="${escapeHtml(definition.title)}">
+      ${phoneSvg({ x: 26, y: 44, rotate: 14, highlight: "top", label: "A" })}
+      ${phoneSvg({ x: 80, y: 44, rotate: -14, highlight: "top", label: "A" })}
+      <circle cx="78" cy="38" r="8" class="phone-contact"/>
+      <line x1="170" y1="16" x2="170" y2="160" class="phone-isolate"/>
+      ${phoneSvg({ x: 206, y: 46, rotate: 0, highlight: "none", label: "B" })}
+      ${phoneSvg({ x: 264, y: 46, rotate: 0, highlight: "none", label: "B" })}
+      <g class="no-pair-badge" transform="translate(255 34)">
+        <circle r="13" class="no-pair-ring"/>
+        <line x1="-7" y1="-7" x2="7" y2="7" class="no-pair-slash"/>
+      </g>
+    </svg>`;
+  }
+  if (id === "noisy-room") {
+    // Top-edge pair surrounded by ambient noise (sound waves + background phones).
+    return `<svg class="hold-diagram" viewBox="0 0 300 184" role="img" aria-label="${escapeHtml(definition.title)}">
+      <g class="noise-bg">
+        ${phoneSvg({ x: 6, y: 96, rotate: -12, highlight: "none" })}
+        ${phoneSvg({ x: 248, y: 96, rotate: 12, highlight: "none" })}
+      </g>
+      ${noiseWavesSvg(64, 128, -1)}
+      ${noiseWavesSvg(236, 128, 1)}
+      ${phoneSvg({ x: 96, y: 52, rotate: 15, highlight: "top", label: "A" })}
+      ${phoneSvg({ x: 158, y: 52, rotate: -15, highlight: "top", label: "B" })}
+      <circle cx="150" cy="50" r="9" class="phone-contact"/>
     </svg>`;
   }
   // Default: top edge to top edge (tent).

@@ -1,9 +1,9 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.96";
-import { formatBytes } from "../utils/format.js?v=1.0.96";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.96";
-import { translate } from "../config/i18n.js?v=1.0.96";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.96";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.96";
+import { Emitter } from "../utils/emitter.js?v=1.0.97";
+import { formatBytes } from "../utils/format.js?v=1.0.97";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.97";
+import { translate } from "../config/i18n.js?v=1.0.97";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.97";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.97";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;
@@ -1347,6 +1347,9 @@ function peerOrbitLayout(index) {
 
 function rankPeersForDisplay(peers, state) {
   return [...peers]
+    // Never show devices the roster has marked offline — they aren't really
+    // present, so they must not appear as connectable orbit icons.
+    .filter((peer) => peer.online !== false)
     .map((peer) => ({
       ...peer,
       __rankScore: peerRankScore(peer, state)

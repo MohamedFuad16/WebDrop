@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.96";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.96";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.96";
+import { formatBytes } from "../utils/format.js?v=1.0.97";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.97";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.97";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
@@ -326,6 +326,13 @@ export function createController({
 
   signaling.on("peerDisconnected", ({ peerId, pairingId } = {}) => {
     const state = store.getState();
+    // Always drop the departed device from the nearby roster so no ghost avatar
+    // lingers on the orbit after that peer leaves — even if it was only nearby
+    // and never connected to us.
+    if (peerId) {
+      const prunedPeers = state.peers.filter((peer) => peer.id !== peerId);
+      if (prunedPeers.length !== state.peers.length) store.patch({ peers: prunedPeers });
+    }
     const relevantPeerId = state.connectedPeerId || state.pendingInviteId || activePeerId;
     const relevantPairingId = state.pairingId;
     if (!relevantPeerId && !relevantPairingId) return;
@@ -742,11 +749,14 @@ export function createController({
     const existing = store.getState().receivedItems.find((item) =>
       item.transferId === transferId && item.id === fileId
     );
-    const reservedView = intent === "view" && isPreviewableReceivedItem(existing) && !existing?.url
+    // Reserve a fresh tab synchronously for EVERY view click (not only the first),
+    // so "View" always opens the image in a new page — even after the blob URL is
+    // already cached — instead of navigating the current tab on the second click.
+    const reservedView = intent === "view" && isPreviewableReceivedItem(existing)
       ? reserveBrowserView()
       : null;
     if (existing?.url) {
-      openReceivedUrl(view, existing.url, existing, intent);
+      openReceivedUrl(view, existing.url, existing, intent, reservedView);
       return;
     }
     if (!runtime.realTransfer || !transferId || !fileId) return;

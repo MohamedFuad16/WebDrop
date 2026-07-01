@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.96";
+const APP_VERSION = "1.0.97";
 const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [
@@ -60,27 +60,23 @@ const RUNTIME_ASSET_PREFIXES = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    Promise.all([
-      caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)),
-      self.skipWaiting()
-    ])
-  );
+  // Precaching now happens in activate after a full cache wipe, so install only
+  // needs to take over as soon as possible.
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    Promise.all([
-      caches.keys().then((keys) =>
-        Promise.all(
-          keys
-            .filter((key) => ![CACHE_NAME, RUNTIME_CACHE_NAME].includes(key))
-            .map((key) => caches.delete(key))
-        )
-      ),
-      self.clients.claim()
-    ])
-  );
+  event.waitUntil((async () => {
+    // Hard reset on every version bump: delete every Cache Storage entry this
+    // origin holds (not just non-current ones), then rebuild the current
+    // precache fresh from the network. This guarantees a new version never
+    // serves a single stale asset and gives each release a clean slate.
+    const keys = await caches.keys();
+    await Promise.all(keys.map((key) => caches.delete(key)));
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll(ASSETS);
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("fetch", (event) => {

@@ -24,7 +24,7 @@ export const TEST_CASES = Object.freeze([
     pairCount: 1,
     targetAttempts: 10,
     purpose: "Measure attenuation when the two phones meet diagonally instead of face-on.",
-    procedure: "Hold both devices at roughly 45 degrees, cross their side edges, tap Connect, and make one clean contact. Alternate which phone sits above."
+    procedure: "Tilt each phone about 30 degrees in opposite directions so they cross in an X, tap Connect, and bump once where they meet. Alternate which phone sits above."
   },
   {
     id: "tap-delay",
