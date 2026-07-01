@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
   <title>WebDrop Admin</title>
-  <link rel="stylesheet" href="../css/operations.css?v=1.0.94">
-  <link rel="stylesheet" href="../css/admin.css?v=1.0.94">
+  <link rel="stylesheet" href="../css/operations.css?v=1.0.95">
+  <link rel="stylesheet" href="../css/admin.css?v=1.0.95">
 </head>
 <body>
   <main class="operations-shell admin-shell">
@@ -36,30 +36,29 @@
       </div>
     </header>
 
-    <section class="summary-strip" aria-label="WebDrop production summary">
-      <article>
-        <span class="summary-icon" data-tone="green" aria-hidden="true">✓</span>
-        <div><small data-i18n="server">Server</small><strong data-summary-server>Checking</strong><span data-summary-server-detail>Azure signaling</span></div>
-      </article>
-      <article>
-        <span class="summary-icon" aria-hidden="true">▣</span>
-        <div><small data-i18n="devicesOnline">Devices online</small><strong data-summary-devices>0</strong><span data-summary-devices-detail>0 physical devices</span></div>
-      </article>
-      <article>
-        <span class="summary-icon" aria-hidden="true">⌁</span>
-        <div><small data-i18n="activePairs">Active pairs</small><strong data-summary-pairs>0</strong><span data-i18n="verifiedConnections">Verified connections</span></div>
-      </article>
-      <article>
-        <span class="summary-icon" data-tone="amber" aria-hidden="true">%</span>
-        <div><small data-i18n="verifiedReadiness">Verified readiness</small><strong data-summary-readiness>0%</strong><span data-summary-readiness-detail>0 of 0 launch checks</span></div>
-      </article>
-      <article>
-        <span class="summary-icon" aria-hidden="true">◇</span>
-        <div><small data-i18n="appVersion">App version</small><strong data-admin-version>1.0.94</strong><span data-i18n="productionFrontend">Production frontend</span></div>
-      </article>
-    </section>
-
     <section class="admin-panel is-active" data-admin-panel="readiness" aria-labelledby="readiness-title">
+      <section class="summary-strip" aria-label="WebDrop production summary">
+        <article>
+          <span class="summary-icon" data-tone="green" aria-hidden="true">✓</span>
+          <div><small data-i18n="server">Server</small><strong data-summary-server>Checking</strong><span data-summary-server-detail>Azure signaling</span></div>
+        </article>
+        <article>
+          <span class="summary-icon" aria-hidden="true">▣</span>
+          <div><small data-i18n="devicesOnline">Devices online</small><strong data-summary-devices>0</strong><span data-summary-devices-detail>0 physical devices</span></div>
+        </article>
+        <article>
+          <span class="summary-icon" aria-hidden="true">⌁</span>
+          <div><small data-i18n="activePairs">Active pairs</small><strong data-summary-pairs>0</strong><span data-i18n="verifiedConnections">Verified connections</span></div>
+        </article>
+        <article>
+          <span class="summary-icon" data-tone="amber" aria-hidden="true">%</span>
+          <div><small data-i18n="verifiedReadiness">Verified readiness</small><strong data-summary-readiness>0%</strong><span data-summary-readiness-detail>0 of 0 launch checks</span></div>
+        </article>
+        <article>
+          <span class="summary-icon" aria-hidden="true">◇</span>
+          <div><small data-i18n="appVersion">App version</small><strong data-admin-version>1.0.95</strong><span data-i18n="productionFrontend">Production frontend</span></div>
+        </article>
+      </section>
       <div class="section-intro">
         <div>
           <h1 id="readiness-title" data-i18n="readinessTitle">What is actually ready</h1>
@@ -94,14 +93,14 @@
         </label>
       </div>
 
-      <div class="live-workspace">
+      <div class="live-stack">
         <section class="workspace-section devices-section" aria-labelledby="devices-title">
           <div class="workspace-heading">
-            <div><small data-i18n="serverAndDevices">Server & devices</small><h2 id="devices-title" data-i18n="connectedDevices">Connected devices</h2></div>
-            <span class="inline-status"><i></i><span data-i18n="signalingConnected">Signaling connected</span></span>
+            <div><small data-i18n="serverAndDevices">Server &amp; devices</small><h2 id="devices-title" data-i18n="connectedDevices">Connected devices</h2></div>
+            <span class="inline-status" data-devices-live><i></i><span data-i18n="signalingConnected">Signaling connected</span> · <span data-session-count>0 active</span></span>
           </div>
           <div class="device-list-head" aria-hidden="true">
-            <span data-i18n="device">Device</span><span data-i18n="platform">Platform</span><span data-i18n="lastSeen">Last seen</span>
+            <span data-i18n="device">Device</span><span data-i18n="pairingState">Pairing</span><span data-i18n="lastSeen">Last seen</span>
           </div>
           <div class="device-list" data-device-list>
             <p class="empty-row" data-i18n="noDevices">No physical devices are connected.</p>
@@ -114,6 +113,7 @@
             <div><small data-i18n="singleDeviceTesting">Single-device test</small><h2 id="monitor-title" data-i18n="continuousMonitor">Continuous ultrasonic monitor</h2></div>
             <span class="monitor-status" data-monitor-status="idle"><i></i><span data-monitor-status-copy data-i18n="idle">Idle</span></span>
           </div>
+          <p class="section-hint" data-i18n="singleDeviceHint">Confirms one phone in isolation: can its mic hear a valid chirp, and are bump/tilt sensors working. Reciprocal pairing checks are in the two-device test below.</p>
           <div class="monitor-controls">
             <label>
               <span data-i18n="selectConnectedDevice">Select a connected device</span>
@@ -145,6 +145,29 @@
           </div>
         </section>
 
+        <section class="workspace-section multi-section" aria-labelledby="multi-title">
+          <div class="workspace-heading">
+            <div><small data-i18n="multiDeviceTesting">Two-device test</small><h2 id="multi-title" data-i18n="twoDeviceTitle">Two-device pairing</h2></div>
+            <span class="monitor-status" data-multi-status="idle"><i></i><span data-multi-status-copy data-i18n="idle">Idle</span></span>
+          </div>
+          <p class="section-hint" data-i18n="twoDeviceHint">Pick two connected phones to watch side-by-side and see the live pairing outcome (did each hear the other, bump-time gap, pass/fail).</p>
+          <div class="multi-controls">
+            <label><span data-i18n="deviceA">Device A</span>
+              <select data-multi-a><option value="" data-i18n="chooseDevice">Choose a device</option></select>
+            </label>
+            <label><span data-i18n="deviceB">Device B</span>
+              <select data-multi-b><option value="" data-i18n="chooseDevice">Choose a device</option></select>
+            </label>
+            <button class="start-button" type="button" data-action="multi-start"><span aria-hidden="true">▶</span><span data-i18n="startBoth">Start both</span></button>
+            <button class="stop-button" type="button" data-action="multi-stop" disabled><span aria-hidden="true">■</span><span data-i18n="stopBoth">Stop both</span></button>
+          </div>
+          <div class="multi-outcome" data-multi-outcome></div>
+          <div class="multi-compare">
+            <div class="multi-column" data-multi-column-a></div>
+            <div class="multi-column" data-multi-column-b></div>
+          </div>
+        </section>
+
         <section class="workspace-section timeline-section" aria-labelledby="timeline-title">
           <div class="workspace-heading">
             <div><small data-i18n="recentActivity">Recent activity</small><h2 id="timeline-title" data-i18n="eventTimeline">Event timeline</h2></div>
@@ -155,16 +178,6 @@
           </div>
         </section>
       </div>
-
-      <section class="session-section" aria-labelledby="sessions-title">
-        <div class="workspace-heading">
-          <div><small data-i18n="multiDeviceTesting">Multi-device sessions</small><h2 id="sessions-title" data-i18n="activeSessions">Active proximity sessions</h2></div>
-          <span data-session-count>0 active</span>
-        </div>
-        <div class="session-table" data-session-table>
-          <p class="empty-row" data-i18n="noSessions">No active proximity sessions.</p>
-        </div>
-      </section>
     </section>
 
     <section class="admin-panel" data-admin-panel="settings" aria-labelledby="settings-title">
@@ -201,9 +214,33 @@
             <legend data-i18n="timingWindows">Timing windows</legend>
             <p data-i18n="timingWindowsCopy">New sessions snapshot these values; a running test is never changed halfway through.</p>
             <div class="timing-control-grid">
-              <label><span data-i18n="lateTapGrace">Late-tap grace</span><span><input data-policy-timing="lateTapGraceMs" type="number" min="2000" max="15000" step="250" inputmode="numeric"><small>ms</small></span><em data-i18n="lateTapGraceHelp">How long the first tap waits for a partner tap.</em></label>
-              <label><span data-i18n="acousticWindow">Acoustic exchange window</span><span><input data-policy-timing="acousticWindowMs" type="number" min="2400" max="12000" step="250" inputmode="numeric"><small>ms</small></span><em data-i18n="acousticWindowHelp">Coded chirp airtime plus continuous microphone capture.</em></label>
-              <label><span data-i18n="matchSlop">Bump match slop</span><span><input data-policy-timing="matchSlopMs" type="number" min="500" max="10000" step="250" inputmode="numeric"><small>ms</small></span><em data-i18n="matchSlopHelp">Maximum bump-time difference after reciprocal audio proof.</em></label>
+              <label class="timing-control">
+                <span class="timing-name" data-i18n="lateTapGrace">Late-tap grace</span>
+                <span class="timing-input-row">
+                  <input class="timing-slider" data-policy-slider="lateTapGraceMs" type="range" min="2000" max="15000" step="250" aria-label="Late-tap grace slider">
+                  <span class="timing-number"><input data-policy-timing="lateTapGraceMs" type="number" min="2000" max="15000" step="250" inputmode="numeric"><small>ms</small></span>
+                </span>
+                <em class="timing-help" data-i18n="lateTapGraceHelp">How long the first person's tap waits for their partner to tap before the cohort starts. Bigger = more forgiving of human timing gaps.</em>
+                <small class="timing-range" data-i18n="lateTapGraceRange">Recommended 5000–8000 ms · allowed 2000–15000</small>
+              </label>
+              <label class="timing-control">
+                <span class="timing-name" data-i18n="acousticWindow">Acoustic exchange window</span>
+                <span class="timing-input-row">
+                  <input class="timing-slider" data-policy-slider="acousticWindowMs" type="range" min="2400" max="12000" step="250" aria-label="Acoustic exchange window slider">
+                  <span class="timing-number"><input data-policy-timing="acousticWindowMs" type="number" min="2400" max="12000" step="250" inputmode="numeric"><small>ms</small></span>
+                </span>
+                <em class="timing-help" data-i18n="acousticWindowHelp">How long the phones emit their coded ultrasonic chirp and keep listening. Bigger = more chances to hear each other, but a longer ceremony.</em>
+                <small class="timing-range" data-i18n="acousticWindowRange">Recommended 5000–8000 ms · allowed 2400–12000</small>
+              </label>
+              <label class="timing-control">
+                <span class="timing-name" data-i18n="matchSlop">Bump match slop</span>
+                <span class="timing-input-row">
+                  <input class="timing-slider" data-policy-slider="matchSlopMs" type="range" min="500" max="10000" step="250" aria-label="Bump match slop slider">
+                  <span class="timing-number"><input data-policy-timing="matchSlopMs" type="number" min="500" max="10000" step="250" inputmode="numeric"><small>ms</small></span>
+                </span>
+                <em class="timing-help" data-i18n="matchSlopHelp">After both phones prove they heard each other, how far apart their two bumps may be in time and still count as one bump. Bigger = easier to match, but looser.</em>
+                <small class="timing-range" data-i18n="matchSlopRange">Recommended 2500–5000 ms · allowed 500–10000</small>
+              </label>
             </div>
           </fieldset>
           <div class="tuning-actions">
@@ -276,7 +313,7 @@
     <p class="page-error" data-admin-error role="alert" aria-live="assertive" hidden></p>
   </main>
 
-  <script src="../js/config/runtime-config.js?v=1.0.94"></script>
-  <script src="../js/admin/readiness.js?v=1.0.94" type="module"></script>
+  <script src="../js/config/runtime-config.js?v=1.0.95"></script>
+  <script src="../js/admin/readiness.js?v=1.0.95" type="module"></script>
 </body>
 </html>

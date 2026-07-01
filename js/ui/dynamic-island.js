@@ -1,9 +1,9 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.94";
-import { Emitter } from "../utils/emitter.js?v=1.0.94";
-import { formatBytes } from "../utils/format.js?v=1.0.94";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.94";
-import { TileWave } from "./tile-wave.js?v=1.0.94";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.94";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.95";
+import { Emitter } from "../utils/emitter.js?v=1.0.95";
+import { formatBytes } from "../utils/format.js?v=1.0.95";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.95";
+import { TileWave } from "./tile-wave.js?v=1.0.95";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.95";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {

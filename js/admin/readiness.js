@@ -1,6 +1,6 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.94";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.94";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.94";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.95";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.95";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.95";
 import {
   TEST_CASES,
   createTestRun,
@@ -8,9 +8,9 @@ import {
   stopTestRun,
   summarizeTestRun,
   validateAssignments
-} from "./test-runs.js?v=1.0.94";
+} from "./test-runs.js?v=1.0.95";
 
-const APP_VERSION = "1.0.94";
+const APP_VERSION = "1.0.95";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -22,7 +22,7 @@ const MONITOR_END_HZ = 19_400;
 // remote operators paste it once (kept only in sessionStorage, never committed).
 const ADMIN_TOKEN_STORAGE_KEY = "webdrop.adminToken";
 const TEST_RUN_STORAGE_KEY = "webdrop.adminTestRuns.v1";
-const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.94", import.meta.url);
+const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.95", import.meta.url);
 
 const ADMIN_MESSAGES = {
   en: {
@@ -84,11 +84,32 @@ const ADMIN_MESSAGES = {
     eventTimeline: "Event timeline",
     clear: "Clear",
     noEvents: "No events yet.",
+    showMoreEvents: "Show {count} more",
+    showLess: "Show less",
     activeSessions: "Active proximity sessions",
     recentSessions: "Recent slot attempts",
     recentSessionCopy: "Finished sessions stay here briefly so you can inspect slots, evidence, and failure reasons.",
     singleDeviceTesting: "Single-device test",
-    multiDeviceTesting: "Multi-device sessions",
+    multiDeviceTesting: "Two-device test",
+    singleDeviceHint: "Confirms one phone in isolation: can its mic hear a valid chirp, and are bump/tilt sensors working. Reciprocal pairing checks are in the two-device test below.",
+    twoDeviceTitle: "Two-device pairing",
+    twoDeviceHint: "Pick two connected phones to watch side-by-side and see the live pairing outcome (did each hear the other, bump-time gap, pass/fail).",
+    deviceA: "Device A",
+    deviceB: "Device B",
+    startBoth: "Start both",
+    stopBoth: "Stop both",
+    pickDeviceSlot: "Choose device {slot}.",
+    pairingState: "Pairing",
+    pairIdle: "Idle",
+    pairInCeremony: "In ceremony",
+    pairVerified: "Verified",
+    pairedWith: "Paired · {name}",
+    pairingWith: "Pairing · {name}",
+    pairingOutcome: "Pairing outcome",
+    pairingOutcomeIdle: "Pick Device A and Device B to see their live pairing result.",
+    pairingOutcomeWaiting: "Waiting for a proximity ceremony between the two phones.",
+    reciprocalHeard: "Reciprocal heard",
+    bumpDelta: "Bump gap",
     noSessions: "No active proximity sessions.",
     sessionColumn: "Session",
     phaseColumn: "Phase",
@@ -223,12 +244,16 @@ const ADMIN_MESSAGES = {
     minimumScore: "Minimum score",
     timingWindows: "Timing windows",
     timingWindowsCopy: "New sessions snapshot these values; a running test is never changed halfway through.",
+    pointsUnit: "points",
     lateTapGrace: "Late-tap grace",
-    lateTapGraceHelp: "How long the first tap waits for a partner tap.",
+    lateTapGraceHelp: "How long the first person's tap waits for their partner to tap before the cohort starts. Bigger = more forgiving of human timing gaps.",
+    lateTapGraceRange: "Recommended 5000–8000 ms · allowed 2000–15000",
     acousticWindow: "Acoustic exchange window",
-    acousticWindowHelp: "Coded chirp airtime plus continuous microphone capture.",
+    acousticWindowHelp: "How long the phones emit their coded ultrasonic chirp and keep listening. Bigger = more chances to hear each other, but a longer ceremony.",
+    acousticWindowRange: "Recommended 5000–8000 ms · allowed 2400–12000",
     matchSlop: "Bump match slop",
-    matchSlopHelp: "Maximum bump-time difference after reciprocal audio proof.",
+    matchSlopHelp: "After both phones prove they heard each other, how far apart their two bumps may be in time and still count as one bump. Bigger = easier to match, but looser.",
+    matchSlopRange: "Recommended 2500–5000 ms · allowed 500–10000",
     applyToServer: "Apply to server",
     testCasesTitle: "Test cases",
     testCasesCopy: "Assign the live phones, record a repeatable run, and keep every result tied to its exact server policy.",
@@ -239,6 +264,9 @@ const ADMIN_MESSAGES = {
     assignPairsTwo: "Assign two phones to Pair A and two to Pair B.",
     assignPairsOne: "Assign exactly two phones to Pair A.",
     keepConditionsNote: "Keep device cases, room position, and operator roles in the run notes.",
+    onePairBadge: "1 pair · 2 phones",
+    twoPairsBadge: "2 pairs · 4 phones",
+    attemptsBadge: "{count} attempts",
     recording: "Recording",
     activeRun: "Active run",
     targetAttempts: "Target attempts",
@@ -311,11 +339,32 @@ const ADMIN_MESSAGES = {
     eventTimeline: "イベントタイムライン",
     clear: "クリア",
     noEvents: "イベントはまだありません。",
+    showMoreEvents: "他 {count} 件を表示",
+    showLess: "表示を減らす",
     activeSessions: "近接セッション",
     recentSessions: "直近のスロット試行",
     recentSessionCopy: "終了したセッションも短時間ここに残し、スロット、証拠、失敗理由を確認できます。",
     singleDeviceTesting: "単体端末テスト",
-    multiDeviceTesting: "複数端末セッション",
+    multiDeviceTesting: "2端末テスト",
+    singleDeviceHint: "1台の端末を単独で確認します。マイクが有効なチャープを聞けるか、バンプ/傾きセンサーが動作するか。相互ペアリングの確認は下の2端末テストで行います。",
+    twoDeviceTitle: "2端末ペアリング",
+    twoDeviceHint: "接続中の2台を選んで並べて監視し、ライブのペアリング結果（互いに聞こえたか、バンプ時刻差、合否）を確認します。",
+    deviceA: "端末A",
+    deviceB: "端末B",
+    startBoth: "両方開始",
+    stopBoth: "両方停止",
+    pickDeviceSlot: "端末{slot}を選択してください。",
+    pairingState: "ペアリング",
+    pairIdle: "待機中",
+    pairInCeremony: "セレモニー中",
+    pairVerified: "確認済み",
+    pairedWith: "ペア · {name}",
+    pairingWith: "ペアリング中 · {name}",
+    pairingOutcome: "ペアリング結果",
+    pairingOutcomeIdle: "端末Aと端末Bを選ぶと、ライブのペアリング結果が表示されます。",
+    pairingOutcomeWaiting: "2台間の近接セレモニーを待っています。",
+    reciprocalHeard: "相互受信",
+    bumpDelta: "バンプ差",
     noSessions: "アクティブな近接セッションはありません。",
     sessionColumn: "セッション",
     phaseColumn: "フェーズ",
@@ -435,12 +484,16 @@ const ADMIN_MESSAGES = {
     minimumScore: "最低スコア",
     timingWindows: "時間枠",
     timingWindowsCopy: "実行中のテストは途中で変更せず、新しいセッションから値を固定して使用します。",
+    pointsUnit: "点",
     lateTapGrace: "遅延タップ猶予",
-    lateTapGraceHelp: "最初のタップが相手のタップを待つ時間です。",
+    lateTapGraceHelp: "最初の人のタップが、相手がタップするまで待つ時間です。長いほど人の操作ずれに寛容になります。",
+    lateTapGraceRange: "推奨 5000〜8000 ms・許容 2000〜15000",
     acousticWindow: "音響交換時間",
-    acousticWindowHelp: "符号化チャープの送信とマイクの継続収録時間です。",
+    acousticWindowHelp: "各端末が符号化超音波チャープを送信し、聞き取りを続ける時間です。長いほど互いに聞こえる機会が増えますが、セレモニーも長くなります。",
+    acousticWindowRange: "推奨 5000〜8000 ms・許容 2400〜12000",
     matchSlop: "バンプ時刻の許容差",
-    matchSlopHelp: "相互の音響証明後に許容するバンプ時刻の最大差です。",
+    matchSlopHelp: "両端末が相互に聞こえたと証明した後、2回のバンプの時刻差がどこまで離れても1回のバンプと見なすかです。大きいほど一致しやすいが緩くなります。",
+    matchSlopRange: "推奨 2500〜5000 ms・許容 500〜10000",
     applyToServer: "サーバーへ適用",
     testCasesTitle: "テストケース",
     testCasesCopy: "接続中の端末を割り当て、再現可能な実験を記録し、結果をサーバーポリシーと一緒に保存します。",
@@ -451,6 +504,9 @@ const ADMIN_MESSAGES = {
     assignPairsTwo: "2台をペアA、2台をペアBに割り当てます。",
     assignPairsOne: "ちょうど2台をペアAに割り当てます。",
     keepConditionsNote: "端末ケース・室内の位置・操作者の役割を実行メモに記録してください。",
+    onePairBadge: "1ペア · 2台",
+    twoPairsBadge: "2ペア · 4台",
+    attemptsBadge: "{count} 回",
     recording: "記録中",
     activeRun: "実行中のテスト",
     targetAttempts: "目標回数",
@@ -506,6 +562,8 @@ const state = {
   errorTimer: 0,
   polling: true,
   selectedDeviceId: "",
+  multiDeviceA: "",
+  multiDeviceB: "",
   activeMonitor: null,
   activeMonitors: new Map(),
   monitorTelemetry: null,
@@ -513,6 +571,8 @@ const state = {
   ignoredMonitorIds: new Set(),
   localEvents: [],
   clearEventsBefore: 0,
+  timelineExpanded: false,
+  readinessCollapsed: new Set(["ready", "later"]),
   tokenPromptDismissed: false,
   policy: null,
   policyDraft: null,
@@ -601,6 +661,16 @@ function bindEvents() {
       renderTuning();
     });
   });
+  $$("[data-policy-slider]").forEach((slider) => {
+    slider.addEventListener("input", () => {
+      const paired = $(`[data-policy-timing="${slider.dataset.policySlider}"]`);
+      if (paired) paired.value = slider.value;
+      state.policyDraft = readPolicyForm();
+      state.policyDirty = true;
+      state.policyMessage = "";
+      renderTuning();
+    });
+  });
   $("[data-tuning-form]")?.addEventListener("submit", applyPolicyUpdate);
   $("[data-tuning-form] button[type='submit']")?.addEventListener("click", applyPolicyUpdate);
   $("[data-live-poll]")?.addEventListener("change", (event) => {
@@ -615,6 +685,10 @@ function bindEvents() {
   $("[data-action='monitor-stop']")?.addEventListener("click", stopMonitor);
   $("[data-action='monitor-start-all']")?.addEventListener("click", startAllMonitors);
   $("[data-action='monitor-stop-all']")?.addEventListener("click", stopAllMonitors);
+  $("[data-multi-a]")?.addEventListener("change", (event) => { state.multiDeviceA = event.target.value; renderMultiDevice(); });
+  $("[data-multi-b]")?.addEventListener("change", (event) => { state.multiDeviceB = event.target.value; renderMultiDevice(); });
+  $("[data-action='multi-start']")?.addEventListener("click", startMultiDevice);
+  $("[data-action='multi-stop']")?.addEventListener("click", stopMultiDevice);
   $("[data-action='timeline-clear']")?.addEventListener("click", () => {
     state.clearEventsBefore = Date.now();
     renderTimeline();
@@ -878,6 +952,7 @@ function renderAll() {
   renderReadinessBoard();
   renderDevices();
   renderMonitor();
+  renderMultiDevice();
   renderTimeline();
   renderSessions();
   renderTuning();
@@ -891,7 +966,7 @@ function renderSummary() {
   const devices = physicalDevices();
   const pairs = state.snapshot?.signaling?.pairs || [];
   const connected = isServerHealthy();
-  const unreachable = state.serverReachable === false;
+  const unreachable = state.serverReachable === false && !isSocketLive();
   const connection = $("[data-server-connection]");
   connection.dataset.state = connected ? "connected" : unreachable ? "offline" : "checking";
   connection.querySelector("span").textContent = connected
@@ -929,18 +1004,35 @@ function renderReadinessBoard() {
   $("[data-readiness-score]").textContent = `${readiness.percent}%`;
   $("[data-readiness-progress]").style.width = `${readiness.percent}%`;
   $("[data-readiness-explainer]").textContent = i18n.t("readinessExplainer", readiness);
-  $("[data-readiness-board]").innerHTML = columns.map((column) => `
-    <section class="readiness-column" data-state="${escapeHtml(column.key)}">
-      <header><span class="state-icon">${escapeHtml(column.icon)}</span><span>${escapeHtml(column.title)}</span><b>${column.items.length}</b></header>
-      ${column.items.map((item) => renderReadinessRow(item)).join("")}
-    </section>
-  `).join("");
+  $("[data-readiness-board]").innerHTML = columns.map((column) => {
+    const open = !state.readinessCollapsed.has(column.key);
+    return `
+    <section class="readiness-column" data-state="${escapeHtml(column.key)}" data-open="${open}">
+      <button type="button" class="readiness-column-toggle" data-readiness-toggle="${escapeHtml(column.key)}" aria-expanded="${open}">
+        <span class="state-icon">${escapeHtml(column.icon)}</span>
+        <span class="readiness-column-title">${escapeHtml(column.title)}</span>
+        <b>${column.items.length}</b>
+        <span class="readiness-chevron" aria-hidden="true">${open ? "▾" : "▸"}</span>
+      </button>
+      <div class="readiness-column-body" ${open ? "" : "hidden"}>
+        ${column.items.map((item) => renderReadinessRow(item)).join("")}
+      </div>
+    </section>`;
+  }).join("");
+  $$("[data-readiness-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const key = button.dataset.readinessToggle;
+      if (state.readinessCollapsed.has(key)) state.readinessCollapsed.delete(key);
+      else state.readinessCollapsed.add(key);
+      renderReadinessBoard();
+    });
+  });
 }
 
 function renderReadinessRow([title, copy, status]) {
-  const icon = status === "live" || status === "ready" ? "✓" : status === "partial" ? "◐" : status === "blocked" ? "!" : "•";
+  const icon = status === "live" || status === "ready" ? "✓" : status === "partial" ? "◑" : status === "blocked" ? "!" : "○";
   return `
-    <article class="readiness-row">
+    <article class="readiness-row" data-row-status="${escapeHtml(status)}">
       <i aria-hidden="true">${icon}</i>
       <div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(copy)}</small></div>
       <span>${escapeHtml(readinessStatusLabel(status))}</span>
@@ -980,13 +1072,14 @@ function renderDevices() {
       const age = telemetry?.sampledAt
         ? formatAge(Date.now() - Number(telemetry.sampledAt), i18n.locale)
         : formatAge(device.lastSeenMsAgo, i18n.locale);
+      const pairing = deviceSessionState(device.id);
       return `
       <button class="device-row${device.id === state.selectedDeviceId ? " is-selected" : ""}" type="button" data-device-id="${escapeHtml(device.id)}">
         <span class="device-name">
           <span class="device-avatar">${escapeHtml(deviceInitials(device))}</span>
-          <span><strong>${escapeHtml(friendlyDeviceName(device))}</strong><small>${escapeHtml(statusLabel(status))} · ${escapeHtml(device.id)}</small></span>
+          <span><strong>${escapeHtml(friendlyDeviceName(device))}</strong><small>${escapeHtml(friendlyPlatform(device))} · ${escapeHtml(statusLabel(status))}</small></span>
         </span>
-        <span>${escapeHtml(friendlyPlatform(device))}</span>
+        <span class="device-pairing" data-pairing-tone="${escapeHtml(pairing.tone)}">${escapeHtml(pairing.label)}</span>
         <span>${escapeHtml(age)}</span>
       </button>
     `;
@@ -1310,7 +1403,9 @@ function renderTimeline() {
     timeline.innerHTML = `<p class="empty-row">${escapeHtml(i18n.t("noEvents"))}</p>`;
     return;
   }
-  timeline.innerHTML = events.map((event) => {
+  const COLLAPSED_COUNT = 4;
+  const visible = state.timelineExpanded ? events : events.slice(0, COLLAPSED_COUNT);
+  const renderItem = (event) => {
     const detail = event.detail || {};
     return `
       <article class="timeline-item" data-tone="${escapeHtml(eventTone(event))}">
@@ -1319,31 +1414,164 @@ function renderTimeline() {
         <small>${escapeHtml(friendlyEventDetail(event.type, detail))}</small>
       </article>
     `;
-  }).join("");
+  };
+  let html = visible.map(renderItem).join("");
+  if (events.length > COLLAPSED_COUNT) {
+    const remaining = events.length - COLLAPSED_COUNT;
+    html += `<button type="button" class="timeline-toggle" data-timeline-toggle>
+      <span>${escapeHtml(state.timelineExpanded ? i18n.t("showLess") : i18n.t("showMoreEvents", { count: remaining }))}</span>
+      <span aria-hidden="true">${state.timelineExpanded ? "▴" : "▾"}</span>
+    </button>`;
+  }
+  timeline.innerHTML = html;
+  timeline.querySelector("[data-timeline-toggle]")?.addEventListener("click", () => {
+    state.timelineExpanded = !state.timelineExpanded;
+    renderTimeline();
+  });
 }
 
 function renderSessions() {
+  // Active proximity sessions are now surfaced inline on the Connected devices
+  // list (pairing badge) and in the Two-device test outcome, so this only keeps
+  // the live "N active" counter in the devices heading up to date.
   const sessions = state.snapshot?.signaling?.proximitySessions || [];
-  const recent = recentSessionSummaries(sessions);
-  $("[data-session-count]").textContent = i18n.t("activeCount", { count: sessions.length });
-  const table = $("[data-session-table]");
-  if (!sessions.length && !recent.length) {
-    table.innerHTML = `<p class="empty-row">${escapeHtml(i18n.t("noSessions"))}</p>`;
-    return;
+  const countNode = $("[data-session-count]");
+  if (countNode) countNode.textContent = i18n.t("activeCount", { count: sessions.length });
+}
+
+// Live pairing/session state for one device, folded into the Connected devices
+// list so there is a single device-state surface (no separate sessions panel).
+function deviceSessionState(deviceId) {
+  const sessions = state.snapshot?.signaling?.proximitySessions || [];
+  const session = sessions.find((entry) => (entry.participants || []).some((p) => p.clientId === deviceId));
+  if (!session) return { tone: "idle", label: i18n.t("pairIdle") };
+  const participants = session.participants || [];
+  const me = participants.find((p) => p.clientId === deviceId);
+  const partner = participants.find((p) => p.clientId !== deviceId);
+  const partnerName = partner ? (partner.deviceName || friendlyShortId(partner.clientId)) : "";
+  if (me?.telemetry?.decision === "verified") {
+    return { tone: "good", label: partnerName ? i18n.t("pairedWith", { name: partnerName }) : i18n.t("pairVerified") };
   }
-  const now = Date.now();
-  const header = `
-    <div class="session-row session-head" aria-hidden="true">
-      <span>${escapeHtml(i18n.t("sessionColumn"))}</span>
-      <span>${escapeHtml(i18n.t("phaseColumn"))}</span>
-      <span>${escapeHtml(i18n.t("devicesColumn"))}</span>
-      <span>${escapeHtml(i18n.t("scoreColumn"))}</span>
-      <span>${escapeHtml(i18n.t("timingColumn"))}</span>
-    </div>`;
-  table.innerHTML = header + [
-    ...sessions.map((session) => renderActiveSessionRow(session, now)),
-    ...recent.map((session) => renderRecentSessionRow(session))
-  ].join("");
+  return { tone: "active", label: partnerName ? i18n.t("pairingWith", { name: partnerName }) : i18n.t("pairInCeremony") };
+}
+
+function friendlyShortId(id) {
+  const raw = String(id || "");
+  return raw.length > 8 ? `${raw.slice(0, 6)}…` : raw;
+}
+
+function renderMultiDevice() {
+  const aSelect = $("[data-multi-a]");
+  const bSelect = $("[data-multi-b]");
+  if (!aSelect || !bSelect) return;
+  const devices = physicalDevices();
+  const options = (selected) => `<option value="">${escapeHtml(i18n.t("chooseDevice"))}</option>` + devices.map((device) =>
+    `<option value="${escapeHtml(device.id)}"${device.id === selected ? " selected" : ""}>${escapeHtml(friendlyDeviceName(device))} · ${escapeHtml(friendlyPlatform(device))}</option>`
+  ).join("");
+  // Drop selections for devices that disconnected.
+  if (state.multiDeviceA && !devices.some((d) => d.id === state.multiDeviceA)) state.multiDeviceA = "";
+  if (state.multiDeviceB && !devices.some((d) => d.id === state.multiDeviceB)) state.multiDeviceB = "";
+  aSelect.innerHTML = options(state.multiDeviceA);
+  bSelect.innerHTML = options(state.multiDeviceB);
+
+  const bothChosen = state.multiDeviceA && state.multiDeviceB && state.multiDeviceA !== state.multiDeviceB;
+  const bothMonitored = bothChosen
+    && state.activeMonitors.has(state.multiDeviceA)
+    && state.activeMonitors.has(state.multiDeviceB);
+  $("[data-action='multi-start']").disabled = !bothChosen || bothMonitored;
+  $("[data-action='multi-stop']").disabled = !(state.activeMonitors.has(state.multiDeviceA) || state.activeMonitors.has(state.multiDeviceB)) || !bothChosen;
+  const statusNode = $("[data-multi-status]");
+  const statusKey = !bothChosen ? "idle" : bothMonitored ? "active" : "waiting";
+  statusNode.dataset.multiStatus = statusKey;
+  $("[data-multi-status-copy]").textContent = i18n.t(statusKey);
+
+  $("[data-multi-column-a]").innerHTML = renderMultiColumn(state.multiDeviceA, "A");
+  $("[data-multi-column-b]").innerHTML = renderMultiColumn(state.multiDeviceB, "B");
+  $("[data-multi-outcome]").innerHTML = renderPairingOutcome(state.multiDeviceA, state.multiDeviceB);
+}
+
+function renderMultiColumn(deviceId, slot) {
+  if (!deviceId) {
+    return `<p class="empty-row">${escapeHtml(i18n.t("pickDeviceSlot", { slot }))}</p>`;
+  }
+  const device = physicalDevices().find((d) => d.id === deviceId);
+  const telemetry = state.monitorTelemetryByDevice.get(deviceId);
+  const heard = telemetry?.status === "active"
+    ? `${Math.round(Number(telemetry.confidence || 0) * 100)}% · ${telemetry.detected ? i18n.t("yes") : i18n.t("no")}`
+    : i18n.t("waiting");
+  const heardTone = telemetry?.status === "active" ? telemetryTone(telemetry) : "idle";
+  const corr = firstNumber(telemetry?.confidence);
+  const bumpTone = telemetry?.bumpDetected || Number(telemetry?.maxAcceleration) >= 6 ? "good" : telemetry ? "bad" : "idle";
+  const tiltRaw = firstNumber(telemetry?.tiltDegrees);
+  const tiltDeg = Number.isFinite(tiltRaw) ? (tiltRaw > 1 ? tiltRaw : tiltRaw * 90) : NaN;
+  const rows = [
+    [i18n.t("heardSignal"), heard, heardTone],
+    [i18n.t("correlation"), Number.isFinite(corr) ? formatNumber(corr, 2) : i18n.t("unknown"), scoreTone(corr, 0.30, 0.20)],
+    [i18n.t("bumpEvidence"), telemetry?.bumpDetected ? `+${Math.round(Number(telemetry.bumpPoints || 20))}` : Number.isFinite(telemetry?.maxAcceleration) ? `raw ${formatNumber(telemetry.maxAcceleration, 1)}` : i18n.t("unknown"), bumpTone],
+    [i18n.t("tiltEvidence"), Number.isFinite(tiltDeg) ? `${formatNumber(tiltDeg, 0)}°` : i18n.t("unknown"), Number.isFinite(tiltDeg) ? (tiltDeg > 30 ? "good" : "bad") : "idle"]
+  ];
+  return `
+    <div class="multi-column-head"><span class="multi-slot">${escapeHtml(slot)}</span><strong>${escapeHtml(device ? friendlyDeviceName(device) : deviceId)}</strong></div>
+    ${rows.map(([name, value, tone]) => `
+      <div class="multi-metric">
+        <span>${escapeHtml(name)}</span>
+        <b>${escapeHtml(value)}</b>
+        <span class="metric-state" data-tone="${escapeHtml(tone)}"><i></i></span>
+      </div>`).join("")}
+  `;
+}
+
+function renderPairingOutcome(aId, bId) {
+  if (!aId || !bId || aId === bId) {
+    return `<div class="pairing-outcome" data-outcome="idle"><strong>${escapeHtml(i18n.t("pairingOutcome"))}</strong><span>${escapeHtml(i18n.t("pairingOutcomeIdle"))}</span></div>`;
+  }
+  const sessions = state.snapshot?.signaling?.proximitySessions || [];
+  const session = sessions.find((entry) => {
+    const ids = (entry.participants || []).map((p) => p.clientId);
+    return ids.includes(aId) && ids.includes(bId);
+  });
+  if (!session) {
+    return `<div class="pairing-outcome" data-outcome="waiting"><strong>${escapeHtml(i18n.t("pairingOutcome"))}</strong><span>${escapeHtml(i18n.t("pairingOutcomeWaiting"))}</span></div>`;
+  }
+  const parts = session.participants || [];
+  const a = parts.find((p) => p.clientId === aId);
+  const b = parts.find((p) => p.clientId === bId);
+  const heardA = Boolean(a?.telemetry?.acoustic?.detected);
+  const heardB = Boolean(b?.telemetry?.acoustic?.detected);
+  const reciprocal = heardA && heardB;
+  const verified = a?.telemetry?.decision === "verified" && b?.telemetry?.decision === "verified";
+  const bumpA = firstNumber(a?.telemetry?.physicalEvidence?.bumpAt, a?.telemetry?.bumpAt);
+  const bumpB = firstNumber(b?.telemetry?.physicalEvidence?.bumpAt, b?.telemetry?.bumpAt);
+  const bumpDelta = Number.isFinite(bumpA) && Number.isFinite(bumpB) ? Math.abs(bumpA - bumpB) : NaN;
+  const outcome = verified ? "pass" : reciprocal ? "waiting" : "fail";
+  const chips = [
+    `${i18n.t("reciprocalHeard")}: ${reciprocal ? i18n.t("yes") : i18n.t("no")}`,
+    `A→${heardA ? i18n.t("heard") : i18n.t("missed")}`,
+    `B→${heardB ? i18n.t("heard") : i18n.t("missed")}`,
+    Number.isFinite(bumpDelta) ? `${i18n.t("bumpDelta")}: ${Math.round(bumpDelta)}ms` : `${i18n.t("bumpDelta")}: ${i18n.t("unknown")}`,
+    verified ? i18n.t("verified") : i18n.t("insufficient")
+  ];
+  return `<div class="pairing-outcome" data-outcome="${outcome}">
+    <strong>${escapeHtml(i18n.t("pairingOutcome"))}</strong>
+    <div class="pairing-chips">${chips.map((c) => `<span>${escapeHtml(c)}</span>`).join("")}</div>
+  </div>`;
+}
+
+function startMultiDevice() {
+  const devices = physicalDevices();
+  const a = devices.find((d) => d.id === state.multiDeviceA);
+  const b = devices.find((d) => d.id === state.multiDeviceB);
+  if (a) startMonitorForDevice(a);
+  if (b) startMonitorForDevice(b);
+  renderMultiDevice();
+}
+
+function stopMultiDevice() {
+  for (const id of [state.multiDeviceA, state.multiDeviceB]) {
+    const monitor = state.activeMonitors.get(id);
+    if (monitor) stopMonitorFor(monitor, { quiet: true });
+  }
+  renderMultiDevice();
 }
 
 function renderActiveSessionRow(session, now) {
@@ -1615,14 +1843,18 @@ function renderTuning() {
   const policy = state.policyDraft || state.policy || normalizePolicySnapshot(null, state.snapshot?.signaling?.protocol);
   for (const input of $$("[data-policy-weight]")) input.value = String(policy.scoring.weights[input.dataset.policyWeight]);
   for (const input of $$("[data-policy-timing]")) input.value = String(policy.timing[input.dataset.policyTiming]);
-  $("[data-policy-minimum]").value = String(policy.scoring.minimum);
+  for (const slider of $$("[data-policy-slider]")) slider.value = String(policy.timing[slider.dataset.policySlider]);
+  $("[data-policy-minimum]").value = String(Math.round(policy.scoring.minimum));
   $("[data-policy-revision]").textContent = state.policy
     ? `${state.policy.revision}${state.policy.updatedAt ? ` · ${formatClock(state.policy.updatedAt)}` : ""}`
     : "—";
   const validation = policyFormStatus(policy);
   const total = $("[data-policy-weight-total]");
-  total.value = `${formatNumber(validation.total, 1)} points`;
-  total.textContent = `${formatNumber(validation.total, 1)} points`;
+  const totalText = Number.isInteger(validation.total)
+    ? `${validation.total} ${i18n.t("pointsUnit")}`
+    : `${formatNumber(validation.total, 1)} ${i18n.t("pointsUnit")}`;
+  total.value = totalText;
+  total.textContent = totalText;
   total.dataset.valid = String(validation.valid);
   const status = $("[data-policy-status]");
   status.dataset.state = state.policySaving ? "saving" : validation.valid ? (state.policyDirty ? "dirty" : "ready") : "error";
@@ -1739,9 +1971,21 @@ function renderTestCases() {
       renderTestCases();
     });
   });
+  const pairBadge = definition.pairCount === 2 ? i18n.t("twoPairsBadge") : i18n.t("onePairBadge");
   $("[data-test-case-detail]").innerHTML = `
-    <div><h3>${escapeHtml(definition.title)}</h3><p>${escapeHtml(definition.purpose)}</p></div>
-    <ol><li>${escapeHtml(definition.procedure)}</li><li>${escapeHtml(definition.pairCount === 2 ? i18n.t("assignPairsTwo") : i18n.t("assignPairsOne"))}</li><li>${escapeHtml(i18n.t("keepConditionsNote"))}</li></ol>
+    <div class="test-case-head">
+      <h3>${escapeHtml(definition.title)}</h3>
+      <div class="test-case-badges">
+        <span class="test-badge" data-badge="${definition.pairCount === 2 ? "two" : "one"}">${escapeHtml(pairBadge)}</span>
+        <span class="test-badge test-badge--muted">${escapeHtml(i18n.t("attemptsBadge", { count: definition.targetAttempts }))}</span>
+      </div>
+    </div>
+    <p class="test-case-purpose">${escapeHtml(definition.purpose)}</p>
+    <ol class="test-case-steps">
+      <li>${escapeHtml(definition.procedure)}</li>
+      <li>${escapeHtml(definition.pairCount === 2 ? i18n.t("assignPairsTwo") : i18n.t("assignPairsOne"))}</li>
+      <li>${escapeHtml(i18n.t("keepConditionsNote"))}</li>
+    </ol>
   `;
   renderTestDeviceAssignments(definition);
   renderActiveTestRun(definition);
@@ -2105,7 +2349,15 @@ function latestMonitorTelemetry() {
   return null;
 }
 
+function isSocketLive() {
+  return state.socket?.readyState === WebSocket.OPEN;
+}
+
 function isServerHealthy() {
+  // A live WebSocket is itself proof the server is reachable, so a transient
+  // HTTP diagnostics hiccup can never show a false "Offline" while live data
+  // is flowing.
+  if (isSocketLive()) return true;
   return Boolean(state.serverReachable && (state.readyz?.ok || state.snapshot?.generatedAt));
 }
 

@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.94";
+const APP_VERSION = "1.0.95";
 const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [
@@ -85,6 +85,12 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  // Never intercept cross-origin requests. The admin dashboard talks to the
+  // Azure signaling server (diagnostics, proximity policy, /readyz) on another
+  // origin; letting those pass straight to the network (like curl) avoids any
+  // SW-induced NetworkError — especially while the SW is updating after a
+  // version bump — which previously flipped the page to a false "Offline".
+  if (new URL(event.request.url).origin !== self.location.origin) return;
   if (event.request.mode === "navigate") {
     event.respondWith(
       fetch(event.request, { cache: "no-store" }).catch(() =>
@@ -125,7 +131,7 @@ self.addEventListener("fetch", (event) => {
           );
         }
         return response;
-      });
+      }).catch(() => caches.match(event.request, { ignoreSearch: true }));
     })
   );
 });
