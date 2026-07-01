@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.92";
+const APP_VERSION = "1.0.93";
 const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [
@@ -19,6 +19,7 @@ const ASSETS = [
   "./js/admin/diagnostics-api.js",
   "./js/admin/operations-i18n.js",
   "./js/admin/shared.js",
+  "./js/admin/test-runs.js",
   "./js/config/avatar-options.js",
   "./js/config/i18n.js",
   "./js/config/runtime-flags.js",

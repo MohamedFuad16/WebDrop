@@ -1,5 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createWebDropServer, validateServerEnvironment } from "../src/server.js";
 
 const productionEnv = {
@@ -104,6 +107,70 @@ test("consolidated diagnostics endpoint rejects un-tokened reads and serves the 
   } finally {
     hub.close();
     await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("authenticated proximity policy updates apply immediately and survive a server restart", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "webdrop-server-policy-"));
+  const policyPath = join(directory, "policy.json");
+  const env = {
+    NODE_ENV: "test",
+    METRICS_API_TOKEN: "test-observability-token",
+    REQUIRE_TURN_AUTH: "false",
+    PROXIMITY_POLICY_PATH: policyPath
+  };
+  const first = createWebDropServer({ env, logger: { info() {}, warn() {}, error() {} } });
+  await new Promise((resolve) => first.server.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${first.server.address().port}`;
+  try {
+    const unauthorized = await fetch(`${base}/api/proximity-policy`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: "{}"
+    });
+    assert.equal(unauthorized.status, 401);
+
+    const invalid = await fetch(`${base}/api/proximity-policy`, {
+      method: "PUT",
+      headers: {
+        Authorization: "Bearer test-observability-token",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ scoring: { weights: { bump: 40 } } })
+    });
+    assert.equal(invalid.status, 400);
+
+    const update = await fetch(`${base}/api/proximity-policy`, {
+      method: "PUT",
+      headers: {
+        Authorization: "Bearer test-observability-token",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        scoring: { minimum: 60, weights: { sound: 30, motion: 22, bump: 25, tilt: 15, qr: 8 } },
+        timing: { lateTapGraceMs: 7500, acousticWindowMs: 6500, matchSlopMs: 4500 }
+      })
+    });
+    assert.equal(update.status, 200);
+    const updated = await update.json();
+    assert.equal(updated.policy.revision, 2);
+    assert.equal(updated.policy.scoring.weights.bump, 25);
+    assert.equal(first.hub.diagnosticsSnapshot().protocol.lateTapGraceMs, 7500);
+    assert.equal(first.hub.diagnosticsSnapshot().protocol.sessionDurationMs, 6500);
+  } finally {
+    first.hub.close();
+    await new Promise((resolve) => first.server.close(resolve));
+  }
+
+  const second = createWebDropServer({ env, logger: { info() {}, warn() {}, error() {} } });
+  try {
+    assert.equal(second.runtimeProximityPolicy.snapshot().revision, 2);
+    assert.equal(second.hub.diagnosticsSnapshot().protocol.scoreMinimum, 0.6);
+    assert.equal(second.hub.diagnosticsSnapshot().protocol.matchSlopMs, 4500);
+  } finally {
+    second.hub.close();
+    second.server.close();
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 

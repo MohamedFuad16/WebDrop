@@ -88,6 +88,16 @@ const SNAPSHOT = {
   }
 };
 
+const DEFAULT_POLICY = {
+  revision: 1,
+  updatedAt: null,
+  scoring: {
+    minimum: 55,
+    weights: { sound: 34, motion: 26, bump: 20, tilt: 12, qr: 8 }
+  },
+  timing: { lateTapGraceMs: 6000, acousticWindowMs: 6000, matchSlopMs: 4000 }
+};
+
 // Rich multi-device snapshot: two concurrent sessions (a running 2-phone verify and
 // a 3-phone joining lobby) plus finished matched/failed sessions reconstructed from
 // the event feed. Exercises slot labels, acoustic margins, per-evidence flags,
@@ -180,7 +190,7 @@ test("redesigns admin readiness around truthful launch state", async ({ page }, 
   await page.goto("/admin/?qa=e2e-admin-redesign", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("heading", { name: "What is actually ready" })).toBeVisible();
-  await expect(page.locator("[data-admin-tab]")).toHaveCount(2);
+  await expect(page.locator("[data-admin-tab]")).toHaveCount(4);
   await expect(page.getByRole("button", { name: "Readiness" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Live testing" })).toBeVisible();
   await expect(page.getByText("Back to app")).toHaveCount(0);
@@ -205,6 +215,37 @@ test("redesigns admin readiness around truthful launch state", async ({ page }, 
   await expect(page.locator("[data-readiness-board]")).toContainText("実機証明が必要");
   await expect(page.locator('[data-readiness-board] [data-state="ready"] .readiness-row span').first()).toHaveText("稼働中");
   await expect(page.locator('[data-readiness-board] [data-state="proof"] .readiness-row span').first()).toHaveText("要実機");
+  expect(consoleProblems()).toEqual([]);
+});
+
+test("updates proximity tuning and records a repeatable test case", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-desktop", "Admin tuning and test recorder are covered once in Chromium.");
+  const consoleProblems = collectConsoleProblems(page);
+  await page.goto("/admin/?tab=settings", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByRole("heading", { name: "Proximity tuning" })).toBeVisible();
+  await expect(page.locator('[data-policy-weight="bump"]')).toHaveValue("20");
+  await expect(page.locator('[data-policy-weight="tilt"]')).toHaveValue("12");
+  await expect(page.locator('[data-policy-timing="lateTapGraceMs"]')).toHaveValue("6000");
+
+  await page.locator('[data-policy-weight="sound"]').fill("30");
+  await page.locator('[data-policy-weight="motion"]').fill("22");
+  await page.locator('[data-policy-weight="bump"]').fill("25");
+  await page.locator('[data-policy-weight="tilt"]').fill("15");
+  await expect(page.locator("[data-policy-weight-total]")).toHaveText("100.0 points");
+  await page.getByRole("button", { name: "Apply to server" }).click();
+  await expect(page.locator("[data-policy-status]")).toContainText("Applied revision 2");
+
+  await page.getByRole("button", { name: "Test cases" }).click();
+  await expect(page.getByRole("heading", { name: "Test cases" })).toBeVisible();
+  await page.locator('[data-test-device-assignment="iphone-a"]').selectOption("A");
+  await page.locator('[data-test-device-assignment="android-a"]').selectOption("A");
+  await expect(page.locator("[data-assignment-status]")).toHaveText("Assignments ready.");
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await expect(page.locator("[data-run-status-copy]")).toHaveText("Recording");
+  await expect(page.locator("[data-active-run-summary]")).toContainText("Revision 2");
+  await page.getByRole("button", { name: "Stop recording" }).click();
+  await expect(page.locator("[data-run-history]")).toContainText("Top edge to top edge");
   expect(consoleProblems()).toEqual([]);
 });
 
@@ -333,6 +374,7 @@ test("renders multi-device proximity sessions with slots, acoustic evidence, and
 });
 
 async function installRuntimeMocks(page) {
+  let policy = structuredClone(DEFAULT_POLICY);
   await page.addInitScript(() => {
     class MockWebSocket extends EventTarget {
       static CONNECTING = 0;
@@ -509,6 +551,25 @@ async function installRuntimeMocks(page) {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify(SNAPSHOT)
+    });
+  });
+  await page.route("https://signal.test/api/proximity-policy", async (route) => {
+    if (route.request().method() === "PUT") {
+      const update = route.request().postDataJSON();
+      policy = {
+        ...policy,
+        ...update,
+        revision: policy.revision + 1,
+        updatedAt: new Date().toISOString(),
+        scoring: { ...policy.scoring, ...update.scoring, weights: { ...policy.scoring.weights, ...update.scoring?.weights } },
+        timing: { ...policy.timing, ...update.timing }
+      };
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, policy }) });
+      return;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ tuning: policy, proximity: { enabled: true } })
     });
   });
 }

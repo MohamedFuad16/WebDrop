@@ -34,7 +34,10 @@ Behavior is controlled at **runtime**, not build time:
 No environment variables are read by the frontend. See `secrets.md` for where URLs/tokens live and `api.md` for the backend.
 
 ## Service worker / PWA
-`service-worker.js` (registered only when **not** on localhost) precaches the app shell (`ASSETS` list) under a versioned cache `webdrop-v2-static-<APP_VERSION>`. Bump `APP_VERSION` (currently `1.0.92`, matching `package.json` `version` and the `?v=1.0.92` import query strings) when shipping cache-affecting changes. Code assets use network-first with cache fallback; `runtime-config.js` is always network-only.
+`service-worker.js` (registered only when **not** on localhost) precaches the app shell (`ASSETS` list) under a versioned cache `webdrop-v2-static-<APP_VERSION>`. Bump `APP_VERSION` (currently `1.0.93`, matching `package.json` `version` and the `?v=1.0.93` import query strings) when shipping cache-affecting changes. Code assets use network-first with cache fallback; `runtime-config.js` is always network-only.
+
+## Runtime proximity policy
+The server persists admin tuning at `PROXIMITY_POLICY_PATH` (production default `/var/lib/webdrop/proximity-policy.json`; systemd creates `/var/lib/webdrop` through `StateDirectory=webdrop`). The authenticated Settings form writes the policy over `PUT /api/proximity-policy`. Defaults are 6,000 ms late-tap grace, 6,000 ms acoustic window, and 4,000 ms match slop. A saved update applies to new sessions immediately and survives restart; active sessions keep their original revision.
 
 ## Quality / verification scripts (from `package.json`)
 ```bash

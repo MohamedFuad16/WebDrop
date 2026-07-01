@@ -18,16 +18,18 @@ export class ProximityScoreAnalyzer {
     this.thresholds = thresholds;
   }
 
-  analyze(metrics = {}) {
+  analyze(metrics = {}, policy = {}) {
     const normalized = normalizeMetrics(metrics);
-    const score = clamp01(Object.entries(this.weights).reduce((total, [key, weight]) => {
+    const weights = normalizeWeights(policy.weights || this.weights);
+    const thresholds = { ...this.thresholds, ...(policy.thresholds || {}) };
+    const score = clamp01(Object.entries(weights).reduce((total, [key, weight]) => {
       return total + normalized[key] * weight;
     }, 0));
     return {
       enabled: this.enabled,
       mode: this.enabled ? "analysis" : "report-only",
       score,
-      decision: this.classify(score),
+      decision: this.classify(score, thresholds),
       confidence: confidenceFor(normalized),
       normalized,
       reasons: reasonsFor(normalized),
@@ -35,11 +37,17 @@ export class ProximityScoreAnalyzer {
     };
   }
 
-  classify(score) {
+  classify(score, thresholds = this.thresholds) {
     if (!this.enabled) return "not_enforced";
-    if (score >= this.thresholds.verified) return "verified";
-    if (score >= this.thresholds.review) return "review";
+    if (score >= thresholds.verified) return "verified";
+    if (score >= thresholds.review) return "review";
     return "insufficient";
+  }
+
+  updatePolicy({ weights, thresholds } = {}) {
+    if (weights) this.weights = normalizeWeights(weights);
+    if (thresholds) this.thresholds = { ...this.thresholds, ...thresholds };
+    return this.policy();
   }
 
   policy() {
@@ -48,7 +56,7 @@ export class ProximityScoreAnalyzer {
       mode: this.enabled ? "analysis" : "report-only",
       thresholds: this.thresholds,
       weights: this.weights,
-      note: "A physical proximity score of at least 55 percent is required when analysis is enabled."
+      note: `A physical proximity score of at least ${Math.round(this.thresholds.verified * 100)} percent is required when analysis is enabled.`
     };
   }
 }

@@ -35,6 +35,7 @@ const DEFAULT_SESSION_START_DELAY_MS = 1200;
 const DEFAULT_SESSION_DURATION_MS = 3600;
 const DEFAULT_PROXIMITY_SESSION_TTL_MS = 15000;
 const DEFAULT_SESSION_MATCH_SLOP_MS = 4000;
+const DEFAULT_LATE_TAP_GRACE_MS = 3600;
 const SESSION_SCORE_MINIMUM = 0.55;
 
 // Acoustic ceremony slot floor. A single coded ultrasonic chirp needs roughly
@@ -114,7 +115,8 @@ export class SignalingHub {
     acousticMinBandwidthHz,
     acousticSessionStaggerMs,
     acousticSessionStaggerPhases,
-    acousticMaxConcurrentSubBands
+    acousticMaxConcurrentSubBands,
+    runtimeProximityPolicy
   } = {}) {
     this.wss = new WebSocketServer({
       noServer: true,
@@ -164,10 +166,11 @@ export class SignalingHub {
     // the ceremony window (proximitySessionDurationMs), not just the cap.
     this.proximityCohortCeiling = Math.max(2, Math.floor(this.proximityDurationMs / ACOUSTIC_CEREMONY_SLOT_FLOOR_MS));
     const requestedCohort = configuredPositive(maxProximitySessionClients, this.proximityCohortCeiling);
-    this.maxProximitySessionClients = Math.max(2, Math.min(this.proximityCohortCeiling, Math.floor(requestedCohort)));
-    if (Math.floor(requestedCohort) > this.proximityCohortCeiling) {
+    this.requestedMaxProximitySessionClients = Math.max(2, Math.floor(requestedCohort));
+    this.maxProximitySessionClients = Math.max(2, Math.min(this.proximityCohortCeiling, this.requestedMaxProximitySessionClients));
+    if (this.requestedMaxProximitySessionClients > this.proximityCohortCeiling) {
       this.logger?.warn("Clamping per-session acoustic cohort to the slot-floor ceiling.", {
-        requested: Math.floor(requestedCohort),
+        requested: this.requestedMaxProximitySessionClients,
         ceiling: this.proximityCohortCeiling,
         ceremonyWindowMs: this.proximityDurationMs,
         slotFloorMs: ACOUSTIC_CEREMONY_SLOT_FLOOR_MS
@@ -182,6 +185,20 @@ export class SignalingHub {
     this.acousticSessionStaggerMs = configuredNonNegative(acousticSessionStaggerMs, DEFAULT_ACOUSTIC_SESSION_STAGGER_MS);
     this.acousticSessionStaggerPhases = Math.max(1, Math.floor(configuredPositive(acousticSessionStaggerPhases, DEFAULT_ACOUSTIC_SESSION_STAGGER_PHASES)));
     this.acousticMaxConcurrentSubBands = Math.max(1, Math.floor(configuredPositive(acousticMaxConcurrentSubBands, DEFAULT_ACOUSTIC_MAX_CONCURRENT_SUBBANDS)));
+    this.runtimeProximityPolicy = {
+      revision: 1,
+      updatedAt: null,
+      scoring: {
+        minimum: Math.round(Number(this.proximityAnalyzer?.thresholds?.verified || SESSION_SCORE_MINIMUM) * 100),
+        weights: policyWeightsFromAnalyzer(this.proximityAnalyzer)
+      },
+      timing: {
+        lateTapGraceMs: Math.max(DEFAULT_LATE_TAP_GRACE_MS, this.proximityJoinWindowMs * 2),
+        acousticWindowMs: this.proximityDurationMs,
+        matchSlopMs: this.proximityMatchSlopMs
+      }
+    };
+    if (runtimeProximityPolicy) this.updateRuntimeProximityPolicy(runtimeProximityPolicy);
     this.rateLimits = new TokenBucket({ capacity: 90, refillPerSecond: 30 });
     this.ipRateLimits = new TokenBucket({ capacity: 120, refillPerSecond: 20 });
 
@@ -209,6 +226,44 @@ export class SignalingHub {
 
   setAllowedOrigins(origins) {
     this.allowedOrigins = new Set((origins || []).filter(Boolean));
+  }
+
+  updateRuntimeProximityPolicy(policy = {}) {
+    const scoring = policy.scoring || this.runtimeProximityPolicy.scoring;
+    const timing = policy.timing || this.runtimeProximityPolicy.timing;
+    this.runtimeProximityPolicy = {
+      revision: Math.max(1, Math.floor(Number(policy.revision || this.runtimeProximityPolicy.revision || 1))),
+      updatedAt: policy.updatedAt || this.runtimeProximityPolicy.updatedAt || null,
+      scoring: {
+        minimum: Number(scoring.minimum),
+        weights: { ...scoring.weights }
+      },
+      timing: {
+        lateTapGraceMs: configuredPositive(timing.lateTapGraceMs, this.runtimeProximityPolicy.timing.lateTapGraceMs),
+        acousticWindowMs: configuredPositive(timing.acousticWindowMs, this.runtimeProximityPolicy.timing.acousticWindowMs),
+        matchSlopMs: configuredPositive(timing.matchSlopMs, this.runtimeProximityPolicy.timing.matchSlopMs)
+      }
+    };
+    const threshold = Math.max(0, Math.min(1, this.runtimeProximityPolicy.scoring.minimum / 100));
+    this.proximityAnalyzer?.updatePolicy?.({
+      weights: this.runtimeProximityPolicy.scoring.weights,
+      thresholds: {
+        verified: threshold,
+        review: Math.min(0.4, Math.max(0, threshold - 0.15))
+      }
+    });
+    this.proximityDurationMs = this.runtimeProximityPolicy.timing.acousticWindowMs;
+    this.proximityMatchSlopMs = this.runtimeProximityPolicy.timing.matchSlopMs;
+    this.proximityCohortCeiling = Math.max(2, Math.floor(this.proximityDurationMs / ACOUSTIC_CEREMONY_SLOT_FLOOR_MS));
+    this.maxProximitySessionClients = Math.max(
+      2,
+      Math.min(this.proximityCohortCeiling, this.requestedMaxProximitySessionClients)
+    );
+    return this.runtimeProximityPolicySnapshot();
+  }
+
+  runtimeProximityPolicySnapshot() {
+    return structuredClone(this.runtimeProximityPolicy);
   }
 
   isAllowedOrigin(origin) {
@@ -434,8 +489,9 @@ export class SignalingHub {
       receivedAt: new Date().toISOString()
     };
     if (message.type === "proximity:telemetry" && this.proximityAnalyzer) {
+      const scoring = this.proximityReady.get(pairingId)?.tuning?.scoring;
       payload.analysis = this.proximityAnalyzer.enabled
-        ? this.proximityAnalyzer.analyze(message.metrics || message.payload || {})
+        ? this.proximityAnalyzer.analyze(message.metrics || message.payload || {}, analysisPolicyFromScoring(scoring, this.proximityAnalyzer))
         : {
           ...this.proximityAnalyzer.policy(),
           decision: "not_enforced"
@@ -772,6 +828,7 @@ export class SignalingHub {
   }
 
   openProximitySession(now) {
+    const tuning = this.runtimeProximityPolicySnapshot();
     const session = {
       id: `prox-${randomUUID()}`,
       clients: new Set(),
@@ -783,10 +840,12 @@ export class SignalingHub {
       createdAt: now,
       expiresAt: now + this.proximitySessionTtlMs,
       joinUntil: now + this.proximityJoinWindowMs,
+      lateTapDeadline: now + tuning.timing.lateTapGraceMs,
       joinExtensions: 0,
       started: false,
       matched: new Set(),
       bandIndex: this.proximityBandCounter++,
+      tuning,
       timer: null,
       failTimer: null
     };
@@ -802,11 +861,14 @@ export class SignalingHub {
     if (!session || session.started) return;
     this.pruneProximitySessionClients(session);
     if (session.clients.size < 2) {
-      if ((session.joinExtensions || 0) < 1 && session.expiresAt > Date.now()) {
+      const lateTapDeadline = Number(session.lateTapDeadline)
+        || Number(session.createdAt || Date.now()) + Number(session.tuning?.timing?.lateTapGraceMs || this.runtimeProximityPolicy.timing.lateTapGraceMs);
+      const remainingGraceMs = Math.max(0, lateTapDeadline - Date.now());
+      if ((session.joinExtensions || 0) < 1 && remainingGraceMs > 0 && session.expiresAt > Date.now()) {
         session.joinExtensions = (session.joinExtensions || 0) + 1;
-        session.joinUntil = Date.now() + this.proximityJoinWindowMs;
+        session.joinUntil = Date.now() + remainingGraceMs;
         this.openProximitySessionIds.add(sessionId);
-        session.timer = setTimeout(() => this.startProximitySession(sessionId), this.proximityJoinWindowMs);
+        session.timer = setTimeout(() => this.startProximitySession(sessionId), remainingGraceMs);
         session.timer.unref?.();
         return;
       }
@@ -827,7 +889,9 @@ export class SignalingHub {
     session.staggerMs = staggerMs;
     const startAt = Date.now() + this.proximityStartDelayMs + staggerMs;
     session.startAt = startAt;
-    session.endsAt = startAt + this.proximityDurationMs;
+    const durationMs = Number(session.tuning?.timing?.acousticWindowMs || this.proximityDurationMs);
+    const matchSlopMs = Number(session.tuning?.timing?.matchSlopMs || this.proximityMatchSlopMs);
+    session.endsAt = startAt + durationMs;
     const acousticBand = this.selectSessionAcousticBand(session);
     session.acousticBand = acousticBand;
     const acousticPlan = [...session.clients].map((clientId, index) => {
@@ -851,7 +915,7 @@ export class SignalingHub {
       this.send(client.socket, "proximity:session:start", {
         sessionId,
         startAt,
-        durationMs: this.proximityDurationMs,
+        durationMs,
         acousticSlot: slot,
         acousticSignatureId: acousticPlan[slot]?.id,
         acousticPlan,
@@ -860,7 +924,8 @@ export class SignalingHub {
         // client/admin can show which frequency lane this cohort is using.
         acousticBandIndex: acousticBand.index,
         acousticBandCount: acousticBand.count,
-        participantCount: session.clients.size
+        participantCount: session.clients.size,
+        tuning: session.tuning
       });
       slot += 1;
     }
@@ -868,7 +933,8 @@ export class SignalingHub {
       sessionId,
       participantCount: session.clients.size,
       startAt,
-      durationMs: this.proximityDurationMs,
+      durationMs,
+      policyRevision: session.tuning?.revision || 1,
       staggerMs,
       acousticBandIndex: acousticBand.index,
       acousticBandCount: acousticBand.count,
@@ -877,7 +943,7 @@ export class SignalingHub {
     });
     session.failTimer = setTimeout(
       () => this.failUnmatchedProximitySession(sessionId),
-      this.proximityStartDelayMs + staggerMs + this.proximityDurationMs + this.proximityMatchSlopMs
+      this.proximityStartDelayMs + staggerMs + durationMs + matchSlopMs
     );
     session.failTimer.unref?.();
   }
@@ -922,7 +988,7 @@ export class SignalingHub {
   }
 
   hasValidCeremonyTiming(session, timing = {}) {
-    return ceremonyTimingValid(session, timing, this.proximityMatchSlopMs);
+    return ceremonyTimingValid(session, timing, session.tuning?.timing?.matchSlopMs || this.proximityMatchSlopMs);
   }
 
   pruneProximitySessionClients(session) {
@@ -973,7 +1039,7 @@ export class SignalingHub {
       this.send(sender.socket, "proximity:session:failed", { sessionId, reason: "timing_out_of_window" });
       return;
     }
-    const analysis = sessionAnalysis(this.proximityAnalyzer, message.payload.metrics || {});
+    const analysis = sessionAnalysis(this.proximityAnalyzer, message.payload.metrics || {}, session.tuning?.scoring);
     session.telemetry.set(sender.id, {
       clientId: sender.id,
       analysis,
@@ -1010,7 +1076,11 @@ export class SignalingHub {
         : [],
       bumpCorrelation: Number(message.payload.metrics?.bumpCorrelation || message.payload.metrics?.bump || 0),
       tiltMatch: Number(message.payload.metrics?.tiltMatch || message.payload.metrics?.tilt || 0),
-      acousticReason: message.payload.metrics?.acousticReason || null
+      acousticReason: message.payload.metrics?.acousticReason || null,
+      startedAt: Number(message.payload.timing?.startedAt || 0),
+      bumpAt: Number(message.payload.timing?.bumpAt || 0),
+      completedAt: Number(message.payload.timing?.completedAt || 0),
+      policyRevision: session.tuning?.revision || 1
     });
     this.tryMatchProximitySession(session);
   }
@@ -1052,7 +1122,7 @@ export class SignalingHub {
         const a = candidates[i];
         const b = candidates[j];
         const delta = Math.abs(Number(a.timing?.bumpAt || a.receivedAt) - Number(b.timing?.bumpAt || b.receivedAt));
-        if (delta > this.proximityMatchSlopMs || !hasReciprocalAcousticEvidence(session, a, b)) continue;
+        if (delta > Number(session.tuning?.timing?.matchSlopMs || this.proximityMatchSlopMs) || !hasReciprocalAcousticEvidence(session, a, b)) continue;
         if (!best || delta < best.delta) best = { a, b, delta };
       }
     }
@@ -1107,14 +1177,14 @@ export class SignalingHub {
       if (!client || client.pairingId) continue;
       this.send(client.socket, "proximity:session:failed", {
         sessionId,
-        reason: proximityFailureReason(entry?.analysis),
+        reason: proximityFailureReason(entry?.analysis, session.tuning?.scoring?.minimum),
         score: entry?.analysis?.score ?? null,
         analysis: entry?.analysis || null
       });
       this.metrics?.recordEvent("proximity:session:failed", {
         sessionId,
         clientId,
-        reason: proximityFailureReason(entry?.analysis),
+        reason: proximityFailureReason(entry?.analysis, session.tuning?.scoring?.minimum),
         score: entry?.analysis?.score ?? null
       });
     }
@@ -1311,10 +1381,13 @@ export class SignalingHub {
     ready.add(sender.id);
     this.proximityReady.set(pairingId, ready);
     if (!ready.has(target.id)) return;
+    const tuning = this.runtimeProximityPolicySnapshot();
+    ready.tuning = tuning;
     const payload = {
       pairingId,
       startAt: Date.now() + 1200,
-      durationMs: 3000
+      durationMs: tuning.timing.acousticWindowMs,
+      tuning
     };
     ready.started = true;
     this.send(sender.socket, "proximity:start", payload);
@@ -1347,7 +1420,11 @@ export class SignalingHub {
         sessionDurationMs: this.proximityDurationMs,
         sessionTtlMs: this.proximitySessionTtlMs,
         matchSlopMs: this.proximityMatchSlopMs,
-        scoreMinimum: SESSION_SCORE_MINIMUM,
+        lateTapGraceMs: this.runtimeProximityPolicy.timing.lateTapGraceMs,
+        scoreMinimum: this.runtimeProximityPolicy.scoring.minimum / 100,
+        policyRevision: this.runtimeProximityPolicy.revision,
+        policyUpdatedAt: this.runtimeProximityPolicy.updatedAt,
+        scoreWeights: { ...this.runtimeProximityPolicy.scoring.weights },
         maxClients: this.maxProximitySessionClients,
         cohortCeiling: this.proximityCohortCeiling,
         slotFloorMs: ACOUSTIC_CEREMONY_SLOT_FLOOR_MS,
@@ -1396,6 +1473,7 @@ export class SignalingHub {
         startAt: session.startAt || null,
         endsAt: session.endsAt || null,
         staggerMs: session.staggerMs || 0,
+        policyRevision: session.tuning?.revision || 1,
         acousticBand: session.acousticBand
           ? {
             index: session.acousticBand.index,
@@ -1573,10 +1651,12 @@ function makeSessionId(id) {
   return `session-${randomUUID()}-${id.slice(0, 40)}`;
 }
 
-function sessionAnalysis(analyzer, metrics = {}) {
+function sessionAnalysis(analyzer, metrics = {}, scoring = {}) {
+  const policy = analysisPolicyFromScoring(scoring, analyzer);
+  const threshold = policy.thresholds.verified;
   const analyzed = analyzer?.analyze
-    ? analyzer.analyze(metrics)
-    : fallbackSessionAnalysis(metrics);
+    ? analyzer.analyze(metrics, policy)
+    : fallbackSessionAnalysis(metrics, threshold);
   const score = Number(analyzed?.score || 0);
   const normalized = analyzed?.normalized || fallbackNormalizedMetrics(metrics);
   const physicalEvidence = {
@@ -1594,9 +1674,21 @@ function sessionAnalysis(analyzer, metrics = {}) {
       : Number(metrics.acousticConfidenceMargin),
     acousticDetections: Array.isArray(metrics.acousticDetections) ? metrics.acousticDetections : [],
     physicalEvidence,
-    decision: score >= SESSION_SCORE_MINIMUM && hasRequiredPhysicalEvidence
+    decision: score >= threshold && hasRequiredPhysicalEvidence
       ? "verified"
       : "insufficient"
+  };
+}
+
+function analysisPolicyFromScoring(scoring = {}, analyzer) {
+  const minimum = Number(scoring?.minimum || Number(analyzer?.thresholds?.verified || SESSION_SCORE_MINIMUM) * 100);
+  const verified = Math.max(0, Math.min(1, minimum / 100));
+  return {
+    weights: scoring?.weights,
+    thresholds: {
+      verified,
+      review: Math.min(0.4, Math.max(0, verified - 0.15))
+    }
   };
 }
 
@@ -1658,7 +1750,7 @@ function hasUsableAcousticDetection(detection) {
     && marginDb >= ACOUSTIC_ENERGY_ASSISTED_MIN_MARGIN_DB;
 }
 
-function fallbackSessionAnalysis(metrics = {}) {
+function fallbackSessionAnalysis(metrics = {}, threshold = SESSION_SCORE_MINIMUM) {
   const normalized = fallbackNormalizedMetrics(metrics);
   const { sound, motion, bump, tilt, qr } = normalized;
   const score = sound * 0.34 + motion * 0.26 + bump * 0.2 + tilt * 0.12 + qr * 0.08;
@@ -1667,7 +1759,7 @@ function fallbackSessionAnalysis(metrics = {}) {
     mode: "fallback",
     normalized,
     score,
-    decision: score >= SESSION_SCORE_MINIMUM ? "verified" : "insufficient"
+    decision: score >= threshold ? "verified" : "insufficient"
   };
 }
 
@@ -1720,12 +1812,12 @@ function publicAcousticCapabilities(capabilities = {}) {
   };
 }
 
-function proximityFailureReason(analysis) {
+function proximityFailureReason(analysis, minimum = SESSION_SCORE_MINIMUM * 100) {
   if (!analysis) return "telemetry_missing";
   if (!analysis.physicalEvidence?.ultrasound) return "acoustic_not_detected";
   if (!analysis.physicalEvidence?.bump) return "bump_not_detected";
   if (!analysis.physicalEvidence?.tilt) return "tilt_not_detected";
-  if (Number(analysis.score || 0) < SESSION_SCORE_MINIMUM) return "score_too_low";
+  if (Number(analysis.score || 0) < Number(minimum) / 100) return "score_too_low";
   return "ambiguous_or_nonreciprocal_match";
 }
 
@@ -1746,4 +1838,17 @@ function configuredPositive(value, fallback) {
 function configuredNonNegative(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : fallback;
+}
+
+function policyWeightsFromAnalyzer(analyzer) {
+  const weights = analyzer?.weights || {};
+  const values = {
+    sound: Number(weights.sound || 0.34) * 100,
+    motion: Number(weights.motion || 0.26) * 100,
+    bump: Number(weights.bump || 0.2) * 100,
+    tilt: Number(weights.tilt || 0.12) * 100,
+    qr: Number(weights.qr || 0.08) * 100
+  };
+  const total = Object.values(values).reduce((sum, value) => sum + value, 0) || 100;
+  return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, Math.round(value / total * 10000) / 100]));
 }

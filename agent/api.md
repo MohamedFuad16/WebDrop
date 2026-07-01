@@ -23,7 +23,7 @@ Client side: `js/services/websocket-signaling.js`. Server side: `azure cloud ser
 | `admin:monitor:start/stop/telemetry` | ops dashboard acoustic monitor |
 | `peer:disconnect` | tear down a pairing |
 
-**Server → client (emitted as adapter events):** `connected`, `disconnected`, `connection-failed`, `protocol:error`, `route:error`, `peers`, `invite`, `invite:accept`(→`inviteAccepted`), `invite:reject`/`inviteRejected`, `chat:message`, `rtc:signal`(→`rtcSignal`), `peer:disconnected`(→`peerDisconnected`), `proximity:decision`, `proximity:start`, `proximity:qr:issued`, `proximity:qr:verified`, `proximity:fallback`, `proximity:session:joined`/`:start`/`:match`/`:failed`, `admin:monitor:*`.
+**Server → client (emitted as adapter events):** `connected`, `disconnected`, `connection-failed`, `protocol:error`, `route:error`, `peers`, `invite`, `invite:accept`(→`inviteAccepted`), `invite:reject`/`inviteRejected`, `chat:message`, `rtc:signal`(→`rtcSignal`), `peer:disconnected`(→`peerDisconnected`), `proximity:decision`, `proximity:start`, `proximity:qr:issued`, `proximity:qr:verified`, `proximity:fallback`, `proximity:session:joined`/`:start`/`:match`/`:failed`, `admin:monitor:*`. Session/direct `proximity:start` payloads include a `tuning` snapshot (`revision`, `scoring`, `timing`) so browser and server score the same ceremony.
 
 **`rtc:signal` shape:** `{ type:"offer"|"answer", sdp }` or `{ type:"candidate", candidate:{candidate,sdpMid,sdpMLineIndex,usernameFragment} }`. SDP is CRLF-normalized; size limits enforced (SDP ≤64 KB, candidate ≤4 KB).
 
@@ -51,7 +51,8 @@ Base: `https://webdrop-wss-0618.japaneast.cloudapp.azure.com` (see `js/config/ru
 | `GET /readyz` | none | readiness (used by admin dashboard) |
 | `GET /api/ice-servers` | Bearer | TURN/ICE config for WebRTC (`turn-config.js`) |
 | `GET /api/relay-policy` | (per server) | relay byte limits |
-| `GET /api/proximity-policy` | (per server) | proximity tuning |
+| `GET /api/proximity-policy` | none | public scoring/permission metadata plus the current safe `tuning` snapshot |
+| `PUT /api/proximity-policy` | Bearer | validate, persist, and apply scoring/timing for new sessions |
 | `GET /api/metrics-summary` | Bearer | metrics (when enabled) |
 | `GET /api/diagnostics-public` | Bearer | consolidated diagnostics feed for the admin dashboard |
 
@@ -64,3 +65,6 @@ Base: `https://webdrop-wss-0618.japaneast.cloudapp.azure.com` (see `js/config/ru
 - **Signaling server** (`wss://…/ws`) — Node `ws` hub in `azure cloud server/`.
 - **Cloudflare TURN/STUN** — `stun:stun.cloudflare.com` fallback; managed TURN via the server broker.
 - **StreamSaver** service worker (`vendor/streamsaver/`) for large streamed downloads on non-iOS.
+
+## Runtime proximity policy
+`PUT /api/proximity-policy` accepts `{ scoring:{ minimum, weights:{ sound,motion,bump,tilt,qr } }, timing:{ lateTapGraceMs, acousticWindowMs, matchSlopMs } }`. Weights must total 100. Bounds: minimum 35–90, late-tap grace 2,000–15,000 ms, acoustic window 2,400–12,000 ms, and match slop 500–10,000 ms. A successful response returns the incremented policy revision and `updatedAt`; persistence is atomic. Existing sessions keep their snapshot, while the next session uses the update.

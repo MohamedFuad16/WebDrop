@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
   <title>WebDrop Admin</title>
-  <link rel="stylesheet" href="../css/operations.css?v=1.0.92">
-  <link rel="stylesheet" href="../css/admin.css?v=1.0.92">
+  <link rel="stylesheet" href="../css/operations.css?v=1.0.93">
+  <link rel="stylesheet" href="../css/admin.css?v=1.0.93">
 </head>
 <body>
   <main class="operations-shell admin-shell">
@@ -18,6 +18,8 @@
       <nav class="admin-tabs" data-i18n-aria="adminSections">
         <button class="is-active" type="button" data-admin-tab="readiness" data-i18n="readiness">Readiness</button>
         <button type="button" data-admin-tab="live" data-i18n="liveTesting">Live testing</button>
+        <button type="button" data-admin-tab="tests" data-i18n="testCases">Test cases</button>
+        <button type="button" data-admin-tab="settings" data-i18n="settings">Settings</button>
       </nav>
       <div class="admin-tools">
         <label class="admin-language">
@@ -53,7 +55,7 @@
       </article>
       <article>
         <span class="summary-icon" aria-hidden="true">◇</span>
-        <div><small data-i18n="appVersion">App version</small><strong data-admin-version>1.0.92</strong><span data-i18n="productionFrontend">Production frontend</span></div>
+        <div><small data-i18n="appVersion">App version</small><strong data-admin-version>1.0.93</strong><span data-i18n="productionFrontend">Production frontend</span></div>
       </article>
     </section>
 
@@ -165,6 +167,108 @@
       </section>
     </section>
 
+    <section class="admin-panel" data-admin-panel="settings" aria-labelledby="settings-title">
+      <div class="section-intro">
+        <div>
+          <h1 id="settings-title" data-i18n="settingsTitle">Settings</h1>
+          <p data-i18n="settingsCopy">Tune the next proximity sessions without disturbing the live monitor or a recording already in progress.</p>
+        </div>
+        <span class="snapshot-label"><span data-i18n="serverBackedSettings">Server-backed settings</span></span>
+      </div>
+      <section class="tuning-section tuning-section--settings" aria-labelledby="tuning-title">
+        <div class="workspace-heading tuning-heading">
+          <div>
+            <small data-i18n="proximityPolicy">Proximity policy</small>
+            <h2 id="tuning-title" data-i18n="proximityTuning">Proximity tuning</h2>
+          </div>
+          <span class="policy-revision"><span data-i18n="policyRevision">Policy revision</span> <strong data-policy-revision>—</strong></span>
+        </div>
+        <form class="tuning-form" data-tuning-form>
+          <fieldset class="tuning-group tuning-group--scores">
+            <legend data-i18n="scoreWeights">Score weights</legend>
+            <p data-i18n="scoreWeightsCopy">Adjust evidence points. The five weights must total exactly 100.</p>
+            <div class="tuning-score-grid">
+              <label><span data-i18n="sound">Sound</span><input name="sound" data-policy-weight="sound" type="number" min="0" max="100" step="1" inputmode="decimal"></label>
+              <label><span data-i18n="motion">Motion</span><input name="motion" data-policy-weight="motion" type="number" min="0" max="100" step="1" inputmode="decimal"></label>
+              <label><span data-i18n="bump">Bump</span><input name="bump" data-policy-weight="bump" type="number" min="0" max="100" step="1" inputmode="decimal"></label>
+              <label><span data-i18n="tilt">Tilt</span><input name="tilt" data-policy-weight="tilt" type="number" min="0" max="100" step="1" inputmode="decimal"></label>
+              <label><span data-i18n="qr">QR</span><input name="qr" data-policy-weight="qr" type="number" min="0" max="100" step="1" inputmode="decimal"></label>
+              <output class="weight-total" data-policy-weight-total data-valid="true">100</output>
+            </div>
+            <label class="minimum-score-control"><span data-i18n="minimumScore">Minimum score</span><input data-policy-minimum type="number" min="35" max="90" step="1" inputmode="decimal"><small>/ 100</small></label>
+          </fieldset>
+          <fieldset class="tuning-group tuning-group--timing">
+            <legend data-i18n="timingWindows">Timing windows</legend>
+            <p data-i18n="timingWindowsCopy">New sessions snapshot these values; a running test is never changed halfway through.</p>
+            <div class="timing-control-grid">
+              <label><span data-i18n="lateTapGrace">Late-tap grace</span><span><input data-policy-timing="lateTapGraceMs" type="number" min="2000" max="15000" step="250" inputmode="numeric"><small>ms</small></span><em data-i18n="lateTapGraceHelp">How long the first tap waits for a partner tap.</em></label>
+              <label><span data-i18n="acousticWindow">Acoustic exchange window</span><span><input data-policy-timing="acousticWindowMs" type="number" min="2400" max="12000" step="250" inputmode="numeric"><small>ms</small></span><em data-i18n="acousticWindowHelp">Coded chirp airtime plus continuous microphone capture.</em></label>
+              <label><span data-i18n="matchSlop">Bump match slop</span><span><input data-policy-timing="matchSlopMs" type="number" min="500" max="10000" step="250" inputmode="numeric"><small>ms</small></span><em data-i18n="matchSlopHelp">Maximum bump-time difference after reciprocal audio proof.</em></label>
+            </div>
+          </fieldset>
+          <div class="tuning-actions">
+            <span data-policy-status data-state="idle" aria-live="polite">Loading server policy…</span>
+            <button class="apply-button" type="submit" data-i18n="applyToServer">Apply to server</button>
+          </div>
+        </form>
+      </section>
+    </section>
+
+    <section class="admin-panel" data-admin-panel="tests" aria-labelledby="tests-title">
+      <div class="section-intro">
+        <div>
+          <h1 id="tests-title" data-i18n="testCasesTitle">Test cases</h1>
+          <p data-i18n="testCasesCopy">Assign the live phones, record a repeatable run, and keep every result tied to its exact server policy.</p>
+        </div>
+        <span class="snapshot-label"><span data-i18n="savedLocally">Saved on this admin device</span></span>
+      </div>
+      <div class="test-console">
+        <aside class="test-devices" aria-labelledby="test-devices-title">
+          <div class="workspace-heading">
+            <div><small data-i18n="pairAssignments">Pair assignments</small><h2 id="test-devices-title" data-i18n="connectedDevices">Connected devices</h2></div>
+            <button class="quiet-button" type="button" data-action="test-clear-assignments" data-i18n="clear">Clear</button>
+          </div>
+          <div class="test-device-list" data-test-device-list>
+            <p class="empty-row" data-i18n="noDevices">No physical devices are connected.</p>
+          </div>
+          <p class="assignment-status" data-assignment-status>Assign exactly two devices to Pair A.</p>
+        </aside>
+        <div class="test-main">
+          <section class="test-catalog-section" aria-labelledby="test-catalog-title">
+            <div class="workspace-heading">
+              <div><small data-i18n="recommendedMatrix">Recommended matrix</small><h2 id="test-catalog-title" data-i18n="chooseTestCase">Choose a test case</h2></div>
+            </div>
+            <div class="test-case-tabs" data-test-case-tabs></div>
+            <article class="test-case-detail" data-test-case-detail></article>
+          </section>
+          <section class="active-run-section" aria-labelledby="active-run-title">
+            <div class="workspace-heading">
+              <div><small data-i18n="recording">Recording</small><h2 id="active-run-title" data-i18n="activeRun">Active run</h2></div>
+              <span class="run-status" data-run-status="idle"><i></i><span data-run-status-copy data-i18n="idle">Idle</span></span>
+            </div>
+            <div class="run-setup" data-run-setup>
+              <label><span data-i18n="targetAttempts">Target attempts</span><input data-test-target type="number" min="1" max="100" step="1" value="10"></label>
+              <label class="run-notes"><span data-i18n="conditionsNotes">Conditions / notes</span><input data-test-notes type="text" maxlength="500" placeholder="Quiet room, cases on, Pair A near the window"></label>
+              <button class="apply-button" type="button" data-action="test-start" data-i18n="startRecording">Start recording</button>
+              <button class="stop-button" type="button" data-action="test-stop" data-i18n="stopRecording" disabled>Stop recording</button>
+            </div>
+            <div class="active-run-summary" data-active-run-summary></div>
+          </section>
+          <section class="run-results-section" aria-labelledby="live-results-title">
+            <div class="workspace-heading"><div><small data-i18n="currentEvidence">Current evidence</small><h2 id="live-results-title" data-i18n="liveResults">Live results</h2></div></div>
+            <div class="run-results-grid" data-run-results></div>
+          </section>
+          <section class="run-history-section" aria-labelledby="run-history-title">
+            <div class="workspace-heading">
+              <div><small data-i18n="comparison">Comparison</small><h2 id="run-history-title" data-i18n="savedRunHistory">Saved run history</h2></div>
+              <button class="quiet-button" type="button" data-action="test-clear-history" data-i18n="clearHistory">Clear history</button>
+            </div>
+            <div class="run-history" data-run-history></div>
+          </section>
+        </div>
+      </div>
+    </section>
+
     <footer class="admin-footer">
       <span><i></i><span data-i18n="pollingEverySecond">Live data refreshes every second</span></span>
       <span><span data-i18n="serverTime">Server time</span> <strong data-server-time>--:--:--</strong></span>
@@ -172,7 +276,7 @@
     <p class="page-error" data-admin-error role="alert" aria-live="assertive" hidden></p>
   </main>
 
-  <script src="../js/config/runtime-config.js?v=1.0.92"></script>
-  <script src="../js/admin/readiness.js?v=1.0.92" type="module"></script>
+  <script src="../js/config/runtime-config.js?v=1.0.93"></script>
+  <script src="../js/admin/readiness.js?v=1.0.93" type="module"></script>
 </body>
 </html>

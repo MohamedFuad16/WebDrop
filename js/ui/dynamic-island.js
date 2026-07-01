@@ -1,9 +1,9 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.92";
-import { Emitter } from "../utils/emitter.js?v=1.0.92";
-import { formatBytes } from "../utils/format.js?v=1.0.92";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.92";
-import { TileWave } from "./tile-wave.js?v=1.0.92";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.92";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.93";
+import { Emitter } from "../utils/emitter.js?v=1.0.93";
+import { formatBytes } from "../utils/format.js?v=1.0.93";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.93";
+import { TileWave } from "./tile-wave.js?v=1.0.93";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.93";
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -616,7 +616,8 @@ export class DynamicIsland extends Emitter {
     this.setMetricState(this.nodes.bumpMetric, bump ? "complete" : motion.samples ? "active" : "waiting");
     this.setMetricState(this.nodes.tiltMetric, motion.tilted ? "complete" : motion.samples ? "active" : "waiting");
     if (this.nodes.bumpValue) {
-      this.nodes.bumpValue.textContent = bump ? `+${BUMP_SCORE_POINTS}` : Number(motion.maxAcceleration || 0).toFixed(1);
+      const bumpPoints = Number(motion.bumpScorePoints || BUMP_SCORE_POINTS);
+      this.nodes.bumpValue.textContent = bump ? `+${bumpPoints}` : Number(motion.maxAcceleration || 0).toFixed(1);
     }
     if (this.nodes.tiltValue) this.nodes.tiltValue.textContent = `${degrees}°`;
   }

@@ -73,7 +73,8 @@ With `ENABLE_PROXIMITY_ANALYSIS=true`, the server blocks RTC signaling, chat, pa
 The pairing layer runs many concurrent bounded acoustic cohorts. The relevant env knobs (all optional; unset uses safe defaults) live in `azure cloud server/.env.example`:
 
 - `MAX_TOTAL_PROXIMITY_PARTICIPANTS` (default `100`): global cap; joins beyond it fail with `reason: "capacity_reached"`.
-- `MAX_PROXIMITY_SESSION_CLIENTS` (default `6`): per-cohort cap, clamped to the slot-floor ceiling derived from `PROXIMITY_SESSION_DURATION_MS` (a coded chirp needs ~520 ms + 80 ms guard, so a 3,600 ms window fits ~6 slots). Raising it above the ceiling has no effect unless the window grows.
+- `MAX_PROXIMITY_SESSION_CLIENTS` (default `6`): per-cohort cap, clamped to the slot-floor ceiling derived from the runtime acoustic window (a coded chirp needs ~520 ms + 80 ms guard, so the default 6,000 ms window has a theoretical ceiling of 10 slots; the configured cap deliberately remains 6 devices).
+- Runtime Settings persist score weights/minimum, `lateTapGraceMs` (default 6,000), `acousticWindowMs` (default 6,000), and `matchSlopMs` (default 4,000) through authenticated `PUT /api/proximity-policy`. New sessions snapshot the revision; active sessions do not change.
 - `ACOUSTIC_SESSION_STAGGER_MS` / `ACOUSTIC_SESSION_STAGGER_PHASES`: spread concurrent cohorts that fill simultaneously across start-time phases.
 - `ACOUSTIC_MAX_CONCURRENT_SUBBANDS` and `ACOUSTIC_BAND_START_HZ` / `ACOUSTIC_BAND_END_HZ`: split concurrent cohorts into different frequency lanes when the band is wide enough (a no-op at the default 18.6–19.4 kHz band, where only one ≥420 Hz lane fits).
 

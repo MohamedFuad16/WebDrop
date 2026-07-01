@@ -23,7 +23,7 @@ Each module's responsibility, key file(s), and dependencies. Most classes extend
 | **WebSocketSignalingAdapter** | `js/services/websocket-signaling.js` | Production WS signaling: handshake, heartbeat, reconnect, message send + event normalize, TURN token broker. `updateProfile(self)` re-announces `client:hello` (cached capabilities) for best-effort live profile presence (ADR-0008). | `emitter` | `app.js`, `controller`, `transport` |
 | **MockSignalingAdapter** | `js/services/mock-signaling.js` | In-memory dev signaling: 15 fake peers, simulated invites/proximity/QR/RTC. | `emitter`, `avatar-options` | `app.js`, `controller` |
 | **TurnConfigProvider** | `js/services/turn-config.js` | Fetch + cache ICE/TURN servers (Bearer); STUN fallback. | — | `transport` |
-| **ProximityEngine** | `js/services/proximity-engine.js` | Run physical ceremony, compute `proximityScore`, enforce ultrasound+bump+tilt gate; exports `PROXIMITY_SCORE_MINIMUM`, `BUMP_SCORE_POINTS`, `proximityScore`. | `acoustic-proximity`, `motion-proximity`, `proximity-token` | `app.js`, `controller`, `dynamic-island` |
+| **ProximityEngine** | `js/services/proximity-engine.js` | Run physical ceremony, apply each server `tuning` snapshot, compute weighted `proximityScore`, and enforce the ultrasound+bump+tilt gate. Exposes the active policy so UI evidence labels use the same bump/tilt points. | `acoustic-proximity`, `motion-proximity`, `proximity-token` | `app.js`, `controller`, `dynamic-island` |
 | **AcousticProximitySensor** | `js/services/acoustic-proximity.js` | Web Audio ultrasonic chirp emit/detect + signature decode. | — | `proximity-engine` |
 | **MotionProximitySensor** | `js/services/motion-proximity.js` | DeviceMotion bump/tilt capture + permission. | — | `proximity-engine` |
 | **proximity-token** | `js/services/proximity-token.js` | `createQrToken`/`decodeQrToken`/`validateQrToken` (`wdp1.<base64url>`, TTL). | — | `proximity-engine` |
@@ -43,5 +43,11 @@ Each module's responsibility, key file(s), and dependencies. Most classes extend
 - `js/utils/emitter.js` — `Emitter` base (on/emit). `format.js` — `formatBytes`. `received-files.js` — preview-safety check.
 
 ## Admin (separate entry: `admin/index.html`)
-- `js/admin/readiness.js` — dashboard controller: polls diagnostics, renders readiness/live testing, runs ultrasonic monitor. Depends on `operations-i18n.js`, `diagnostics-api.js`, `shared.js`.
-- `js/admin/diagnostics-api.js` — `DiagnosticsApi` (`/readyz`, `/api/diagnostics-public`). `operations-i18n.js` — admin strings. `shared.js` — formatting helpers.
+- `js/admin/readiness.js` — four-tab dashboard controller: Readiness, Live testing, Test cases, and Settings. Polls diagnostics, runs the continuous ultrasonic monitor, applies server policy updates, and persists active/saved test runs.
+- `js/admin/test-runs.js` — pure recorder/aggregator for seven physical test definitions, Pair A/B validation, bounded event de-duplication, correct/wrong matches, failures, evidence rates, and medians.
+- `js/admin/diagnostics-api.js` — `DiagnosticsApi` (`/readyz`, `/api/diagnostics-public`, `GET`/`PUT /api/proximity-policy`). `operations-i18n.js` — admin strings. `shared.js` — formatting helpers.
+
+## Backend proximity policy
+- `azure cloud server/src/runtime-proximity-policy.js` — validates, revisions, atomically persists, and snapshots runtime scoring/timing.
+- `azure cloud server/src/signaling-hub.js` — admits late partners through the policy grace, snapshots a revision per session, schedules the acoustic window, applies match slop, and exposes diagnostics.
+- `azure cloud server/src/proximity-score.js` — server-side analyzer whose weights/minimum are updated from the runtime policy.

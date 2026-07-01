@@ -407,21 +407,21 @@ code with file citations.
   never overlap.
 - **Analogy:** a roll-call: the teacher says "A speaks in second 1, B in second
   2, C in second 3"; everyone listens the whole time and only speaks on cue.
-- **How it works:** the 3,600 ms ceremony window is divided into slots of at least
+- **How it works:** the default 6,000 ms ceremony window is divided into slots of at least
   ~600 ms (a ~520 ms coded chirp + ~80 ms guard). Each cohort member emits only in
   its own slot and records the entire window, decoding all peers afterward:
 
 ```text
-Window:  |<-------------------- 3,600 ms -------------------->|
+Window:  |<-------------------- 6,000 ms -------------------->|
 Slot 1:  [ A emits | B,C,D listen ]
 Slot 2:               [ B emits | A,C,D listen ]
 Slot 3:                            [ C emits | A,B,D listen ]
 Slot 4:                                         [ D emits | ... ]
 ```
 
-- **In WebDrop:** `floor(3600 / 600) = 6` slots fit, which is exactly why the
-  per-cohort cap is **6** (and is *clamped* to that ceiling). Bigger cohorts need
-  a longer window, not just a bigger number.
+- **In WebDrop:** `floor(6000 / 600) = 10` slots fit in theory. The configured
+  per-cohort cap deliberately remains **6 devices** (3 pairs) and is clamped to
+  the active ceiling. Bigger cohorts need both a larger cap and enough window.
 
 ### 26. Concurrent bounded cohorts (the capacity model)
 
@@ -449,7 +449,8 @@ Slot 4:                                         [ D emits | ... ]
 | --- | ---: | --- |
 | `MAX_TOTAL_PROXIMITY_PARTICIPANTS` | 100 | allows more concurrent participants (toward 10k) — needs shared state + multi-node to mean anything |
 | `MAX_PROXIMITY_SESSION_CLIENTS` | 6 | only helps if `PROXIMITY_SESSION_DURATION_MS` also grows (it is clamped to the slot-floor ceiling) |
-| `PROXIMITY_SESSION_DURATION_MS` | 3,600 ms | adds slots (longer window) so bigger cohorts become legal — at the cost of a slower ceremony |
+| `PROXIMITY_LATE_TAP_GRACE_MS` | 6,000 ms | lets a lone first tap admit a later partner; too high makes an unmatched user wait longer |
+| `PROXIMITY_SESSION_DURATION_MS` | 6,000 ms | adds acoustic listening time and slots — at the cost of a slower ceremony |
 | `ACOUSTIC_SESSION_STAGGER_MS` | 600 ms | spreads simultaneous cohort starts so they don't all chirp at once |
 | `ACOUSTIC_MAX_CONCURRENT_SUBBANDS` | 4 | pins cohorts to different frequency lanes — a no-op until the band is widened past ~420 Hz |
 
@@ -504,12 +505,13 @@ but it is not used to decide *which* device pairs with which.
 
 ### Q(iii) — What if B taps Connect a bit slower than C?
 
-It depends on whether B taps within the cohort's **join window**:
+It depends on whether B taps before the cohort's **late-tap deadline**:
 
-- A cohort opens with a join window of `PROXIMITY_SESSION_JOIN_WINDOW_MS`
-  (**1,800 ms**). If only one device is present when it expires, the server grants
-  **one extension** (another 1,800 ms) before failing — so a late second device
-  has up to ~3,600 ms to arrive (`openProximitySession` / `startProximitySession`).
+- A cohort first collects taps for `PROXIMITY_SESSION_JOIN_WINDOW_MS`
+  (**1,800 ms**). If only one device is present when it expires, the server keeps
+  that cohort open until the session's runtime `lateTapGraceMs` deadline —
+  **6,000 ms from the first tap by default**. A late partner starts the cohort
+  after a short settle (`openProximitySession` / `startProximitySession`).
 - If B taps within that window, B joins the **same** open cohort as the others.
 - If B taps **after** that cohort has already started its ceremony, B is placed
   into a **different** concurrent cohort (the open one with room, or a new one).
@@ -517,7 +519,7 @@ It depends on whether B taps within the cohort's **join window**:
   `reason: "no_nearby_partner"` (it can retry or use QR). Nothing pairs by
   accident.
 
-In short: small timing differences (within ~1.8–3.6 s) keep everyone in one
+In short: timing differences within the configured 6-second grace keep everyone in one
 cohort; larger gaps split them into separate concurrent cohorts, and the matcher
 still only connects reciprocal pairs.
 
@@ -596,9 +598,9 @@ open cohorts (`openProximitySessionIds`, commit `25acf17`):
   (verified in `tests/signaling-hub-proximity-scaling.test.mjs`).
 - **Per-cohort cap:** `MAX_PROXIMITY_SESSION_CLIENTS` (default 6) is **clamped**
   to a slot-floor ceiling. A coded chirp needs ~520 ms + an 80 ms guard (~600 ms
-  slot floor), and the 3,600 ms ceremony window fits ~6 slots, so the cohort can
-  never schedule sub-floor slots. Bigger cohorts require a longer window
-  (`PROXIMITY_SESSION_DURATION_MS`), not just a bigger number.
+  slot floor), and the default 6,000 ms ceremony window has a theoretical
+  ceiling of 10 slots. The configured cap stays at 6 devices, so tomorrow's
+  cohorts remain at most 3 pairs.
 - **De-confliction:** concurrent cohorts that fill simultaneously are spread
   across start-time phases (`ACOUSTIC_SESSION_STAGGER_MS`) and, when the band is
   wide enough, pinned to different sub-bands

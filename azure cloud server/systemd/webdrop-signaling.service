@@ -17,6 +17,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
+StateDirectory=webdrop
 
 [Install]
 WantedBy=multi-user.target

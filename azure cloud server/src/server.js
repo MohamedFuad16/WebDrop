@@ -6,6 +6,7 @@ import { PermissionPolicyProvider } from "./permission-policy.js";
 import { ProximityScoreAnalyzer } from "./proximity-score.js";
 import { QrTokenProvider } from "./qr-token-provider.js";
 import { TokenBucket } from "./rate-limits.js";
+import { analyzerPolicyFromRuntime, PolicyValidationError, RuntimeProximityPolicy } from "./runtime-proximity-policy.js";
 import { ServerMetrics } from "./metrics.js";
 import { SignalingHub } from "./signaling-hub.js";
 import { TurnConfigProvider } from "./turn-provider.js";
@@ -17,8 +18,21 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
   const maxJsonBytes = parsePositiveInt(env.MAX_JSON_BYTES, 65536);
   const turnProvider = new TurnConfigProvider({ env, fetchImpl, logger: providedLogger });
   const permissionPolicy = new PermissionPolicyProvider({ env });
+  const runtimeProximityPolicy = new RuntimeProximityPolicy({
+    filePath: env.PROXIMITY_POLICY_PATH || (env.NODE_ENV === "production" ? "/var/lib/webdrop/proximity-policy.json" : ""),
+    defaults: {
+      timing: {
+        lateTapGraceMs: parsePositiveInt(env.PROXIMITY_LATE_TAP_GRACE_MS, 6000),
+        acousticWindowMs: parsePositiveInt(env.PROXIMITY_SESSION_DURATION_MS, 6000),
+        matchSlopMs: parsePositiveInt(env.PROXIMITY_SESSION_MATCH_SLOP_MS, 4000)
+      }
+    },
+    logger: providedLogger
+  });
+  const initialAnalyzerPolicy = analyzerPolicyFromRuntime(runtimeProximityPolicy.snapshot());
   const proximityAnalyzer = new ProximityScoreAnalyzer({
-    enabled: env.ENABLE_PROXIMITY_ANALYSIS === "true"
+    enabled: env.ENABLE_PROXIMITY_ANALYSIS === "true",
+    ...initialAnalyzerPolicy
   });
   const qrTokenProvider = new QrTokenProvider({
     ttlMs: parsePositiveInt(env.QR_TOKEN_TTL_MS, 120000)
@@ -43,7 +57,7 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
         }
         response.writeHead(204, {
           ...corsHeaders,
-          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
           "Access-Control-Allow-Headers": "Authorization, Content-Type",
           "Access-Control-Max-Age": "600"
         });
@@ -117,7 +131,32 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
       if (request.method === "GET" && url.pathname === "/api/proximity-policy") {
         sendJson(response, 200, {
           proximity: proximityAnalyzer.policy(),
+          tuning: hub?.runtimeProximityPolicySnapshot?.() || runtimeProximityPolicy.snapshot(),
           permissions: permissionPolicy.getPolicy()
+        }, {
+          "Cache-Control": "no-store",
+          ...(corsHeaders || {})
+        });
+        return;
+      }
+
+      if (request.method === "PUT" && url.pathname === "/api/proximity-policy") {
+        if (!hasMetricsAuthorization(request, env.METRICS_API_TOKEN)) {
+          sendJson(response, 401, { error: "unauthorized" }, corsHeaders || {});
+          return;
+        }
+        const update = await readJsonBody(request, { maximumBytes: 16384 });
+        const policy = runtimeProximityPolicy.update(update);
+        hub?.updateRuntimeProximityPolicy?.(policy);
+        metrics.recordEvent("admin:policy:updated", {
+          revision: policy.revision,
+          updatedAt: policy.updatedAt,
+          scoring: policy.scoring,
+          timing: policy.timing
+        });
+        sendJson(response, 200, {
+          ok: true,
+          policy: hub?.runtimeProximityPolicySnapshot?.() || policy
         }, {
           "Cache-Control": "no-store",
           ...(corsHeaders || {})
@@ -164,6 +203,13 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
         error: "not_found"
       }, url.pathname.startsWith("/api/") ? corsHeaders || {} : {});
     } catch (error) {
+      if (error instanceof PolicyValidationError || error?.code === "invalid_json") {
+        sendJson(response, 400, {
+          error: error.code || "invalid_proximity_policy",
+          message: error.message
+        }, allowedOriginHeaders(request.headers.origin, allowedOrigins) || {});
+        return;
+      }
       providedLogger.error("HTTP request failed.", { message: error.message });
       sendJson(response, 500, {
         error: "internal_error"
@@ -198,13 +244,14 @@ export function createWebDropServer({ env = process.env, logger: providedLogger 
     acousticSessionStaggerMs: parseNonNegativeInt(env.ACOUSTIC_SESSION_STAGGER_MS, undefined),
     acousticSessionStaggerPhases: parsePositiveInt(env.ACOUSTIC_SESSION_STAGGER_PHASES, undefined),
     acousticMaxConcurrentSubBands: parsePositiveInt(env.ACOUSTIC_MAX_CONCURRENT_SUBBANDS, undefined),
+    runtimeProximityPolicy: runtimeProximityPolicy.snapshot(),
     proximityAnalyzer,
     qrTokenProvider,
     metrics
   });
   hub.setAllowedOrigins(allowedOrigins);
 
-  return { server, hub, turnProvider, proximityAnalyzer, permissionPolicy, qrTokenProvider, metrics };
+  return { server, hub, turnProvider, proximityAnalyzer, permissionPolicy, qrTokenProvider, metrics, runtimeProximityPolicy };
 }
 
 export function startServer({ env = process.env } = {}) {
@@ -240,6 +287,28 @@ function sendJson(response, statusCode, body, headers = {}) {
     ...headers
   });
   response.end(JSON.stringify(body));
+}
+
+async function readJsonBody(request, { maximumBytes = 16384 } = {}) {
+  const chunks = [];
+  let received = 0;
+  for await (const chunk of request) {
+    received += chunk.length;
+    if (received > maximumBytes) {
+      const error = new Error("Request body is too large.");
+      error.code = "invalid_json";
+      throw error;
+    }
+    chunks.push(chunk);
+  }
+  try {
+    const text = Buffer.concat(chunks).toString("utf8");
+    return text ? JSON.parse(text) : {};
+  } catch {
+    const error = new Error("Request body must be valid JSON.");
+    error.code = "invalid_json";
+    throw error;
+  }
 }
 
 function diagnosticsPayload({ hub, metrics }) {

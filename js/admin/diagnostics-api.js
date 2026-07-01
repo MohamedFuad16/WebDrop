@@ -27,25 +27,40 @@ export class DiagnosticsApi {
     return this.request("/api/diagnostics-public", { authenticated: true });
   }
 
-  async request(path, { authenticated = false } = {}) {
+  async proximityPolicy() {
+    return this.request("/api/proximity-policy", { authenticated: false });
+  }
+
+  async updateProximityPolicy(policy) {
+    return this.request("/api/proximity-policy", {
+      authenticated: true,
+      method: "PUT",
+      body: policy
+    });
+  }
+
+  async request(path, { authenticated = false, method = "GET", body } = {}) {
     if (!this.baseUrl) throw new Error("Signaling HTTP base is required.");
     const headers = {};
     if (authenticated && this.token) headers.Authorization = `Bearer ${this.token}`;
+    if (body !== undefined) headers["Content-Type"] = "application/json";
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
       headers,
+      method,
+      body: body === undefined ? undefined : JSON.stringify(body),
       cache: "no-store"
     });
     const text = await response.text();
-    let body;
+    let parsedBody;
     try {
-      body = JSON.parse(text);
+      parsedBody = JSON.parse(text);
     } catch {
-      body = text;
+      parsedBody = text;
     }
     if (!response.ok) {
-      const message = body?.error || body?.message || `${response.status} ${response.statusText}`;
+      const message = parsedBody?.message || parsedBody?.error || `${response.status} ${response.statusText}`;
       throw new Error(message);
     }
-    return body;
+    return parsedBody;
   }
 }

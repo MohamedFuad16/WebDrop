@@ -107,15 +107,23 @@ browser: Browser PWA (static, no build) {
 azure: Azure Node server {
   style.fill: "#e0f2f1"
   hub: signaling-hub.js
+  policy: runtime-proximity-policy.js
   ice: /api/ice-servers
   diag: /api/diagnostics
+  tune: /api/proximity-policy
+  policy -> hub: session snapshot
+  tune -> policy: validate / persist
 }
 
 admin: Admin dashboard {
   style.fill: "#fff3e0"
+  readiness: readiness.js
+  runs: test-runs.js
+  readiness -> runs: record / summarize
 }
 
 browser.signaling.wss <-> azure.hub: wss:// JSON
 browser.signaling.turn -> azure.ice: GET (Bearer)
-admin -> azure.hub: monitor
-admin -> azure.diag: poll
+admin.readiness -> azure.hub: monitor
+admin.readiness -> azure.diag: poll
+admin.readiness -> azure.tune: GET / PUT

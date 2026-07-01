@@ -20,6 +20,7 @@ Single observable object created in `js/app.js` via `createStore()` (`js/core/st
 ```
 **Persistence (browser):**
 - `localStorage`: `webdrop.deviceId`, `webdrop.deviceName`, `webdrop.avatarChoice`, `webdrop.ringColor`, `webdrop.theme`, `webdrop.locale`, `webdrop.motionPaused`, `webdrop.proximityPermissions` (mic/motion grants).
+- Admin-only `localStorage`: `webdrop.adminTestRuns.v1` (`selectedTestCaseId`, live Pair A/B assignments, an optional active run, and up to 50 completed runs). Each run keeps its policy snapshot; this history is local to that browser.
 - `sessionStorage`: `webdrop.clientId` (per-tab), `webdrop.adminToken` (admin dashboard).
 
 ## Peer model
@@ -35,7 +36,9 @@ JSON `{ type, targetId?, pairingId?, payload?|signal?|metrics? }`. Validated by 
 
 **Proximity metrics** (`proximity:telemetry` / `:session:telemetry`) — normalized score floats 0..1 plus acoustic detail: `soundCorrelation, motionCorrelation, bumpCorrelation, tiltMatch, qrMatch, tokenFresh, lowRttHint, acousticSignatureId, heardAcousticSignatureId, acousticSlot, acousticMarginDb, acousticDetections[…]`, etc.
 
-**Proximity score** (`proximity-engine.js` `proximityScore`): `sound*34 + motion*26 + bump*20 + tilt*12 + qr*8`; pass needs score ≥ `PROXIMITY_SCORE_MINIMUM` (55) **and** ultrasound+bump+tilt all present.
+**Proximity policy snapshot:** `{ revision, updatedAt, scoring:{ minimum, weights:{ sound,motion,bump,tilt,qr } }, timing:{ lateTapGraceMs, acousticWindowMs, matchSlopMs } }`. Defaults are weights `34/26/20/12/8`, minimum 55, and timing `6000/6000/4000` ms. Every session stores one immutable snapshot; the browser receives it in `proximity:start` and uses the same values. A pass still requires ultrasound+bump+tilt in addition to the configured minimum.
+
+**Admin test run:** `{ id, caseId, caseTitle, status, startedAt, stoppedAt?, targetAttempts, notes, assignments:{clientId:"A"|"B"}, devices, policy, events, sessions }`. Derived summaries count correct and wrong assigned-pair matches, failed sessions, acoustic/bump/tilt pass rates, median score, and median bump delta. Raw events are bounded and de-duplicated because the diagnostics feed is polled repeatedly.
 
 ## Transfer protocol formats (data plane)
 File `js/services/data-channel-transfer-protocol.js`.

@@ -1,8 +1,16 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.92";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.92";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.92";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.93";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.93";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.93";
+import {
+  TEST_CASES,
+  createTestRun,
+  ingestTestRun,
+  stopTestRun,
+  summarizeTestRun,
+  validateAssignments
+} from "./test-runs.js?v=1.0.93";
 
-const APP_VERSION = "1.0.92";
+const APP_VERSION = "1.0.93";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -13,7 +21,8 @@ const MONITOR_END_HZ = 19_400;
 // machine it is auto-loaded from the gitignored js/config/local-admin-token.js;
 // remote operators paste it once (kept only in sessionStorage, never committed).
 const ADMIN_TOKEN_STORAGE_KEY = "webdrop.adminToken";
-const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.92", import.meta.url);
+const TEST_RUN_STORAGE_KEY = "webdrop.adminTestRuns.v1";
+const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.93", import.meta.url);
 
 const ADMIN_MESSAGES = {
   en: {
@@ -22,6 +31,8 @@ const ADMIN_MESSAGES = {
     language: "Language",
     readiness: "Readiness",
     liveTesting: "Live testing",
+    testCases: "Test cases",
+    settings: "Settings",
     checkingServer: "Checking server",
     server: "Server",
     devicesOnline: "Devices online",
@@ -196,7 +207,47 @@ const ADMIN_MESSAGES = {
       ["10,000-client load testing", "Run after the physical handshake is stable.", "later"],
       ["Multi-node signaling", "Requires shared state or sticky sessions before horizontal scale.", "later"],
       ["Long-run acoustic calibration", "Collect multiple device models and noisy-room samples.", "later"]
-    ]
+    ],
+    proximityPolicy: "Live server policy",
+    proximityTuning: "Proximity tuning",
+    policyRevision: "Policy revision",
+    scoreWeights: "Score weights",
+    scoreWeightsCopy: "Adjust evidence points. The five weights must total exactly 100.",
+    sound: "Sound",
+    motion: "Motion",
+    bump: "Bump",
+    tilt: "Tilt",
+    qr: "QR",
+    minimumScore: "Minimum score",
+    timingWindows: "Timing windows",
+    timingWindowsCopy: "New sessions snapshot these values; a running test is never changed halfway through.",
+    lateTapGrace: "Late-tap grace",
+    lateTapGraceHelp: "How long the first tap waits for a partner tap.",
+    acousticWindow: "Acoustic exchange window",
+    acousticWindowHelp: "Coded chirp airtime plus continuous microphone capture.",
+    matchSlop: "Bump match slop",
+    matchSlopHelp: "Maximum bump-time difference after reciprocal audio proof.",
+    applyToServer: "Apply to server",
+    testCasesTitle: "Test cases",
+    testCasesCopy: "Assign the live phones, record a repeatable run, and keep every result tied to its exact server policy.",
+    savedLocally: "Saved on this admin device",
+    pairAssignments: "Pair assignments",
+    recommendedMatrix: "Recommended matrix",
+    chooseTestCase: "Choose a test case",
+    recording: "Recording",
+    activeRun: "Active run",
+    targetAttempts: "Target attempts",
+    conditionsNotes: "Conditions / notes",
+    startRecording: "Start recording",
+    stopRecording: "Stop recording",
+    currentEvidence: "Current evidence",
+    liveResults: "Live results",
+    comparison: "Comparison",
+    savedRunHistory: "Saved run history",
+    clearHistory: "Clear history",
+    settingsTitle: "Settings",
+    settingsCopy: "Tune the next proximity sessions without disturbing the live monitor or a recording already in progress.",
+    serverBackedSettings: "Server-backed settings"
   },
   ja: {
     documentTitle: "WebDrop 管理",
@@ -361,6 +412,49 @@ const ADMIN_MESSAGES = {
     failed: "失敗",
     verified: "確認済み",
     notReady: "未準備",
+    testCases: "テストケース",
+    settings: "設定",
+    proximityPolicy: "稼働中のサーバーポリシー",
+    proximityTuning: "近接チューニング",
+    proximityTuningCopy: "スコア配分と、次の近接セッションで使う時間枠を調整します。",
+    policyRevision: "ポリシー改訂",
+    scoreWeights: "スコア配分",
+    scoreWeightsCopy: "証拠ポイントを調整します。5項目の合計は必ず100にしてください。",
+    sound: "音響",
+    motion: "モーション",
+    bump: "バンプ",
+    tilt: "傾き",
+    qr: "QR",
+    minimumScore: "最低スコア",
+    timingWindows: "時間枠",
+    timingWindowsCopy: "実行中のテストは途中で変更せず、新しいセッションから値を固定して使用します。",
+    lateTapGrace: "遅延タップ猶予",
+    lateTapGraceHelp: "最初のタップが相手のタップを待つ時間です。",
+    acousticWindow: "音響交換時間",
+    acousticWindowHelp: "符号化チャープの送信とマイクの継続収録時間です。",
+    matchSlop: "バンプ時刻の許容差",
+    matchSlopHelp: "相互の音響証明後に許容するバンプ時刻の最大差です。",
+    applyToServer: "サーバーへ適用",
+    testCasesTitle: "テストケース",
+    testCasesCopy: "接続中の端末を割り当て、再現可能な実験を記録し、結果をサーバーポリシーと一緒に保存します。",
+    savedLocally: "この管理端末に保存",
+    pairAssignments: "ペア割り当て",
+    recommendedMatrix: "推奨テスト一覧",
+    chooseTestCase: "テストケースを選択",
+    recording: "記録中",
+    activeRun: "実行中のテスト",
+    targetAttempts: "目標回数",
+    conditionsNotes: "条件・メモ",
+    startRecording: "記録開始",
+    stopRecording: "記録停止",
+    currentEvidence: "現在の証拠",
+    liveResults: "ライブ結果",
+    comparison: "比較",
+    savedRunHistory: "保存済み履歴",
+    clearHistory: "履歴を消去",
+    settingsTitle: "設定",
+    settingsCopy: "ライブ監視や記録中のテストに影響を与えず、次の近接セッションを調整します。",
+    serverBackedSettings: "サーバー保存設定",
     readyItems: [
       ["本番シグナリング", "Azure WebSocket の在席、ルーティング、診断が稼働中です。", "live"],
       ["TURN 認証情報", "サーバー側 ICE 認証経路は実装済みで、リレーテスト可能です。", "ready"],
@@ -389,6 +483,7 @@ const runtime = globalThis.WEBDROP_RUNTIME_CONFIG || {};
 const httpBase = apiBaseFrom(runtime.turnConfigUrl || runtime.signalingUrl) || DEFAULT_HTTP_BASE;
 const wsUrl = runtime.signalingUrl || DEFAULT_WS_URL;
 const diagnostics = new DiagnosticsApi({ baseUrl: httpBase });
+const storedTestState = loadStoredTestState();
 
 const state = {
   socket: null,
@@ -408,7 +503,15 @@ const state = {
   ignoredMonitorIds: new Set(),
   localEvents: [],
   clearEventsBefore: 0,
-  tokenPromptDismissed: false
+  tokenPromptDismissed: false,
+  policy: null,
+  policyDraft: null,
+  policyDirty: false,
+  policySaving: false,
+  selectedTestCaseId: storedTestState.selectedTestCaseId || TEST_CASES[0].id,
+  testAssignments: storedTestState.assignments || {},
+  activeTestRun: storedTestState.activeRun || null,
+  testRunHistory: storedTestState.history || []
 };
 
 const i18n = createOperationsI18n(ADMIN_MESSAGES, {
@@ -420,7 +523,8 @@ init();
 async function init() {
   $("[data-admin-version]").textContent = APP_VERSION;
   bindEvents();
-  activateTab(new URLSearchParams(location.search).get("tab") === "live" ? "live" : "readiness");
+  const requestedTab = new URLSearchParams(location.search).get("tab");
+  activateTab(["readiness", "live", "tests", "settings"].includes(requestedTab) ? requestedTab : "readiness");
   renderAll();
   connectAdminSocket();
   diagnostics.configure({ token: await resolveAdminToken() });
@@ -479,6 +583,16 @@ function bindEvents() {
   $$("[data-admin-tab]").forEach((button) => {
     button.addEventListener("click", () => activateTab(button.dataset.adminTab));
   });
+  $$("[data-policy-weight], [data-policy-minimum], [data-policy-timing]").forEach((input) => {
+    input.addEventListener("input", () => {
+      state.policyDraft = readPolicyForm();
+      state.policyDirty = true;
+      state.policyMessage = "";
+      renderTuning();
+    });
+  });
+  $("[data-tuning-form]")?.addEventListener("submit", applyPolicyUpdate);
+  $("[data-tuning-form] button[type='submit']")?.addEventListener("click", applyPolicyUpdate);
   $("[data-live-poll]")?.addEventListener("change", (event) => {
     state.polling = event.target.checked;
     if (state.polling) schedulePoll();
@@ -494,6 +608,20 @@ function bindEvents() {
   $("[data-action='timeline-clear']")?.addEventListener("click", () => {
     state.clearEventsBefore = Date.now();
     renderTimeline();
+  });
+  $("[data-action='test-start']")?.addEventListener("click", startTestRecording);
+  $("[data-action='test-stop']")?.addEventListener("click", stopTestRecording);
+  $("[data-action='test-clear-assignments']")?.addEventListener("click", () => {
+    if (state.activeTestRun) return;
+    state.testAssignments = {};
+    persistTestState();
+    renderTestCases();
+  });
+  $("[data-action='test-clear-history']")?.addEventListener("click", () => {
+    if (!state.testRunHistory.length || !globalThis.confirm("Clear the saved WebDrop test run history on this admin device?")) return;
+    state.testRunHistory = [];
+    persistTestState();
+    renderTestCases();
   });
   globalThis.addEventListener("beforeunload", () => {
     if (state.activeMonitor) sendSocket({
@@ -681,12 +809,19 @@ function sendSocket(payload) {
 
 async function refreshDiagnostics() {
   try {
-    const [readyz, snapshot] = await Promise.all([
+    const [readyz, snapshot, policyResponse] = await Promise.all([
       diagnostics.readiness().catch((error) => ({ ok: false, error: error.message })),
-      diagnostics.snapshot()
+      diagnostics.snapshot(),
+      diagnostics.proximityPolicy().catch(() => null)
     ]);
     state.readyz = readyz;
     state.snapshot = snapshot;
+    state.policy = normalizePolicySnapshot(policyResponse?.tuning, snapshot?.signaling?.protocol);
+    if (!state.policyDirty) state.policyDraft = structuredClone(state.policy);
+    if (state.activeTestRun) {
+      state.activeTestRun = ingestTestRun(state.activeTestRun, snapshot?.metrics?.recentEvents || []);
+      persistTestState();
+    }
     state.serverReachable = true;
     renderAll();
   } catch (error) {
@@ -721,6 +856,8 @@ function renderAll() {
   renderMonitor();
   renderTimeline();
   renderSessions();
+  renderTuning();
+  renderTestCases();
   const generatedClock = formatClock(state.snapshot?.generatedAt || Date.now());
   $("[data-snapshot-time]").textContent = generatedClock;
   $("[data-server-time]").textContent = generatedClock;
@@ -1381,6 +1518,332 @@ function recentSessionSummaries(activeSessions = []) {
     .map((session) => ({ ...session, participants: [...session.participants.values()] }))
     .sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0))
     .slice(0, 8);
+}
+
+function normalizePolicySnapshot(tuning, protocol = {}) {
+  const source = tuning || {};
+  const weights = source.scoring?.weights || protocol.scoreWeights || {
+    sound: 34,
+    motion: 26,
+    bump: 20,
+    tilt: 12,
+    qr: 8
+  };
+  return {
+    revision: Math.max(1, Math.floor(Number(source.revision || protocol.policyRevision || 1))),
+    updatedAt: source.updatedAt || protocol.policyUpdatedAt || null,
+    scoring: {
+      minimum: Number(source.scoring?.minimum || Number(protocol.scoreMinimum || 0.55) * 100),
+      weights: Object.fromEntries(["sound", "motion", "bump", "tilt", "qr"].map((key) => [key, Number(weights[key] || 0)]))
+    },
+    timing: {
+      lateTapGraceMs: Number(source.timing?.lateTapGraceMs || protocol.lateTapGraceMs || 6000),
+      acousticWindowMs: Number(source.timing?.acousticWindowMs || protocol.sessionDurationMs || 6000),
+      matchSlopMs: Number(source.timing?.matchSlopMs || protocol.matchSlopMs || 4000)
+    }
+  };
+}
+
+function readPolicyForm() {
+  const weights = Object.fromEntries($$("[data-policy-weight]").map((input) => [input.dataset.policyWeight, Number(input.value)]));
+  const timing = Object.fromEntries($$("[data-policy-timing]").map((input) => [input.dataset.policyTiming, Number(input.value)]));
+  return {
+    scoring: {
+      minimum: Number($("[data-policy-minimum]")?.value),
+      weights
+    },
+    timing
+  };
+}
+
+function policyFormStatus(policy) {
+  const weights = Object.values(policy?.scoring?.weights || {}).map(Number);
+  const total = weights.reduce((sum, value) => sum + Number(value || 0), 0);
+  if (weights.length !== 5 || weights.some((value) => !Number.isFinite(value) || value < 0 || value > 100)) {
+    return { valid: false, total, message: "Each score weight must be between 0 and 100." };
+  }
+  if (Math.abs(total - 100) > 0.01) return { valid: false, total, message: `Weights total ${formatNumber(total, 1)}. They must equal 100.` };
+  const minimum = Number(policy?.scoring?.minimum);
+  if (!Number.isFinite(minimum) || minimum < 35 || minimum > 90) return { valid: false, total, message: "Minimum score must be between 35 and 90." };
+  const timingBounds = {
+    lateTapGraceMs: [2000, 15000, "Late-tap grace"],
+    acousticWindowMs: [2400, 12000, "Acoustic window"],
+    matchSlopMs: [500, 10000, "Match slop"]
+  };
+  for (const [key, [lower, upper, label]] of Object.entries(timingBounds)) {
+    const value = Number(policy?.timing?.[key]);
+    if (!Number.isFinite(value) || value < lower || value > upper) {
+      return { valid: false, total, message: `${label} must be between ${lower} and ${upper} ms.` };
+    }
+  }
+  return { valid: true, total, message: state.policyDirty ? "Unsaved changes. New sessions still use the current server revision." : "New sessions use this policy immediately; active sessions keep their snapshot." };
+}
+
+function renderTuning() {
+  const form = $("[data-tuning-form]");
+  if (!form) return;
+  const policy = state.policyDraft || state.policy || normalizePolicySnapshot(null, state.snapshot?.signaling?.protocol);
+  for (const input of $$("[data-policy-weight]")) input.value = String(policy.scoring.weights[input.dataset.policyWeight]);
+  for (const input of $$("[data-policy-timing]")) input.value = String(policy.timing[input.dataset.policyTiming]);
+  $("[data-policy-minimum]").value = String(policy.scoring.minimum);
+  $("[data-policy-revision]").textContent = state.policy
+    ? `${state.policy.revision}${state.policy.updatedAt ? ` · ${formatClock(state.policy.updatedAt)}` : ""}`
+    : "—";
+  const validation = policyFormStatus(policy);
+  const total = $("[data-policy-weight-total]");
+  total.value = `${formatNumber(validation.total, 1)} points`;
+  total.textContent = `${formatNumber(validation.total, 1)} points`;
+  total.dataset.valid = String(validation.valid);
+  const status = $("[data-policy-status]");
+  status.dataset.state = state.policySaving ? "saving" : validation.valid ? (state.policyDirty ? "dirty" : "ready") : "error";
+  status.textContent = state.policySaving ? "Applying policy to the server…" : (state.policyMessage || validation.message);
+  form.querySelector("button[type='submit']").disabled = state.policySaving || !validation.valid || !state.policyDirty;
+  $$("[data-policy-weight], [data-policy-minimum], [data-policy-timing]").forEach((input) => {
+    input.disabled = state.policySaving || !state.policy;
+  });
+}
+
+async function applyPolicyUpdate(event) {
+  event.preventDefault();
+  const policy = readPolicyForm();
+  const validation = policyFormStatus(policy);
+  if (!validation.valid || state.policySaving) {
+    state.policyMessage = validation.message;
+    renderTuning();
+    return;
+  }
+  state.policySaving = true;
+  state.policyMessage = "";
+  renderTuning();
+  try {
+    const response = await diagnostics.updateProximityPolicy(policy);
+    state.policy = normalizePolicySnapshot(response.policy, response.policy);
+    state.policyDraft = structuredClone(state.policy);
+    state.policyDirty = false;
+    state.policyMessage = `Applied revision ${state.policy.revision}. Refresh complete; the next proximity session will use it.`;
+    addLocalEvent("admin:policy:updated", {
+      revision: state.policy.revision,
+      timing: state.policy.timing,
+      scoring: state.policy.scoring
+    });
+    await refreshDiagnostics();
+  } catch (error) {
+    state.policyMessage = friendlyError(error);
+    showError(state.policyMessage);
+  } finally {
+    state.policySaving = false;
+    renderTuning();
+  }
+}
+
+function renderTestCases() {
+  const tabs = $("[data-test-case-tabs]");
+  if (!tabs) return;
+  const definition = TEST_CASES.find((entry) => entry.id === state.selectedTestCaseId) || TEST_CASES[0];
+  state.selectedTestCaseId = definition.id;
+  tabs.innerHTML = TEST_CASES.map((entry) => `
+    <button type="button" data-test-case-id="${escapeHtml(entry.id)}" class="${entry.id === definition.id ? "is-active" : ""}" ${state.activeTestRun ? "disabled" : ""}>${escapeHtml(entry.shortTitle)}</button>
+  `).join("");
+  tabs.querySelectorAll("[data-test-case-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedTestCaseId = button.dataset.testCaseId;
+      const selected = TEST_CASES.find((entry) => entry.id === state.selectedTestCaseId);
+      const target = $("[data-test-target]");
+      if (target && selected) target.value = String(selected.targetAttempts);
+      state.testAssignments = {};
+      persistTestState();
+      renderTestCases();
+    });
+  });
+  $("[data-test-case-detail]").innerHTML = `
+    <div><h3>${escapeHtml(definition.title)}</h3><p>${escapeHtml(definition.purpose)}</p></div>
+    <ol><li>${escapeHtml(definition.procedure)}</li><li>${definition.pairCount === 2 ? "Assign two phones to Pair A and two to Pair B." : "Assign exactly two phones to Pair A."}</li><li>Keep device cases, room position, and operator roles in the run notes.</li></ol>
+  `;
+  renderTestDeviceAssignments(definition);
+  renderActiveTestRun(definition);
+  renderRunHistory();
+}
+
+function renderTestDeviceAssignments(definition) {
+  const devices = physicalDevices();
+  if (!state.activeTestRun) {
+    const liveIds = new Set(devices.map((device) => device.id));
+    for (const clientId of Object.keys(state.testAssignments)) {
+      if (!liveIds.has(clientId)) delete state.testAssignments[clientId];
+    }
+  }
+  const list = $("[data-test-device-list]");
+  if (!devices.length) {
+    list.innerHTML = `<p class="empty-row">${escapeHtml(i18n.t("noDevices"))}</p>`;
+  } else {
+    list.innerHTML = devices.map((device) => {
+      const assignment = state.testAssignments[device.id] || "";
+      return `
+        <label class="test-device-row">
+          <span class="device-avatar">${escapeHtml(deviceInitials(device))}</span>
+          <span><strong>${escapeHtml(friendlyDeviceName(device))}</strong><small>${escapeHtml(friendlyPlatform(device))}</small></span>
+          <select data-test-device-assignment="${escapeHtml(device.id)}" ${state.activeTestRun ? "disabled" : ""} aria-label="Pair assignment for ${escapeHtml(friendlyDeviceName(device))}">
+            <option value=""${assignment ? "" : " selected"}>Not included</option>
+            <option value="A"${assignment === "A" ? " selected" : ""}>Pair A</option>
+            <option value="B"${assignment === "B" ? " selected" : ""}${definition.pairCount === 1 ? " disabled" : ""}>Pair B</option>
+          </select>
+        </label>`;
+    }).join("");
+  }
+  list.querySelectorAll("[data-test-device-assignment]").forEach((select) => {
+    select.addEventListener("change", () => {
+      const clientId = select.dataset.testDeviceAssignment;
+      if (select.value) state.testAssignments[clientId] = select.value;
+      else delete state.testAssignments[clientId];
+      persistTestState();
+      renderTestCases();
+    });
+  });
+  const assignmentValidation = validateAssignments(definition.id, state.testAssignments);
+  const assignmentStatus = $("[data-assignment-status]");
+  assignmentStatus.textContent = state.activeTestRun
+    ? `Recording ${Object.keys(state.activeTestRun.assignments || {}).length} assigned devices.`
+    : assignmentValidation.valid ? "Assignments ready." : assignmentValidation.message;
+  assignmentStatus.dataset.valid = String(assignmentValidation.valid);
+}
+
+function renderActiveTestRun(definition) {
+  const run = state.activeTestRun;
+  const validation = validateAssignments(definition.id, state.testAssignments);
+  const status = $("[data-run-status]");
+  status.dataset.runStatus = run ? "active" : "idle";
+  $("[data-run-status-copy]").textContent = run ? "Recording" : i18n.t("idle");
+  const target = $("[data-test-target]");
+  const notes = $("[data-test-notes]");
+  target.disabled = Boolean(run);
+  notes.disabled = Boolean(run);
+  $("[data-action='test-start']").disabled = Boolean(run) || !validation.valid || !state.policy;
+  $("[data-action='test-stop']").disabled = !run;
+  if (!run && !target.value) target.value = String(definition.targetAttempts);
+  const summary = summarizeTestRun(run);
+  $("[data-active-run-summary]").innerHTML = run ? `
+    <span><small>Elapsed</small><strong>${escapeHtml(formatElapsed(Date.now() - run.startedAt))}</strong></span>
+    <span><small>Case</small><strong>${escapeHtml(run.caseTitle)}</strong></span>
+    <span><small>Policy</small><strong>Revision ${escapeHtml(run.policy?.revision || "—")}</strong></span>
+    <span><small>Sessions</small><strong>${summary.sessions} / ${run.targetAttempts}</strong></span>
+    <span><small>Pairs</small><strong>${escapeHtml(formatAssignedPairs(run.assignments))}</strong></span>
+  ` : `<p class="empty-row">Choose a case, assign the connected phones, then start recording.</p>`;
+  renderRunResults(run);
+}
+
+function renderRunResults(run) {
+  const summary = summarizeTestRun(run);
+  const cells = [
+    ["Sessions", summary.sessions],
+    ["Correct pairs", summary.correctPairs],
+    ["Wrong pairs", summary.wrongPairs],
+    ["Failed", summary.failed],
+    ["Acoustic pass", formatRate(summary.acousticPass)],
+    ["Bump pass", formatRate(summary.bumpPass)],
+    ["Tilt pass", formatRate(summary.tiltPass)],
+    ["Median score", summary.medianScore == null ? "—" : formatNumber(summary.medianScore, 1)],
+    ["Bump delta", summary.medianBumpDeltaMs == null ? "—" : `${formatNumber(summary.medianBumpDeltaMs, 0)} ms`]
+  ];
+  $("[data-run-results]").innerHTML = cells.map(([label, value], index) => `
+    <span data-tone="${index === 2 && Number(value) > 0 ? "bad" : index === 1 && Number(value) > 0 ? "good" : "neutral"}"><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong></span>
+  `).join("");
+}
+
+function renderRunHistory() {
+  const node = $("[data-run-history]");
+  const history = state.testRunHistory || [];
+  if (!history.length) {
+    node.innerHTML = `<p class="empty-row">No saved runs yet. Completed recordings will appear here for comparison.</p>`;
+    return;
+  }
+  node.innerHTML = `
+    <div class="run-history-row run-history-head" aria-hidden="true">
+      <span>Date</span><span>Test case</span><span>Policy</span><span>Sessions</span><span>Correct</span><span>Wrong</span><span>Failed</span><span>Audio</span><span>Bump</span><span>Tilt</span><span>Score</span><span>Δ bump</span>
+    </div>
+    ${history.slice(0, 30).map((run) => {
+      const summary = summarizeTestRun(run);
+      return `<article class="run-history-row">
+        <span>${escapeHtml(new Date(run.stoppedAt || run.startedAt).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }))}</span>
+        <strong>${escapeHtml(run.caseTitle)}</strong>
+        <span>r${escapeHtml(run.policy?.revision || "—")}</span>
+        <span>${summary.sessions}</span><span data-tone="good">${summary.correctPairs}</span><span data-tone="${summary.wrongPairs ? "bad" : "neutral"}">${summary.wrongPairs}</span><span>${summary.failed}</span>
+        <span>${escapeHtml(formatRate(summary.acousticPass))}</span><span>${escapeHtml(formatRate(summary.bumpPass))}</span><span>${escapeHtml(formatRate(summary.tiltPass))}</span>
+        <span>${summary.medianScore == null ? "—" : escapeHtml(formatNumber(summary.medianScore, 1))}</span><span>${summary.medianBumpDeltaMs == null ? "—" : `${escapeHtml(formatNumber(summary.medianBumpDeltaMs, 0))}ms`}</span>
+      </article>`;
+    }).join("")}`;
+}
+
+function startTestRecording() {
+  if (state.activeTestRun) return;
+  const validation = validateAssignments(state.selectedTestCaseId, state.testAssignments);
+  if (!validation.valid) {
+    showError(validation.message);
+    return;
+  }
+  state.activeTestRun = createTestRun({
+    caseId: state.selectedTestCaseId,
+    assignments: state.testAssignments,
+    policy: state.policy,
+    targetAttempts: $("[data-test-target]")?.value,
+    notes: $("[data-test-notes]")?.value,
+    devices: physicalDevices()
+  });
+  addLocalEvent("admin:test-run:started", { runId: state.activeTestRun.id, caseId: state.activeTestRun.caseId });
+  persistTestState();
+  renderTestCases();
+}
+
+function stopTestRecording() {
+  if (!state.activeTestRun) return;
+  const completed = stopTestRun(state.activeTestRun);
+  state.testRunHistory.unshift(completed);
+  state.testRunHistory = state.testRunHistory.slice(0, 50);
+  addLocalEvent("admin:test-run:stopped", { runId: completed.id, summary: summarizeTestRun(completed) });
+  state.activeTestRun = null;
+  persistTestState();
+  renderTestCases();
+}
+
+function loadStoredTestState() {
+  try {
+    const parsed = JSON.parse(globalThis.localStorage?.getItem(TEST_RUN_STORAGE_KEY) || "{}");
+    return {
+      selectedTestCaseId: typeof parsed.selectedTestCaseId === "string" ? parsed.selectedTestCaseId : TEST_CASES[0].id,
+      assignments: isPlainObject(parsed.assignments) ? parsed.assignments : {},
+      activeRun: parsed.activeRun?.status === "active" ? parsed.activeRun : null,
+      history: Array.isArray(parsed.history) ? parsed.history.slice(0, 50) : []
+    };
+  } catch {
+    return { selectedTestCaseId: TEST_CASES[0].id, assignments: {}, activeRun: null, history: [] };
+  }
+}
+
+function persistTestState() {
+  try {
+    globalThis.localStorage?.setItem(TEST_RUN_STORAGE_KEY, JSON.stringify({
+      selectedTestCaseId: state.selectedTestCaseId,
+      assignments: state.testAssignments,
+      activeRun: state.activeTestRun,
+      history: state.testRunHistory
+    }));
+  } catch {
+    /* local persistence is best-effort; the active page still retains results */
+  }
+}
+
+function formatAssignedPairs(assignments = {}) {
+  return ["A", "B"].filter((pair) => Object.values(assignments).includes(pair)).join(" + ") || "—";
+}
+
+function formatRate(value) {
+  return value == null ? "—" : `${formatNumber(value, 1)}%`;
+}
+
+function formatElapsed(milliseconds) {
+  const totalSeconds = Math.max(0, Math.floor(Number(milliseconds || 0) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 function setSocketState(nextState) {

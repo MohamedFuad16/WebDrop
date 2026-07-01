@@ -1,9 +1,18 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.92";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.92";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.92";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.93";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.93";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.93";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 export const BUMP_SCORE_POINTS = 20;
+export const DEFAULT_PROXIMITY_TUNING = Object.freeze({
+  revision: 1,
+  updatedAt: null,
+  scoring: Object.freeze({
+    minimum: PROXIMITY_SCORE_MINIMUM,
+    weights: Object.freeze({ sound: 34, motion: 26, bump: BUMP_SCORE_POINTS, tilt: 12, qr: 8 })
+  }),
+  timing: Object.freeze({ lateTapGraceMs: 6000, acousticWindowMs: 6000, matchSlopMs: 4000 })
+});
 const ACOUSTIC_SLOT_GUARD_MS = 80;
 const ACOUSTIC_MIN_SLOT_MS = 520;
 const ACOUSTIC_GRACE_LISTEN_MS = 1600;
@@ -12,16 +21,27 @@ export class ProximityEngine {
   constructor({
     enabled = false,
     acoustic = new AcousticProximitySensor(),
-    motion = new MotionProximitySensor()
+    motion = new MotionProximitySensor(),
+    tuning = DEFAULT_PROXIMITY_TUNING
   } = {}) {
     this.enabled = enabled;
     this.acoustic = acoustic;
     this.motion = motion;
+    this.tuning = normalizeProximityTuning(tuning);
   }
 
   setEnabled(enabled) {
     this.enabled = Boolean(enabled);
     return this.enabled;
+  }
+
+  setTuning(tuning) {
+    this.tuning = normalizeProximityTuning(tuning, this.tuning);
+    return this.getTuning();
+  }
+
+  getTuning() {
+    return structuredClone(this.tuning);
   }
 
   async requestMicrophonePermission(constraints) {
@@ -83,7 +103,12 @@ export class ProximityEngine {
   getSnapshot() {
     return {
       enabled: this.enabled,
-      motion: this.motion.getSnapshot()
+      motion: {
+        ...this.motion.getSnapshot(),
+        bumpScorePoints: this.tuning.scoring.weights.bump,
+        tiltScorePoints: this.tuning.scoring.weights.tilt
+      },
+      tuning: this.getTuning()
     };
   }
 
@@ -107,12 +132,14 @@ export class ProximityEngine {
     tokenFresh = false,
     qrToken,
     qrOptions,
+    tuning,
     onProgress = () => {}
   } = {}) {
     if (!this.enabled) {
       return disabledResult();
     }
 
+    const activeTuning = this.setTuning(tuning || this.tuning);
     await waitUntil(startAt);
     onProgress({ phase: "audio", state: acoustic ? "active" : "unavailable" });
     const acousticResult = acoustic
@@ -131,7 +158,11 @@ export class ProximityEngine {
           durationMs: ceremonyDurationMs
         })
       : { detected: false, reason: "skipped" };
-    const motion = this.motion.getSnapshot();
+    const motion = {
+      ...this.motion.getSnapshot(),
+      bumpScorePoints: activeTuning.scoring.weights.bump,
+      tiltScorePoints: activeTuning.scoring.weights.tilt
+    };
     onProgress({ phase: "audio", state: acousticResult.detected ? "complete" : "failed", acoustic: acousticResult });
     onProgress({ phase: "motion", state: "complete", motion });
     const qr = qrToken
@@ -178,7 +209,9 @@ export class ProximityEngine {
       qrFallback: qr.valid && !acousticResult.detected,
       lowRttHint: false
     };
-    const score = proximityScore(metrics);
+    metrics.scoreMinimum = activeTuning.scoring.minimum;
+    metrics.scoreWeights = { ...activeTuning.scoring.weights };
+    const score = proximityScore(metrics, activeTuning);
     // Mirror the authoritative server gate (hasRequiredPhysicalEvidence in
     // azure cloud server/src/signaling-hub.js): a real ceremony only passes when
     // ultrasound, bump, and tilt are all present, never on motion alone. This
@@ -187,13 +220,14 @@ export class ProximityEngine {
     const hasRequiredPhysicalEvidence = Boolean(metrics.acoustic)
       && Boolean(metrics.bump)
       && Boolean(metrics.tilt);
-    const passed = score >= PROXIMITY_SCORE_MINIMUM && hasRequiredPhysicalEvidence;
+    const passed = score >= activeTuning.scoring.minimum && hasRequiredPhysicalEvidence;
     onProgress({ phase: "score", state: passed ? "complete" : "failed", score, metrics, motion });
 
     return {
       passed,
       score,
       metrics,
+      tuning: activeTuning,
       evidence: { acoustic: { ...acousticResult, role: acousticRole }, motion, qr }
     };
   }
@@ -208,11 +242,12 @@ export class ProximityEngine {
       qrFallback: !capabilities.microphone || !capabilities.motion,
       lowRttHint: true
     };
-    const score = proximityScore(metrics);
+    const score = proximityScore(metrics, this.tuning);
     return {
-      passed: score >= PROXIMITY_SCORE_MINIMUM,
+      passed: score >= this.tuning.scoring.minimum,
       score,
-      metrics
+      metrics,
+      tuning: this.getTuning()
     };
   }
 
@@ -632,13 +667,52 @@ function waitUntil(timestamp) {
   return delay(Math.max(0, Number(timestamp) - Date.now()));
 }
 
-export function proximityScore(metrics) {
+export function proximityScore(metrics, tuning = DEFAULT_PROXIMITY_TUNING) {
+  const activeTuning = normalizeProximityTuning(tuning);
+  const weights = activeTuning.scoring.weights;
   const sound = metricValue(metrics.soundCorrelation ?? metrics.acoustic);
   const motion = metricValue(metrics.motionCorrelation);
   const bump = metricValue(metrics.bump);
   const tilt = metricValue(metrics.tilt);
   const qr = metricValue(metrics.qrMatch ?? metrics.qrFallback);
-  return Math.round((sound * 34 + motion * 26 + bump * BUMP_SCORE_POINTS + tilt * 12 + qr * 8) * 10) / 10;
+  return Math.round((sound * weights.sound
+    + motion * weights.motion
+    + bump * weights.bump
+    + tilt * weights.tilt
+    + qr * weights.qr) * 10) / 10;
+}
+
+export function normalizeProximityTuning(tuning = {}, fallback = DEFAULT_PROXIMITY_TUNING) {
+  const source = tuning && typeof tuning === "object" ? tuning : {};
+  const base = fallback && typeof fallback === "object" ? fallback : DEFAULT_PROXIMITY_TUNING;
+  const weightSource = source.scoring?.weights || base.scoring?.weights || DEFAULT_PROXIMITY_TUNING.scoring.weights;
+  const weights = Object.fromEntries(["sound", "motion", "bump", "tilt", "qr"].map((key) => {
+    const value = Number(weightSource[key]);
+    return [key, Number.isFinite(value) && value >= 0 ? value : DEFAULT_PROXIMITY_TUNING.scoring.weights[key]];
+  }));
+  const total = Object.values(weights).reduce((sum, value) => sum + value, 0) || 100;
+  const normalizedWeights = Object.fromEntries(
+    Object.entries(weights).map(([key, value]) => [key, Math.round(value / total * 1000) / 10])
+  );
+  const minimum = Number(source.scoring?.minimum ?? base.scoring?.minimum ?? PROXIMITY_SCORE_MINIMUM);
+  return {
+    revision: Math.max(1, Math.floor(Number(source.revision || base.revision || 1))),
+    updatedAt: source.updatedAt || base.updatedAt || null,
+    scoring: {
+      minimum: Number.isFinite(minimum) ? Math.max(0, Math.min(100, minimum)) : PROXIMITY_SCORE_MINIMUM,
+      weights: normalizedWeights
+    },
+    timing: {
+      lateTapGraceMs: positiveTiming(source.timing?.lateTapGraceMs, base.timing?.lateTapGraceMs, 6000),
+      acousticWindowMs: positiveTiming(source.timing?.acousticWindowMs, base.timing?.acousticWindowMs, 6000),
+      matchSlopMs: positiveTiming(source.timing?.matchSlopMs, base.timing?.matchSlopMs, 4000)
+    }
+  };
+}
+
+function positiveTiming(value, fallback, finalFallback) {
+  const number = Number(value ?? fallback ?? finalFallback);
+  return Number.isFinite(number) && number > 0 ? number : finalFallback;
 }
 
 function metricValue(value) {

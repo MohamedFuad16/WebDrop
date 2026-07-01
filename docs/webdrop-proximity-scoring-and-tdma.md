@@ -82,13 +82,13 @@ Current production values (`azure cloud server/.env.example`,
 | Setting | Env knob | Current value |
 | --- | --- | ---: |
 | Initial join window | `PROXIMITY_SESSION_JOIN_WINDOW_MS` | 1,800 ms |
-| One-person extension | (built in) | One additional 1,800 ms window |
+| Late-partner admission grace | runtime policy (`PROXIMITY_LATE_TAP_GRACE_MS` default) | 6,000 ms from the first tap |
 | Per-cohort device cap | `MAX_PROXIMITY_SESSION_CLIENTS` | 6 (clamped — see below) |
 | Global participant cap | `MAX_TOTAL_PROXIMITY_PARTICIPANTS` | 100 |
 | Delay before the ceremony starts | `PROXIMITY_SESSION_START_DELAY_MS` | 1,200 ms |
-| Acoustic ceremony duration | `PROXIMITY_SESSION_DURATION_MS` | 3,600 ms |
+| Acoustic ceremony duration | runtime policy (`PROXIMITY_SESSION_DURATION_MS` default) | 6,000 ms |
 | Server session lifetime | `PROXIMITY_SESSION_TTL_MS` | 15,000 ms |
-| Allowed bump-time difference | `PROXIMITY_SESSION_MATCH_SLOP_MS` | 4,000 ms |
+| Allowed bump-time difference | runtime policy (`PROXIMITY_SESSION_MATCH_SLOP_MS` default) | 4,000 ms |
 
 If only one phone joins after the extension, the normal pairing ceremony ends
 with `no_nearby_partner`. This is correct for pairing, because one phone cannot
@@ -117,13 +117,12 @@ of open cohorts (`openProximitySessionIds`). When a phone joins:
 **Why the per-cohort cap is clamped.** Every device in one cohort shares one
 acoustic band and is separated by *time slots*. A single coded chirp needs about
 `ACOUSTIC_MIN_SLOT_MS` (520 ms) plus an `ACOUSTIC_SLOT_GUARD_MS` (80 ms) guard,
-so the slot floor is ~600 ms. Inside the 3,600 ms ceremony window only
-`floor(3600 / 600) = 6` slots fit. The hub computes this `cohortCeiling` from the
-ceremony window and **clamps** `MAX_PROXIMITY_SESSION_CLIENTS` to it, so a
-misconfiguration can never schedule sub-floor slots. Raising the real per-cohort
-size therefore requires extending `PROXIMITY_SESSION_DURATION_MS`, not just the
-cap (`proximitySessionDurationMs: 4800` → ceiling 8, verified in
-`tests/signaling-hub-proximity-scaling.test.mjs`).
+so the slot floor is ~600 ms. The default 6,000 ms acoustic window has a
+theoretical ceiling of `floor(6000 / 600) = 10` slots. The hub computes this
+`cohortCeiling` from the active runtime policy and **clamps**
+`MAX_PROXIMITY_SESSION_CLIENTS` to it, so a misconfiguration can never schedule
+sub-floor slots. The configured cap remains 6 devices (3 pairs) per cohort for
+conservative tomorrow testing even though the longer window could fit more.
 
 So with the current defaults, 100 participants resolve to roughly
 `100 / 6 ≈ 17` concurrent 6-person cohorts, i.e. up to ~50 simultaneous pairs.
@@ -372,9 +371,10 @@ Tilt passes when either absolute angle is **strictly greater than 30 degrees**.
 
 The server also requires explicit tilt evidence. Score alone cannot replace it.
 
-## The Current Score
+## The Default Runtime Score
 
-WebDrop currently has two representations of the same evidence:
+WebDrop has two representations of the same evidence, both driven by the same
+revisioned runtime policy:
 
 1. The client produces a raw diagnostic point score.
 2. The production server normalizes the configured weights into a percentage.
@@ -390,7 +390,7 @@ WebDrop currently has two representations of the same evidence:
 | QR metric in the generic analyzer | 8 |
 | Total | 100 |
 
-The client-side point model has a maximum of 100. The client formula
+The default client-side point model has a maximum of 100. The default formula
 (`proximityScore` in `js/services/proximity-engine.js`) is:
 
 ```text
@@ -406,9 +406,10 @@ Every input is normalized between 0 and 1.
 
 ### Server percentage
 
-The server (`azure cloud server/src/proximity-score.js`) uses the same weights
-expressed as fractions that sum to 1.0, then normalizes them (the sum is already
-1.0, so the effective weights are unchanged):
+The server (`azure cloud server/src/proximity-score.js`) converts the same
+point weights to fractions that sum to 1.0. Admin Settings may change the five
+point values, but they must still total 100 and each session snapshots one
+revision:
 
 | Evidence | Configured weight | Effective percentage weight |
 | --- | ---: | ---: |
@@ -419,7 +420,7 @@ expressed as fractions that sum to 1.0, then normalizes them (the sum is already
 | QR metric | 0.08 | 8% |
 | Total | 1.00 | 100% |
 
-This is why complete physical evidence without QR is:
+With the default revision, complete physical evidence without QR is:
 
 ```text
 92 raw client points

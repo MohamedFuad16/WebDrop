@@ -2,7 +2,7 @@
 
 Human-readable companion to [`dependencies.dot`](dependencies.dot) / [`dependencies.json`](dependencies.json) and the architecture diagram [`architecture.svg`](architecture.svg) (source [`architecture.d2`](architecture.d2)).
 
-> **Note on generation:** `madge` and `dependency-cruiser` return **empty** edges for this repo because imports carry `?v=1.0.92` cache-busting query strings (e.g. `import {X} from "./foo.js?v=1.0.92"`) that defeat path resolution. The graph below was therefore built **deterministically by reading the real `import … from` statements** across `js/` + `workers/`. Regenerate the same way (or strip `?v=` before running a tool). `architecture.svg` was rendered with `d2 0.7.1`.
+> **Note on generation:** `madge` and `dependency-cruiser` return **empty** edges for this repo because imports carry `?v=1.0.93` cache-busting query strings (e.g. `import {X} from "./foo.js?v=1.0.93"`) that defeat path resolution. The graph below was therefore built **deterministically by reading the real `import … from` statements** across the project JavaScript sources. Regenerate the same way (or strip `?v=` before running a tool). `architecture.svg` was rendered with `d2 0.7.1`.
 
 ## Entry points
 - `js/app.js` — main app (loaded by `index.html` as a module).
@@ -31,7 +31,8 @@ ui/dynamic-island.js ── vendor/qrcode-generator, utils/emitter, utils/format
                         config/avatar-options, ui/tile-wave, services/proximity-engine
 services/data-channel-transfer-protocol.js ── utils/emitter, workers/incremental-sha256
 
-admin/readiness.js ── admin/operations-i18n, admin/diagnostics-api, admin/shared
+admin/readiness.js ── admin/operations-i18n, admin/diagnostics-api, admin/shared, admin/test-runs
+azure cloud server/server.js ── runtime-proximity-policy.js ── node:fs, node:path
 ```
 
 ## Most-depended-upon modules (change with extreme care)
@@ -46,6 +47,7 @@ admin/readiness.js ── admin/operations-i18n, admin/diagnostics-api, admin/sh
 - **`services/webrtc-transport.js` (events/channels):** `transfer-engine.js` and `core/controller.js` (`waitForTransportConnection`, path stats).
 - **Signaling event names/shape (`websocket-signaling.js` / `mock-signaling.js`):** `core/controller.js` (the big set of `signaling.on(...)` handlers) and `webrtc-transport.js` (`rtcSignal`). Keep both adapters in sync, and align with the server hub.
 - **`services/proximity-engine.js` scoring/gate:** `core/controller.js` (ceremony orchestration, failure messages) and `ui/dynamic-island.js` (metrics display). Mirror changes in the server gate (`hasRequiredPhysicalEvidence`).
+- **Runtime proximity policy (`runtime-proximity-policy.js` / `signaling-hub.js`):** client `proximity-engine.js`, controller start handling, admin Settings, diagnostics payloads, and `tests/admin-test-runs.test.mjs`. New fields must stay serializable because sessions and saved test runs snapshot them.
 - **`storage/storage-client.js` backend API:** `services/transfer-engine.js` (prepare/writeChunk/finalize/export) and `core/controller.js` (`open-received` export). Update `agent/data.md`.
 - **`ui/app-view.js` emitted events:** `core/controller.js` `view.on(...)` handlers. Adding a UI action means adding a controller handler.
 - **`config/runtime-flags.js` / `runtime-config.js`:** `app.js` wiring + every "real vs mock" branch in `controller.js`. Update `agent/setup.md`.
@@ -55,3 +57,6 @@ admin/readiness.js ── admin/operations-i18n, admin/diagnostics-api, admin/sh
 - **`js/ui/siri-wave.js`** — not statically imported by any runtime module; only dynamically imported by `tests/e2e/app-ui.spec.mjs` and precached in `service-worker.js`.
 - **`js/config/local-admin-token.js`** — not statically imported; fetched as text at runtime by `admin/readiness.js` (regex-extracted) and stubbed in tests. Gitignored (see `secrets.md`).
 - **`js/vendor/*`** (`jsqr.js`, `qrcode-generator.mjs`, `streamsaver-adapter.js`) and **`workers/incremental-sha256.js`** are leaf modules.
+
+## Last generated
+- 2026-07-01 via tree-sitter/heuristic fallback.

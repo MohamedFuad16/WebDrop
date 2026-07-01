@@ -225,6 +225,8 @@ Policy endpoint:
 
 ```text
 GET /api/proximity-policy
+PUT /api/proximity-policy
+Authorization: Bearer <METRICS_API_TOKEN>   # PUT only
 ```
 
 The response reports:
@@ -234,13 +236,16 @@ The response reports:
 - the server never requests browser permissions
 - when analysis is enabled, RTC/chat/path/transfer routing is gated until a `verified` decision; when disabled, connection acceptance is not gated by the score
 - Node and nginx emit `Permissions-Policy` headers that keep microphone, camera, accelerometer, gyroscope, and magnetometer off by default
+- `tuning` contains the current revisioned score weights/minimum plus late-tap grace, acoustic window, and match slop; authenticated PUT validates and persists a new revision for subsequent sessions
+
+Production persists tuning at `/var/lib/webdrop/proximity-policy.json` by default (`PROXIMITY_POLICY_PATH` overrides it). The systemd unit creates `/var/lib/webdrop` with `StateDirectory=webdrop`. Updates are atomic and survive restart. Running sessions retain their own snapshot.
 
 ### Concurrent bounded cohorts (capacity model)
 
 The server-coordinated ceremony runs MANY concurrent proximity sessions, each kept a SMALL acoustic cohort so per-session time slots stay reliable (`openProximitySessionIds` in `src/signaling-hub.js`):
 
 - `MAX_TOTAL_PROXIMITY_PARTICIPANTS` (default **100**): global cap across all concurrent cohorts. Joins beyond it are rejected cleanly with `proximity:session:failed` and `reason: "capacity_reached"`.
-- `MAX_PROXIMITY_SESSION_CLIENTS` (default 6): per-cohort cap, **clamped** to the slot-floor ceiling derived from the ceremony window. A coded chirp needs ~520 ms + 80 ms guard (~600 ms floor), so the 3,600 ms `PROXIMITY_SESSION_DURATION_MS` window fits ~6 slots. Raising the cap higher has no effect unless the window grows.
+- `MAX_PROXIMITY_SESSION_CLIENTS` (default 6): per-cohort cap, **clamped** to the slot-floor ceiling derived from the ceremony window. A coded chirp needs ~520 ms + 80 ms guard (~600 ms floor), so the default 6,000 ms acoustic window has a theoretical ceiling of 10 slots; the configured cap deliberately remains 6 devices (3 pairs) per cohort.
 - `ACOUSTIC_SESSION_STAGGER_MS` / `ACOUSTIC_SESSION_STAGGER_PHASES`: spread cohorts that fill at the same instant across start-time phases so they do not all chirp at once.
 - `ACOUSTIC_MAX_CONCURRENT_SUBBANDS` (+ `ACOUSTIC_BAND_START_HZ`/`ACOUSTIC_BAND_END_HZ`): pin concurrent cohorts to different frequency lanes when the usable band is wide enough (a no-op at the default 18.6–19.4 kHz band, where only one ≥420 Hz lane fits).
 
@@ -354,7 +359,8 @@ Proximity-pairing capacity + acoustic cohort tuning (optional; unset uses safe d
 
 - `MAX_TOTAL_PROXIMITY_PARTICIPANTS=100` (global cap; `capacity_reached` beyond it)
 - `MAX_PROXIMITY_SESSION_CLIENTS=6` (per-cohort cap, clamped to the slot-floor ceiling)
-- `PROXIMITY_SESSION_JOIN_WINDOW_MS=1800`, `PROXIMITY_SESSION_START_DELAY_MS=1200`, `PROXIMITY_SESSION_DURATION_MS=3600`, `PROXIMITY_SESSION_TTL_MS=15000`, `PROXIMITY_SESSION_MATCH_SLOP_MS=4000`
+- `PROXIMITY_SESSION_JOIN_WINDOW_MS=1800`, `PROXIMITY_LATE_TAP_GRACE_MS=6000`, `PROXIMITY_SESSION_START_DELAY_MS=1200`, `PROXIMITY_SESSION_DURATION_MS=6000`, `PROXIMITY_SESSION_TTL_MS=15000`, `PROXIMITY_SESSION_MATCH_SLOP_MS=4000`
+- `PROXIMITY_POLICY_PATH=/var/lib/webdrop/proximity-policy.json` (production default; persisted Settings updates override the timing env defaults after first save)
 - `ACOUSTIC_BAND_START_HZ=18600`, `ACOUSTIC_BAND_END_HZ=19400`, `ACOUSTIC_MIN_BANDWIDTH_HZ=420`
 - `ACOUSTIC_SESSION_STAGGER_MS=600`, `ACOUSTIC_SESSION_STAGGER_PHASES=3`, `ACOUSTIC_MAX_CONCURRENT_SUBBANDS=4`
 

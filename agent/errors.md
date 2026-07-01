@@ -3,7 +3,7 @@
 Observed in the real code. "Resolution" = how the code already handles it or what to do.
 
 ## Build/tooling
-- **`?v=1.0.92` import query strings break static analyzers.** `madge`/`dependency-cruiser` resolve `./foo.js?v=…` to a non-existent path and report **empty** dependencies. *Resolution:* the graph in `agent/graph/` was built by reading imports directly; regenerate the same way. When bumping the version, change it in `package.json`, `service-worker.js` (`APP_VERSION`), `runtime-config.js`/`readiness.js`, **and** every `?v=` import suffix together.
+- **`?v=1.0.93` import query strings break static analyzers.** `madge`/`dependency-cruiser` resolve `./foo.js?v=…` to a non-existent path and report **empty** dependencies. *Resolution:* the graph in `agent/graph/` was built by reading imports directly; regenerate the same way. When bumping the version, change it in `package.json`, `service-worker.js` (`APP_VERSION`), `runtime-config.js`/`readiness.js`, **and** every `?v=` import suffix together.
 - **`js/ui/siri-wave.js` is effectively orphaned.** No runtime module statically imports it; it's only dynamically imported by `tests/e2e/app-ui.spec.mjs` and precached in `service-worker.js`. Don't assume it's dead — but also don't expect it on the main import graph.
 
 ## Signaling fallbacks & failure modes
@@ -24,6 +24,8 @@ Observed in the real code. "Resolution" = how the code already handles it or wha
 - **App control messages need a `type` and must be forwarded.** `handleControlMessage` drops any message without `.type`, and unknown types fall through to a `control` event. `WebRtcTransport` only re-emits events on an explicit allow-list, so `control` had to be added there. The live profile feature sends `{ type: "profile:update", profile }` via `sendControlMessage` → `sendControl`; reuse this pattern (namespaced `type`, forwarded `control`) for new peer-to-peer control JSON rather than inventing a side channel.
 
 ## Proximity ceremony
+- **Policy updates are revisioned and affect new sessions only.** `RuntimeProximityPolicy` snapshots score/timing onto each session; changing Settings while devices are already running intentionally does not alter them. Stop/retry before comparing revisions. Score weights must total exactly 100 or `PUT /api/proximity-policy` rejects the update.
+- **Late-tap grace is not the same as acoustic airtime.** `lateTapGraceMs` controls how long a lone first tap may wait to admit a partner. `acousticWindowMs` controls the coded chirp/listen ceremony after the cohort starts. Keep both explicit when analyzing a delayed-tap failure.
 - **Local pass requires ultrasound + bump + tilt (not score alone).** `hasRequiredPhysicalEvidence` mirrors the server gate so the client doesn't claim "passed" on evidence the server will reject. Changing the score weights without this gate causes false positives.
 - **Non-reciprocal acoustic match** (`ambiguous_or_nonreciprocal_match`): one phone heard the chirp, the other didn't. The UI says "realign," not "bump harder" (`proximityServerReasonKey`). Preserve that distinction.
 - **Ultrasound needs real hardware + secure context.** ~18.6–19.4 kHz emit/detect requires mic + speaker permission and a high-enough sample rate; some devices/laptops can't reproduce or hear it. The server can fail with `acoustic_not_detected` even when one side worked.
@@ -36,6 +38,9 @@ Observed in the real code. "Resolution" = how the code already handles it or wha
 ## PWA / caching
 - **Service worker only registers off-localhost.** Local dev never gets SW caching (intentional). A `controllerchange` reload guard prevents infinite reloads on update.
 - **`runtime-config.js` is always fetched network-only** (`no-store`) so production toggles/URLs update without a cache bust.
+
+## Admin test recordings
+- **Run history is local to one admin browser.** `webdrop.adminTestRuns.v1` lives in `localStorage`; it is not synchronized to the signaling server. Export/screenshot important evidence before clearing browser data or moving operators.
 
 ## UI / rendering
 - **Personalized QR depends on ECC level H.** `DynamicIsland.drawQr` overlays an avatar badge on the *display* QR, which only stays scannable because the code is rendered at level **H**. If you drop it back to "M"/"Q" or enlarge the badge/knockout, re-check `tests/qr-personalized.test.mjs` (it asserts `jsQR` still decodes the badged code). Badge ≈ 24% of the code; knockout = badge + ~1.4 modules.

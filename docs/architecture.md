@@ -186,8 +186,9 @@ The score threshold is necessary but not sufficient: server verification also
 requires explicit ultrasound, bump, and tilt evidence, and rejects bump timing
 outside the server-issued ceremony window.
 If the initial anonymous join window contains only one device, the server keeps
-that identity-hidden session open for one short grace window and starts it
-quickly when a slightly late second device arrives.
+that identity-hidden session open until the session's revisioned late-tap
+deadline (6 seconds from the first tap by default) and starts it after a short
+settle when a late second device arrives.
 
 ### Concurrent proximity cohorts (capacity model)
 
@@ -200,8 +201,8 @@ so its acoustic time slots stay reliable, and a global cap bounds the total:
   `reason: "capacity_reached"`.
 - `MAX_PROXIMITY_SESSION_CLIENTS` (default 6): the per-cohort cap, **clamped** to
   a slot-floor-derived ceiling. A coded chirp needs ~520 ms + 80 ms guard, so the
-  3,600 ms `PROXIMITY_SESSION_DURATION_MS` window fits ~6 slots; raising the cap
-  above that ceiling has no effect unless the window grows.
+  default 6,000 ms acoustic window has a theoretical ceiling of 10 slots; the
+  configured cap remains 6 devices for conservative three-pair cohorts.
 - New additive wire fields `acousticBandIndex` / `acousticBandCount` on
   `proximity:session:start`, plus cross-cohort start staggering
   (`ACOUSTIC_SESSION_STAGGER_MS`) and optional sub-band splitting

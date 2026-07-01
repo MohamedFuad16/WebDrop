@@ -43,6 +43,20 @@ test("physical proximity uses a minimum score of 55", () => {
   assert.equal(PROXIMITY_SCORE_MINIMUM, 55);
 });
 
+test("runtime tuning changes bump and tilt points without changing the 100-point scale", () => {
+  const tuning = {
+    revision: 4,
+    scoring: {
+      minimum: 60,
+      weights: { sound: 30, motion: 22, bump: 25, tilt: 15, qr: 8 }
+    },
+    timing: { lateTapGraceMs: 6000, acousticWindowMs: 6000, matchSlopMs: 4000 }
+  };
+  assert.equal(proximityScore({ bump: true }, tuning), 25);
+  assert.equal(proximityScore({ tilt: true }, tuning), 15);
+  assert.equal(proximityScore({ soundCorrelation: 1, motionCorrelation: 1, bump: true, tilt: true, qrFallback: true }, tuning), 100);
+});
+
 test("a real ceremony rejects motion-only evidence so the client agrees with the server", async () => {
   const motion = {
     getSnapshot() {

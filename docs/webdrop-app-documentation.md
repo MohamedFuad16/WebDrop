@@ -429,19 +429,20 @@ slot and back off on collision; WebDrop instead *reserves* slots centrally, whic
 is strictly more reliable for a small, known, server-coordinated cohort. (Framed
 Slotted Aloha remains a conceivable fallback if there were ever no coordinator.)
 
-**Worked schedule.** The 3,600 ms ceremony window is split into ~600 ms slots (a
+**Worked schedule.** The default 6,000 ms ceremony window is split into ~600 ms slots (a
 ~520 ms coded chirp + ~80 ms guard). Each phone records the *whole* window but
 emits only in its own slot:
 
 ```text
-Window:  |<-------------------- 3,600 ms -------------------->|
+Window:  |<-------------------- 6,000 ms -------------------->|
 Slot 1:  [ A emits | B,C,D listen ]
 Slot 2:               [ B emits | A,C,D listen ]
 Slot 3:                            [ C emits | A,B,D listen ]
 Slot 4:                                         [ D emits | ... ]
 ```
 
-`floor(3600 / 600) = 6` slots fit, which is exactly why the per-cohort cap is 6.
+`floor(6000 / 600) = 10` slots fit in theory. The configured per-cohort cap
+deliberately remains 6 devices (3 pairs) for conservative acoustic isolation.
 
 **Why:** it lets up to a per-cohort cap of devices chirp in one room without
 colliding, and it scales by opening **many concurrent bounded cohorts** (see
@@ -614,8 +615,9 @@ runs many concurrent bounded cohorts (`openProximitySessionIds`, commit
 - `MAX_TOTAL_PROXIMITY_PARTICIPANTS` (default **100**) — global cap; over it,
   joins fail cleanly with `reason: "capacity_reached"`.
 - `MAX_PROXIMITY_SESSION_CLIENTS` (default 6) — per-cohort cap, **clamped** to a
-  slot-floor ceiling (a ~600 ms slot floor in a 3,600 ms window ⇒ ~6 slots), so
-  the scheduler can never create sub-floor acoustic slots.
+  slot-floor ceiling (a ~600 ms slot floor in the default 6,000 ms window ⇒ a
+  theoretical 10 slots), so the scheduler can never create sub-floor acoustic
+  slots while the configured cap stays at 6 devices.
 - Cross-cohort de-confliction via start-time staggering and (when the band is
   wide enough) sub-band splitting; the assigned lane is reported as the additive
   `acousticBandIndex` / `acousticBandCount` fields on `proximity:session:start`.
@@ -641,7 +643,8 @@ genuinely contended case is *many pairs in one small room on one band*.
 | --- | ---: | --- |
 | `MAX_TOTAL_PROXIMITY_PARTICIPANTS` | 100 | More concurrent participants; only meaningful past ~one node with Redis + multi-node WS |
 | `MAX_PROXIMITY_SESSION_CLIENTS` | 6 | No effect unless the window grows — it is clamped to `floor(window / ~600 ms)` |
-| `PROXIMITY_SESSION_DURATION_MS` | 3,600 ms | Adds slots so bigger cohorts become legal; slower ceremony (4,800 ms ⇒ ceiling 8) |
+| `PROXIMITY_LATE_TAP_GRACE_MS` | 6,000 ms | Lets a lone first tap admit a later partner; higher values make unmatched users wait longer |
+| `PROXIMITY_SESSION_DURATION_MS` | 6,000 ms | Adds acoustic listening time and slots; slower ceremony |
 | `ACOUSTIC_SESSION_STAGGER_MS` | 600 ms | Spreads simultaneous cohort starts so they don't all chirp at once |
 | `ACOUSTIC_MAX_CONCURRENT_SUBBANDS` | 4 | Splits cohorts across frequency lanes — a no-op until the band is widened past ~420 Hz |
 

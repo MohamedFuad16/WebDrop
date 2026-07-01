@@ -1,9 +1,8 @@
-import { formatBytes } from "../utils/format.js?v=1.0.92";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.92";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.92";
+import { formatBytes } from "../utils/format.js?v=1.0.93";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.93";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.93";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
-const PROXIMITY_SCORE_MINIMUM = 55;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
 
 export function createController({
@@ -474,7 +473,7 @@ export function createController({
         confidence: sample.confidence,
         bands: sampled.bands.slice(1),
         bumpDetected: Boolean(motion.bump),
-        bumpPoints: motion.bump ? BUMP_SCORE_POINTS : 0,
+        bumpPoints: motion.bump ? Number(proximity.getTuning?.().scoring?.weights?.bump || BUMP_SCORE_POINTS) : 0,
         tiltDetected: Boolean(motion.tilted),
         tiltDegrees,
         motionSamples: Number(motion.samples || 0),
@@ -1649,6 +1648,7 @@ export function createController({
         acousticRole: store.getState().self.id < peerId ? "emit" : "detect",
         startAt: start.startAt,
         ceremonyDurationMs: start.durationMs,
+        tuning: start.tuning,
         tokenFresh: Boolean(pairingId),
         onProgress: (progress) => view.updateIslandCeremony(progress)
       });
@@ -1719,6 +1719,7 @@ export function createController({
         acousticSignatureId: startPayload.acousticSignatureId,
         startAt: startPayload.startAt,
         ceremonyDurationMs: startPayload.durationMs,
+        tuning: startPayload.tuning,
         tokenFresh: Boolean(startPayload.sessionId),
         onProgress: (progress) => {
           view.updateIslandCeremony(progress);
@@ -2423,8 +2424,9 @@ export function createController({
       messages.push(view.translate("proximityErrorRemote"));
     }
     const score = Math.round(result?.score || percentageScore(decision?.analysis?.score));
-    if (score < PROXIMITY_SCORE_MINIMUM) {
-      messages.push(view.translate("proximityErrorScore", { score, required: PROXIMITY_SCORE_MINIMUM }));
+    const requiredScore = Number(result?.tuning?.scoring?.minimum || metrics.scoreMinimum || 55);
+    if (score < requiredScore) {
+      messages.push(view.translate("proximityErrorScore", { score, required: requiredScore }));
     }
     return [...new Set(messages)];
   }
