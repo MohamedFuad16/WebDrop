@@ -1,6 +1,6 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.93";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.93";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.93";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.94";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.94";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.94";
 import {
   TEST_CASES,
   createTestRun,
@@ -8,9 +8,9 @@ import {
   stopTestRun,
   summarizeTestRun,
   validateAssignments
-} from "./test-runs.js?v=1.0.93";
+} from "./test-runs.js?v=1.0.94";
 
-const APP_VERSION = "1.0.93";
+const APP_VERSION = "1.0.94";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -22,7 +22,7 @@ const MONITOR_END_HZ = 19_400;
 // remote operators paste it once (kept only in sessionStorage, never committed).
 const ADMIN_TOKEN_STORAGE_KEY = "webdrop.adminToken";
 const TEST_RUN_STORAGE_KEY = "webdrop.adminTestRuns.v1";
-const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.93", import.meta.url);
+const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.94", import.meta.url);
 
 const ADMIN_MESSAGES = {
   en: {
@@ -124,8 +124,10 @@ const ADMIN_MESSAGES = {
     turnReady: "TURN ready",
     statusLive: "Live",
     statusReady: "Ready",
+    statusPartial: "1-on-1 verified",
     statusProof: "Needs proof",
     statusLater: "Later",
+    adminTokenNeeded: "Server is online. Paste the admin token to load live monitoring and diagnostics.",
     serverUnreachable: "Production server",
     serverUnreachableCopy: "The diagnostics endpoint is not reachable from this browser.",
     diagnosticsProtected: "Diagnostics need the operations token. Paste a valid token to continue.",
@@ -197,7 +199,7 @@ const ADMIN_MESSAGES = {
       ["Admin operations shell", "This page now uses the production diagnostics feed and live WebSocket monitor.", "live"]
     ],
     proofItems: [
-      ["Proximity ceremony", "Not signed off. Ultrasound interpretation still needs real iPhone/Android proof.", "proof"],
+      ["Proximity ceremony", "1-on-1 pairing has worked in live runs. Multi-device and two-pair proof still pending.", "partial"],
       ["iPhone acoustic calibration", "Need repeated live tests to confirm emitted slots are heard on the other phone.", "proof"],
       ["Android acoustic calibration", "Android is no longer labeled unknown, but acoustic capture still needs real-device proof.", "proof"],
       ["WebRTC file transfer", "Needs same-room direct and TURN relay proof after proximity pairing is stable.", "proof"],
@@ -234,6 +236,9 @@ const ADMIN_MESSAGES = {
     pairAssignments: "Pair assignments",
     recommendedMatrix: "Recommended matrix",
     chooseTestCase: "Choose a test case",
+    assignPairsTwo: "Assign two phones to Pair A and two to Pair B.",
+    assignPairsOne: "Assign exactly two phones to Pair A.",
+    keepConditionsNote: "Keep device cases, room position, and operator roles in the run notes.",
     recording: "Recording",
     activeRun: "Active run",
     targetAttempts: "Target attempts",
@@ -346,8 +351,10 @@ const ADMIN_MESSAGES = {
     turnReady: "TURN 準備済み",
     statusLive: "稼働中",
     statusReady: "準備済み",
+    statusPartial: "1対1で確認済み",
     statusProof: "要実機",
     statusLater: "後で",
+    adminTokenNeeded: "サーバーは稼働中です。ライブ監視と診断を読み込むには管理トークンを貼り付けてください。",
     serverUnreachable: "本番サーバー",
     serverUnreachableCopy: "このブラウザから診断エンドポイントに到達できません。",
     diagnosticsProtected: "診断には運用トークンが必要です。有効なトークンを貼り付けてください。",
@@ -441,6 +448,9 @@ const ADMIN_MESSAGES = {
     pairAssignments: "ペア割り当て",
     recommendedMatrix: "推奨テスト一覧",
     chooseTestCase: "テストケースを選択",
+    assignPairsTwo: "2台をペアA、2台をペアBに割り当てます。",
+    assignPairsOne: "ちょうど2台をペアAに割り当てます。",
+    keepConditionsNote: "端末ケース・室内の位置・操作者の役割を実行メモに記録してください。",
     recording: "記録中",
     activeRun: "実行中のテスト",
     targetAttempts: "目標回数",
@@ -462,7 +472,7 @@ const ADMIN_MESSAGES = {
       ["管理オペレーション画面", "このページは本番診断フィードとライブ WebSocket 監視を使います。", "live"]
     ],
     proofItems: [
-      ["近接セレモニー", "未完了。超音波の解釈は実機 iPhone/Android で証明が必要です。", "proof"],
+      ["近接セレモニー", "1対1のペアリングは実機で成功しています。複数端末・2ペアの証明は保留中です。", "partial"],
       ["iPhone 音響調整", "送信スロットが相手端末で聞こえるか、繰り返しライブ確認が必要です。", "proof"],
       ["Android 音響調整", "Android は Unknown 表示にしませんが、音響キャプチャは実機証明が必要です。", "proof"],
       ["WebRTC ファイル転送", "近接ペアリング安定後に直接/TURN リレー転送の証明が必要です。", "proof"],
@@ -808,23 +818,24 @@ function sendSocket(payload) {
 }
 
 async function refreshDiagnostics() {
+  // /readyz and the proximity policy are public reads: they define whether the
+  // server is reachable at all. The diagnostics snapshot is token-gated, so a
+  // missing/invalid admin token must NOT make a healthy server look offline —
+  // it only means the authenticated live data is unavailable until a token is
+  // pasted. Fetch the public reads independently of the snapshot.
+  const [readyz, policyResponse] = await Promise.all([
+    diagnostics.readiness().catch((error) => ({ ok: false, error: error.message })),
+    diagnostics.proximityPolicy().catch(() => null)
+  ]);
+  state.readyz = readyz;
+  const serverReachable = Boolean(readyz?.ok) || Boolean(policyResponse);
+
+  let snapshot = null;
+  let snapshotError = null;
   try {
-    const [readyz, snapshot, policyResponse] = await Promise.all([
-      diagnostics.readiness().catch((error) => ({ ok: false, error: error.message })),
-      diagnostics.snapshot(),
-      diagnostics.proximityPolicy().catch(() => null)
-    ]);
-    state.readyz = readyz;
-    state.snapshot = snapshot;
-    state.policy = normalizePolicySnapshot(policyResponse?.tuning, snapshot?.signaling?.protocol);
-    if (!state.policyDirty) state.policyDraft = structuredClone(state.policy);
-    if (state.activeTestRun) {
-      state.activeTestRun = ingestTestRun(state.activeTestRun, snapshot?.metrics?.recentEvents || []);
-      persistTestState();
-    }
-    state.serverReachable = true;
-    renderAll();
+    snapshot = await diagnostics.snapshot();
   } catch (error) {
+    snapshotError = error;
     if (error.message === "unauthorized") {
       const token = promptForAdminToken();
       if (token) {
@@ -832,12 +843,25 @@ async function refreshDiagnostics() {
         return refreshDiagnostics();
       }
     }
-    state.serverReachable = false;
-    state.readyz = { ok: false, error: error.message };
-    setSocketState("offline");
-    showError(friendlyError(error));
-    renderAll();
   }
+
+  if (snapshot) state.snapshot = snapshot;
+  state.policy = normalizePolicySnapshot(policyResponse?.tuning, (snapshot || state.snapshot)?.signaling?.protocol);
+  if (!state.policyDirty) state.policyDraft = structuredClone(state.policy);
+  if (snapshot && state.activeTestRun) {
+    state.activeTestRun = ingestTestRun(state.activeTestRun, snapshot?.metrics?.recentEvents || []);
+    persistTestState();
+  }
+
+  state.serverReachable = serverReachable;
+  if (!serverReachable) {
+    setSocketState("offline");
+    if (snapshotError) showError(friendlyError(snapshotError));
+  } else if (snapshotError && snapshotError.message === "unauthorized") {
+    // Server is up; we just have no admin token in this browser session.
+    showError(i18n.t("adminTokenNeeded"));
+  }
+  renderAll();
 }
 
 function schedulePoll() {
@@ -914,7 +938,7 @@ function renderReadinessBoard() {
 }
 
 function renderReadinessRow([title, copy, status]) {
-  const icon = status === "live" || status === "ready" ? "✓" : status === "blocked" ? "!" : "•";
+  const icon = status === "live" || status === "ready" ? "✓" : status === "partial" ? "◐" : status === "blocked" ? "!" : "•";
   return `
     <article class="readiness-row">
       <i aria-hidden="true">${icon}</i>
@@ -928,6 +952,7 @@ function readinessStatusLabel(status) {
   const labels = {
     live: i18n.t("statusLive"),
     ready: i18n.t("statusReady"),
+    partial: i18n.t("statusPartial"),
     proof: i18n.t("statusProof"),
     later: i18n.t("statusLater"),
     blocked: i18n.t("blocked"),
@@ -1173,10 +1198,15 @@ function monitorFrequencyBands() {
 }
 
 function readinessSummary() {
-  const total = i18n.t("readyItems").length + i18n.t("proofItems").length;
+  const readyItems = i18n.t("readyItems");
+  const proofItems = i18n.t("proofItems");
+  const total = readyItems.length + proofItems.length;
   const liveInfrastructureChecks = isServerHealthy() ? 2 : 0;
-  const locallyVerifiedChecks = Math.max(0, i18n.t("readyItems").length - 2);
-  const verified = Math.min(total, liveInfrastructureChecks + locallyVerifiedChecks);
+  const locallyVerifiedChecks = Math.max(0, readyItems.length - 2);
+  // Capabilities proven for a single 1-on-1 pair (but not yet for multi-device /
+  // two-pair runs) are flagged "partial" and count toward verified readiness.
+  const partialProofChecks = proofItems.filter((item) => item[2] === "partial").length;
+  const verified = Math.min(total, liveInfrastructureChecks + locallyVerifiedChecks + partialProofChecks);
   return {
     verified,
     total,
@@ -1636,12 +1666,66 @@ async function applyPolicyUpdate(event) {
   }
 }
 
+// Japanese overrides for the (English-authored) TEST_CASES catalog in
+// test-runs.js. Keyed by case id; English remains the source of truth and the
+// fallback for any field left untranslated.
+const TEST_CASE_I18N_JA = {
+  "top-edge": {
+    shortTitle: "上端どうし",
+    title: "上端どうしの接触",
+    purpose: "最も有利と考えられるマイク同士の接触形状で基準を取ります。",
+    procedure: "カメラと受話口付近の上端を合わせ、Connect をタップして一度きれいに接触させます。室内や端末ケースを変えずに繰り返します。"
+  },
+  "speaker-microphone": {
+    shortTitle: "スピーカー↔マイク",
+    title: "スピーカーからマイクへ",
+    purpose: "一方のスピーカーを相手のマイクに向けたときの指向性の利点を測定します。",
+    procedure: "一方の端末のスピーカー側を相手のマイク側に当てます。5回ごとに端末の役割を入れ替えます。"
+  },
+  "cross-angle": {
+    shortTitle: "斜め接触",
+    title: "斜め角度での接触",
+    purpose: "正面ではなく斜めに接触したときの減衰を測定します。",
+    procedure: "両端末を約45度に保ち、側縁を交差させて Connect をタップし、一度きれいに接触させます。上側にする端末を交互に変えます。"
+  },
+  "tap-delay": {
+    shortTitle: "タップ遅延",
+    title: "タップ遅延スイープ",
+    purpose: "物理形状を変えずにレイトタップ猶予の実用限界を探ります。",
+    procedure: "上端どうしの基準を用います。2回のConnectタップ間隔を 0・0.5・1・1.5・3・5 秒として、各2回ずつ実行します。"
+  },
+  "simultaneous-pairs": {
+    shortTitle: "2ペア同時",
+    title: "2ペア同時",
+    purpose: "相互の符号化超音波により、同時進行の2ペアが混線しないことを証明します。",
+    procedure: "ペアAとペアBを約5メートル離して配置します。4人全員が1秒以内に Connect をタップし、意図したペアどうしで接触します。途中で配置を入れ替えます。"
+  },
+  "negative-control": {
+    shortTitle: "陰性対照",
+    title: "陰性対照の分離",
+    purpose: "より強い近傍信号や不完全な物理的証拠があるときの誤マッチを測定します。",
+    procedure: "意図した1ペアを実行し、もう1ペアは参加するがバンプしない状態にして、その後入れ替えます。バンプなし・傾きなし・非相互の端末は決して接続してはいけません。"
+  },
+  "noisy-room": {
+    shortTitle: "騒音下",
+    title: "騒音下での再試験",
+    purpose: "形状の失敗を、高周波の環境騒音や端末処理の違いから切り分けます。",
+    procedure: "通常の会話や音楽が近くにある状態で上端どうしの基準を繰り返します。静かな基準時と距離・ケース・タップ間隔を変えないでください。"
+  }
+};
+
+function localizeCase(definition) {
+  if (i18n.locale !== "ja") return definition;
+  const overrides = TEST_CASE_I18N_JA[definition.id];
+  return overrides ? { ...definition, ...overrides } : definition;
+}
+
 function renderTestCases() {
   const tabs = $("[data-test-case-tabs]");
   if (!tabs) return;
-  const definition = TEST_CASES.find((entry) => entry.id === state.selectedTestCaseId) || TEST_CASES[0];
+  const definition = localizeCase(TEST_CASES.find((entry) => entry.id === state.selectedTestCaseId) || TEST_CASES[0]);
   state.selectedTestCaseId = definition.id;
-  tabs.innerHTML = TEST_CASES.map((entry) => `
+  tabs.innerHTML = TEST_CASES.map((entry) => localizeCase(entry)).map((entry) => `
     <button type="button" data-test-case-id="${escapeHtml(entry.id)}" class="${entry.id === definition.id ? "is-active" : ""}" ${state.activeTestRun ? "disabled" : ""}>${escapeHtml(entry.shortTitle)}</button>
   `).join("");
   tabs.querySelectorAll("[data-test-case-id]").forEach((button) => {
@@ -1657,7 +1741,7 @@ function renderTestCases() {
   });
   $("[data-test-case-detail]").innerHTML = `
     <div><h3>${escapeHtml(definition.title)}</h3><p>${escapeHtml(definition.purpose)}</p></div>
-    <ol><li>${escapeHtml(definition.procedure)}</li><li>${definition.pairCount === 2 ? "Assign two phones to Pair A and two to Pair B." : "Assign exactly two phones to Pair A."}</li><li>Keep device cases, room position, and operator roles in the run notes.</li></ol>
+    <ol><li>${escapeHtml(definition.procedure)}</li><li>${escapeHtml(definition.pairCount === 2 ? i18n.t("assignPairsTwo") : i18n.t("assignPairsOne"))}</li><li>${escapeHtml(i18n.t("keepConditionsNote"))}</li></ol>
   `;
   renderTestDeviceAssignments(definition);
   renderActiveTestRun(definition);
