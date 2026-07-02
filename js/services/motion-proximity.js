@@ -1,17 +1,19 @@
-// Real iPhone bumps frequently peak between ~6 and ~10 m/s² of linear
-// (gravity-excluded) acceleration. The previous 10 m/s² floor sat right inside
-// that range, so deliberate taps registered only intermittently and the server
-// rejected otherwise-valid sessions with `bump_not_detected`. 6 m/s² still sits
-// well above passive handling noise (typically <3 m/s²) while reliably catching
-// an intentional bump. The gravity-jerk fallback (Android, where only
-// accelerationIncludingGravity is reported) is lowered in step.
-export const BUMP_ACCELERATION_THRESHOLD = 6;
+// Real bumps often peak lower than the raw physics suggest: a phone in a case
+// softens the impact, and `devicemotion` only samples at ~60 Hz, so a sharp
+// contact frequently lands *between* samples and the captured peak understates
+// the true jerk. At the previous 6 m/s² floor, deliberate phone-to-phone bumps
+// registered only intermittently and the server rejected valid sessions with
+// `bump_not_detected`. 4.5 m/s² still sits clearly above passive handling noise
+// (typically <3 m/s²) while catching cased, real-world bumps reliably. The
+// gravity-jerk fallback (Android / any device where `acceleration` is null and
+// only `accelerationIncludingGravity` is reported) is lowered in step.
+export const BUMP_ACCELERATION_THRESHOLD = 4.5;
 
 export class MotionProximitySensor {
   constructor({
     target = globalThis,
     bumpThreshold = BUMP_ACCELERATION_THRESHOLD,
-    gravityBumpThreshold = 2.5,
+    gravityBumpThreshold = 2,
     tiltThreshold = 30,
     now = () => Date.now()
   } = {}) {
