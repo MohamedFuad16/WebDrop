@@ -28,11 +28,11 @@ Run `npm run serve` if a spec expects the app served at `http://127.0.0.1:4178`.
 
 **Backend (`azure cloud server/tests/`):** `runtime-proximity-policy.test.mjs` covers validation/revision/persistence; `server-config.test.mjs` covers authenticated PUT, invalid input, immediate application, and restart recovery; `signaling-hub.test.mjs` covers bounded cohorts, late partners, reciprocal matching, and diagnostics.
 
-## Latest verification (2026-07-01)
-- `npm run verify`: 49/49 unit tests pass.
-- Backend `npm test`: 54/54 tests pass.
+## Latest verification (2026-07-02)
+- `npm run verify:full`: 52/52 frontend unit tests and 54/54 backend tests pass; frontend/backend audits report 0 vulnerabilities; secret and diff checks pass.
+- WebKit iPhone permission E2E: the motion and microphone requests both start from one user gesture, and the microphone receives the intended raw-audio constraints.
 - `npx playwright test tests/e2e/diagnostics.spec.mjs --project=chromium-desktop`: 5/5 admin E2E tests pass.
-- In-app browser QA: four tabs render; tuning exists only in Settings; authenticated revision update works; a four-device Pair A recording starts/stops and saves history; desktop and 390 px Settings layouts have no horizontal overflow.
+- Production QA (`/admin/?tab=settings`, v1.0.102): Live testing → Settings navigation works; tuning exists only in Settings; revision-10 values render as 8000/8650/5000 ms; no framework overlay, layout overflow, or page exception. The in-app Browser connection stalled during the final run, so this pass used the repo Playwright runtime and explicitly simulated an unsupported `prompt()`; the earlier v1.0.101 in-app Browser run supplied the original failing evidence.
 
 ## Coverage gaps / recommendations
 - **No coverage reporting** is configured; `coverage/` is gitignored. Consider `node --test --experimental-test-coverage` or c8 for a coverage gate.
