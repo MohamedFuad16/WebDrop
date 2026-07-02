@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.98";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.98";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.98";
+import { formatBytes } from "../utils/format.js?v=1.0.99";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.99";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.99";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
@@ -1799,12 +1799,18 @@ export function createController({
     clearProximitySessionWaiters();
     if (sessionId) await signaling.cancelProximitySession?.(sessionId).catch(() => {});
     proximitySessionId = null;
-    // Prefer concrete local errors; otherwise fall back to the server's
-    // authoritative reason so a device whose own ceremony passed (e.g. the peer
-    // simply could not hear its ultrasound) no longer claims a missing bump.
+    // Prefer concrete local errors. When there are none, this device's own
+    // ceremony was complete (audio, bump, and tilt all present, score high
+    // enough), so the failure can only be the *mutual* confirmation between the
+    // two phones — most often each side only heard ultrasonic energy and never
+    // decoded the other's coded chirp. Show the reciprocal-acoustic guidance
+    // ("hold them closer, screens up") instead of a misleading "No matching bump
+    // found" — bump was fine. Only defer to a specific server reason when it
+    // maps to concrete, actionable text (not the generic match-failed fallback).
+    const mappedServerKey = serverReason ? proximityServerReasonKey(serverReason) : "proximityMatchFailed";
     const resolvedErrors = errors.length
       ? errors
-      : [view.translate(proximityServerReasonKey(serverReason))];
+      : [view.translate(mappedServerKey === "proximityMatchFailed" ? "proximityErrorReciprocal" : mappedServerKey)];
     await view.showIslandVerificationFailure({
       score,
       errors: resolvedErrors
