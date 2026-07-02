@@ -422,8 +422,8 @@ test("inaudible ultrasound band detection tolerates phone speaker distortion", (
 
   const evidence = analyzeFrequencyBand(frequencies, { sampleRate, fftSize });
 
-  assert.equal(DEFAULT_CHIRP.startFrequencyHz, 18_600);
-  assert.equal(DEFAULT_CHIRP.endFrequencyHz, 19_400);
+  assert.equal(DEFAULT_CHIRP.startFrequencyHz, 17_800);
+  assert.equal(DEFAULT_CHIRP.endFrequencyHz, 18_600);
   assert.ok(DEFAULT_CHIRP.startFrequencyHz >= MIN_INAUDIBLE_FREQUENCY_HZ);
   assert.equal(evidence.detected, true);
   assert.ok(evidence.marginDb > 30);
@@ -481,6 +481,10 @@ test("diagnostics sample the live ultrasonic band without releasing the warm mic
   assert.ok(sample.marginDb > 30);
   assert.deepEqual(sensor.getStatus(), {
     streamActive: true,
+    streamHealthy: true,
+    trackMuted: false,
+    trackReadyState: null,
+    trackSampleRate: null,
     contextState: "running",
     sampleRate,
     inputTracks: 1

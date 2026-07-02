@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.103";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.103";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.103";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.104";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.104";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.104";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 export const BUMP_SCORE_POINTS = 20;
@@ -50,6 +50,18 @@ export class ProximityEngine {
 
   async prepareAudioOutput() {
     return this.acoustic.prepareAudioOutput();
+  }
+
+  async revalidateAudio() {
+    return this.acoustic.revalidateAudio?.() ?? { ok: true };
+  }
+
+  async captureSelfTest(options) {
+    return this.acoustic.captureSelfTest?.(options) ?? { ok: true, skipped: true };
+  }
+
+  getAcousticHealth() {
+    return this.acoustic.getHealth?.() ?? null;
   }
 
   async requestMotionPermission() {
@@ -453,14 +465,44 @@ async function exchangeCapturedSignatureChirps(acoustic, {
       slotCount: signatures.length
     }
   });
-  await waitUntil(Number(startAt) + durationMs);
+  // Early finish: our own chirp has already been emitted above, so the trailing
+  // window is pure listening. Poll the partial capture and stop as soon as the
+  // partner signature decodes cleanly (full correlation) — a nearby pair usually
+  // hears each other within the first slot, turning an ~8s wait into ~2-3s. This
+  // only ever SHORTENS the wait; if nothing decodes early we fall through to the
+  // unchanged full-window decode below.
+  const windowEndAt = Number(startAt) + durationMs;
+  let earlyFinish = false;
+  if (typeof acoustic.peekCeremonyCapture === "function" && emittedCount > 0) {
+    while (Date.now() < windowEndAt - 300) {
+      await waitUntil(Math.min(windowEndAt - 300, Date.now() + 600));
+      if (Date.now() >= windowEndAt - 300) break;
+      const partial = acoustic.peekCeremonyCapture();
+      if (!partial?.samples?.length) continue;
+      const partialDetections = acoustic.decodeCeremonyCapture(partial, signatures, {
+        ownSignatureId,
+        slotDurationMs,
+        slotGuardMs: ACOUSTIC_SLOT_GUARD_MS,
+        packetIntervalMs: Number(options.intervalMs) || 220
+      });
+      const cleanPartner = partialDetections.some((detection) =>
+        detection.signatureId !== ownSignatureId
+        && detection.detected
+        && detection.detectionMethod === "correlation"
+        && detection.correlation >= 0.3
+        && detection.marginDb >= 1.5);
+      if (cleanPartner) { earlyFinish = true; break; }
+    }
+  }
+  if (!earlyFinish) await waitUntil(windowEndAt);
   onProgress({
     phase: "audio",
     state: "active",
     acoustic: {
       mode: "decode-start",
       continuous: true,
-      slotCount: signatures.length
+      slotCount: signatures.length,
+      earlyFinish
     }
   });
   const recording = acoustic.stopCeremonyCapture();

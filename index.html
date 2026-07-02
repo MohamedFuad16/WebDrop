@@ -191,6 +191,14 @@
         </svg>
       </button>
 
+      <div class="tab-replaced-overlay" data-tab-replaced role="alertdialog" aria-modal="true" aria-labelledby="tab-replaced-title" hidden>
+        <div class="tab-replaced-card">
+          <h2 id="tab-replaced-title" data-i18n="tabReplacedTitle">WebDrop is open in another tab</h2>
+          <p data-i18n="tabReplacedCopy">To avoid conflicts, only one WebDrop tab stays active. Continue here to move the session to this tab.</p>
+          <button class="sheet-primary" type="button" data-action="reclaim-tab" data-i18n="tabReplacedUseHere">Use WebDrop here</button>
+        </div>
+      </div>
+
       <div class="sheet-backdrop" data-backdrop data-action="close-all-sheets" hidden></div>
 
       <section class="bottom-sheet peer-sheet" data-peer-sheet data-invite-direction="outgoing" hidden role="dialog" aria-modal="true" aria-labelledby="peer-actions-title" aria-describedby="peer-actions-copy" aria-label="Peer actions" data-i18n-aria="peerActions" tabindex="-1">
@@ -333,7 +341,7 @@
         </button>
         <div class="app-version">
           <span data-i18n="appVersion">App version</span>
-          <strong>1.0.103</strong>
+          <strong>1.0.104</strong>
         </div>
       </section>
 
@@ -433,8 +441,8 @@
       <input data-file-input type="file" multiple hidden>
     </div>
 
-    <script src="js/vendor/jsqr.js?v=1.0.103"></script>
-    <script src="js/config/runtime-config.js?v=1.0.103"></script>
-    <script type="module" src="js/app.js?v=1.0.103"></script>
+    <script src="js/vendor/jsqr.js?v=1.0.104"></script>
+    <script src="js/config/runtime-config.js?v=1.0.104"></script>
+    <script type="module" src="js/app.js?v=1.0.104"></script>
   </body>
 </html>

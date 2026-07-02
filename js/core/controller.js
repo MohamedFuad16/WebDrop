@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.103";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.103";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.103";
+import { formatBytes } from "../utils/format.js?v=1.0.104";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.104";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.104";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
@@ -71,6 +71,7 @@ export function createController({
 
   signaling.on("connected", () => {
     store.patch({ signalingStatus: "online" });
+    announceTabTakeover();
   });
 
   signaling.on("connection-failed", () => {
@@ -109,6 +110,66 @@ export function createController({
     clearProximitySessionWaiters();
     view.closeDynamicIsland();
     if (wasOnline) view.toast(view.translate("signalingLost"));
+  });
+
+  // Instant multi-tab standdown: a freshly-connecting tab announces itself; any
+  // older tab hearing a newer epoch stands down immediately instead of waiting
+  // for the server's 4001 kick (the server still enforces takeover regardless).
+  const tabEpoch = Date.now();
+  let tabChannel = null;
+  if (runtime.productionSignaling && typeof BroadcastChannel !== "undefined") {
+    try {
+      tabChannel = new BroadcastChannel("webdrop-tab");
+      tabChannel.addEventListener("message", (event) => {
+        if (event.data?.type === "hello" && Number(event.data.epoch) > tabEpoch) {
+          signaling.disconnect?.();
+          if (signaling) signaling.replaced = true;
+          enterReplacedState();
+        }
+      });
+    } catch { tabChannel = null; }
+  }
+  function announceTabTakeover() {
+    try { tabChannel?.postMessage({ type: "hello", epoch: tabEpoch }); } catch { /* no channel */ }
+  }
+
+  function enterReplacedState() {
+    stopAdminAcousticMonitor();
+    pendingAdminMonitor = null;
+    transport.close?.();
+    cancelPendingTransferPatch();
+    resolveQrCancellation();
+    clearVerificationWaiters();
+    clearProximitySessionWaiters();
+    activePeerId = null;
+    incomingInvite = null;
+    proximitySessionId = null;
+    store.patch({
+      mode: "lobby",
+      connectedPeerId: null,
+      selectedPeerId: null,
+      pendingInviteId: null,
+      incomingInvite: null,
+      pairingId: null,
+      files: [],
+      transfer: null,
+      peers: [],
+      signalingStatus: "replaced"
+    });
+    view.closeDynamicIsland();
+    view.showTabReplaced?.();
+  }
+
+  signaling.on("replaced", () => {
+    if (!runtime.productionSignaling) return;
+    enterReplacedState();
+  });
+
+  view.on("reclaim-tab", () => {
+    view.hideTabReplaced?.();
+    announceTabTakeover();
+    store.patch({ signalingStatus: "connecting" });
+    signaling.connect?.(undefined, { force: true });
   });
 
   signaling.on("route:error", (payload = {}) => {
@@ -423,8 +484,8 @@ export function createController({
       adminId,
       sequence: 0,
       intervalMs: Math.max(500, Math.min(5000, Number(payload.intervalMs) || 1000)),
-      startFrequencyHz: Number(payload.startFrequencyHz) || 18_600,
-      endFrequencyHz: Number(payload.endFrequencyHz) || 19_400,
+      startFrequencyHz: Number(payload.startFrequencyHz) || 17_800,
+      endFrequencyHz: Number(payload.endFrequencyHz) || 20_000,
       emit: payload.emit !== false,
       timer: 0,
       stopped: false
@@ -470,14 +531,19 @@ export function createController({
       const sample = sampled.bands[0] || {};
       const motion = proximity.getSnapshot?.().motion || {};
       const tiltDegrees = maximumTiltDegrees(motion.tilt);
+      const audioStatus = proximity.getAcousticStatus?.() || {};
       signaling.sendAdminMonitorTelemetry?.(monitor.adminId, {
         monitorId: monitor.monitorId,
         status: sampled.available ? "active" : "blocked",
         reason: sampled.reason || emitted.reason || null,
         sequence: monitor.sequence,
         sampledAt: Date.now(),
-        contextState: sampled.contextState || proximity.getAcousticStatus?.().contextState,
+        contextState: sampled.contextState || audioStatus.contextState,
         sampleRate: sampled.sampleRate || emitted.sampleRate,
+        micHealthy: audioStatus.streamHealthy,
+        trackMuted: audioStatus.trackMuted,
+        trackReadyState: audioStatus.trackReadyState,
+        trackSampleRate: audioStatus.trackSampleRate,
         emitted: Boolean(emitted.emitted),
         detected: Boolean(sample.detected),
         startFrequencyHz: monitor.startFrequencyHz,
@@ -513,10 +579,10 @@ export function createController({
 
   function adminMonitorFrequencyBands() {
     return [
-      { startFrequencyHz: 18_000, endFrequencyHz: 18_500 },
-      { startFrequencyHz: 18_500, endFrequencyHz: 19_500 },
-      { startFrequencyHz: 19_500, endFrequencyHz: 20_500 },
-      { startFrequencyHz: 20_500, endFrequencyHz: 21_000 }
+      { startFrequencyHz: 17_500, endFrequencyHz: 18_200 },
+      { startFrequencyHz: 18_200, endFrequencyHz: 18_900 },
+      { startFrequencyHz: 18_900, endFrequencyHz: 19_600 },
+      { startFrequencyHz: 19_600, endFrequencyHz: 20_500 }
     ];
   }
 
@@ -1715,6 +1781,32 @@ export function createController({
           startAt: startPayload.startAt
         }
       });
+      // Mic capture self-test in the sync headroom: prove the mic actually
+      // captures audio, and rebuild a silently-dead stream (iOS muted/interrupted
+      // or sample-rate-mismatched) BEFORE the real ceremony window opens. This is
+      // the fix for detected=false / rms≈0.001 with a live-looking stream.
+      if (microphonePermission.granted && audioOutputPermission.granted) {
+        const ownSignature = (startPayload.acousticPlan || []).find(
+          (sig) => sig?.id === startPayload.acousticSignatureId
+        ) || (startPayload.acousticPlan || [])[0] || {};
+        const hasHeadroom = () => Number(startPayload.startAt) - Date.now() >= 900;
+        if (hasHeadroom()) {
+          let selfTest = await proximity.captureSelfTest({ signature: ownSignature });
+          let outcome = selfTest.ok ? "pass" : "silent";
+          if (!selfTest.ok && hasHeadroom()) {
+            // Force-drop and re-acquire a fresh stream, then retest once.
+            proximity.stopAcousticCapture({ releaseStream: true });
+            await proximity.requestMicrophonePermission();
+            selfTest = await proximity.captureSelfTest({ signature: ownSignature });
+            outcome = selfTest.ok ? "rebuilt" : "failed";
+          }
+          emitDiagnostic("audio:self-test", {
+            state: selfTest.ok ? "pass" : "failed",
+            reason: outcome,
+            acoustic: { peak: selfTest.peak, rms: selfTest.rms }
+          });
+        }
+      }
       motionTimer = globalThis.setInterval(() => {
         view.updateIslandCeremony({
           phase: "motion",
@@ -1884,8 +1976,13 @@ export function createController({
   function ensureProximityPermissions() {
     if (permissionRequestPromise) return permissionRequestPromise;
     // Start both native prompts before yielding so every iPhone browser keeps user activation.
-    const motionPromise = ["denied", "unsupported"].includes(storedPermissions.motion)
-      ? Promise.resolve({ granted: false, reason: storedPermissions.motion, cached: true })
+    // Only "unsupported" is a durable answer. Never short-circuit a cached "denied":
+    // iOS requires DeviceMotionEvent.requestPermission() from a fresh gesture every
+    // page load, and a stale localStorage "denied" (from one aborted attempt, or before
+    // the user re-enabled Motion in Settings) would otherwise permanently suppress the
+    // prompt — the "dead accelerometer until you switch browsers" bug.
+    const motionPromise = storedPermissions.motion === "unsupported"
+      ? Promise.resolve({ granted: false, reason: "unsupported", cached: true })
       : proximity.requestMotionPermission();
     const audioOutputPromise = proximity.prepareAudioOutput();
     // Never let a locally cached microphone denial suppress a fresh

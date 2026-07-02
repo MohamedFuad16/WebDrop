@@ -1,16 +1,16 @@
-import { createStore } from "./core/state.js?v=1.0.103";
-import { createController } from "./core/controller.js?v=1.0.103";
-import { detectCapabilities } from "./services/capabilities.js?v=1.0.103";
-import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.103";
-import { WebSocketSignalingAdapter } from "./services/websocket-signaling.js?v=1.0.103";
-import { TurnConfigProvider } from "./services/turn-config.js?v=1.0.103";
-import { ProximityEngine } from "./services/proximity-engine.js?v=1.0.103";
-import { WebRtcTransport } from "./services/webrtc-transport.js?v=1.0.103";
-import { TransferEngine } from "./services/transfer-engine.js?v=1.0.103";
-import { StorageClient } from "./storage/storage-client.js?v=1.0.103";
-import { AppView } from "./ui/app-view.js?v=1.0.103";
-import { randomAvatarChoice, normalizeAvatarChoice } from "./config/avatar-options.js?v=1.0.103";
-import { getRuntimeFlags } from "./config/runtime-flags.js?v=1.0.103";
+import { createStore } from "./core/state.js?v=1.0.104";
+import { createController } from "./core/controller.js?v=1.0.104";
+import { detectCapabilities } from "./services/capabilities.js?v=1.0.104";
+import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.104";
+import { WebSocketSignalingAdapter } from "./services/websocket-signaling.js?v=1.0.104";
+import { TurnConfigProvider } from "./services/turn-config.js?v=1.0.104";
+import { ProximityEngine } from "./services/proximity-engine.js?v=1.0.104";
+import { WebRtcTransport } from "./services/webrtc-transport.js?v=1.0.104";
+import { TransferEngine } from "./services/transfer-engine.js?v=1.0.104";
+import { StorageClient } from "./storage/storage-client.js?v=1.0.104";
+import { AppView } from "./ui/app-view.js?v=1.0.104";
+import { randomAvatarChoice, normalizeAvatarChoice } from "./config/avatar-options.js?v=1.0.104";
+import { getRuntimeFlags } from "./config/runtime-flags.js?v=1.0.104";
 
 function browserLocale() {
   const storedLocale = localStorage.getItem("webdrop.locale");
@@ -117,6 +117,15 @@ window.addEventListener("pagehide", () => {
   signaling.disconnect?.();
   storage.cleanupAll?.().catch(() => {});
 });
+
+// On returning to the foreground, recover a suspended/interrupted AudioContext
+// and drop a stream iOS muted while backgrounded, so the next Connect re-acquires
+// a live mic instead of silently capturing nothing.
+function revalidateAudioOnForeground() {
+  if (document.visibilityState === "visible") proximity.revalidateAudio?.().catch(() => {});
+}
+document.addEventListener("visibilitychange", revalidateAudioOnForeground);
+window.addEventListener("pageshow", revalidateAudioOnForeground);
 
 function persistentClientId() {
   const stored = sessionStorage.getItem("webdrop.clientId");

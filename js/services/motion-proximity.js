@@ -55,12 +55,12 @@ export class MotionProximitySensor {
   }
 
   restorePermission(permission) {
-    // iPhone browsers must revalidate native motion access from a fresh user gesture.
-    if (["denied", "unsupported"].includes(permission)) {
-      this.permission = permission;
-    } else {
-      this.permission = "unknown";
-    }
+    // iPhone browsers must revalidate native motion access from a fresh user
+    // gesture every page load. Only "unsupported" is durable; a persisted "denied"
+    // is downgraded to "unknown" so requestPermission() re-prompts (or silently
+    // re-grants if the user re-enabled it in Settings) instead of being eaten by
+    // the cached-denial short-circuit.
+    this.permission = permission === "unsupported" ? "unsupported" : "unknown";
     return this.permission;
   }
 

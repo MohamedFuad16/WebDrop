@@ -31,7 +31,10 @@ const PROXIMITY_GATED_TYPES = new Set([
 // server.js) so the operator can adjust caps and intervals live. They are
 // DEFAULTS only; the hub reads the resolved values from instance fields.
 const DEFAULT_SESSION_JOIN_WINDOW_MS = 1800;
-const DEFAULT_SESSION_START_DELAY_MS = 1200;
+// Trimmed 1200->700 to cut dead time before the ceremony. Multi-lane band
+// de-confliction (4 lanes) means concurrent cohorts no longer need a long
+// stagger to avoid frequency collisions.
+const DEFAULT_SESSION_START_DELAY_MS = 700;
 const DEFAULT_SESSION_DURATION_MS = 3600;
 const DEFAULT_PROXIMITY_SESSION_TTL_MS = 15000;
 const DEFAULT_SESSION_MATCH_SLOP_MS = 4000;
@@ -61,8 +64,12 @@ const DEFAULT_MAX_TOTAL_PROXIMITY_PARTICIPANTS = 100;
 // not silently change when the cohort cap is tuned.
 const MAX_ACOUSTIC_DETECTIONS = 8;
 
-const ACOUSTIC_BAND_START_HZ = 18_600;
-const ACOUSTIC_BAND_END_HZ = 19_400;
+// Expanded from 18.6-19.4kHz to 17.8-20.0kHz (2200Hz). Phone speakers radiate
+// far more energy toward the lower edge, fixing weak/silent reception, and the
+// wider band splits into 4 concurrent 550Hz lanes so simultaneous pair sessions
+// stop colliding. Env vars still override. ~17.5kHz+ is inaudible to most adults.
+const ACOUSTIC_BAND_START_HZ = 17_800;
+const ACOUSTIC_BAND_END_HZ = 20_000;
 const ACOUSTIC_MIN_BANDWIDTH_HZ = 420;
 
 // Cross-session acoustic de-confliction knobs (all env-tunable). With the
@@ -70,7 +77,7 @@ const ACOUSTIC_MIN_BANDWIDTH_HZ = 420;
 // splitting is a no-op until the band is widened via ACOUSTIC_BAND_END_HZ; the
 // start stagger spreads concurrent cohorts across a few time phases so cohorts
 // that fill at the same instant do not all begin chirping simultaneously.
-const DEFAULT_ACOUSTIC_SESSION_STAGGER_MS = 600;
+const DEFAULT_ACOUSTIC_SESSION_STAGGER_MS = 300;
 const DEFAULT_ACOUSTIC_SESSION_STAGGER_PHASES = 3;
 const DEFAULT_ACOUSTIC_MAX_CONCURRENT_SUBBANDS = 4;
 // Minimum separation (correlation units, 0..1) the strongest heard signature must
@@ -1726,8 +1733,18 @@ function ceremonyTimingValid(session, timing = {}, matchSlopMs = DEFAULT_SESSION
   if (![startedAt, bumpAt, completedAt].every(Number.isFinite)) return false;
   if (!Number.isFinite(session.startAt) || !Number.isFinite(session.endsAt)) return false;
   if (Date.now() < session.startAt - 250) return false;
+  // Accept a bump anywhere from cohort creation (the first Connect tap) through
+  // the end of the acoustic window + match slop. Previously the floor was
+  // startAt-250, which opened only 1.2-2.4s after the second tap — so a user who
+  // bumped immediately was rejected as timing_out_of_window, and only the "tap,
+  // wait 3-5s, then bump" trick worked. Co-presence at tap time is genuine; the
+  // anti-relay guarantee still comes from reciprocal acoustic + the pair's
+  // bump-time delta (matchSlopMs), which are unchanged.
+  const earliestBump = Number.isFinite(session.createdAt)
+    ? Math.min(session.createdAt - 2000, session.startAt - 250)
+    : session.startAt - 250;
   return Math.abs(startedAt - session.startAt) <= 250
-    && bumpAt >= session.startAt - 250
+    && bumpAt >= earliestBump
     && bumpAt <= session.endsAt + matchSlopMs
     && completedAt >= bumpAt
     && completedAt <= session.endsAt + matchSlopMs;

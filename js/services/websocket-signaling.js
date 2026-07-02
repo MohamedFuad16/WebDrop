@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.103";
+import { Emitter } from "../utils/emitter.js?v=1.0.104";
 
 export class WebSocketSignalingAdapter extends Emitter {
   constructor({
@@ -25,13 +25,19 @@ export class WebSocketSignalingAdapter extends Emitter {
     this.reconnectAttempt = 0;
     this.lastConnectPayload = null;
     this.shouldReconnect = false;
+    // Set when the server closes us with 4001 because a newer tab/device session
+    // took over. We stay terminally offline (no reconnect fight) until the user
+    // explicitly reclaims this tab with connect({ force: true }).
+    this.replaced = false;
   }
 
-  async connect(payload) {
+  async connect(payload, { force = false } = {}) {
     if (!this.url) {
       this.emit("unconfigured", { reason: "Production signaling URL is not configured." });
       return false;
     }
+    if (this.replaced && !force) return false;
+    if (force) this.replaced = false;
     if (!this.WebSocketImpl) throw new Error("WebSocket is not available in this environment.");
     this.lastConnectPayload = payload || this.lastConnectPayload;
     this.shouldReconnect = true;
@@ -118,6 +124,19 @@ export class WebSocketSignalingAdapter extends Emitter {
       this.socket = null;
       this.stopHeartbeat();
       this.turnAccessToken = "";
+      // A 4001 close (or a "replaced_by_*" reason) means a newer session for this
+      // device/client id took over. Do NOT reconnect — otherwise the old tab
+      // would kick the new one, which reconnects and kicks back, forever. Go
+      // terminally offline and tell the app so it can show a "replaced" state.
+      const replacedByNewer = event.code === 4001 || String(event.reason || "").startsWith("replaced_by");
+      if (replacedByNewer) {
+        this.replaced = true;
+        this.shouldReconnect = false;
+        this.clearTimeoutImpl(this.reconnectTimer);
+        this.reconnectTimer = 0;
+        this.emit("replaced", { code: event.code, reason: event.reason });
+        return;
+      }
       this.emit("disconnected", { code: event.code, reason: event.reason });
       this.scheduleReconnect();
     });

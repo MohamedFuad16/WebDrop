@@ -1,7 +1,10 @@
 export const DEFAULT_CHIRP = Object.freeze({
   durationMs: 112,
-  startFrequencyHz: 18600,
-  endFrequencyHz: 19400,
+  // Fallback band only (server assigns per-session signature bands). Expanded
+  // downward with MIN_INAUDIBLE_FREQUENCY_HZ so phones — whose speakers roll off
+  // hard above ~18.5kHz — actually radiate the chirp.
+  startFrequencyHz: 17800,
+  endFrequencyHz: 18600,
   code: 0,
   // Live telemetry showed the common failure is the *receiving* phone reporting
   // det=False — it never heard the partner's chirp — while emit/score/bump/tilt
@@ -12,7 +15,11 @@ export const DEFAULT_CHIRP = Object.freeze({
   gain: 0.72
 });
 
-export const MIN_INAUDIBLE_FREQUENCY_HZ = 18500;
+// Lowered from 18500 to admit the expanded 17.8-20.0kHz band. ~17.5kHz is beyond
+// most adults' hearing; the trade-off (faint audibility to young ears) was
+// accepted to gain much louder, more reliable phone-speaker output and 4 lanes
+// for concurrent pair sessions.
+export const MIN_INAUDIBLE_FREQUENCY_HZ = 17500;
 export const ENERGY_ASSISTED_CORRELATION_MINIMUM = 0.16;
 export const ENERGY_ASSISTED_MARGIN_DB_MINIMUM = 4.5;
 export const SLOT_ENERGY_MARGIN_DB_MINIMUM = 8;
@@ -41,6 +48,114 @@ export class AcousticProximitySensor {
     this.captureChunks = [];
     this.captureSampleCount = 0;
     this.captureMaximumSamples = 0;
+    // Identity of the stream + context the capture graph (source/analyser) was
+    // last wired from, so #ensureAnalyser rebuilds after either is replaced
+    // instead of leaving a MediaStreamSource attached to a dead node.
+    this.graphStream = null;
+    this.graphContext = null;
+    // Per-track lifecycle bookkeeping so an iOS-muted / ended stream is dropped
+    // and re-acquired on the next gesture instead of silently recording silence.
+    this.trackHandlers = [];
+    this.muteSince = 0;
+    this.contextStateHandler = null;
+    // Field-debug health surface, mirrored into ceremony telemetry.
+    this.health = {
+      muteEvents: 0,
+      endedEvents: 0,
+      interruptedCount: 0,
+      rebuilds: 0,
+      lastSelfTest: null,
+      trackMuted: false,
+      trackReadyState: null,
+      contextSampleRate: null,
+      trackSampleRate: null
+    };
+  }
+
+  getHealth() {
+    const track = this.#audioTrack();
+    return {
+      ...this.health,
+      trackMuted: track ? Boolean(track.muted) : this.health.trackMuted,
+      trackReadyState: track?.readyState ?? this.health.trackReadyState,
+      contextSampleRate: this.context?.sampleRate ?? this.health.contextSampleRate,
+      trackSampleRate: this.#trackSampleRate() ?? this.health.trackSampleRate,
+      streamActive: Boolean(this.stream?.active),
+      healthy: this.#streamHealthy()
+    };
+  }
+
+  #audioTrack() {
+    return this.stream?.getAudioTracks?.()[0] || null;
+  }
+
+  #trackSampleRate() {
+    const settings = this.#audioTrack()?.getSettings?.();
+    const rate = Number(settings?.sampleRate);
+    return Number.isFinite(rate) && rate > 0 ? rate : null;
+  }
+
+  // A stream that iOS has muted (screen lock, backgrounding, route change) stays
+  // `active` but delivers pure silence, which is the top cause of the observed
+  // detected=false / rms≈0.001 field failures. Treat only a live, unmuted track
+  // as usable.
+  #streamHealthy() {
+    const stream = this.stream;
+    if (!stream?.active) return false;
+    if (typeof stream.getAudioTracks !== "function") return true;
+    const tracks = stream.getAudioTracks();
+    if (!tracks.length) return true;
+    // A real MediaStreamTrack always reports readyState/muted; treat only an
+    // explicit "ended"/muted===true as unhealthy so mock tracks (tests) and
+    // browsers that omit the fields still count as usable.
+    return tracks.every((track) => track.readyState !== "ended" && track.muted !== true);
+  }
+
+  #attachTrackListeners(stream) {
+    this.#detachTrackListeners();
+    const track = stream?.getAudioTracks?.()[0];
+    if (!track?.addEventListener) return;
+    const onMute = () => {
+      this.health.muteEvents += 1;
+      this.muteSince = Date.now();
+    };
+    const onUnmute = () => { this.muteSince = 0; };
+    const onEnded = () => {
+      this.health.endedEvents += 1;
+      this.#dropStream();
+    };
+    track.addEventListener("mute", onMute);
+    track.addEventListener("unmute", onUnmute);
+    track.addEventListener("ended", onEnded);
+    this.trackHandlers = [
+      ["mute", onMute],
+      ["unmute", onUnmute],
+      ["ended", onEnded]
+    ].map(([type, handler]) => ({ track, type, handler }));
+  }
+
+  #detachTrackListeners() {
+    for (const { track, type, handler } of this.trackHandlers) {
+      track.removeEventListener?.(type, handler);
+    }
+    this.trackHandlers = [];
+  }
+
+  // Fully release the current stream + capture graph so the next
+  // requestMicrophonePermission re-acquires a fresh, live stream.
+  #dropStream() {
+    this.#detachTrackListeners();
+    try {
+      this.source?.disconnect();
+    } catch { /* already disconnected */ }
+    this.source = null;
+    this.analyser = null;
+    this.graphStream = null;
+    this.muteSince = 0;
+    this.stream?.getTracks?.().forEach((track) => {
+      try { track.stop(); } catch { /* ignore */ }
+    });
+    this.stream = null;
   }
 
   async requestMicrophonePermission(constraints = {
@@ -53,9 +168,12 @@ export class AcousticProximitySensor {
     },
     video: false
   }) {
-    if (this.stream?.active) {
+    // Reuse only a genuinely healthy stream. A cached-but-muted/ended stream
+    // (iOS after lock/background) is dropped so we re-acquire a live one.
+    if (this.#streamHealthy()) {
       return { granted: true, reason: "granted", stream: this.stream, cached: true };
     }
+    if (this.stream) this.#dropStream();
     const mediaDevices = this.mediaDevices;
     if (!mediaDevices?.getUserMedia) {
       return { granted: false, reason: "unsupported" };
@@ -72,6 +190,8 @@ export class AcousticProximitySensor {
 
     try {
       this.stream = await mediaDevices.getUserMedia(constraints);
+      this.#attachTrackListeners(this.stream);
+      this.muteSince = 0;
       return { granted: true, stream: this.stream, permissionState };
     } catch (error) {
       return { granted: false, reason: permissionReason(error), error };
@@ -82,14 +202,21 @@ export class AcousticProximitySensor {
     try {
       const context = this.#ensureContext();
       const resume = context.state !== "running" ? context.resume() : Promise.resolve();
+      // Prime the iOS "play and record" audio session with a short, real (but
+      // inaudible) tone. The previous 0.00001-gain / 20ms pulse sat below the
+      // session-activation threshold, so the mic input was never actually routed
+      // and the ceremony captured silence. 60ms at 18.5kHz / gain 0.15 forces the
+      // session live while staying inaudible.
       if (context.createOscillator && context.createGain) {
         const oscillator = context.createOscillator();
         const gain = context.createGain();
-        gain.gain.value = 0.00001;
+        if (oscillator.frequency) oscillator.frequency.value = 18500;
+        gain.gain.value = 0.15;
         oscillator.connect(gain);
         gain.connect(context.destination);
-        oscillator.start(context.currentTime || 0);
-        oscillator.stop((context.currentTime || 0) + 0.02);
+        const startAt = context.currentTime || 0;
+        oscillator.start(startAt);
+        oscillator.stop(startAt + 0.06);
         oscillator.addEventListener?.("ended", () => {
           oscillator.disconnect();
           gain.disconnect();
@@ -99,6 +226,20 @@ export class AcousticProximitySensor {
       return { granted: context.state === "running", reason: context.state };
     } catch (error) {
       return { granted: false, reason: "audio-context-error", error };
+    }
+  }
+
+  // Called on tab foreground / pageshow: recover a suspended/interrupted context
+  // and drop a stream iOS muted while backgrounded so the next gesture re-acquires.
+  async revalidateAudio() {
+    try {
+      if (this.context && this.context.state !== "closed" && this.context.state !== "running") {
+        await this.context.resume().catch(() => {});
+      }
+      if (this.stream && !this.#streamHealthy()) this.#dropStream();
+      return { ok: true, contextState: this.context?.state || null, healthy: this.#streamHealthy() };
+    } catch (error) {
+      return { ok: false, error };
     }
   }
 
@@ -272,7 +413,8 @@ export class AcousticProximitySensor {
   }
 
   async startCeremonyCapture({ maximumDurationMs = 6000, bufferSize = 2048 } = {}) {
-    if (!this.stream?.active) return { started: false, reason: "microphone-not-granted" };
+    if (!this.#streamHealthy()) return { started: false, reason: "microphone-not-granted" };
+    await this.#reconcileContextSampleRate();
     const contextResult = await this.#getContextResult();
     if (!contextResult.context) return { started: false, reason: contextResult.reason };
     const context = contextResult.context;
@@ -299,6 +441,21 @@ export class AcousticProximitySensor {
     this.captureNode.connect(this.captureSink);
     this.captureSink.connect(context.destination);
     return { started: true, sampleRate: context.sampleRate };
+  }
+
+  // Non-destructive snapshot of the samples captured so far, so the ceremony can
+  // attempt an early decode mid-window without stopping the live capture.
+  peekCeremonyCapture() {
+    const samples = concatenateSamples(this.captureChunks, this.captureSampleCount);
+    const sampleRate = this.context?.sampleRate || null;
+    const signal = sampleEnergy(samples);
+    return {
+      samples,
+      sampleRate,
+      durationMs: sampleRate ? samples.length / sampleRate * 1000 : 0,
+      rms: signal.rms,
+      peak: signal.peak
+    };
   }
 
   stopCeremonyCapture() {
@@ -422,8 +579,13 @@ export class AcousticProximitySensor {
   }
 
   getStatus() {
+    const track = this.#audioTrack();
     return {
       streamActive: Boolean(this.stream?.active),
+      streamHealthy: this.#streamHealthy(),
+      trackMuted: track ? Boolean(track.muted) : null,
+      trackReadyState: track?.readyState || null,
+      trackSampleRate: this.#trackSampleRate(),
       contextState: this.context?.state || "uninitialized",
       sampleRate: this.context?.sampleRate || null,
       inputTracks: this.stream?.getAudioTracks?.().length || 0
@@ -432,14 +594,15 @@ export class AcousticProximitySensor {
 
   stopCapture({ releaseStream = false } = {}) {
     this.stopCeremonyCapture();
-    this.source?.disconnect();
-    this.analyser?.disconnect();
+    try {
+      this.source?.disconnect();
+      this.analyser?.disconnect();
+    } catch { /* already disconnected */ }
     this.source = null;
     this.analyser = null;
-    if (releaseStream) {
-      this.stream?.getTracks().forEach((track) => track.stop());
-      this.stream = null;
-    }
+    this.graphStream = null;
+    this.graphContext = null;
+    if (releaseStream) this.#dropStream();
   }
 
   stop() {
@@ -456,13 +619,39 @@ export class AcousticProximitySensor {
 
   async #getRunningContext() {
     const context = this.#ensureContext();
-    if (context.state !== "running") await context.resume();
+    this.#watchContextState(context);
+    // iOS reports "interrupted" (call, Siri, route change) and "suspended"; both
+    // must be resumed or capture stays silent.
+    if (context.state !== "running") {
+      if (context.state === "interrupted") this.health.interruptedCount += 1;
+      await context.resume();
+    }
     return context;
   }
 
   #ensureContext() {
-    if (!this.context || this.context.state === "closed") this.context = this.audioContextFactory();
+    if (!this.context || this.context.state === "closed") {
+      // Match the AudioContext sample rate to the live mic track's rate. On iOS a
+      // 44.1kHz context wired to a 48kHz mic stream (or vice-versa) makes
+      // createMediaStreamSource capture silence. Pinning the rate at creation
+      // avoids the WebKit resampler failure.
+      const trackRate = this.#trackSampleRate();
+      this.context = this.audioContextFactory(trackRate ? { sampleRate: trackRate } : undefined);
+      this.health.contextSampleRate = this.context?.sampleRate ?? null;
+    }
     return this.context;
+  }
+
+  #watchContextState(context) {
+    if (!context?.addEventListener || this.contextStateHandler?.context === context) return;
+    const handler = () => {
+      if (context.state === "interrupted" || context.state === "suspended") {
+        this.health.interruptedCount += 1;
+        context.resume?.().catch(() => {});
+      }
+    };
+    context.addEventListener("statechange", handler);
+    this.contextStateHandler = { context, handler };
   }
 
   async #getContextResult() {
@@ -478,11 +667,58 @@ export class AcousticProximitySensor {
   }
 
   #ensureAnalyser(context) {
-    if (this.source && this.analyser) return;
+    // Rebuild whenever the stream OR context instance changed since the graph was
+    // wired — a stale MediaStreamSource points at a dead track and captures
+    // silence. (The old `if (source && analyser) return` never rebuilt.)
+    if (this.source && this.analyser && this.graphStream === this.stream && this.graphContext === context) {
+      return;
+    }
+    try {
+      this.source?.disconnect();
+      this.analyser?.disconnect();
+    } catch { /* already disconnected */ }
+    if (this.source || this.analyser) this.health.rebuilds += 1;
     this.source = context.createMediaStreamSource(this.stream);
     this.analyser = context.createAnalyser();
     this.analyser.smoothingTimeConstant = 0;
     this.source.connect(this.analyser);
+    this.graphStream = this.stream;
+    this.graphContext = context;
+  }
+
+  // If an early context (created during the gesture, before getUserMedia
+  // resolved) has a different sample rate than the live mic track, close it so
+  // the next #ensureContext recreates it pinned to the track rate.
+  async #reconcileContextSampleRate() {
+    const trackRate = this.#trackSampleRate();
+    if (!trackRate || !this.context || this.context.state === "closed") return;
+    if (Math.abs(this.context.sampleRate - trackRate) < 1) return;
+    try {
+      this.contextStateHandler = null;
+      await this.context.close();
+    } catch { /* ignore */ }
+    this.context = null;
+    this.source = null;
+    this.analyser = null;
+    this.graphStream = null;
+    this.graphContext = null;
+  }
+
+  // Verify the mic actually captures audio: emit one short probe of the phone's
+  // OWN signature and confirm it shows up in the capture. Used during the sync
+  // phase before the ceremony so a dead/muted mic can be rebuilt in time.
+  async captureSelfTest({ signature = {}, gain = 0.6, durationMs = 150, settleMs = 90 } = {}) {
+    const started = await this.startCeremonyCapture({ maximumDurationMs: durationMs + settleMs + 400, bufferSize: 2048 });
+    if (!started.started) {
+      this.health.lastSelfTest = "failed";
+      return { ok: false, reason: started.reason, peak: 0, rms: 0 };
+    }
+    await this.emitChirp({ ...DEFAULT_CHIRP, ...signature, gain, durationMs });
+    await new Promise((resolve) => setTimeout(resolve, settleMs));
+    const recording = this.stopCeremonyCapture();
+    const ok = Number(recording.peak) >= 0.02;
+    this.health.lastSelfTest = ok ? "pass" : "silent";
+    return { ok, peak: recording.peak, rms: recording.rms, sampleRate: recording.sampleRate, reason: ok ? null : "silent-capture" };
   }
 }
 
@@ -616,9 +852,17 @@ export function analyzeFrequencyBand(frequencies, {
   };
 }
 
-function defaultAudioContextFactory() {
+function defaultAudioContextFactory(options) {
   const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
   if (!AudioContext) throw new Error("Web Audio is not supported");
+  // Pin the sample rate to the mic track's rate when known (iOS resampler bug).
+  // If the exact rate is unsupported the constructor throws — fall back to the
+  // browser default rather than failing audio entirely.
+  if (options?.sampleRate) {
+    try {
+      return new AudioContext({ sampleRate: options.sampleRate });
+    } catch { /* fall through to default rate */ }
+  }
   return new AudioContext();
 }
 

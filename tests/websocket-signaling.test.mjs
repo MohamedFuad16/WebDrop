@@ -57,6 +57,42 @@ test("reports proximity session telemetry sends and skips closed sockets", async
   assert.equal(skipped[0].messageType, "proximity:session:telemetry");
 });
 
+test("a 4001 takeover close goes terminally offline without reconnecting", async () => {
+  const timers = [];
+  const adapter = new WebSocketSignalingAdapter({
+    url: "wss://signal.example.test/ws",
+    WebSocketImpl: FakeWebSocket,
+    setTimeoutImpl(callback, delay) {
+      const timer = { callback, delay, cancelled: false };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeoutImpl(timer) { if (timer) timer.cancelled = true; }
+  });
+  const replaced = [];
+  const disconnected = [];
+  adapter.on("replaced", (event) => replaced.push(event));
+  adapter.on("disconnected", (event) => disconnected.push(event));
+
+  adapter.connect({ self: { id: "tab-a" } });
+  const socket = adapter.socket;
+  socket.readyState = FakeWebSocket.OPEN;
+  socket.dispatch("open");
+  // Server kicks this tab because a newer session took over.
+  socket.dispatch("close", { code: 4001, reason: "replaced_by_new_device_session" });
+
+  assert.equal(replaced.length, 1);
+  assert.equal(replaced[0].code, 4001);
+  assert.equal(disconnected.length, 0, "must not emit disconnected / trigger reconnect");
+  assert.equal(adapter.replaced, true);
+  assert.equal(timers.filter((timer) => !timer.cancelled).length, 0, "no reconnect timer armed");
+
+  // A plain connect() is a no-op while replaced; force reclaims the tab.
+  assert.equal(await adapter.connect({ self: { id: "tab-a" } }), false);
+  adapter.connect({ self: { id: "tab-a" } }, { force: true });
+  assert.equal(adapter.replaced, false);
+});
+
 class FakeWebSocket {
   static OPEN = 1;
 

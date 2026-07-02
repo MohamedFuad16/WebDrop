@@ -101,8 +101,8 @@ test("consolidated diagnostics endpoint rejects un-tokened reads and serves the 
     assert.equal(body.signaling.protocol.scoreMinimum, 0.55);
     assert.equal(body.signaling.protocol.maxClients, 6);
     assert.equal(body.signaling.protocol.acousticSlotCorrelationMin, 0.2);
-    assert.equal(body.signaling.protocol.acousticBandStartHz, 18600);
-    assert.equal(body.signaling.protocol.acousticBandEndHz, 19400);
+    assert.equal(body.signaling.protocol.acousticBandStartHz, 17800);
+    assert.equal(body.signaling.protocol.acousticBandEndHz, 20000);
     assert.ok(Array.isArray(body.metrics.recentEvents));
   } finally {
     hub.close();

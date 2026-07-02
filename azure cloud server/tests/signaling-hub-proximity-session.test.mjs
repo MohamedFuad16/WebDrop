@@ -165,6 +165,27 @@ test("proximity session rejects a high score without explicit bump and tilt evid
   hub.close();
 });
 
+test("proximity session accepts a bump made at connect-tap time (before startAt)", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  const session = createSession(hub, [clientA, clientB]);
+  // Realistic epoch timing, all in the past (telemetry always arrives after the
+  // window closes): tapped 8s ago, ceremony started 6s ago, ended 0.5s ago.
+  const now = Date.now();
+  session.createdAt = now - 8000;
+  session.startAt = now - 6000;
+  session.endsAt = now - 500;
+  // Both users bumped right after tapping Connect — ~1.9s BEFORE startAt. This
+  // was the "immediate bump fails" case; it must now pair.
+  hub.recordProximitySessionTelemetry(clientA, sessionMessage(session, clientA, verifiedMetrics(), session.createdAt + 100, clientB));
+  hub.recordProximitySessionTelemetry(clientB, sessionMessage(session, clientB, verifiedMetrics(), session.createdAt + 160, clientA));
+
+  assert.ok(clientA.pairingId);
+  assert.equal(clientA.pairingId, clientB.pairingId);
+  hub.close();
+});
+
 test("proximity session rejects bump evidence outside the issued ceremony window", () => {
   const metrics = new ServerMetrics();
   const hub = createTestHub({ metrics });

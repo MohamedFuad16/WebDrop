@@ -1,6 +1,6 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.103";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.103";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.103";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.104";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.104";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.104";
 import {
   TEST_CASES,
   createTestRun,
@@ -8,21 +8,21 @@ import {
   stopTestRun,
   summarizeTestRun,
   validateAssignments
-} from "./test-runs.js?v=1.0.103";
+} from "./test-runs.js?v=1.0.104";
 
-const APP_VERSION = "1.0.103";
+const APP_VERSION = "1.0.104";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
 const MONITOR_INTERVAL_MS = 1000;
-const MONITOR_START_HZ = 18_600;
-const MONITOR_END_HZ = 19_400;
+const MONITOR_START_HZ = 17_800;
+const MONITOR_END_HZ = 20_000;
 // The diagnostics feed requires the metrics bearer token. On the operator's own
 // machine it is auto-loaded from the gitignored js/config/local-admin-token.js;
 // remote operators paste it once (kept only in sessionStorage, never committed).
 const ADMIN_TOKEN_STORAGE_KEY = "webdrop.adminToken";
 const TEST_RUN_STORAGE_KEY = "webdrop.adminTestRuns.v1";
-const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.103", import.meta.url);
+const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.104", import.meta.url);
 
 const ADMIN_MESSAGES = {
   en: {
@@ -633,12 +633,42 @@ async function init() {
 }
 
 async function resolveAdminToken() {
+  // Magic-link first: a shared URL like /admin/#k=TOKEN logs an operator in with
+  // zero typing. The token lives in the URL *fragment*, which browsers never send
+  // to the server and which is not written to server/proxy logs. We stash it in
+  // sessionStorage and immediately scrub it from the address bar/history.
+  const fromHash = adminTokenFromHash();
+  if (fromHash) {
+    storeAdminToken(fromHash);
+    scrubAdminTokenFromUrl();
+    return fromHash;
+  }
   const fromGlobal = typeof globalThis.WEBDROP_ADMIN_TOKEN === "string" ? globalThis.WEBDROP_ADMIN_TOKEN.trim() : "";
   if (fromGlobal) return fromGlobal;
   const fromSession = storedAdminToken();
   if (fromSession) return fromSession;
   if (!isLocalAdminHost()) return "";
   return fetchLocalAdminToken();
+}
+
+function adminTokenFromHash() {
+  try {
+    const hash = String(globalThis.location?.hash || "").replace(/^#/, "");
+    if (!hash) return "";
+    const token = new URLSearchParams(hash).get("k");
+    return typeof token === "string" ? token.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+function scrubAdminTokenFromUrl() {
+  try {
+    const { pathname, search } = globalThis.location || {};
+    globalThis.history?.replaceState?.(null, "", `${pathname || ""}${search || ""}`);
+  } catch {
+    /* history API unavailable; token is already stored in sessionStorage */
+  }
 }
 
 function isLocalAdminHost() {
@@ -1398,10 +1428,10 @@ function frequencyOverlap(a, b) {
 
 function monitorFrequencyBands() {
   return [
-    { label: "18 kHz", startFrequencyHz: 18_000, endFrequencyHz: 18_500 },
-    { label: "19 kHz", startFrequencyHz: 18_500, endFrequencyHz: 19_500 },
-    { label: "20 kHz", startFrequencyHz: 19_500, endFrequencyHz: 20_500 },
-    { label: "21 kHz", startFrequencyHz: 20_500, endFrequencyHz: 21_000 }
+    { label: "17.8 kHz", startFrequencyHz: 17_500, endFrequencyHz: 18_200 },
+    { label: "18.5 kHz", startFrequencyHz: 18_200, endFrequencyHz: 18_900 },
+    { label: "19.3 kHz", startFrequencyHz: 18_900, endFrequencyHz: 19_600 },
+    { label: "20 kHz", startFrequencyHz: 19_600, endFrequencyHz: 20_500 }
   ];
 }
 
