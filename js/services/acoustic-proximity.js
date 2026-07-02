@@ -3,7 +3,13 @@ export const DEFAULT_CHIRP = Object.freeze({
   startFrequencyHz: 18600,
   endFrequencyHz: 19400,
   code: 0,
-  gain: 0.45
+  // Live telemetry showed the common failure is the *receiving* phone reporting
+  // det=False — it never heard the partner's chirp — while emit/score/bump/tilt
+  // were fine. Phone speakers roll off hard at 18–19 kHz, so a modest 0.45
+  // digital level often didn't carry across the gap. 0.72 gives materially more
+  // acoustic output (better SNR at the far phone → fewer det=False) while
+  // staying below clipping (peak·gain < 1) and inaudible in the ultrasonic band.
+  gain: 0.72
 });
 
 export const MIN_INAUDIBLE_FREQUENCY_HZ = 18500;

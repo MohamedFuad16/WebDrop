@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.99";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.99";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.99";
+import { formatBytes } from "../utils/format.js?v=1.0.101";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.101";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.101";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
@@ -35,6 +35,7 @@ export function createController({
   let proximitySessionStartResolver = null;
   let proximityMatchResolver = null;
   let proximitySessionFailedResolver = null;
+  let proximityTelemetryAckResolver = null;
   let lastProximityFailure = null;
   let pendingTransferPatch = null;
   let transferPatchFrame = 0;
@@ -298,6 +299,11 @@ export function createController({
     proximityMatchResolver = null;
   });
 
+  signaling.on("proximity:session:telemetry:accepted", (payload = {}) => {
+    proximityTelemetryAckResolver?.(payload);
+    proximityTelemetryAckResolver = null;
+  });
+
   signaling.on("proximity:session:failed", (payload = {}) => {
     // The server decides the authoritative failure reason (bump vs ultrasound vs
     // non-reciprocal match). Hold onto it so the UI can report the REAL cause
@@ -310,6 +316,8 @@ export function createController({
     proximitySessionStartResolver = null;
     proximityMatchResolver?.(null);
     proximityMatchResolver = null;
+    proximityTelemetryAckResolver?.(null);
+    proximityTelemetryAckResolver = null;
   });
 
   signaling.on("admin:monitor:start", (payload = {}) => {
@@ -1161,16 +1169,7 @@ export function createController({
       },
       motion: result.evidence?.motion
     });
-    await signaling.sendProximitySessionTelemetry?.({
-      sessionId,
-      clientNonce,
-      metrics: result.metrics,
-      timing: {
-        startedAt: startPayload.startAt,
-        bumpAt: result.evidence?.motion?.bumpAt || Date.now(),
-        completedAt: Date.now()
-      }
-    });
+    await sendProximityTelemetryWithAck(startPayload, clientNonce, result);
     const matchPayload = await match;
     if (!matchPayload?.peerId || !matchPayload?.pairingId || !isCurrentProximitySession(sessionId)) {
       await failAnonymousVerification({
@@ -1793,6 +1792,59 @@ export function createController({
     });
   }
 
+  async function sendProximityTelemetryWithAck(startPayload = {}, clientNonce, result = {}) {
+    const sessionId = startPayload.sessionId || proximitySessionId;
+    if (!sessionId) return { sent: false, accepted: false, attempts: 0 };
+    const timing = {
+      startedAt: startPayload.startAt,
+      bumpAt: result.evidence?.motion?.bumpAt || Date.now(),
+      completedAt: Date.now()
+    };
+    const payload = {
+      sessionId,
+      clientNonce,
+      metrics: result.metrics,
+      timing
+    };
+    const maxAttempts = 3;
+    let sentAny = false;
+    for (let attempt = 1; attempt <= maxAttempts && isCurrentProximitySession(sessionId); attempt += 1) {
+      const ack = waitForProximityTelemetryAck(sessionId, attempt === 1 ? 800 : 1000);
+      const sent = Boolean(await signaling.sendProximitySessionTelemetry?.(payload));
+      sentAny = sentAny || sent;
+      sendProximitySessionDiagnostic(startPayload, "telemetry:send", {
+        clientNonce,
+        state: sent ? "sent" : "skipped",
+        reason: sent ? null : "socket-not-open",
+        message: `attempt=${attempt};accepted=pending`,
+        timing
+      });
+      if (!sent) {
+        proximityTelemetryAckResolver?.(null);
+        proximityTelemetryAckResolver = null;
+      }
+      const accepted = sent ? await ack : null;
+      if (accepted?.sessionId === sessionId) {
+        sendProximitySessionDiagnostic(startPayload, "telemetry:accepted", {
+          clientNonce,
+          state: "accepted",
+          message: `attempt=${attempt};score=${Math.round(Number(accepted.score || 0) * 100)}`,
+          timing
+        });
+        return { sent: true, accepted: true, attempts: attempt };
+      }
+      if (attempt < maxAttempts) await wait(220);
+    }
+    sendProximitySessionDiagnostic(startPayload, "telemetry:unconfirmed", {
+      clientNonce,
+      state: sentAny ? "sent" : "skipped",
+      reason: sentAny ? "ack-timeout" : "socket-not-open",
+      message: `attempts=${maxAttempts}`,
+      timing
+    });
+    return { sent: sentAny, accepted: false, attempts: maxAttempts };
+  }
+
   async function failAnonymousVerification({ score = 0, errors = [], serverReason = null } = {}) {
     const sessionId = proximitySessionId;
     stopProximitySensors();
@@ -1836,15 +1888,19 @@ export function createController({
       ? Promise.resolve({ granted: false, reason: storedPermissions.motion, cached: true })
       : proximity.requestMotionPermission();
     const audioOutputPromise = proximity.prepareAudioOutput();
-    const microphonePromise = storedPermissions.microphone === "denied"
-      ? Promise.resolve({ granted: false, reason: "denied", cached: true })
-      : proximity.requestMicrophonePermission();
+    // Never let a locally cached microphone denial suppress a fresh
+    // getUserMedia() call. Safari/iOS does not expose a reliable microphone
+    // Permissions API state, and a stale localStorage "denied" from an earlier
+    // aborted/blocked attempt can otherwise stop the native prompt from showing
+    // on the user's next Connect tap. The acoustic sensor still honors a real
+    // browser-level Permissions API denial where that API exists.
+    const microphonePromise = proximity.requestMicrophonePermission();
     permissionRequestPromise = Promise.all([motionPromise, audioOutputPromise, microphonePromise]).then(([
       motion,
       audioOutput,
       microphone
     ]) => {
-      storedPermissions.microphone = permissionState(microphone);
+      storedPermissions.microphone = microphonePermissionState(microphone);
       storedPermissions.motion = permissionState(motion);
       writeStoredPermissions(storedPermissions);
       return { microphone, motion, audioOutput };
@@ -2147,6 +2203,20 @@ export function createController({
     });
   }
 
+  function waitForProximityTelemetryAck(sessionId, timeoutMs) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        proximityTelemetryAckResolver = null;
+        resolve(null);
+      }, timeoutMs);
+      proximityTelemetryAckResolver = (payload) => {
+        if (payload && payload.sessionId !== sessionId) return;
+        clearTimeout(timer);
+        resolve(payload);
+      };
+    });
+  }
+
   function clearProximitySessionWaiters() {
     proximitySessionJoinedResolver?.(null);
     proximitySessionJoinedResolver = null;
@@ -2156,6 +2226,8 @@ export function createController({
     proximityMatchResolver = null;
     proximitySessionFailedResolver?.(null);
     proximitySessionFailedResolver = null;
+    proximityTelemetryAckResolver?.(null);
+    proximityTelemetryAckResolver = null;
   }
 
   function failedQrResult(reason) {
@@ -2478,11 +2550,16 @@ function permissionState(result) {
   return ["denied", "unsupported"].includes(result?.reason) ? result.reason : "unknown";
 }
 
+function microphonePermissionState(result) {
+  if (result?.granted) return "granted";
+  return result?.reason === "unsupported" ? "unsupported" : "unknown";
+}
+
 function readStoredPermissions() {
   try {
     const value = JSON.parse(localStorage.getItem(PROXIMITY_PERMISSION_KEY) || "{}");
     return {
-      microphone: value.microphone || "unknown",
+      microphone: ["granted", "unsupported"].includes(value.microphone) ? value.microphone : "unknown",
       motion: value.motion || "unknown"
     };
   } catch {
@@ -2502,6 +2579,12 @@ function writeStoredPermissions(permissions) {
     // Browsers can disable storage while still allowing a one-session connection.
   }
 }
+
+export const __controllerTest = Object.freeze({
+  microphonePermissionState,
+  permissionState,
+  readStoredPermissions
+});
 
 function demoPdfItems() {
   return [

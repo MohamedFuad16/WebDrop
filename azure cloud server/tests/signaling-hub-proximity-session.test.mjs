@@ -18,6 +18,8 @@ test("proximity session matches the intended pair while a third client is nearby
   assert.equal(clientA.pairingId, clientB.pairingId);
   assert.ok(clientA.pairingId);
   assert.equal(clientC.pairingId, null);
+  assert.equal(messagesOf(clientA, "proximity:session:telemetry:accepted")[0].payload.decision, "verified");
+  assert.equal(messagesOf(clientB, "proximity:session:telemetry:accepted")[0].payload.decision, "verified");
   assert.equal(messagesOf(clientA, "proximity:match")[0].payload.peerId, "client-b");
   assert.equal(messagesOf(clientB, "proximity:match")[0].payload.peerId, "client-a");
   assert.equal(messagesOf(clientC, "proximity:match").length, 0);
@@ -164,7 +166,8 @@ test("proximity session rejects a high score without explicit bump and tilt evid
 });
 
 test("proximity session rejects bump evidence outside the issued ceremony window", () => {
-  const hub = createTestHub();
+  const metrics = new ServerMetrics();
+  const hub = createTestHub({ metrics });
   const clientA = addClient(hub, "client-a");
   const clientB = addClient(hub, "client-b");
   const session = createSession(hub, [clientA, clientB]);
@@ -176,6 +179,11 @@ test("proximity session rejects bump evidence outside the issued ceremony window
 
   assert.equal(session.telemetry.has(clientA.id), false);
   assert.equal(messagesOf(clientA, "proximity:session:failed")[0].payload.reason, "timing_out_of_window");
+  const rejection = metrics.summary().recentEvents.find((event) => event.type === "proximity:session:telemetry:rejected");
+  assert.equal(rejection.detail.reason, "timing_out_of_window");
+  assert.equal(rejection.detail.clientId, clientA.id);
+  assert.equal(rejection.detail.timing.valid, false);
+  assert.equal(Number.isFinite(rejection.detail.timing.bumpFromStartMs), true);
 
   hub.close();
 });
@@ -214,6 +222,7 @@ test("proximity session rejects telemetry with the wrong join nonce", () => {
 
   assert.equal(session.telemetry.has(clientA.id), false);
   assert.equal(messagesOf(clientA, "proximity:session:failed")[0].payload.reason, "session_nonce_mismatch");
+  assert.equal(messagesOf(clientA, "proximity:session:telemetry:accepted").length, 0);
 
   hub.close();
 });

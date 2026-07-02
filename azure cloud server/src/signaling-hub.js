@@ -1028,15 +1028,15 @@ export class SignalingHub {
     const sessionId = message.payload.sessionId;
     const session = this.proximitySessions.get(sessionId);
     if (!session || !session.clients.has(sender.id) || session.expiresAt <= Date.now()) {
-      this.send(sender.socket, "proximity:session:failed", { sessionId, reason: "session_not_available" });
+      this.rejectProximitySessionTelemetry(sender, message, "session_not_available", session);
       return;
     }
     if (!message.payload.clientNonce || session.nonces.get(sender.id) !== message.payload.clientNonce) {
-      this.send(sender.socket, "proximity:session:failed", { sessionId, reason: "session_nonce_mismatch" });
+      this.rejectProximitySessionTelemetry(sender, message, "session_nonce_mismatch", session);
       return;
     }
     if (!this.hasValidCeremonyTiming(session, message.payload.timing)) {
-      this.send(sender.socket, "proximity:session:failed", { sessionId, reason: "timing_out_of_window" });
+      this.rejectProximitySessionTelemetry(sender, message, "timing_out_of_window", session);
       return;
     }
     const analysis = sessionAnalysis(this.proximityAnalyzer, message.payload.metrics || {}, session.tuning?.scoring);
@@ -1082,7 +1082,34 @@ export class SignalingHub {
       completedAt: Number(message.payload.timing?.completedAt || 0),
       policyRevision: session.tuning?.revision || 1
     });
+    this.send(sender.socket, "proximity:session:telemetry:accepted", {
+      sessionId,
+      decision: analysis.decision,
+      score: analysis.score,
+      telemetryCount: session.telemetry.size,
+      policyRevision: session.tuning?.revision || 1
+    });
     this.tryMatchProximitySession(session);
+  }
+
+  rejectProximitySessionTelemetry(sender, message, reason, session = null) {
+    const sessionId = message.payload?.sessionId || null;
+    const detail = {
+      sessionId,
+      clientId: sender.id,
+      deviceName: sender.deviceName,
+      deviceFamily: sender.deviceFamily,
+      reason,
+      sessionPresent: Boolean(session),
+      inSession: Boolean(session?.clients?.has(sender.id)),
+      sessionExpired: Boolean(session && session.expiresAt <= Date.now()),
+      nonceProvided: Boolean(message.payload?.clientNonce),
+      nonceMatches: Boolean(session && message.payload?.clientNonce && session.nonces.get(sender.id) === message.payload.clientNonce),
+      timing: telemetryTimingDiagnostics(session, message.payload?.timing, session?.tuning?.timing?.matchSlopMs || this.proximityMatchSlopMs)
+    };
+    this.metrics?.recordEvent("proximity:session:telemetry:rejected", detail);
+    this.logger?.warn("Proximity session telemetry rejected.", detail);
+    this.send(sender.socket, "proximity:session:failed", { sessionId, reason });
   }
 
   recordProximitySessionDiagnostic(sender, message) {
@@ -1704,6 +1731,29 @@ function ceremonyTimingValid(session, timing = {}, matchSlopMs = DEFAULT_SESSION
     && bumpAt <= session.endsAt + matchSlopMs
     && completedAt >= bumpAt
     && completedAt <= session.endsAt + matchSlopMs;
+}
+
+function telemetryTimingDiagnostics(session, timing = {}, matchSlopMs = DEFAULT_SESSION_MATCH_SLOP_MS) {
+  const startedAt = Number(timing?.startedAt);
+  const bumpAt = Number(timing?.bumpAt);
+  const completedAt = Number(timing?.completedAt);
+  const startAt = Number(session?.startAt);
+  const endsAt = Number(session?.endsAt);
+  const now = Date.now();
+  return {
+    startedAt: finiteOrNull(startedAt),
+    bumpAt: finiteOrNull(bumpAt),
+    completedAt: finiteOrNull(completedAt),
+    sessionStartAt: finiteOrNull(startAt),
+    sessionEndsAt: finiteOrNull(endsAt),
+    matchSlopMs: finiteOrNull(matchSlopMs),
+    now,
+    startDeltaMs: Number.isFinite(startedAt) && Number.isFinite(startAt) ? Math.round(startedAt - startAt) : null,
+    bumpFromStartMs: Number.isFinite(bumpAt) && Number.isFinite(startAt) ? Math.round(bumpAt - startAt) : null,
+    completedFromEndMs: Number.isFinite(completedAt) && Number.isFinite(endsAt) ? Math.round(completedAt - endsAt) : null,
+    completedAfterBumpMs: Number.isFinite(completedAt) && Number.isFinite(bumpAt) ? Math.round(completedAt - bumpAt) : null,
+    valid: Boolean(session && ceremonyTimingValid(session, timing, matchSlopMs))
+  };
 }
 
 function hasReciprocalAcousticEvidence(session, first, second) {

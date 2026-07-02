@@ -34,12 +34,36 @@ test("fails a black-holed WebSocket handshake on the configured deadline", async
   assert.equal(timers.filter((timer) => !timer.cancelled).length, 0);
 });
 
+test("reports proximity session telemetry sends and skips closed sockets", async () => {
+  const adapter = new WebSocketSignalingAdapter({
+    url: "wss://signal.example.test/ws",
+    WebSocketImpl: FakeWebSocket
+  });
+  const socket = new FakeWebSocket();
+  socket.readyState = FakeWebSocket.OPEN;
+  adapter.socket = socket;
+  const skipped = [];
+  adapter.on("send-skipped", (event) => skipped.push(event));
+
+  assert.equal(await adapter.sendProximitySessionTelemetry({ sessionId: "prox-a" }), true);
+  assert.deepEqual(JSON.parse(socket.sent[0]), {
+    type: "proximity:session:telemetry",
+    payload: { sessionId: "prox-a" }
+  });
+
+  socket.readyState = 3;
+  assert.equal(await adapter.sendProximitySessionTelemetry({ sessionId: "prox-b" }), false);
+  assert.equal(skipped[0].reason, "socket-not-open");
+  assert.equal(skipped[0].messageType, "proximity:session:telemetry");
+});
+
 class FakeWebSocket {
   static OPEN = 1;
 
   constructor() {
     this.readyState = 0;
     this.listeners = new Map();
+    this.sent = [];
   }
 
   addEventListener(type, listener) {
@@ -57,7 +81,9 @@ class FakeWebSocket {
     this.dispatch("close", { code: 1006, reason: "" });
   }
 
-  send() {}
+  send(raw) {
+    this.sent.push(raw);
+  }
 
   dispatch(type, event = {}) {
     for (const listener of [...(this.listeners.get(type) || [])]) listener(event);
