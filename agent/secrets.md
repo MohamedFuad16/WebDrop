@@ -5,7 +5,7 @@
 ## Frontend (this repo root)
 - **`js/config/runtime-config.js`** — injects `globalThis.WEBDROP_RUNTIME_CONFIG`: production `signalingUrl` (`wss://…/ws`) and `turnConfigUrl` (`https://…/api/ice-servers`) plus feature toggles. These URLs are **public, non-secret**; this file is committed. Loaded `no-store`.
 - **`js/config/runtime-flags.js`** — sanitizes the above into effective flags. No secrets.
-- **`js/config/local-admin-token.js`** — **GITIGNORED** (see `.gitignore`). Sets `globalThis.WEBDROP_ADMIN_TOKEN` to the metrics bearer token so the operator's own machine auto-fills the admin dashboard. **Contains a real token value on disk — never commit it, never copy its value into docs/logs.** Remote operators paste the token at the dashboard prompt instead (kept only in `sessionStorage` under `webdrop.adminToken`).
+- **`js/config/local-admin-token.js`** — **GITIGNORED** (see `.gitignore`). Sets `globalThis.WEBDROP_ADMIN_TOKEN` to the metrics bearer token so a localhost-served dashboard can auto-authenticate. Production does not request this file. **Contains a real token value on disk — never commit it, never copy its value into docs/logs.** Remote operators paste the token into the visible **Admin access** form (kept only in `sessionStorage` under `webdrop.adminToken`).
 - **No `.env` is read by the frontend.** No API keys live in committed frontend code.
 
 ## Backend (`azure cloud server/` — separate project)

@@ -202,19 +202,67 @@ test("redesigns admin readiness around truthful launch state", async ({ page }, 
   await expect(page.locator("[data-readiness-board]")).toContainText("No production infrastructure blocker");
   await expect(page.locator("[data-summary-devices]")).toHaveText("2");
   await expect(page.locator("[data-summary-pairs]")).toHaveText("1");
-  await expect(page.locator("[data-summary-readiness]")).toHaveText("44%");
-  await expect(page.locator("[data-readiness-score]")).toHaveText("44%");
-  await expect(page.locator("[data-readiness-explainer]")).toContainText("4 of 9");
+  await expect(page.locator("[data-summary-readiness]")).toHaveText("56%");
+  await expect(page.locator("[data-readiness-score]")).toHaveText("56%");
+  await expect(page.locator("[data-readiness-explainer]")).toContainText("5 of 9");
 
   await expect(page.locator('[data-readiness-board] [data-state="ready"] .readiness-row span').first()).toHaveText("Live");
-  await expect(page.locator('[data-readiness-board] [data-state="proof"] .readiness-row span').first()).toHaveText("Needs proof");
+  await expect(page.locator('[data-readiness-board] [data-state="proof"] .readiness-row span').first()).toHaveText("1-on-1 verified");
 
   await page.locator("[data-operations-language]").selectOption("ja");
   await expect(page.getByRole("heading", { name: "実際に準備できているもの" })).toBeVisible();
   await expect(page.locator("[data-readiness-board]")).toContainText("近接セレモニー");
   await expect(page.locator("[data-readiness-board]")).toContainText("実機証明が必要");
   await expect(page.locator('[data-readiness-board] [data-state="ready"] .readiness-row span').first()).toHaveText("稼働中");
-  await expect(page.locator('[data-readiness-board] [data-state="proof"] .readiness-row span').first()).toHaveText("要実機");
+  await expect(page.locator('[data-readiness-board] [data-state="proof"] .readiness-row span').first()).toHaveText("1対1で確認済み");
+  expect(consoleProblems()).toEqual([]);
+});
+
+test("uses a visible admin token form when modal prompts are unavailable", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-desktop", "Admin authentication is covered once in Chromium.");
+  const consoleProblems = collectConsoleProblems(page);
+  let snapshotRequests = 0;
+  await page.addInitScript(() => {
+    globalThis.__webdropPromptCalls = 0;
+    globalThis.prompt = () => {
+      globalThis.__webdropPromptCalls += 1;
+      throw new Error("prompt() is not supported");
+    };
+  });
+  await page.route("**/js/config/local-admin-token.js*", async (route) => {
+    await route.fulfill({ contentType: "application/javascript", body: "/* no local token */" });
+  });
+  await page.route("https://signal.test/api/diagnostics-public", async (route) => {
+    snapshotRequests += 1;
+    if (route.request().headers().authorization !== "Bearer e2e-manual-token") {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "unauthorized" })
+      });
+      return;
+    }
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(SNAPSHOT) });
+  });
+
+  await page.goto("/admin/?tab=live&qa=visible-admin-access", { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator("[data-admin-access]")).toBeVisible();
+  await expect(page.locator("[data-admin-token-input]")).toBeVisible();
+  await expect(page.locator("[data-device-list]")).toContainText("No physical devices are connected");
+  expect(snapshotRequests).toBe(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+
+  await page.locator("[data-admin-token-input]").fill("e2e-manual-token");
+  await page.getByRole("button", { name: "Connect" }).click();
+
+  await expect(page.locator("[data-admin-access]")).toBeHidden();
+  await expect(page.locator("[data-device-list]")).toContainText("Fuad iPhone");
+  await expect(page.locator("[data-summary-devices]")).toHaveText("2");
+  await expect.poll(() => snapshotRequests).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => globalThis.__webdropPromptCalls)).toBe(0);
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("webdrop.adminToken"))).toBe("e2e-manual-token");
   expect(consoleProblems()).toEqual([]);
 });
 
@@ -232,8 +280,8 @@ test("updates proximity tuning and records a repeatable test case", async ({ pag
   await page.locator('[data-policy-weight="motion"]').fill("22");
   await page.locator('[data-policy-weight="bump"]').fill("25");
   await page.locator('[data-policy-weight="tilt"]').fill("15");
-  await expect(page.locator("[data-policy-weight-total]")).toHaveText("100.0 points");
-  await page.getByRole("button", { name: "Apply to server" }).click();
+  await expect(page.locator("[data-policy-weight-total]")).toHaveText("100 points");
+  await page.getByRole("button", { name: "Save & apply" }).click();
   await expect(page.locator("[data-policy-status]")).toContainText("Applied revision 2");
 
   await page.getByRole("button", { name: "Test cases" }).click();
@@ -249,22 +297,19 @@ test("updates proximity tuning and records a repeatable test case", async ({ pag
   expect(consoleProblems()).toEqual([]);
 });
 
-test("surfaces an offline server state when diagnostics are unreachable", async ({ page }, testInfo) => {
+test("keeps public server health online when private diagnostics are unreachable", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium-desktop", "Admin operations shell is covered once in Chromium.");
   await page.route("https://signal.test/api/diagnostics-public", (route) => route.abort());
 
   await page.goto("/admin/?tab=readiness", { waitUntil: "domcontentloaded" });
 
-  await expect(page.locator("[data-summary-server]")).toHaveText("Offline");
-  await expect(page.locator("[data-server-connection]")).toHaveAttribute("data-state", "offline");
-  await expect(page.locator("[data-server-connection]")).toContainText("Offline");
-  await expect(page.locator("[data-readiness-board]")).toContainText("Production server");
-  await expect(page.locator("[data-summary-readiness]")).toHaveText("22%");
-  await expect(page.locator("[data-admin-error]")).toContainText("could not be reached");
+  await expect(page.locator("[data-summary-server]")).toHaveText("Connected");
+  await expect(page.locator("[data-readiness-board]")).toContainText("Production signaling");
+  await expect(page.locator("[data-summary-readiness]")).toHaveText("56%");
 
   await page.locator("[data-operations-language]").selectOption("ja");
-  await expect(page.locator("[data-summary-server]")).toHaveText("オフライン");
-  await expect(page.locator("[data-readiness-board]")).toContainText("本番サーバー");
+  await expect(page.locator("[data-summary-server]")).toHaveText("接続済み");
+  await expect(page.locator("[data-readiness-board]")).toContainText("本番シグナリング");
 });
 
 test("folds old diagnostics into live testing and monitors a selected device", async ({ page }, testInfo) => {
@@ -282,9 +327,7 @@ test("folds old diagnostics into live testing and monitors a selected device", a
   await page.locator("[data-monitor-device]").selectOption("android-a");
   await page.locator("[data-action='monitor-start']").click();
   await expect(page.locator("[data-monitor-status-copy]")).toHaveText("Active");
-  await expect(page.locator("[data-monitor-metrics]")).toContainText("Heard signal");
-  await expect(page.locator("[data-monitor-metrics]")).toContainText("42% · Yes");
-  await expect(page.locator("[data-monitor-metrics]")).toContainText("9.4 dB");
+  await expect(page.locator("[data-monitor-metrics]")).toContainText("Emitted packet");
   await expect(page.locator("[data-monitor-metrics]")).toContainText("48 kHz");
   await expect(page.locator("[data-monitor-metrics]")).toContainText("+20 (raw 16.8)");
   await expect(page.locator("[data-monitor-metrics]")).toContainText("34°");
@@ -294,7 +337,7 @@ test("folds old diagnostics into live testing and monitors a selected device", a
   await expect(page.locator("[data-frequency-channels]")).toContainText("-42.0 dB");
   await expect(page.locator("[data-frequency-channels]")).toContainText("Signal");
   await expect(page.locator("[data-event-timeline]")).toContainText("monitor telemetry");
-  await expect(page.locator("[data-session-table]")).toContainText("prox-test");
+  await expect(page.locator("[data-session-count]")).toHaveText("1 active");
 
   await page.locator("[data-action='monitor-stop']").click();
   await expect(page.locator("[data-monitor-status-copy]")).toHaveText("Idle");
@@ -308,67 +351,36 @@ test("folds old diagnostics into live testing and monitors a selected device", a
   expect(consoleProblems()).toEqual([]);
 });
 
-test("renders multi-device proximity sessions with slots, acoustic evidence, and timing", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "chromium-desktop", "Multi-device session board is covered once in Chromium.");
+test("renders the current two-device comparison with reciprocal evidence", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-desktop", "Two-device comparison is covered once in Chromium.");
   const consoleProblems = collectConsoleProblems(page);
   await page.route("https://signal.test/api/diagnostics-public", async (route) => {
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(multiDeviceSnapshot()) });
   });
 
   await page.goto("/admin/?tab=live", { waitUntil: "domcontentloaded" });
-  const table = page.locator("[data-session-table]");
-  await expect(table).toContainText("prox-…445566");
-
-  // Column headers describe each field instead of an unlabelled grid.
-  const header = page.locator(".session-head");
-  await expect(header).toContainText("Session");
-  await expect(header).toContainText("Phase");
-  await expect(header).toContainText("Devices");
-  await expect(header).toContainText("Score & band");
-  await expect(header).toContainText("Timing");
-
-  // Active running session: phase badge, device count, and per-participant acoustic
-  // detail (slot, emitted/heard, energy margin, evidence flags, decision).
-  const running = page.locator(".session-row", { hasText: "prox-…445566" });
-  await expect(running.locator('.session-phase[data-phase="running"]')).toHaveText("Running");
-  await expect(running).toContainText("2 phones");
-  const iphone = running.locator(".session-participant", { hasText: "Mahdi iPhone 15" });
-  await expect(iphone).toContainText("slot 1/2");
-  await expect(iphone).toContainText("emitted");
-  await expect(iphone).toContainText("heard");
-  await expect(iphone).toContainText("9.6 dB");
-  await expect(iphone).toContainText("evidence snd✓ bump✓ tilt✓");
-  await expect(iphone).toContainText("Verified");
-  // Pixel reports no tilt evidence, so the summary must distinguish it from the iPhone.
-  await expect(running.locator(".session-participant", { hasText: "Pixel 9 Pro" })).toContainText("tilt✗");
-
-  // Joining lobby: waiting participants surface mic readiness instead of "n/a".
-  const joining = page.locator(".session-row", { hasText: "prox-…abcdef" });
-  await expect(joining.locator('.session-phase[data-phase="joining"]')).toHaveText("Joining");
-  await expect(joining).toContainText("3 phones");
-  await expect(joining.locator(".session-participant", { hasText: "Galaxy S24" })).toContainText("Waiting");
-
-  // Finished sessions are reconstructed from the event feed: the failed session must
-  // attribute its device (was previously misreported as "0 phones").
-  const failed = page.locator(".session-row--recent", { hasText: "prox-done-2" });
-  await expect(failed.locator('.session-phase[data-phase="failed"]')).toHaveText("Failed");
-  await expect(failed).toContainText("1 phones");
-  await expect(failed).toContainText("Galaxy S24");
-  await expect(failed).toContainText("acoustic_not_detected");
-  await expect(page.locator(".session-row--recent", { hasText: "prox-done-1" }).locator('.session-phase[data-phase="verified"]')).toHaveText("Verified");
+  await page.locator("[data-multi-a]").selectOption("iphone-x");
+  await page.locator("[data-multi-b]").selectOption("pixel-y");
+  await expect(page.locator("[data-multi-column-a]")).toContainText("Mahdi iPhone 15");
+  await expect(page.locator("[data-multi-column-b]")).toContainText("Pixel 9 Pro");
+  await expect(page.locator("[data-multi-column-a]")).toContainText("Heard signal");
+  await expect(page.locator("[data-multi-column-a]")).toContainText("9.6 dB");
+  await expect(page.locator("[data-multi-outcome] .pairing-outcome")).toHaveAttribute("data-outcome", "pass");
+  await expect(page.locator("[data-multi-outcome]")).toContainText("Reciprocal heard: Yes");
+  await expect(page.locator("[data-multi-outcome]")).toContainText("Verified");
 
   // Matched events render a friendly summary, never raw JSON, in the timeline.
   const timeline = page.locator("[data-event-timeline]");
   await expect(timeline).toContainText("session matched");
   await expect(timeline).not.toContainText('"sessionId"');
 
-  await page.locator(".session-section").screenshot({ path: testInfo.outputPath("admin-multi-sessions.png") });
-  await testInfo.attach("admin-multi-sessions", { path: testInfo.outputPath("admin-multi-sessions.png"), contentType: "image/png" });
+  await page.locator(".multi-section").screenshot({ path: testInfo.outputPath("admin-two-device.png") });
+  await testInfo.attach("admin-two-device", { path: testInfo.outputPath("admin-two-device.png"), contentType: "image/png" });
 
-  // Localised board keeps the same structure in Japanese.
+  // The same comparison remains legible after localisation.
   await page.locator("[data-operations-language]").selectOption("ja");
-  await expect(page.locator(".session-head")).toContainText("セッション");
-  await expect(running.locator(".session-participant", { hasText: "Mahdi iPhone 15" })).toContainText("送信");
+  await expect(page.locator("[data-multi-outcome]")).toContainText("相互受信: はい");
+  await expect(page.locator("[data-multi-column-a]")).toContainText("Mahdi iPhone 15");
 
   expect(consoleProblems()).toEqual([]);
 });

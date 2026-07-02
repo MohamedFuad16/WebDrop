@@ -1,6 +1,6 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.102";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.102";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.102";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.103";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.103";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.103";
 import {
   TEST_CASES,
   createTestRun,
@@ -8,9 +8,9 @@ import {
   stopTestRun,
   summarizeTestRun,
   validateAssignments
-} from "./test-runs.js?v=1.0.102";
+} from "./test-runs.js?v=1.0.103";
 
-const APP_VERSION = "1.0.102";
+const APP_VERSION = "1.0.103";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -22,7 +22,7 @@ const MONITOR_END_HZ = 19_400;
 // remote operators paste it once (kept only in sessionStorage, never committed).
 const ADMIN_TOKEN_STORAGE_KEY = "webdrop.adminToken";
 const TEST_RUN_STORAGE_KEY = "webdrop.adminTestRuns.v1";
-const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.102", import.meta.url);
+const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.103", import.meta.url);
 
 const ADMIN_MESSAGES = {
   en: {
@@ -146,12 +146,19 @@ const ADMIN_MESSAGES = {
     statusPartial: "1-on-1 verified",
     statusProof: "Needs proof",
     statusLater: "Later",
-    adminTokenNeeded: "Server is online. Paste the admin token to load live monitoring and diagnostics.",
+    adminAccessTitle: "Admin access",
+    adminAccessCopy: "Paste the operations token to load live devices, diagnostics, and server controls. It stays only in this browser tab.",
+    adminTokenLabel: "Operations token",
+    adminTokenPlaceholder: "Paste operations token",
+    adminTokenConnect: "Connect",
+    adminTokenChecking: "Checking…",
+    adminTokenMissing: "Paste the operations token first.",
+    adminTokenInvalid: "That token was rejected. Check it and try again.",
+    adminAccessToSave: "Connect admin access above to save changes.",
     serverUnreachable: "Production server",
     serverUnreachableCopy: "The diagnostics endpoint is not reachable from this browser.",
     diagnosticsProtected: "Diagnostics need the operations token. Paste a valid token to continue.",
     diagnosticsMissing: "The signaling server does not have the diagnostics route deployed yet.",
-    tokenPrompt: "Enter the WebDrop operations token to read live diagnostics:",
     diagnosticsUnreachable: "The signaling server could not be reached. Check connectivity and allowed origins.",
     phonesCount: "{count} phones",
     physicalDevices: "{count} physical devices",
@@ -408,12 +415,19 @@ const ADMIN_MESSAGES = {
     statusPartial: "1対1で確認済み",
     statusProof: "要実機",
     statusLater: "後で",
-    adminTokenNeeded: "サーバーは稼働中です。ライブ監視と診断を読み込むには管理トークンを貼り付けてください。",
+    adminAccessTitle: "管理者アクセス",
+    adminAccessCopy: "運用トークンを貼り付けると、接続中の端末、診断、サーバー操作を読み込めます。トークンはこのブラウザタブ内だけに保持されます。",
+    adminTokenLabel: "運用トークン",
+    adminTokenPlaceholder: "運用トークンを貼り付け",
+    adminTokenConnect: "接続",
+    adminTokenChecking: "確認中…",
+    adminTokenMissing: "先に運用トークンを貼り付けてください。",
+    adminTokenInvalid: "トークンが拒否されました。確認して再試行してください。",
+    adminAccessToSave: "上の管理者アクセスに接続して変更を保存してください。",
     serverUnreachable: "本番サーバー",
     serverUnreachableCopy: "このブラウザから診断エンドポイントに到達できません。",
     diagnosticsProtected: "診断には運用トークンが必要です。有効なトークンを貼り付けてください。",
     diagnosticsMissing: "シグナリングサーバーに診断ルートがまだありません。",
-    tokenPrompt: "ライブ診断を表示するには WebDrop の運用トークンを入力してください:",
     diagnosticsUnreachable: "シグナリングサーバーに到達できません。接続と許可オリジンを確認してください。",
     phonesCount: "{count} 台",
     physicalDevices: "物理端末 {count} 台",
@@ -587,7 +601,9 @@ const state = {
   clearEventsBefore: 0,
   timelineExpanded: false,
   readinessCollapsed: new Set(["ready", "later"]),
-  tokenPromptDismissed: false,
+  adminAccessState: "checking",
+  adminTokenSubmitting: false,
+  adminTokenError: "",
   policy: null,
   policyDraft: null,
   policyDirty: false,
@@ -621,7 +637,12 @@ async function resolveAdminToken() {
   if (fromGlobal) return fromGlobal;
   const fromSession = storedAdminToken();
   if (fromSession) return fromSession;
+  if (!isLocalAdminHost()) return "";
   return fetchLocalAdminToken();
+}
+
+function isLocalAdminHost() {
+  return ["localhost", "127.0.0.1", "::1"].includes(globalThis.location?.hostname || "");
 }
 
 function storedAdminToken() {
@@ -633,9 +654,8 @@ function storedAdminToken() {
 }
 
 async function fetchLocalAdminToken() {
-  // Silent best-effort read of the gitignored local token file. A 404 (the file
-  // is absent on shared/remote machines) resolves to an empty string without a
-  // console error, so remote operators simply fall through to the paste prompt.
+  // Local development may auto-load the gitignored token helper. Production
+  // never requests this URL: remote operators use the visible session-only form.
   try {
     const response = await fetch(LOCAL_ADMIN_TOKEN_URL, { cache: "no-store" });
     if (!response.ok) return "";
@@ -647,38 +667,55 @@ async function fetchLocalAdminToken() {
   }
 }
 
-function promptForAdminToken() {
-  if (state.tokenPromptDismissed || typeof globalThis.prompt !== "function") {
-    state.tokenPromptDismissed = true;
-    return "";
-  }
-  let entered = null;
-  try {
-    entered = globalThis.prompt(i18n.t("tokenPrompt"));
-  } catch {
-    // Some embedded browsers and automation surfaces intentionally disable
-    // prompt(). Treat that like "no token entered" so the public readiness and
-    // Settings panels keep rendering without a console error.
-    state.tokenPromptDismissed = true;
-    return "";
-  }
-  const token = typeof entered === "string" ? entered.trim() : "";
-  if (!token) {
-    state.tokenPromptDismissed = true;
-    return "";
-  }
+function storeAdminToken(token) {
   try {
     globalThis.sessionStorage?.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
   } catch {
-    /* sessionStorage may be unavailable; keep the token in memory via configure */
+    /* sessionStorage may be unavailable; DiagnosticsApi still keeps it in memory. */
   }
-  return token;
+}
+
+function clearAdminToken() {
+  diagnostics.configure({ token: "" });
+  try {
+    globalThis.sessionStorage?.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+  } catch {
+    /* sessionStorage may be unavailable; the in-memory token is already cleared. */
+  }
+}
+
+async function connectAdminAccess(event) {
+  event.preventDefault();
+  if (state.adminTokenSubmitting) return;
+  const input = $("[data-admin-token-input]");
+  const token = input?.value?.trim() || "";
+  if (!token) {
+    state.adminAccessState = "required";
+    state.adminTokenError = i18n.t("adminTokenMissing");
+    renderAdminAccess();
+    input?.focus();
+    return;
+  }
+  state.adminTokenSubmitting = true;
+  state.adminAccessState = "checking";
+  state.adminTokenError = "";
+  diagnostics.configure({ token });
+  storeAdminToken(token);
+  renderAdminAccess();
+  await refreshDiagnostics();
+  state.adminTokenSubmitting = false;
+  renderAll();
+  if (state.adminAccessState !== "authorized") {
+    if (input) input.value = "";
+    input?.focus();
+  }
 }
 
 function bindEvents() {
   $$("[data-admin-tab]").forEach((button) => {
     button.addEventListener("click", () => activateTab(button.dataset.adminTab));
   });
+  $("[data-admin-token-form]")?.addEventListener("submit", connectAdminAccess);
   $$("[data-policy-weight], [data-policy-minimum], [data-policy-timing]").forEach((input) => {
     input.addEventListener("input", () => {
       state.policyDraft = readPolicyForm();
@@ -927,20 +964,30 @@ async function refreshDiagnostics() {
 
   let snapshot = null;
   let snapshotError = null;
-  try {
-    snapshot = await diagnostics.snapshot();
-  } catch (error) {
-    snapshotError = error;
-    if (error.message === "unauthorized") {
-      const token = promptForAdminToken();
-      if (token) {
-        diagnostics.configure({ token });
-        return refreshDiagnostics();
-      }
+  const hadAdminToken = Boolean(diagnostics.token);
+  if (hadAdminToken) {
+    try {
+      snapshot = await diagnostics.snapshot();
+    } catch (error) {
+      snapshotError = error;
     }
+  } else {
+    snapshotError = new Error("unauthorized");
   }
 
-  if (snapshot) state.snapshot = snapshot;
+  if (snapshot) {
+    state.snapshot = snapshot;
+    state.adminAccessState = "authorized";
+    state.adminTokenError = "";
+  } else if (snapshotError?.message === "unauthorized") {
+    if (hadAdminToken) {
+      clearAdminToken();
+      state.adminAccessState = "invalid";
+      state.adminTokenError = i18n.t("adminTokenInvalid");
+    } else if (state.adminAccessState !== "invalid") {
+      state.adminAccessState = "required";
+    }
+  }
   state.policy = normalizePolicySnapshot(policyResponse?.tuning, (snapshot || state.snapshot)?.signaling?.protocol);
   if (!state.policyDirty) state.policyDraft = structuredClone(state.policy);
   if (snapshot && state.activeTestRun) {
@@ -952,9 +999,6 @@ async function refreshDiagnostics() {
   if (!serverReachable) {
     setSocketState("offline");
     if (snapshotError) showError(friendlyError(snapshotError));
-  } else if (snapshotError && snapshotError.message === "unauthorized") {
-    // Server is up; we just have no admin token in this browser session.
-    showError(i18n.t("adminTokenNeeded"));
   }
   renderAll();
 }
@@ -969,6 +1013,7 @@ function schedulePoll() {
 }
 
 function renderAll() {
+  renderAdminAccess();
   renderSummary();
   renderReadinessBoard();
   renderDevices();
@@ -981,6 +1026,29 @@ function renderAll() {
   const generatedClock = formatClock(state.snapshot?.generatedAt || Date.now());
   $("[data-snapshot-time]").textContent = generatedClock;
   $("[data-server-time]").textContent = generatedClock;
+}
+
+function renderAdminAccess() {
+  const panel = $("[data-admin-access]");
+  if (!panel) return;
+  const isInitialCheck = state.adminAccessState === "checking" && !state.adminTokenSubmitting;
+  panel.hidden = state.adminAccessState === "authorized" || isInitialCheck;
+  panel.dataset.state = state.adminAccessState;
+  const input = $("[data-admin-token-input]");
+  if (input) {
+    input.placeholder = i18n.t("adminTokenPlaceholder");
+    input.disabled = state.adminTokenSubmitting;
+  }
+  const submit = $("[data-admin-token-submit]");
+  if (submit) {
+    submit.disabled = state.adminTokenSubmitting;
+    submit.textContent = i18n.t(state.adminTokenSubmitting ? "adminTokenChecking" : "adminTokenConnect");
+  }
+  const error = $("[data-admin-access-error]");
+  if (error) {
+    error.textContent = state.adminTokenError;
+    error.hidden = !state.adminTokenError;
+  }
 }
 
 function renderSummary() {
@@ -1718,8 +1786,11 @@ function renderTuning() {
   total.dataset.valid = String(validation.valid);
   const status = $("[data-policy-status]");
   status.dataset.state = state.policySaving ? "saving" : validation.valid ? (state.policyDirty ? "dirty" : "ready") : "error";
-  status.textContent = state.policySaving ? "Applying policy to the server…" : (state.policyMessage || validation.message);
-  form.querySelector("button[type='submit']").disabled = state.policySaving || !validation.valid || !state.policyDirty;
+  const needsAdminAccess = state.adminAccessState !== "authorized";
+  status.textContent = state.policySaving
+    ? "Applying policy to the server…"
+    : (state.policyMessage || (state.policyDirty && needsAdminAccess ? i18n.t("adminAccessToSave") : validation.message));
+  form.querySelector("button[type='submit']").disabled = state.policySaving || needsAdminAccess || !validation.valid || !state.policyDirty;
   $$("[data-policy-weight], [data-policy-minimum], [data-policy-timing]").forEach((input) => {
     input.disabled = state.policySaving || !state.policy;
   });
@@ -1750,11 +1821,16 @@ async function applyPolicyUpdate(event) {
     });
     await refreshDiagnostics();
   } catch (error) {
+    if (error.message === "unauthorized") {
+      clearAdminToken();
+      state.adminAccessState = "invalid";
+      state.adminTokenError = i18n.t("adminTokenInvalid");
+    }
     state.policyMessage = friendlyError(error);
     showError(state.policyMessage);
   } finally {
     state.policySaving = false;
-    renderTuning();
+    renderAll();
   }
 }
 

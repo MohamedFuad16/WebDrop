@@ -69,6 +69,106 @@
   gap: 18px;
 }
 
+.admin-access {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, .72fr);
+  gap: 14px 20px;
+  align-items: center;
+  margin: 14px 16px 2px;
+  padding: 14px 16px;
+  border: 1px solid #a9c8ff;
+  border-radius: 10px;
+  background: #f4f8ff;
+  box-shadow: 0 8px 24px rgba(31, 116, 245, .08);
+}
+
+.admin-access[hidden] {
+  display: none;
+}
+
+.admin-access__copy {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  min-width: 0;
+}
+
+.admin-access__copy > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-access__copy strong {
+  font-size: 13px;
+}
+
+.admin-access__copy span:not(.admin-access__icon) {
+  color: var(--ops-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.admin-access__icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: #175fc9;
+  background: #dceaff;
+  font-size: 17px;
+}
+
+.admin-access__form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.admin-access__form label {
+  min-width: 0;
+}
+
+.admin-access__form input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--ops-line-strong);
+  border-radius: 7px;
+  color: var(--ops-ink);
+  background: #fff;
+  font: inherit;
+}
+
+.admin-access__form input:focus {
+  border-color: #4488ed;
+  outline: 3px solid rgba(68, 136, 237, .16);
+}
+
+.admin-access__form button {
+  min-height: 38px;
+  padding: 0 18px;
+  border-color: #1f74f5;
+  color: #fff;
+  background: #1f74f5;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-access__form button:disabled {
+  cursor: wait;
+  opacity: .58;
+}
+
+.admin-access__error {
+  grid-column: 1 / -1;
+  margin: -4px 0 0 41px;
+  color: var(--ops-red);
+  font-size: 11px;
+}
+
 .admin-language select {
   padding: 0 30px 0 11px;
   color: #4b4f55;
@@ -1536,6 +1636,19 @@
 
   .admin-tools {
     justify-content: space-between;
+  }
+
+  .admin-access {
+    grid-template-columns: 1fr;
+    margin: 12px 12px 0;
+  }
+
+  .admin-access__form {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-access__error {
+    margin-left: 0;
   }
 
   .admin-tabs {

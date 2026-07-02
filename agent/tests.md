@@ -31,7 +31,7 @@ Run `npm run serve` if a spec expects the app served at `http://127.0.0.1:4178`.
 ## Latest verification (2026-07-02)
 - `npm run verify:full`: 52/52 frontend unit tests and 54/54 backend tests pass; frontend/backend audits report 0 vulnerabilities; secret and diff checks pass.
 - WebKit iPhone permission E2E: the motion and microphone requests both start from one user gesture, and the microphone receives the intended raw-audio constraints.
-- `npx playwright test tests/e2e/diagnostics.spec.mjs --project=chromium-desktop`: 5/5 admin E2E tests pass.
+- `npx playwright test tests/e2e/diagnostics.spec.mjs --project=chromium-desktop`: 6/6 admin E2E tests pass. The auth regression forces `prompt()` to throw, confirms no private diagnostics call occurs before a token exists, verifies the 390 px layout has no horizontal overflow, connects through the visible session-only form, and confirms live devices load.
 - Production QA (`/admin/?tab=settings`, v1.0.102): Live testing → Settings navigation works; tuning exists only in Settings; revision-10 values render as 8000/8650/5000 ms; no framework overlay, layout overflow, or page exception. The in-app Browser connection stalled during the final run, so this pass used the repo Playwright runtime and explicitly simulated an unsupported `prompt()`; the earlier v1.0.101 in-app Browser run supplied the original failing evidence.
 
 ## Coverage gaps / recommendations

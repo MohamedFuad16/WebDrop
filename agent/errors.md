@@ -43,6 +43,7 @@ Observed in the real code. "Resolution" = how the code already handles it or wha
 
 ## Admin test recordings
 - **Run history is local to one admin browser.** `webdrop.adminTestRuns.v1` lives in `localStorage`; it is not synchronized to the signaling server. Export/screenshot important evidence before clearing browser data or moving operators.
+- **Admin auth must never depend on `prompt()`.** Embedded browsers can disable modal prompts. Production must show the visible session-only **Admin access** form, skip the gitignored local-token URL, and avoid calling `/api/diagnostics-public` until a token exists. Otherwise the page tells operators to paste a token without giving them anywhere to paste it.
 
 ## UI / rendering
 - **Personalized QR depends on ECC level H.** `DynamicIsland.drawQr` overlays an avatar badge on the *display* QR, which only stays scannable because the code is rendered at level **H**. If you drop it back to "M"/"Q" or enlarge the badge/knockout, re-check `tests/qr-personalized.test.mjs` (it asserts `jsQR` still decodes the badged code). Badge ≈ 24% of the code; knockout = badge + ~1.4 modules.

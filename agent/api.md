@@ -58,7 +58,7 @@ Base: `https://webdrop-wss-0618.japaneast.cloudapp.azure.com` (see `js/config/ru
 
 ## Auth flows (no secrets stored in frontend)
 - **TURN/ICE:** `TurnConfigProvider.getRemoteConfig()` fetches `/api/ice-servers` with `Authorization: Bearer <turnAccessToken>`, where the token is brokered by the signaling server in the `connected` message (`signaling.getTurnAuthorization()`). 30 s cache. If unauthenticated/disabled it falls back to public Cloudflare STUN.
-- **Admin/metrics:** the dashboard sends `Authorization: Bearer <METRICS_API_TOKEN>` to `/api/diagnostics-public`. On the operator's own machine the token auto-loads from the gitignored `js/config/local-admin-token.js`; remote operators paste it (kept only in `sessionStorage`). The same value lives in the server's `.env` (`METRICS_API_TOKEN`).
+- **Admin/metrics:** the dashboard sends `Authorization: Bearer <METRICS_API_TOKEN>` to `/api/diagnostics-public`. On localhost the token may auto-load from the gitignored `js/config/local-admin-token.js`; production never requests that file. Remote operators use the visible **Admin access** form, which keeps the token only in `sessionStorage` for that browser tab. Until a token exists the dashboard reads only public readiness/policy endpoints and does not make a doomed private diagnostics request. The same value lives in the server's `.env` (`METRICS_API_TOKEN`).
 - **Cloudflare TURN credentials** (`CLOUDFLARE_TURN_KEY_ID` / `_API_TOKEN`) live **only on the server**, never in frontend code.
 
 ## External connectors
