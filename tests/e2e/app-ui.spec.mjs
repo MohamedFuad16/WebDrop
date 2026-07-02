@@ -466,7 +466,9 @@ test("requests iPhone motion and microphone permissions from one user gesture", 
     audio: {
       echoCancellation: false,
       noiseSuppression: false,
-      autoGainControl: false
+      autoGainControl: false,
+      channelCount: { ideal: 1 },
+      sampleRate: { ideal: 48000 }
     },
     video: false
   });

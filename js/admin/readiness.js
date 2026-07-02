@@ -1,6 +1,6 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.101";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.101";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.101";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.102";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.102";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.102";
 import {
   TEST_CASES,
   createTestRun,
@@ -8,9 +8,9 @@ import {
   stopTestRun,
   summarizeTestRun,
   validateAssignments
-} from "./test-runs.js?v=1.0.101";
+} from "./test-runs.js?v=1.0.102";
 
-const APP_VERSION = "1.0.101";
+const APP_VERSION = "1.0.102";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -22,7 +22,7 @@ const MONITOR_END_HZ = 19_400;
 // remote operators paste it once (kept only in sessionStorage, never committed).
 const ADMIN_TOKEN_STORAGE_KEY = "webdrop.adminToken";
 const TEST_RUN_STORAGE_KEY = "webdrop.adminTestRuns.v1";
-const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.101", import.meta.url);
+const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.102", import.meta.url);
 
 const ADMIN_MESSAGES = {
   en: {
@@ -648,8 +648,20 @@ async function fetchLocalAdminToken() {
 }
 
 function promptForAdminToken() {
-  if (state.tokenPromptDismissed || typeof globalThis.prompt !== "function") return "";
-  const entered = globalThis.prompt(i18n.t("tokenPrompt"));
+  if (state.tokenPromptDismissed || typeof globalThis.prompt !== "function") {
+    state.tokenPromptDismissed = true;
+    return "";
+  }
+  let entered = null;
+  try {
+    entered = globalThis.prompt(i18n.t("tokenPrompt"));
+  } catch {
+    // Some embedded browsers and automation surfaces intentionally disable
+    // prompt(). Treat that like "no token entered" so the public readiness and
+    // Settings panels keep rendering without a console error.
+    state.tokenPromptDismissed = true;
+    return "";
+  }
   const token = typeof entered === "string" ? entered.trim() : "";
   if (!token) {
     state.tokenPromptDismissed = true;

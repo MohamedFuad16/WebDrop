@@ -1,16 +1,16 @@
-import { createStore } from "./core/state.js?v=1.0.101";
-import { createController } from "./core/controller.js?v=1.0.101";
-import { detectCapabilities } from "./services/capabilities.js?v=1.0.101";
-import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.101";
-import { WebSocketSignalingAdapter } from "./services/websocket-signaling.js?v=1.0.101";
-import { TurnConfigProvider } from "./services/turn-config.js?v=1.0.101";
-import { ProximityEngine } from "./services/proximity-engine.js?v=1.0.101";
-import { WebRtcTransport } from "./services/webrtc-transport.js?v=1.0.101";
-import { TransferEngine } from "./services/transfer-engine.js?v=1.0.101";
-import { StorageClient } from "./storage/storage-client.js?v=1.0.101";
-import { AppView } from "./ui/app-view.js?v=1.0.101";
-import { randomAvatarChoice, normalizeAvatarChoice } from "./config/avatar-options.js?v=1.0.101";
-import { getRuntimeFlags } from "./config/runtime-flags.js?v=1.0.101";
+import { createStore } from "./core/state.js?v=1.0.102";
+import { createController } from "./core/controller.js?v=1.0.102";
+import { detectCapabilities } from "./services/capabilities.js?v=1.0.102";
+import { MockSignalingAdapter } from "./services/mock-signaling.js?v=1.0.102";
+import { WebSocketSignalingAdapter } from "./services/websocket-signaling.js?v=1.0.102";
+import { TurnConfigProvider } from "./services/turn-config.js?v=1.0.102";
+import { ProximityEngine } from "./services/proximity-engine.js?v=1.0.102";
+import { WebRtcTransport } from "./services/webrtc-transport.js?v=1.0.102";
+import { TransferEngine } from "./services/transfer-engine.js?v=1.0.102";
+import { StorageClient } from "./storage/storage-client.js?v=1.0.102";
+import { AppView } from "./ui/app-view.js?v=1.0.102";
+import { randomAvatarChoice, normalizeAvatarChoice } from "./config/avatar-options.js?v=1.0.102";
+import { getRuntimeFlags } from "./config/runtime-flags.js?v=1.0.102";
 
 function browserLocale() {
   const storedLocale = localStorage.getItem("webdrop.locale");
