@@ -1,5 +1,5 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.104";
-import { IncrementalSha256 } from "../../workers/incremental-sha256.js?v=1.0.104";
+import { Emitter } from "../utils/emitter.js?v=1.0.105";
+import { IncrementalSha256 } from "../../workers/incremental-sha256.js?v=1.0.105";
 
 export const DATA_CHANNEL_LABELS = Object.freeze({
   control: "webdrop-control-v1",
@@ -270,6 +270,12 @@ export class DataChannelTransferProtocol extends Emitter {
       if (!isValidManifest(manifest)) {
         const error = new Error("Received an invalid transfer manifest.");
         this.emit("protocol-error", { error, message });
+        return;
+      }
+      // Idempotent: a retransmitted manifest (lost ack) must NOT reset an
+      // in-progress receive to zero. Re-ack and return, keeping existing state.
+      if (this.incoming.has(manifest.id)) {
+        this.sendControl({ type: "transfer:ack", transferId: manifest.id, stage: "manifest" });
         return;
       }
       if (manifest.totalBytes > this.sessionCapBytes) {

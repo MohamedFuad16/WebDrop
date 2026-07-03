@@ -64,12 +64,16 @@ const DEFAULT_MAX_TOTAL_PROXIMITY_PARTICIPANTS = 100;
 // not silently change when the cohort cap is tuned.
 const MAX_ACOUSTIC_DETECTIONS = 8;
 
-// Expanded from 18.6-19.4kHz to 17.8-20.0kHz (2200Hz). Phone speakers radiate
+// Expanded from 18.6-19.4kHz to 17.8-19.8kHz (2000Hz). Phone speakers radiate
 // far more energy toward the lower edge, fixing weak/silent reception, and the
-// wider band splits into 4 concurrent 550Hz lanes so simultaneous pair sessions
-// stop colliding. Env vars still override. ~17.5kHz+ is inaudible to most adults.
+// wider band splits into 4 concurrent 500Hz lanes so simultaneous pair sessions
+// stop colliding. The end is capped at 19.8kHz (NOT 20k) so the top lane's
+// endFrequency (19.8kHz) stays under the 44.1kHz-device emit ceiling of
+// 0.45*44100 = 19.845kHz — otherwise a 44.1kHz phone assigned the top lane would
+// emit/decode SILENCE (createChirpSamples returns zeros when unsupported). Env
+// vars still override. ~17.5kHz+ is inaudible to most adults.
 const ACOUSTIC_BAND_START_HZ = 17_800;
-const ACOUSTIC_BAND_END_HZ = 20_000;
+const ACOUSTIC_BAND_END_HZ = 19_800;
 const ACOUSTIC_MIN_BANDWIDTH_HZ = 420;
 
 // Cross-session acoustic de-confliction knobs (all env-tunable). With the
@@ -795,16 +799,23 @@ export class SignalingHub {
       joinUntil: session.joinUntil,
       participantCount: session.clients.size
     });
-    if (session.clients.size >= 2 && session.joinExtensions > 0 && !session.started) {
-      clearTimeout(session.timer);
-      session.timer = setTimeout(() => this.startProximitySession(session.id), 300);
-      session.timer.unref?.();
-    } else if (session.clients.size >= this.maxProximitySessionClients && !session.started) {
+    if (session.clients.size >= this.maxProximitySessionClients && !session.started) {
       // The cohort is full: close it to new joiners so the next joiner opens a
       // fresh concurrent cohort, and start the ceremony shortly.
       this.openProximitySessionIds.delete(session.id);
       clearTimeout(session.timer);
       session.timer = setTimeout(() => this.startProximitySession(session.id), 100);
+      session.timer.unref?.();
+    } else if (session.clients.size >= 2 && !session.started) {
+      // A pair (or more) is present. Cap the remaining idle so the common
+      // both-tap-quickly path doesn't wait out the full ~1.8s join window,
+      // while still leaving a short linger for a 3rd/4th phone to join a forming
+      // cohort. A partner that arrived after a join extension goes even faster.
+      // Never push the start LATER than the original join window.
+      const linger = session.joinExtensions > 0 ? 300 : 600;
+      const remainingMs = Math.max(0, Number(session.joinUntil || Date.now()) - Date.now());
+      clearTimeout(session.timer);
+      session.timer = setTimeout(() => this.startProximitySession(session.id), Math.min(remainingMs, linger));
       session.timer.unref?.();
     }
   }

@@ -1,4 +1,4 @@
-import { createStreamSaverAdapter, isStreamSaverSupported } from "../vendor/streamsaver-adapter.js?v=1.0.104";
+import { createStreamSaverAdapter, isStreamSaverSupported } from "../vendor/streamsaver-adapter.js?v=1.0.105";
 
 const DEFAULT_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const DEFAULT_BLOB_FALLBACK_CAP_BYTES = 128 * 1024 * 1024;
@@ -226,7 +226,7 @@ class DeferredIndexedDbStorageClient {
     this.assertSessionCap(session.receivedBytes + size);
     session.files.set(file.id, {
       id: file.id,
-      name: file.name || "webdrop-file",
+      name: sanitizeFilename(file.name),
       type: file.type || "application/octet-stream",
       expectedBytes: size,
       expectedHash: file.hash || null,
@@ -482,11 +482,11 @@ class DownloadStreamStorageClient {
     const session = this.requireSession(sessionId);
     const size = Number.isFinite(file.size) ? file.size : 0;
     this.assertSessionCap(session.receivedBytes + size);
-    const stream = this.streamSaver.createWriteStream(file.name || "webdrop-file", { size });
+    const stream = this.streamSaver.createWriteStream(sanitizeFilename(file.name), { size });
     const writer = stream.getWriter();
     session.files.set(file.id, {
       id: file.id,
-      name: file.name || "webdrop-file",
+      name: sanitizeFilename(file.name),
       type: file.type || "application/octet-stream",
       expectedBytes: size,
       expectedHash: file.hash || null,
@@ -674,7 +674,7 @@ class BlobStorageClient {
     this.assertSessionCap(session.receivedBytes + size);
     session.files.set(file.id, {
       id: file.id,
-      name: file.name || "webdrop-file",
+      name: sanitizeFilename(file.name),
       type: file.type || "application/octet-stream",
       expectedBytes: size,
       expectedHash: file.hash || null,
@@ -832,6 +832,23 @@ export class StorageClientError extends Error {
     this.code = code;
     this.details = details;
   }
+}
+
+export function sanitizeFilename(name) {
+  const fallback = "webdrop-file";
+  if (typeof name !== "string") return fallback;
+  // Strip any path components a peer might inject (…/../…, backslashes, drive
+  // colons) plus control chars and Windows-reserved characters, then trim
+  // leading dots/spaces so the download can't traverse directories or become
+  // a hidden/reserved name. Browsers mitigate most of this; this is defense in
+  // depth against peer-controlled manifest names.
+  const base = name.split(/[\\/]/).pop() || "";
+  const cleaned = base
+    .replace(/[\x00-\x1f\x7f<>:"|?*]/g, "_")
+    .replace(/^[.\s]+/, "")
+    .trim()
+    .slice(0, 200);
+  return cleaned || fallback;
 }
 
 function fileSummary(sessionId, file, options = {}) {

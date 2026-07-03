@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.104";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.104";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.104";
+import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.105";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.105";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.105";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 export const BUMP_SCORE_POINTS = 20;
@@ -427,7 +427,12 @@ async function exchangeSignatureChirps(acoustic, {
 async function exchangeCapturedSignatureChirps(acoustic, {
   signatures, ownSignatureId, options, startAt, durationMs, slotDurationMs, onProgress
 }) {
-  const capture = await acoustic.startCeremonyCapture({ maximumDurationMs: durationMs + 600 });
+  // Capture starts NOW but the ceremony's slot 0 begins at startAt; the buffer's
+  // t=0 therefore leads startAt by leadMs. Enlarge the capture cap so the lead
+  // doesn't truncate the last slot's tail, and pass leadMs to the decoder so its
+  // per-slot search windows line up with where the chirps actually landed.
+  const leadMs = Math.max(0, Number(startAt) - Date.now());
+  const capture = await acoustic.startCeremonyCapture({ maximumDurationMs: durationMs + leadMs + 600 });
   if (!capture?.started) {
     return { detected: false, emitted: false, mode: "missed", reason: capture?.reason || "capture-failed" };
   }
@@ -482,6 +487,7 @@ async function exchangeCapturedSignatureChirps(acoustic, {
       const partialDetections = acoustic.decodeCeremonyCapture(partial, signatures, {
         ownSignatureId,
         slotDurationMs,
+        slotOffsetMs: leadMs,
         slotGuardMs: ACOUSTIC_SLOT_GUARD_MS,
         packetIntervalMs: Number(options.intervalMs) || 220
       });
@@ -509,6 +515,7 @@ async function exchangeCapturedSignatureChirps(acoustic, {
   const detections = acoustic.decodeCeremonyCapture(recording, signatures, {
     ownSignatureId,
     slotDurationMs,
+    slotOffsetMs: leadMs,
     slotGuardMs: ACOUSTIC_SLOT_GUARD_MS,
     packetIntervalMs: Number(options.intervalMs) || 220
   });

@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.104";
+const APP_VERSION = "1.0.105";
 const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [
@@ -74,7 +74,16 @@ self.addEventListener("activate", (event) => {
     const keys = await caches.keys();
     await Promise.all(keys.map((key) => caches.delete(key)));
     const cache = await caches.open(CACHE_NAME);
-    await cache.addAll(ASSETS);
+    // Tolerant precache: fetch each asset individually and skip failures instead
+    // of cache.addAll(), which rejects atomically if ANY single asset 404s (e.g.
+    // one file renamed in a deploy). A rejected addAll would leave activate stuck
+    // with the old caches already deleted — a broken offline shell.
+    await Promise.all(ASSETS.map(async (url) => {
+      try {
+        const response = await fetch(url, { cache: "no-cache" });
+        if (response.ok) await cache.put(url, response);
+      } catch { /* asset unavailable now; runtime fetch will fill it later */ }
+    }));
     await self.clients.claim();
   })());
 });

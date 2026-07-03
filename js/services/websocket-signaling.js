@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.104";
+import { Emitter } from "../utils/emitter.js?v=1.0.105";
 
 export class WebSocketSignalingAdapter extends Emitter {
   constructor({
@@ -40,6 +40,11 @@ export class WebSocketSignalingAdapter extends Emitter {
     if (force) this.replaced = false;
     if (!this.WebSocketImpl) throw new Error("WebSocket is not available in this environment.");
     this.lastConnectPayload = payload || this.lastConnectPayload;
+    // Reuse the retained payload when called without one (e.g. a forced tab
+    // reclaim: connect(undefined, { force: true })). onOpen sends client:hello
+    // with `payload`, so leaving it undefined would register a phantom client
+    // with a random id and no capabilities.
+    payload = this.lastConnectPayload;
     this.shouldReconnect = true;
     if (this.socket?.readyState === this.WebSocketImpl.OPEN) return true;
     if (this.connectPromise) return this.connectPromise;

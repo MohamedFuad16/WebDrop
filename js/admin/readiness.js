@@ -1,6 +1,6 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.104";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.104";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.104";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.105";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.105";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.105";
 import {
   TEST_CASES,
   createTestRun,
@@ -8,21 +8,21 @@ import {
   stopTestRun,
   summarizeTestRun,
   validateAssignments
-} from "./test-runs.js?v=1.0.104";
+} from "./test-runs.js?v=1.0.105";
 
-const APP_VERSION = "1.0.104";
+const APP_VERSION = "1.0.105";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
 const MONITOR_INTERVAL_MS = 1000;
 const MONITOR_START_HZ = 17_800;
-const MONITOR_END_HZ = 20_000;
+const MONITOR_END_HZ = 19_800;
 // The diagnostics feed requires the metrics bearer token. On the operator's own
 // machine it is auto-loaded from the gitignored js/config/local-admin-token.js;
 // remote operators paste it once (kept only in sessionStorage, never committed).
 const ADMIN_TOKEN_STORAGE_KEY = "webdrop.adminToken";
 const TEST_RUN_STORAGE_KEY = "webdrop.adminTestRuns.v1";
-const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.104", import.meta.url);
+const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.105", import.meta.url);
 
 const ADMIN_MESSAGES = {
   en: {
@@ -1428,10 +1428,10 @@ function frequencyOverlap(a, b) {
 
 function monitorFrequencyBands() {
   return [
-    { label: "17.8 kHz", startFrequencyHz: 17_500, endFrequencyHz: 18_200 },
-    { label: "18.5 kHz", startFrequencyHz: 18_200, endFrequencyHz: 18_900 },
-    { label: "19.3 kHz", startFrequencyHz: 18_900, endFrequencyHz: 19_600 },
-    { label: "20 kHz", startFrequencyHz: 19_600, endFrequencyHz: 20_500 }
+    { label: "17.8 kHz", startFrequencyHz: 17_800, endFrequencyHz: 18_300 },
+    { label: "18.3 kHz", startFrequencyHz: 18_300, endFrequencyHz: 18_800 },
+    { label: "18.8 kHz", startFrequencyHz: 18_800, endFrequencyHz: 19_300 },
+    { label: "19.3 kHz", startFrequencyHz: 19_300, endFrequencyHz: 19_800 }
   ];
 }
 

@@ -1,8 +1,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { StorageClient, StorageClientError } from "../js/storage/storage-client.js";
+import { StorageClient, StorageClientError, sanitizeFilename } from "../js/storage/storage-client.js";
 
 const MB = 1024 * 1024;
+
+test("sanitizeFilename strips path traversal and reserved characters from peer names", () => {
+  assert.equal(sanitizeFilename("../../etc/passwd"), "passwd");
+  assert.equal(sanitizeFilename("a/b\\c.txt"), "c.txt");
+  assert.equal(sanitizeFilename("bad:name?<>|.png"), "bad_name____.png");
+  assert.equal(sanitizeFilename("...hidden"), "hidden");
+  assert.equal(sanitizeFilename(""), "webdrop-file");
+  assert.equal(sanitizeFilename(undefined), "webdrop-file");
+  assert.equal(sanitizeFilename("   "), "webdrop-file");
+  assert.equal(sanitizeFilename("clean-file.jpg"), "clean-file.jpg");
+});
 
 test("streams received chunks when deferred and Blob storage are unavailable", async () => {
   const writes = [];

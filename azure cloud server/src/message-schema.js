@@ -292,8 +292,8 @@ export function validateRoutedMessage(message) {
       payload: {
         monitorId: cleanString(payload.monitorId, 120) || cryptoRandomId("monitor"),
         intervalMs: clampInteger(payload.intervalMs, 500, 5000, 1000),
-        startFrequencyHz: clampNumber(payload.startFrequencyHz, 18_500, 21_000, 18_600),
-        endFrequencyHz: clampNumber(payload.endFrequencyHz, 18_500, 21_000, 19_400),
+        startFrequencyHz: clampNumber(payload.startFrequencyHz, 17_000, 21_000, 17_800),
+        endFrequencyHz: clampNumber(payload.endFrequencyHz, 17_000, 21_000, 19_800),
         emit: payload.emit !== false
       }
     };

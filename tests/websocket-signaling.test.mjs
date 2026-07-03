@@ -93,6 +93,33 @@ test("a 4001 takeover close goes terminally offline without reconnecting", async
   assert.equal(adapter.replaced, false);
 });
 
+test("a forced reclaim with no payload re-sends the original client:hello identity", async () => {
+  const adapter = new WebSocketSignalingAdapter({
+    url: "wss://signal.example.test/ws",
+    WebSocketImpl: FakeWebSocket
+  });
+  const original = { self: { id: "device-1-abc", name: "Moha" }, capabilities: { microphone: true } };
+
+  // Initial connect stores the identity payload.
+  adapter.connect(original);
+  let socket = adapter.socket;
+  socket.readyState = FakeWebSocket.OPEN;
+  socket.dispatch("open");
+  assert.deepEqual(JSON.parse(socket.sent[0]).payload, original, "first hello carries identity");
+  await new Promise((resolve) => setTimeout(resolve, 0)); // let connectPromise .finally clear
+
+  // Server takeover, then user reclaims THIS tab with connect(undefined, {force}).
+  socket.dispatch("close", { code: 4001, reason: "replaced_by_new_connection" });
+  adapter.connect(undefined, { force: true });
+  socket = adapter.socket;
+  socket.readyState = FakeWebSocket.OPEN;
+  socket.dispatch("open");
+  const reclaimHello = JSON.parse(socket.sent[0]);
+  assert.equal(reclaimHello.type, "client:hello");
+  assert.deepEqual(reclaimHello.payload, original, "reclaim hello must reuse the retained identity, not undefined");
+  assert.equal(adapter.selfId, "device-1-abc");
+});
+
 class FakeWebSocket {
   static OPEN = 1;
 

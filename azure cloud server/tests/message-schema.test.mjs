@@ -147,7 +147,7 @@ test("admin acoustic monitor payloads are bounded for live diagnostics", () => {
   });
   assert.equal(start.payload.monitorId, "monitor-a");
   assert.equal(start.payload.intervalMs, 500);
-  assert.equal(start.payload.startFrequencyHz, 18500);
+  assert.equal(start.payload.startFrequencyHz, 17000);
   assert.equal(start.payload.endFrequencyHz, 21000);
   assert.equal(start.payload.emit, true);
 

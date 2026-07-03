@@ -482,6 +482,12 @@ export class AcousticProximitySensor {
   decodeCeremonyCapture(recording, plan, {
     ownSignatureId,
     slotDurationMs,
+    // Milliseconds the recording started BEFORE the ceremony startAt. The slot
+    // windows below are measured from startAt, but capture begins immediately
+    // (startCeremonyCapture is called before the waitUntil(startAt)), so the
+    // recording's t=0 leads startAt by this much. Adding it aligns the search
+    // windows with where the chirps actually landed in the buffer.
+    slotOffsetMs = 0,
     threshold = 0.3,
     slotGuardMs = 260,
     driftGuardMs = 520,
@@ -504,8 +510,9 @@ export class AcousticProximitySensor {
         const template = createChirpSamples(sampleRate, signature);
         const guardSamples = Math.round(sampleRate * slotGuardMs / 1000);
         const driftSamples = Math.round(sampleRate * driftGuardMs / 1000);
-        const nominalStart = Math.round(sampleRate * index * slotDurationMs / 1000);
-        const nominalEnd = Math.round(sampleRate * (index + 1) * slotDurationMs / 1000);
+        const offsetSamples = Math.round(sampleRate * Math.max(0, slotOffsetMs) / 1000);
+        const nominalStart = Math.round(sampleRate * index * slotDurationMs / 1000) + offsetSamples;
+        const nominalEnd = Math.round(sampleRate * (index + 1) * slotDurationMs / 1000) + offsetSamples;
         const slotStart = Math.max(0, nominalStart - guardSamples);
         const slotEnd = Math.min(samples.length, nominalEnd + guardSamples);
         const primary = scoreCaptureWindow(samples, template, slotStart, slotEnd, {
@@ -713,9 +720,16 @@ export class AcousticProximitySensor {
       this.health.lastSelfTest = "failed";
       return { ok: false, reason: started.reason, peak: 0, rms: 0 };
     }
-    await this.emitChirp({ ...DEFAULT_CHIRP, ...signature, gain, durationMs });
-    await new Promise((resolve) => setTimeout(resolve, settleMs));
-    const recording = this.stopCeremonyCapture();
+    // try/finally guarantees the probe capture is always torn down — a throw from
+    // emitChirp must never leak the live captureNode into the real ceremony that
+    // runs immediately after.
+    let recording;
+    try {
+      await this.emitChirp({ ...DEFAULT_CHIRP, ...signature, gain, durationMs });
+      await new Promise((resolve) => setTimeout(resolve, settleMs));
+    } finally {
+      recording = this.stopCeremonyCapture();
+    }
     const ok = Number(recording.peak) >= 0.02;
     this.health.lastSelfTest = ok ? "pass" : "silent";
     return { ok, peak: recording.peak, rms: recording.rms, sampleRate: recording.sampleRate, reason: ok ? null : "silent-capture" };

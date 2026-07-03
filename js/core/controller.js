@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.104";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.104";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.104";
+import { formatBytes } from "../utils/format.js?v=1.0.105";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.105";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.105";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
@@ -485,7 +485,7 @@ export function createController({
       sequence: 0,
       intervalMs: Math.max(500, Math.min(5000, Number(payload.intervalMs) || 1000)),
       startFrequencyHz: Number(payload.startFrequencyHz) || 17_800,
-      endFrequencyHz: Number(payload.endFrequencyHz) || 20_000,
+      endFrequencyHz: Number(payload.endFrequencyHz) || 19_800,
       emit: payload.emit !== false,
       timer: 0,
       stopped: false
@@ -579,10 +579,10 @@ export function createController({
 
   function adminMonitorFrequencyBands() {
     return [
-      { startFrequencyHz: 17_500, endFrequencyHz: 18_200 },
-      { startFrequencyHz: 18_200, endFrequencyHz: 18_900 },
-      { startFrequencyHz: 18_900, endFrequencyHz: 19_600 },
-      { startFrequencyHz: 19_600, endFrequencyHz: 20_500 }
+      { startFrequencyHz: 17_800, endFrequencyHz: 18_300 },
+      { startFrequencyHz: 18_300, endFrequencyHz: 18_800 },
+      { startFrequencyHz: 18_800, endFrequencyHz: 19_300 },
+      { startFrequencyHz: 19_300, endFrequencyHz: 19_800 }
     ];
   }
 
@@ -1793,12 +1793,24 @@ export function createController({
         if (hasHeadroom()) {
           let selfTest = await proximity.captureSelfTest({ signature: ownSignature });
           let outcome = selfTest.ok ? "pass" : "silent";
-          if (!selfTest.ok && hasHeadroom()) {
-            // Force-drop and re-acquire a fresh stream, then retest once.
-            proximity.stopAcousticCapture({ releaseStream: true });
-            await proximity.requestMicrophonePermission();
-            selfTest = await proximity.captureSelfTest({ signature: ownSignature });
-            outcome = selfTest.ok ? "rebuilt" : "failed";
+          if (!selfTest.ok) {
+            // Rebuild the mic ONCE, but only if there is enough headroom to
+            // finish before startAt (retest ~640ms + a margin). getUserMedia is
+            // raced with a budget-bounded timeout so a hung re-acquire (e.g. an
+            // iOS prompt without activation) can never stall the ceremony past
+            // its start; if the budget is too small we leave the stream intact.
+            const budgetMs = Number(startPayload.startAt) - Date.now() - 700;
+            if (budgetMs > 200) {
+              proximity.stopAcousticCapture({ releaseStream: true });
+              await Promise.race([
+                proximity.requestMicrophonePermission(),
+                new Promise((resolve) => globalThis.setTimeout(resolve, Math.min(2000, budgetMs)))
+              ]);
+              selfTest = await proximity.captureSelfTest({ signature: ownSignature });
+              outcome = selfTest.ok ? "rebuilt" : "failed";
+            } else {
+              outcome = "rebuild-skipped-no-headroom";
+            }
           }
           emitDiagnostic("audio:self-test", {
             state: selfTest.ok ? "pass" : "failed",

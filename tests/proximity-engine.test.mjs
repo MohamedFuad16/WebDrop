@@ -541,6 +541,39 @@ test("continuous decoder tolerates iPhone output and microphone slot drift", () 
   assert.equal(detection.sampleOffset, lateOffset);
 });
 
+test("slotOffsetMs realigns slot windows for a large capture-start lead", () => {
+  const sampleRate = 48_000;
+  const slotDurationMs = 720;
+  const plan = [
+    { id: "self-signature", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 0 },
+    { id: "peer-signature", startFrequencyHz: 18_600, endFrequencyHz: 19_400, code: 1 }
+  ];
+  const peerTemplate = createChirpSamples(sampleRate, plan[1]);
+  const samples = new Float32Array(Math.round(sampleRate * 3));
+  // The recording started 1300ms before startAt (big lead), so the peer's slot-1
+  // chirp lands at slot1Start + lead, well past the drift-guard window.
+  const leadMs = 1300;
+  const peerPos = Math.round(sampleRate * (slotDurationMs / 1000 + leadMs / 1000));
+  samples.set(peerTemplate, peerPos);
+  const sensor = new AcousticProximitySensor();
+
+  // Without the offset, the peer sits outside even the expanded drift window → missed.
+  const [withoutOffset] = sensor.decodeCeremonyCapture(
+    { samples, sampleRate }, plan,
+    { ownSignatureId: "self-signature", slotDurationMs }
+  );
+  assert.equal(withoutOffset.detected, false, "large lead is missed when the window is not shifted");
+
+  // With slotOffsetMs = lead, the primary window moves to cover it → detected.
+  const [withOffset] = sensor.decodeCeremonyCapture(
+    { samples, sampleRate }, plan,
+    { ownSignatureId: "self-signature", slotDurationMs, slotOffsetMs: leadMs }
+  );
+  assert.equal(withOffset.detected, true);
+  assert.equal(withOffset.signatureId, "peer-signature");
+  assert.equal(withOffset.sampleOffset, peerPos);
+});
+
 test("continuous decoder accepts weak iPhone waveform correlation when slot energy is clear", () => {
   const sampleRate = 48_000;
   const slotDurationMs = 720;
