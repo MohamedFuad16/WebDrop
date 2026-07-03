@@ -156,6 +156,65 @@ test("a ceremony on the low acoustic lanes (17.8-18.8kHz) still emits and passes
   assert.equal(result.passed, true);
 });
 
+test("the acoustic early-exit waits for the bump before shortening the window", async () => {
+  // A clean partner decode alone must NOT end the ceremony early: if the user
+  // hasn't bumped yet, exiting would snapshot bump=false and fail locally.
+  // The gate only applies while motion evidence is flowing (samples > 0).
+  const runCase = async ({ bump, samples }) => {
+    const acoustic = {
+      async startCeremonyCapture() {
+        return { started: true, sampleRate: 48000 };
+      },
+      peekCeremonyCapture() {
+        return { samples: new Float32Array(128), sampleRate: 48000, durationMs: 500, rms: 0.1, peak: 0.5 };
+      },
+      decodeCeremonyCapture(recording, plan, { ownSignatureId }) {
+        return plan
+          .filter((signature) => signature.id !== ownSignatureId)
+          .map((signature) => ({
+            signatureId: signature.id,
+            detected: true,
+            detectionMethod: "correlation",
+            correlation: 0.9,
+            marginDb: 12
+          }));
+      },
+      stopCeremonyCapture() {
+        return { samples: new Float32Array(128), sampleRate: 48000, durationMs: 2400, rms: 0.1, peak: 0.5 };
+      },
+      async emitChirp() {
+        return { emitted: true };
+      }
+    };
+    const motion = {
+      getSnapshot() {
+        return { bump, tilted: true, samples };
+      },
+      stopCapture() {}
+    };
+    const engine = new ProximityEngine({ enabled: true, acoustic, motion });
+    let earlyFinish = null;
+    await engine.runRealCeremony({
+      acousticPlan: [
+        { id: "self-signature", startFrequencyHz: 18800, endFrequencyHz: 19300 },
+        { id: "peer-signature", startFrequencyHz: 18800, endFrequencyHz: 19300 }
+      ],
+      acousticSignatureId: "self-signature",
+      acousticOptions: { intervalMs: 500 },
+      startAt: Date.now() + 5,
+      ceremonyDurationMs: 2400,
+      onProgress: (progress) => {
+        if (progress?.acoustic?.mode === "decode-start") earlyFinish = progress.acoustic.earlyFinish;
+      }
+    });
+    return earlyFinish;
+  };
+
+  assert.equal(await runCase({ bump: true, samples: 4 }), true, "bump recorded → clean decode may finish early");
+  assert.equal(await runCase({ bump: false, samples: 4 }), false, "no bump yet → keep listening the full window");
+  assert.equal(await runCase({ bump: false, samples: 0 }), true, "no motion evidence flowing → gate does not hold the window");
+});
+
 test("a raw acceleration value of 10 awards the full 20 bump points", async () => {
   const listeners = new Map();
   const target = {

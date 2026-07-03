@@ -1,6 +1,6 @@
-import { AcousticProximitySensor, MIN_INAUDIBLE_FREQUENCY_HZ } from "./acoustic-proximity.js?v=1.0.106";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.106";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.106";
+import { AcousticProximitySensor, MIN_INAUDIBLE_FREQUENCY_HZ } from "./acoustic-proximity.js?v=1.0.107";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.107";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.107";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 export const BUMP_SCORE_POINTS = 20;
@@ -160,6 +160,16 @@ export class ProximityEngine {
     }
 
     const activeTuning = this.setTuning(tuning || this.tuning);
+    // The acoustic early-exit must never end the ceremony before the bump has
+    // been recorded: a clean partner decode at ~5s with the user bumping a beat
+    // later would otherwise snapshot bump=false and fail locally. Only gate on
+    // the bump while motion evidence is actually flowing (samples > 0) — without
+    // motion permission the local evidence gate fails regardless, so holding the
+    // window would gain nothing.
+    const canFinishEarly = () => {
+      const snapshot = this.motion.getSnapshot();
+      return Number(snapshot?.samples) > 0 ? Boolean(snapshot.bump) : true;
+    };
     await waitUntil(startAt);
     onProgress({ phase: "audio", state: acoustic ? "active" : "unavailable" });
     const acousticResult = acoustic
@@ -170,6 +180,7 @@ export class ProximityEngine {
           options: acousticOptions,
           startAt,
           durationMs: ceremonyDurationMs,
+          canFinishEarly,
           onProgress
         })
         : await exchangeChirps(this.acoustic, {
@@ -283,13 +294,14 @@ async function exchangeSignatureChirps(acoustic, {
   options = {},
   startAt,
   durationMs = 3600,
+  canFinishEarly = () => true,
   onProgress = () => {}
 }) {
   const signatures = normalizeAcousticPlan(plan);
   const slotDurationMs = Math.max(ACOUSTIC_MIN_SLOT_MS, Math.floor(durationMs / Math.max(1, signatures.length)));
   if (typeof acoustic.startCeremonyCapture === "function" && typeof acoustic.decodeCeremonyCapture === "function") {
     return exchangeCapturedSignatureChirps(acoustic, {
-      signatures, ownSignatureId, options, startAt, durationMs, slotDurationMs, onProgress
+      signatures, ownSignatureId, options, startAt, durationMs, slotDurationMs, canFinishEarly, onProgress
     });
   }
   const detections = [];
@@ -433,7 +445,7 @@ async function exchangeSignatureChirps(acoustic, {
 }
 
 async function exchangeCapturedSignatureChirps(acoustic, {
-  signatures, ownSignatureId, options, startAt, durationMs, slotDurationMs, onProgress
+  signatures, ownSignatureId, options, startAt, durationMs, slotDurationMs, canFinishEarly = () => true, onProgress
 }) {
   // Capture starts NOW but the ceremony's slot 0 begins at startAt; the buffer's
   // t=0 therefore leads startAt by leadMs. Enlarge the capture cap so the lead
@@ -505,7 +517,10 @@ async function exchangeCapturedSignatureChirps(acoustic, {
         && detection.detectionMethod === "correlation"
         && detection.correlation >= 0.3
         && detection.marginDb >= 1.5);
-      if (cleanPartner) { earlyFinish = true; break; }
+      // Only shorten the window when the bump is already in evidence — a clean
+      // decode without a bump would end the ceremony into a guaranteed local
+      // fail, while continuing to listen only improves the final decode.
+      if (cleanPartner && canFinishEarly()) { earlyFinish = true; break; }
     }
   }
   if (!earlyFinish) await waitUntil(windowEndAt);

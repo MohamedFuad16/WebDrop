@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.106";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.106";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.106";
+import { formatBytes } from "../utils/format.js?v=1.0.107";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.107";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.107";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
@@ -1707,6 +1707,12 @@ export function createController({
     });
     proximity.resetMotionCapture();
     if (motionPermission.granted) proximity.startMotionCapture();
+    // Warm up / prove the acoustic loop concurrently with the ready/start
+    // handshake, mirroring the anonymous path's tap-time preflight. Single-flight
+    // in the sensor, so this is a no-op when a fresh preflight already ran.
+    if (microphonePermission.granted && audioOutputPermission.granted) {
+      proximity.preflightAcousticCapture?.({ timeoutMs: 2500 })?.catch?.(() => null);
+    }
     let motionTimer = 0;
     try {
       const pairingId = store.getState().pairingId;
