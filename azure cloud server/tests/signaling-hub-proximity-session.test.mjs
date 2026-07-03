@@ -531,6 +531,63 @@ test("admin monitor routes continuous acoustic telemetry from a selected device"
   hub.close();
 });
 
+test("starting a proximity session extends expiresAt past the telemetry window", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  hub.joinProximitySession(clientA, { payload: { clientNonce: "nonce-client-a", acousticCapabilities: { sampleRate: 48000 } } });
+  hub.joinProximitySession(clientB, { payload: { clientNonce: "nonce-client-b", acousticCapabilities: { sampleRate: 48000 } } });
+  const session = [...hub.proximitySessions.values()][0];
+
+  hub.startProximitySession(session.id);
+
+  const slop = Number(session.tuning?.timing?.matchSlopMs ?? hub.proximityMatchSlopMs);
+  assert.equal(session.started, true);
+  assert.ok(Number.isFinite(session.endsAt));
+  // The failTimer keeps the session alive until endsAt + slop; expiresAt must
+  // now cover at least that window (plus the 2s client ack/retry slack).
+  assert.ok(
+    session.expiresAt >= session.endsAt + slop + 2000,
+    `expiresAt ${session.expiresAt} should cover endsAt ${session.endsAt} + slop ${slop} + 2000`
+  );
+
+  hub.close();
+});
+
+test("a session whose window outlives the creation TTL still accepts late telemetry", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  hub.joinProximitySession(clientA, { payload: { clientNonce: "nonce-client-a" } });
+  hub.joinProximitySession(clientB, { payload: { clientNonce: "nonce-client-b" } });
+  const session = [...hub.proximitySessions.values()][0];
+
+  // Simulate a late-tap-grace start: the cohort was created ~12s before it
+  // actually started, so its acoustic window ends after the creation-based TTL.
+  session.createdAt = Date.now() - 12000;
+  session.expiresAt = session.createdAt + hub.proximitySessionTtlMs;
+
+  hub.startProximitySession(session.id);
+
+  // Fast-forward the session's clock so "now" is 2s past the window end — the
+  // exact shape of the live rejection (telemetry arriving at endsAt + ~2s).
+  const shift = session.endsAt - Date.now() + 2000;
+  session.startAt -= shift;
+  session.endsAt -= shift;
+  session.createdAt -= shift;
+  session.expiresAt -= shift;
+
+  hub.recordProximitySessionTelemetry(
+    clientA,
+    sessionMessage(session, clientA, verifiedMetrics(), session.startAt + 1200, clientB)
+  );
+
+  assert.equal(messagesOf(clientA, "proximity:session:telemetry:accepted").length, 1);
+  assert.equal(messagesOf(clientA, "proximity:session:failed").length, 0);
+
+  hub.close();
+});
+
 function createTestHub({ metrics } = {}) {
   return new SignalingHub({
     server: { on() {} },

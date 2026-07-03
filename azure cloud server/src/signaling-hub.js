@@ -910,6 +910,12 @@ export class SignalingHub {
     const durationMs = Number(session.tuning?.timing?.acousticWindowMs || this.proximityDurationMs);
     const matchSlopMs = Number(session.tuning?.timing?.matchSlopMs || this.proximityMatchSlopMs);
     session.endsAt = startAt + durationMs;
+    // The ceremony legally outlives the join-time TTL: the failTimer keeps the
+    // session alive until endsAt + matchSlop for late-but-valid telemetry, and a
+    // late-tap-grace start can already push endsAt past the creation-based TTL.
+    // Extend expiresAt to cover that whole window (plus client ack/retry slack)
+    // so slow phones' final telemetry is never rejected as session_not_available.
+    session.expiresAt = Math.max(session.expiresAt, session.endsAt + matchSlopMs + 2000);
     const acousticBand = this.selectSessionAcousticBand(session);
     session.acousticBand = acousticBand;
     const acousticPlan = [...session.clients].map((clientId, index) => {

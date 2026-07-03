@@ -48,19 +48,11 @@
             </div>
             <div class="webdrop-island__ceremony" data-island-ceremony>
               <div class="webdrop-island__ceremony-head">
-                <strong data-island-ceremony-stage>Checking permissions</strong>
-                <span data-island-ceremony-score>0 / 100</span>
+                <strong data-island-ceremony-stage>Getting ready…</strong>
+                <span data-island-ceremony-score hidden>0 / 100</span>
               </div>
-              <div class="webdrop-island__metrics">
-                <span data-island-metric="audio" data-status="waiting">
-                  <i aria-hidden="true"></i><small data-i18n="ceremonyAudio">Audio chime</small><strong data-island-audio-value>Waiting</strong>
-                </span>
-                <span data-island-metric="bump" data-status="waiting">
-                  <i aria-hidden="true"></i><small data-i18n="ceremonyBump">Bump</small><strong data-island-bump-value>0.0</strong>
-                </span>
-                <span data-island-metric="tilt" data-status="waiting">
-                  <i aria-hidden="true"></i><small data-i18n="ceremonyTilt">Tilt</small><strong data-island-tilt-value>0&deg;</strong>
-                </span>
+              <div class="webdrop-island__ceremony-steps" data-island-ceremony-steps aria-hidden="true">
+                <i data-status="active"></i><i data-status="pending"></i><i data-status="pending"></i><i data-status="pending"></i><i data-status="pending"></i><i data-status="pending"></i>
               </div>
               <p id="island-ceremony-error" class="webdrop-island__ceremony-error" data-island-ceremony-error hidden></p>
               <div class="webdrop-island__failure-actions" data-island-failure-actions hidden>
@@ -341,7 +333,7 @@
         </button>
         <div class="app-version">
           <span data-i18n="appVersion">App version</span>
-          <strong>1.0.105</strong>
+          <strong>1.0.106</strong>
         </div>
       </section>
 
@@ -441,8 +433,8 @@
       <input data-file-input type="file" multiple hidden>
     </div>
 
-    <script src="js/vendor/jsqr.js?v=1.0.105"></script>
-    <script src="js/config/runtime-config.js?v=1.0.105"></script>
-    <script type="module" src="js/app.js?v=1.0.105"></script>
+    <script src="js/vendor/jsqr.js?v=1.0.106"></script>
+    <script src="js/config/runtime-config.js?v=1.0.106"></script>
+    <script type="module" src="js/app.js?v=1.0.106"></script>
   </body>
 </html>

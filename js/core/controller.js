@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.105";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.105";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.105";
+import { formatBytes } from "../utils/format.js?v=1.0.106";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.106";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.106";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
@@ -41,6 +41,7 @@ export function createController({
   let transferPatchFrame = 0;
   let receivePresentationTimer = 0;
   let permissionRequestPromise = null;
+  let acousticPreflight = null;
   let suppressDisconnectToast = false;
   let adminMonitor = null;
   let pendingAdminMonitor = null;
@@ -1118,6 +1119,17 @@ export function createController({
     view.toast(view.translate("findingNearbyPeer"));
 
     if (permissionPromise) await permissionPromise.catch(() => null);
+    // Kick off the acoustic preflight now (do NOT await): it warms up / rebuilds
+    // the emit→mic→capture loop concurrently with the server join window, so the
+    // very first ceremony captures real audio instead of first-attempt silence.
+    // Bounded-awaited in the sync phase below.
+    acousticPreflight = null;
+    if (permissionPromise && runtime.realProximityCeremony && proximity.preflightAcousticCapture) {
+      acousticPreflight = {
+        startedAt: Date.now(),
+        promise: proximity.preflightAcousticCapture({ timeoutMs: 2500 }).catch(() => null)
+      };
+    }
     const acousticStatus = proximity.getAcousticStatus?.() || {};
     const clientNonce = crypto.randomUUID?.() || `nonce-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const joined = waitForProximitySessionJoined(10000);
@@ -1789,8 +1801,26 @@ export function createController({
         const ownSignature = (startPayload.acousticPlan || []).find(
           (sig) => sig?.id === startPayload.acousticSignatureId
         ) || (startPayload.acousticPlan || [])[0] || {};
+        // Bounded-await the tap-time preflight (kicked off before the join). It
+        // already proved/rebuilt the capture loop concurrently with the join
+        // window, so a fresh pass here lets us skip the sync-phase self-test —
+        // which the server's tight startDelay (stagger 0) usually starves anyway.
+        let preflightResult = null;
+        if (acousticPreflight?.promise) {
+          const budgetMs = Math.max(0, Math.min(2500, Number(startPayload.startAt) - Date.now() - 250));
+          preflightResult = await Promise.race([
+            acousticPreflight.promise,
+            new Promise((resolve) => globalThis.setTimeout(() => resolve(null), budgetMs))
+          ]);
+          emitDiagnostic("audio:preflight", {
+            state: preflightResult?.ok ? "pass" : "failed",
+            reason: preflightResult ? (preflightResult.ok ? (preflightResult.rebuilt ? "rebuilt" : "pass") : preflightResult.reason) : "pending",
+            acoustic: { peak: preflightResult?.peak, rms: preflightResult?.rms }
+          });
+        }
+        const preflightFresh = Boolean(preflightResult?.ok) && Date.now() - Number(preflightResult.at || 0) < 8000;
         const hasHeadroom = () => Number(startPayload.startAt) - Date.now() >= 900;
-        if (hasHeadroom()) {
+        if (!preflightFresh && hasHeadroom()) {
           let selfTest = await proximity.captureSelfTest({ signature: ownSignature });
           let outcome = selfTest.ok ? "pass" : "silent";
           if (!selfTest.ok) {
@@ -2004,7 +2034,7 @@ export function createController({
     // on the user's next Connect tap. The acoustic sensor still honors a real
     // browser-level Permissions API denial where that API exists.
     const microphonePromise = proximity.requestMicrophonePermission();
-    permissionRequestPromise = Promise.all([motionPromise, audioOutputPromise, microphonePromise]).then(([
+    permissionRequestPromise = Promise.all([motionPromise, audioOutputPromise, microphonePromise]).then(async ([
       motion,
       audioOutput,
       microphone
@@ -2012,6 +2042,12 @@ export function createController({
       storedPermissions.microphone = microphonePermissionState(microphone);
       storedPermissions.motion = permissionState(motion);
       writeStoredPermissions(storedPermissions);
+      // prepareAudioOutput created the AudioContext before getUserMedia resolved,
+      // so it may be pinned to the wrong (default) sample rate. Reconcile it to
+      // the live mic track rate now that all three promises have settled — doing
+      // this here (not inside requestMicrophonePermission) avoids racing the
+      // context close against prepareAudioOutput's concurrent resume/oscillator.
+      if (microphone?.granted) await proximity.reconcileAcousticContext?.();
       return { microphone, motion, audioOutput };
     }).finally(() => {
       permissionRequestPromise = null;

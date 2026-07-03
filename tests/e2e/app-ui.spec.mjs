@@ -598,22 +598,20 @@ test("keeps the expanded mobile island edge-to-edge with a centered Canvas2D wav
   expect(geometry.radius).toBe("0px 0px 34px 34px");
 });
 
-test("shows acoustic slot diagnostics in the Dynamic Island ceremony", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "chromium-desktop", "Slot diagnostic text is covered once in Chromium.");
-  await page.goto("/?qa=e2e-acoustic-diagnostics&runtime=mock", { waitUntil: "domcontentloaded" });
+test("advances the staged ceremony ladder monotonically in the Dynamic Island", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium-desktop", "Ceremony ladder text is covered once in Chromium.");
+  await page.goto("/?qa=e2e-ceremony-ladder&runtime=mock", { waitUntil: "domcontentloaded" });
   await expect(page.locator("#app")).toHaveAttribute("data-ready", "true", { timeout: 7000 });
 
   await page.evaluate(async () => {
-    const { DynamicIsland } = await import("/js/ui/dynamic-island.js?v=e2e-acoustic-diagnostics");
+    const { DynamicIsland } = await import("/js/ui/dynamic-island.js?v=e2e-ceremony-ladder");
     const messages = {
-      ceremonyAudioEmitting: "Emitting",
-      ceremonyAudioEmitted: "Emitted",
-      ceremonyAudioEmitFailed: "Emit failed",
-      ceremonyAudioListening: "Listening",
-      ceremonyDetected: "Detected",
-      ceremonyEnergyHeard: "Energy heard",
-      ceremonyMissed: "Missed",
-      ceremonyAudioSending: "Listening"
+      ceremonyStagePreparing: "Getting ready…",
+      ceremonyStageExchanging: "Exchanging ultrasonic waves…",
+      ceremonyStageBump: "Bump the phones together now",
+      ceremonyStageTilt: "Bump detected — verifying tilt…",
+      ceremonyStageVerifying: "Verifying proximity…",
+      ceremonyStageConnecting: "Connecting…"
     };
     const island = new DynamicIsland(document, (key) => messages[key] || key);
     island.showAnonymousConnectionProgress({
@@ -621,68 +619,51 @@ test("shows acoustic slot diagnostics in the Dynamic Island ceremony", async ({ 
       name: "WebDrop Device",
       avatar: "assets/icons/avatars/user-01.png"
     });
-    globalThis.__webdropDiagnosticIsland = island;
-    island.updateCeremony({
-      phase: "audio",
-      state: "active",
-      acoustic: {
-        mode: "detected",
-        detected: true,
-        slot: 2,
-        slotCount: 4,
-        marginDb: 31,
-        startFrequencyHz: 19020,
-        endFrequencyHz: 19240
-      }
-    });
+    globalThis.__webdropCeremonyIsland = island;
   });
 
-  await expect(page.locator("[data-island-audio-value]")).toHaveText("Detected 2/4 +31dB 19-19.2kHz");
-  const audioValueStyle = await page.locator("[data-island-audio-value]").evaluate((node) => {
-    const style = getComputedStyle(node);
-    return {
-      whiteSpace: style.whiteSpace,
-      textOverflow: style.textOverflow,
-      height: Math.round(node.getBoundingClientRect().height)
-    };
-  });
-  expect(audioValueStyle.whiteSpace).not.toBe("nowrap");
-  expect(audioValueStyle.textOverflow).not.toBe("ellipsis");
-  expect(audioValueStyle.height).toBeGreaterThan(10);
+  const island = () => page.locator("[data-dynamic-island]");
+  const stage = () => page.locator("[data-island-ceremony-stage]");
 
+  // Stage 1: preparing (reset default).
+  await expect(island()).toHaveAttribute("data-ceremony-stage", "1");
+  await expect(stage()).toHaveText("Getting ready…");
+
+  // Stage 2: the first audio-phase event.
+  await page.evaluate(() => globalThis.__webdropCeremonyIsland.updateCeremony({ phase: "audio", state: "active" }));
+  await expect(island()).toHaveAttribute("data-ceremony-stage", "2");
+  await expect(stage()).toHaveText("Exchanging ultrasonic waves…");
+
+  // Stage 3: the bump cue, but only after the exchange has been held briefly.
+  // Backdate the stage-entry clock to clear the 900ms hold deterministically.
   await page.evaluate(() => {
-    globalThis.__webdropDiagnosticIsland.updateCeremony({
-      phase: "audio",
-      state: "failed",
-      acoustic: {
-        mode: "missed",
-        detected: false,
-        missedCount: 2,
-        slotCount: 3,
-        startFrequencyHz: 19020,
-        endFrequencyHz: 19400
-      }
-    });
+    globalThis.__webdropCeremonyIsland.ceremonyStageEnteredAt -= 1000;
+    globalThis.__webdropCeremonyIsland.updateCeremony({ phase: "motion", state: "active", motion: { bump: false, samples: 3 } });
   });
-  await expect(page.locator("[data-island-audio-value]")).toHaveText("Missed 2 slots 19-19.4kHz");
+  await expect(island()).toHaveAttribute("data-ceremony-stage", "3");
+  await expect(stage()).toHaveText("Bump the phones together now");
 
-  await page.evaluate(() => {
-    globalThis.__webdropDiagnosticIsland.updateCeremony({
-      phase: "audio",
-      state: "active",
-      acoustic: {
-        mode: "detected",
-        detected: true,
-        energyAssisted: true,
-        slot: 2,
-        slotCount: 4,
-        marginDb: 5,
-        startFrequencyHz: 18600,
-        endFrequencyHz: 19400
-      }
-    });
-  });
-  await expect(page.locator("[data-island-audio-value]")).toHaveText("Energy heard 2/4 +5dB 18.6-19.4kHz");
+  // A late audio-phase event must NOT regress the ladder back to stage 2.
+  await page.evaluate(() => globalThis.__webdropCeremonyIsland.updateCeremony({ phase: "audio", state: "active" }));
+  await expect(island()).toHaveAttribute("data-ceremony-stage", "3");
+
+  // Stage 4: bump detected.
+  await page.evaluate(() => globalThis.__webdropCeremonyIsland.updateCeremony({ phase: "motion", state: "active", motion: { bump: true, tilted: false, samples: 6 } }));
+  await expect(island()).toHaveAttribute("data-ceremony-stage", "4");
+  await expect(stage()).toHaveText("Bump detected — verifying tilt…");
+
+  // Stage 5: proximity verification.
+  await page.evaluate(() => globalThis.__webdropCeremonyIsland.updateCeremony({ phase: "score", state: "active", score: 92 }));
+  await expect(island()).toHaveAttribute("data-ceremony-stage", "5");
+  await expect(stage()).toHaveText("Verifying proximity…");
+
+  // The score span stays hidden during a healthy ceremony.
+  await expect(page.locator("[data-island-ceremony-score]")).toBeHidden();
+
+  // Stage 6: connecting, via the verified-ceremony snapshot after match.
+  await page.evaluate(() => globalThis.__webdropCeremonyIsland.renderVerifiedCeremony({ score: 92 }));
+  await expect(island()).toHaveAttribute("data-ceremony-stage", "6");
+  await expect(stage()).toHaveText("Connecting…");
 });
 
 test("keeps Japanese failure diagnostics and fallback actions reachable on iPhone", async ({ page }, testInfo) => {

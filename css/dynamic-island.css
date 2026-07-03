@@ -229,63 +229,49 @@
   color: #e24d4d;
 }
 
-.webdrop-island__metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+/* Staged ceremony: a single status line (the head strong) over a row of six
+   step dots that fill as pairing advances (preparing → connecting). */
+.webdrop-island__ceremony-head strong {
+  transition: color 200ms ease;
 }
 
-.webdrop-island__metrics > span {
-  min-width: 0;
+.webdrop-island[data-ceremony-stage="3"] .webdrop-island__ceremony-head strong {
+  color: #347df5;
+  font-weight: 820;
+}
+
+.webdrop-island__ceremony-steps {
   display: grid;
-  grid-template-columns: 7px minmax(0, 1fr) auto;
+  grid-template-columns: repeat(6, 1fr);
   align-items: center;
-  gap: 5px;
-  padding: 7px 8px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--island-ink) 7%, transparent);
+  gap: 6px;
+  padding: 2px 0;
 }
 
-.webdrop-island__metrics i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--island-ink) 28%, transparent);
+.webdrop-island__ceremony-steps i {
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--island-ink) 22%, transparent);
+  transition: background 260ms ease, box-shadow 260ms ease;
 }
 
-.webdrop-island__metrics [data-status="active"] i {
-  background: #347df5;
-  box-shadow: 0 0 0 4px rgba(52, 125, 245, .16);
-}
-
-.webdrop-island__metrics [data-status="complete"] i,
-.webdrop-island__metrics [data-status="ready"] i {
+.webdrop-island__ceremony-steps i[data-status="done"] {
   background: #26a76d;
 }
 
-.webdrop-island__metrics [data-status="failed"] i {
-  background: #e24d4d;
+.webdrop-island__ceremony-steps i[data-status="active"] {
+  background: #347df5;
 }
 
-.webdrop-island__metrics small,
-.webdrop-island__metrics strong {
-  overflow: hidden;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+@media (prefers-reduced-motion: no-preference) {
+  .webdrop-island__ceremony-steps i[data-status="active"] {
+    animation: islandStepPulse 1.4s ease-in-out infinite;
+  }
 }
 
-.webdrop-island__metrics small {
-  color: var(--island-muted);
-}
-
-.webdrop-island__metrics [data-island-metric="audio"] strong {
-  overflow: visible;
-  font-size: 9px;
-  line-height: 1.08;
-  text-overflow: clip;
-  white-space: normal;
-  overflow-wrap: anywhere;
+@keyframes islandStepPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(52, 125, 245, .28); }
+  50% { box-shadow: 0 0 0 3px rgba(52, 125, 245, 0); }
 }
 
 .webdrop-island__ceremony-error {
@@ -644,14 +630,6 @@
     grid-template-columns: minmax(0, 1fr) minmax(108px, 1.18fr) minmax(0, 1fr);
     grid-template-rows: minmax(108px, 1fr) auto;
     padding-inline: 0;
-  }
-
-  .webdrop-island__metrics > span {
-    grid-template-columns: 7px minmax(0, 1fr);
-  }
-
-  .webdrop-island__metrics strong {
-    grid-column: 2;
   }
 }
 

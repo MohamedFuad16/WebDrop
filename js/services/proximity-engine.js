@@ -1,6 +1,6 @@
-import { AcousticProximitySensor } from "./acoustic-proximity.js?v=1.0.105";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.105";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.105";
+import { AcousticProximitySensor, MIN_INAUDIBLE_FREQUENCY_HZ } from "./acoustic-proximity.js?v=1.0.106";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.106";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.106";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 export const BUMP_SCORE_POINTS = 20;
@@ -58,6 +58,14 @@ export class ProximityEngine {
 
   async captureSelfTest(options) {
     return this.acoustic.captureSelfTest?.(options) ?? { ok: true, skipped: true };
+  }
+
+  async preflightAcousticCapture(options) {
+    return this.acoustic.preflightCapture?.(options) ?? { ok: true, skipped: true };
+  }
+
+  async reconcileAcousticContext() {
+    return this.acoustic.reconcileContextToTrackRate?.() ?? null;
   }
 
   getAcousticHealth() {
@@ -660,7 +668,7 @@ function normalizeAcousticPlan(plan) {
   })).filter((entry) => entry.id
     && Number.isFinite(entry.startFrequencyHz)
     && Number.isFinite(entry.endFrequencyHz)
-    && entry.startFrequencyHz >= 18_500
+    && entry.startFrequencyHz >= MIN_INAUDIBLE_FREQUENCY_HZ
     && entry.endFrequencyHz > entry.startFrequencyHz);
 }
 

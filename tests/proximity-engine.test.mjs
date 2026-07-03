@@ -117,6 +117,45 @@ test("a real ceremony passes once ultrasound, bump, and tilt are all present", a
   assert.equal(result.passed, true);
 });
 
+test("a ceremony on the low acoustic lanes (17.8-18.8kHz) still emits and passes", async () => {
+  // Regression for the lane-0/1 filter fossil: normalizeAcousticPlan used to
+  // drop every signature starting below 18_500Hz, silencing the two lowest of
+  // the four concurrent lanes. With the band at 17.8-19.8kHz that killed ~half
+  // of all cohorts. The filter now tracks MIN_INAUDIBLE_FREQUENCY_HZ (17_500).
+  let emitCount = 0;
+  const acoustic = {
+    async emitChirp() {
+      emitCount += 1;
+      return { emitted: true };
+    },
+    async detectChirp() {
+      return { detected: true, correlation: 0.84, band: { marginDb: 31 } };
+    }
+  };
+  const motion = {
+    getSnapshot() {
+      return { bump: true, tilted: true, samples: 4 };
+    },
+    stopCapture() {}
+  };
+  const engine = new ProximityEngine({ enabled: true, acoustic, motion });
+
+  const result = await engine.runRealCeremony({
+    acousticPlan: [
+      { id: "self-signature", startFrequencyHz: 17800, endFrequencyHz: 18300 },
+      { id: "peer-signature", startFrequencyHz: 18300, endFrequencyHz: 18800 }
+    ],
+    acousticSignatureId: "self-signature",
+    acousticOptions: { intervalMs: 500 },
+    startAt: Date.now() + 5,
+    ceremonyDurationMs: 840
+  });
+
+  assert.ok(emitCount > 0, "the phone must actually emit on lane 0 (pre-fix: never)");
+  assert.equal(result.metrics.acoustic, true);
+  assert.equal(result.passed, true);
+});
+
 test("a raw acceleration value of 10 awards the full 20 bump points", async () => {
   const listeners = new Map();
   const target = {
@@ -1159,3 +1198,187 @@ function createVirtualAcousticMedium() {
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+// ---- Acoustic preflight (P2) test harness ------------------------------------
+
+function loudCaptureSamples() {
+  const samples = new Float32Array(256);
+  for (let index = 0; index < samples.length; index += 1) {
+    samples[index] = Math.sin(index) * 0.5;
+  }
+  return samples;
+}
+
+function fakeMicStream(sampleRate = 48000) {
+  const track = {
+    readyState: "live",
+    muted: false,
+    getSettings: () => ({ sampleRate }),
+    addEventListener() {},
+    removeEventListener() {},
+    stop() { track.readyState = "ended"; }
+  };
+  return { active: true, getAudioTracks: () => [track], getTracks: () => [track], _track: track };
+}
+
+// Context whose MediaStreamSource replays `captureSamples` into the capture
+// ScriptProcessor, so stopCeremonyCapture sees a real peak (loud) or silence.
+function fakePreflightContext(sampleRate, { loud = true } = {}) {
+  const captureSamples = loud ? loudCaptureSamples() : new Float32Array(256);
+  const context = {
+    state: "running",
+    sampleRate,
+    currentTime: 0,
+    destination: {},
+    closed: false,
+    async resume() { this.state = "running"; },
+    async close() { this.state = "closed"; this.closed = true; },
+    addEventListener() {},
+    removeEventListener() {},
+    createMediaStreamSource() {
+      return {
+        connect(node) {
+          // Only the capture ScriptProcessor carries onaudioprocess; feeding it
+          // asynchronously mimics the audio thread delivering an input buffer.
+          if (node && node.onaudioprocess) {
+            setTimeout(() => node.onaudioprocess({
+              inputBuffer: { getChannelData: () => captureSamples }
+            }), 0);
+          }
+        },
+        disconnect() {}
+      };
+    },
+    createAnalyser() {
+      return {
+        fftSize: 2048,
+        smoothingTimeConstant: 0,
+        get frequencyBinCount() { return this.fftSize / 2; },
+        getFloatFrequencyData(values) { values.fill(-90); },
+        connect() {},
+        disconnect() {}
+      };
+    },
+    createScriptProcessor() {
+      return { onaudioprocess: null, connect() {}, disconnect() {} };
+    },
+    createGain() {
+      return { gain: { value: 0 }, connect() {}, disconnect() {} };
+    },
+    createBuffer(_channels, length) {
+      const data = new Float32Array(length);
+      return { getChannelData: () => data, copyToChannel() {} };
+    },
+    createBufferSource() {
+      return { buffer: null, connect() {}, disconnect() {}, start() {}, addEventListener(_type, cb) { cb(); } };
+    }
+  };
+  return context;
+}
+
+// Factory that hands out one context per creation, driven by a sequence of
+// loudness flags, so a test can make the first capture silent and the next loud.
+function preflightContextFactory(loudnessSequence) {
+  const created = [];
+  let index = 0;
+  const factory = (options) => {
+    const loud = loudnessSequence[Math.min(index, loudnessSequence.length - 1)];
+    index += 1;
+    const context = fakePreflightContext(options?.sampleRate || 48000, { loud });
+    created.push(context);
+    return context;
+  };
+  return { factory, created };
+}
+
+test("preflightCapture passes on a healthy loopback without rebuilding", async () => {
+  let getUserMediaCalls = 0;
+  const { factory } = preflightContextFactory([true]);
+  const sensor = new AcousticProximitySensor({
+    audioContextFactory: factory,
+    mediaDevices: {
+      async getUserMedia() {
+        getUserMediaCalls += 1;
+        return fakeMicStream(48000);
+      }
+    }
+  });
+
+  const result = await sensor.preflightCapture({ timeoutMs: 2500 });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.rebuilt, false);
+  assert.equal(getUserMediaCalls, 1);
+  assert.equal(sensor.getHealth().lastPreflight.ok, true);
+});
+
+test("preflightCapture rebuilds a silent capture once", async () => {
+  let getUserMediaCalls = 0;
+  const streams = [fakeMicStream(48000), fakeMicStream(48000)];
+  const { factory, created } = preflightContextFactory([false, true]);
+  const sensor = new AcousticProximitySensor({
+    audioContextFactory: factory,
+    mediaDevices: {
+      async getUserMedia() {
+        const stream = streams[Math.min(getUserMediaCalls, streams.length - 1)];
+        getUserMediaCalls += 1;
+        return stream;
+      }
+    }
+  });
+
+  const result = await sensor.preflightCapture({ timeoutMs: 2500 });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.rebuilt, true);
+  assert.equal(getUserMediaCalls, 2, "the silent stream is released and re-acquired once");
+  assert.equal(streams[0]._track.readyState, "ended", "the first stream is stopped");
+  assert.equal(created[0].closed, true, "the first (silent) context is closed");
+});
+
+test("preflightCapture recreates the context pinned to the live mic track rate", async () => {
+  const { factory, created } = preflightContextFactory([true, true]);
+  const sensor = new AcousticProximitySensor({
+    audioContextFactory: (options) => factory({ sampleRate: options?.sampleRate || 44100 }),
+    mediaDevices: {
+      async getUserMedia() {
+        return fakeMicStream(48000);
+      }
+    }
+  });
+
+  // Context created during the gesture, before the mic stream exists → 44.1kHz.
+  await sensor.prepareAudioOutput();
+  assert.equal(created[0].sampleRate, 44100);
+
+  // Acquire the 48kHz mic, then reconcile: the 44.1kHz context must be closed.
+  await sensor.requestMicrophonePermission();
+  await sensor.reconcileContextToTrackRate();
+  assert.equal(created[0].closed, true, "the mismatched context is discarded");
+
+  // The next capture rebuilds a context pinned to the 48kHz track rate.
+  await sensor.captureSelfTest({ signature: { startFrequencyHz: 18500, endFrequencyHz: 18560, code: 0 } });
+  assert.equal(created[1].sampleRate, 48000);
+});
+
+test("preflightCapture is single-flight for overlapping callers", async () => {
+  let getUserMediaCalls = 0;
+  const { factory } = preflightContextFactory([true]);
+  const sensor = new AcousticProximitySensor({
+    audioContextFactory: factory,
+    mediaDevices: {
+      async getUserMedia() {
+        getUserMediaCalls += 1;
+        return fakeMicStream(48000);
+      }
+    }
+  });
+
+  const [a, b] = await Promise.all([
+    sensor.preflightCapture({ timeoutMs: 2500 }),
+    sensor.preflightCapture({ timeoutMs: 2500 })
+  ]);
+
+  assert.deepEqual(a, b);
+  assert.equal(getUserMediaCalls, 1, "overlapping callers share one probe");
+});

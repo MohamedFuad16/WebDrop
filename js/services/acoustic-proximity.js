@@ -58,6 +58,8 @@ export class AcousticProximitySensor {
     this.trackHandlers = [];
     this.muteSince = 0;
     this.contextStateHandler = null;
+    // Single-flight guard for the tap-time acoustic preflight.
+    this.preflightPromise = null;
     // Field-debug health surface, mirrored into ceremony telemetry.
     this.health = {
       muteEvents: 0,
@@ -65,6 +67,7 @@ export class AcousticProximitySensor {
       interruptedCount: 0,
       rebuilds: 0,
       lastSelfTest: null,
+      lastPreflight: null,
       trackMuted: false,
       trackReadyState: null,
       contextSampleRate: null,
@@ -241,6 +244,18 @@ export class AcousticProximitySensor {
     } catch (error) {
       return { ok: false, error };
     }
+  }
+
+  // Public wrapper so the controller can reconcile an early-created context to
+  // the live mic track rate the moment permissions resolve — BEFORE the ceremony
+  // window. Called after ensureProximityPermissions' Promise.all settles (never
+  // concurrently with prepareAudioOutput, which would race the context close).
+  async reconcileContextToTrackRate() {
+    await this.#reconcileContextSampleRate();
+    return {
+      contextSampleRate: this.context?.sampleRate ?? null,
+      trackSampleRate: this.#trackSampleRate()
+    };
   }
 
   async emitChirp(options = {}) {
@@ -733,6 +748,55 @@ export class AcousticProximitySensor {
     const ok = Number(recording.peak) >= 0.02;
     this.health.lastSelfTest = ok ? "pass" : "silent";
     return { ok, peak: recording.peak, rms: recording.rms, sampleRate: recording.sampleRate, reason: ok ? null : "silent-capture" };
+  }
+
+  // Tap-time acoustic preflight: prove the full emit→speaker→mic→capture loop is
+  // alive and the context is pinned to the live track rate BEFORE the server
+  // schedules the ceremony window, and rebuild ONCE if the first probe is silent.
+  // Runs concurrently with the session join, so a first-attempt dead capture
+  // (iOS warm-up / sample-rate mismatch) is fixed before it can fail the pairing.
+  // Single-flight: overlapping callers share one probe. The probe is a narrow
+  // ~18.5kHz tone — near-zero correlation against any coded 500Hz sweep template,
+  // so it cannot spoof a concurrent cohort's decode.
+  async preflightCapture({ timeoutMs = 2500 } = {}) {
+    if (this.preflightPromise) return this.preflightPromise;
+    this.preflightPromise = (async () => {
+      const startedAt = Date.now();
+      const budgetLeft = () => timeoutMs - (Date.now() - startedAt);
+      const probe = { startFrequencyHz: 18500, endFrequencyHz: 18560, code: 0 };
+      if (!this.#streamHealthy()) {
+        const acquired = await this.requestMicrophonePermission();
+        if (!acquired.granted) {
+          const result = { ok: false, reason: acquired.reason || "microphone-not-granted", peak: 0, rms: 0, rebuilt: false, at: Date.now() };
+          this.health.lastPreflight = result;
+          return result;
+        }
+      }
+      await this.#reconcileContextSampleRate();
+      let test = await this.captureSelfTest({ signature: probe });
+      let rebuilt = false;
+      if (!test.ok && budgetLeft() > 900) {
+        // One rebuild: release the stream + context and re-acquire a fresh, live
+        // pair, raced against the remaining budget so a hung getUserMedia can
+        // never stall the caller past the ceremony start.
+        rebuilt = true;
+        this.stopCapture({ releaseStream: true });
+        try {
+          if (this.context && this.context.state !== "closed") await this.context.close();
+        } catch { /* ignore */ }
+        this.context = null;
+        this.contextStateHandler = null;
+        const reacquired = await Promise.race([
+          this.requestMicrophonePermission(),
+          new Promise((resolve) => setTimeout(() => resolve({ granted: false, reason: "preflight-timeout" }), Math.max(400, budgetLeft() - 800)))
+        ]);
+        if (reacquired.granted) test = await this.captureSelfTest({ signature: probe });
+      }
+      const result = { ok: test.ok, reason: test.reason || null, peak: test.peak, rms: test.rms, rebuilt, at: Date.now() };
+      this.health.lastPreflight = result;
+      return result;
+    })().finally(() => { this.preflightPromise = null; });
+    return this.preflightPromise;
   }
 }
 

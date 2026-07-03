@@ -1,9 +1,28 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.105";
-import { Emitter } from "../utils/emitter.js?v=1.0.105";
-import { formatBytes } from "../utils/format.js?v=1.0.105";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.105";
-import { TileWave } from "./tile-wave.js?v=1.0.105";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.105";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.106";
+import { Emitter } from "../utils/emitter.js?v=1.0.106";
+import { formatBytes } from "../utils/format.js?v=1.0.106";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.106";
+import { TileWave } from "./tile-wave.js?v=1.0.106";
+
+// Monotonic ceremony stage ladder shown in the island during pairing. Replaces
+// the old permissions/audio/bump/tilt checklist with a single staged status line
+// + a step-dot row, driven by the same ceremony progress events.
+const CEREMONY_STAGES = Object.freeze({
+  preparing: 1,
+  exchanging: 2,
+  bump: 3,
+  tilt: 4,
+  verifying: 5,
+  connecting: 6
+});
+const CEREMONY_STAGE_KEYS = Object.freeze({
+  1: "ceremonyStagePreparing",
+  2: "ceremonyStageExchanging",
+  3: "ceremonyStageBump",
+  4: "ceremonyStageTilt",
+  5: "ceremonyStageVerifying",
+  6: "ceremonyStageConnecting"
+});
 
 export class DynamicIsland extends Emitter {
   constructor(document, translate) {
@@ -32,12 +51,7 @@ export class DynamicIsland extends Emitter {
       failureActions: this.root?.querySelector("[data-island-failure-actions]"),
       retry: this.root?.querySelector("[data-island-retry]"),
       fallback: this.root?.querySelector("[data-island-fallback]"),
-      audioMetric: this.root?.querySelector("[data-island-metric='audio']"),
-      audioValue: this.root?.querySelector("[data-island-audio-value]"),
-      bumpMetric: this.root?.querySelector("[data-island-metric='bump']"),
-      bumpValue: this.root?.querySelector("[data-island-bump-value]"),
-      tiltMetric: this.root?.querySelector("[data-island-metric='tilt']"),
-      tiltValue: this.root?.querySelector("[data-island-tilt-value]"),
+      ceremonySteps: this.root?.querySelector("[data-island-ceremony-steps]"),
       transfer: this.root?.querySelector("[data-island-transfer]"),
       transferLabel: this.root?.querySelector("[data-island-transfer-label]"),
       transferPercent: this.root?.querySelector("[data-island-transfer-percent]"),
@@ -73,6 +87,8 @@ export class DynamicIsland extends Emitter {
     this.scanCanvas = document.createElement("canvas");
     this.scanContext = this.scanCanvas.getContext("2d", { willReadFrequently: true });
     this.previousFocus = null;
+    this.ceremonyStage = 1;
+    this.ceremonyStageEnteredAt = 0;
     this.copyKeys = { title: null, status: null };
     this.transferDisplayRatio = 0;
     this.transferTargetRatio = 0;
@@ -223,46 +239,63 @@ export class DynamicIsland extends Emitter {
     this.setStatus("qrConnected");
   }
 
-  updateCeremony({ phase, state, permissions, acoustic, motion, score } = {}) {
+  updateCeremony({ phase, state, motion, score } = {}) {
     if (!this.nodes.ceremony || !["connecting", "verification-failed"].includes(this.state)) return;
-    if (phase) this.root.dataset.ceremonyPhase = phase;
-    const stageKeys = {
-      permissions: "ceremonyPermissions",
-      sync: "ceremonySync",
-      audio: state === "active" ? "ceremonyAudioActive" : "ceremonyAudioComplete",
-      motion: "ceremonyMotion",
-      score: state === "failed" ? "ceremonyScoreFailed" : "ceremonyScore"
-    };
-    if (stageKeys[phase] && this.nodes.ceremonyStage) {
-      this.nodes.ceremonyStage.textContent = this.translate(stageKeys[phase]);
-    }
-    if (permissions) {
-      this.setMetricState(this.nodes.audioMetric, permissions.microphone?.granted ? "ready" : "failed");
-      if (!permissions.microphone?.granted && this.nodes.audioValue) {
-        this.nodes.audioValue.textContent = this.translate("ceremonyPermissionDenied");
-      }
-      const motionReady = permissions.motion?.granted;
-      this.setMetricState(this.nodes.bumpMetric, motionReady ? "ready" : "failed");
-      this.setMetricState(this.nodes.tiltMetric, motionReady ? "ready" : "failed");
-    }
-    if (phase === "audio") {
-      const detected = Boolean(acoustic?.detected);
-      this.setMetricState(this.nodes.audioMetric, state === "active" ? "active" : detected ? "complete" : "failed");
-      if (this.nodes.audioValue) {
-        this.nodes.audioValue.textContent = formatAcousticStatus(acoustic, {
-          fallback: state === "active"
-            ? this.translate("ceremonyAudioSending")
-            : detected
-              ? this.translate("ceremonyDetected")
-              : this.translate("ceremonyMissed"),
-          translate: this.translate.bind(this)
-        });
-      }
-    }
-    if (motion) this.renderMotionMetrics(motion);
+    // The score span stays hidden during a healthy ceremony and is revealed only
+    // on failure (by showVerificationFailure). Keep its value current regardless.
     if (Number.isFinite(score) && this.nodes.ceremonyScore) {
       this.nodes.ceremonyScore.textContent = `${Math.round(score)} / 100`;
       this.nodes.ceremonyScore.dataset.passed = String(score >= 55);
+    }
+    // In the failure state the headline is owned by showVerificationFailure and
+    // the ladder must not advance. A failed score event just sets the headline.
+    if (this.state === "verification-failed" || state === "failed") {
+      if (phase === "score" && state === "failed" && this.nodes.ceremonyStage) {
+        this.nodes.ceremonyStage.textContent = this.translate("ceremonyScoreFailed");
+      }
+      return;
+    }
+    const target = this.ceremonyStageForEvent({ phase, motion });
+    if (target) this.advanceCeremonyStage(target);
+  }
+
+  // Map a ceremony progress event to its monotonic stage index (or null if the
+  // event should not advance the ladder yet).
+  ceremonyStageForEvent({ phase, motion } = {}) {
+    if (phase === "permissions" || phase === "sync") return CEREMONY_STAGES.preparing;
+    if (phase === "audio") return CEREMONY_STAGES.exchanging;
+    if (phase === "motion") {
+      if (motion?.bump) return CEREMONY_STAGES.tilt;
+      // Hold "Exchanging ultrasonic waves…" briefly before surfacing the bump
+      // cue, so the actionable instruction doesn't flash in immediately. Motion
+      // polls repeat (~120ms), so a later poll advances once the hold elapses.
+      if (this.ceremonyStage >= CEREMONY_STAGES.exchanging
+        && this.now() - this.ceremonyStageEnteredAt >= 900) {
+        return CEREMONY_STAGES.bump;
+      }
+      return null;
+    }
+    if (phase === "score") return CEREMONY_STAGES.verifying;
+    return null;
+  }
+
+  advanceCeremonyStage(target) {
+    if (!Number.isFinite(target) || target <= this.ceremonyStage) return;
+    this.ceremonyStage = target;
+    this.ceremonyStageEnteredAt = this.now();
+    if (this.root) this.root.dataset.ceremonyStage = String(target);
+    if (this.nodes.ceremonyStage) {
+      this.nodes.ceremonyStage.textContent = this.translate(CEREMONY_STAGE_KEYS[target]);
+    }
+    this.paintCeremonySteps(target);
+  }
+
+  paintCeremonySteps(stage = this.ceremonyStage) {
+    const steps = this.nodes.ceremonySteps?.children;
+    if (!steps) return;
+    for (let index = 0; index < steps.length; index += 1) {
+      const position = index + 1;
+      steps[index].dataset.status = position < stage ? "done" : position === stage ? "active" : "pending";
     }
   }
 
@@ -272,6 +305,7 @@ export class DynamicIsland extends Emitter {
     }
     this.setBackgroundInert(true);
     this.setState("verification-failed");
+    if (this.nodes.ceremonyScore) this.nodes.ceremonyScore.hidden = false;
     this.updateCeremony({ phase: "score", state: "failed", score });
     if (score >= 55 && this.nodes.ceremonyStage && errors.find(Boolean)) {
       this.nodes.ceremonyStage.textContent = errors.find(Boolean);
@@ -555,6 +589,10 @@ export class DynamicIsland extends Emitter {
     if (this.nodes.camera) this.nodes.camera.textContent = this.translate("startCamera");
     if (this.nodes.retry) this.nodes.retry.textContent = this.translate("retry");
     if (this.nodes.fallback) this.nodes.fallback.textContent = this.translate("useQrInstead");
+    // Keep the live ceremony stage headline localized across a mid-ceremony switch.
+    if (this.state === "connecting" && this.nodes.ceremonyStage && CEREMONY_STAGE_KEYS[this.ceremonyStage]) {
+      this.nodes.ceremonyStage.textContent = this.translate(CEREMONY_STAGE_KEYS[this.ceremonyStage]);
+    }
   }
 
   renderPeople(self, peer) {
@@ -574,9 +612,13 @@ export class DynamicIsland extends Emitter {
   }
 
   resetCeremony() {
-    if (this.nodes.ceremonyStage) this.nodes.ceremonyStage.textContent = this.translate("ceremonyPermissions");
+    this.ceremonyStage = 1;
+    this.ceremonyStageEnteredAt = this.now();
+    if (this.root) this.root.dataset.ceremonyStage = "1";
+    if (this.nodes.ceremonyStage) this.nodes.ceremonyStage.textContent = this.translate("ceremonyStagePreparing");
     if (this.nodes.ceremonyScore) {
       this.nodes.ceremonyScore.textContent = `0 / 100`;
+      this.nodes.ceremonyScore.hidden = true;
       delete this.nodes.ceremonyScore.dataset.passed;
     }
     if (this.nodes.ceremonyError) {
@@ -584,46 +626,17 @@ export class DynamicIsland extends Emitter {
       this.nodes.ceremonyError.textContent = "";
     }
     if (this.nodes.failureActions) this.nodes.failureActions.hidden = true;
-    [this.nodes.audioMetric, this.nodes.bumpMetric, this.nodes.tiltMetric].forEach((node) => this.setMetricState(node, "waiting"));
-    if (this.nodes.audioValue) this.nodes.audioValue.textContent = this.translate("ceremonyWaiting");
-    if (this.nodes.bumpValue) this.nodes.bumpValue.textContent = "0.0";
-    if (this.nodes.tiltValue) this.nodes.tiltValue.textContent = "0°";
+    this.paintCeremonySteps(1);
   }
 
-  renderVerifiedCeremony({ score = 100, acoustic = {}, motion = {} } = {}) {
-    this.updateCeremony({
-      phase: "audio",
-      state: "complete",
-      acoustic: { detected: true, ...acoustic }
-    });
-    this.updateCeremony({
-      phase: "motion",
-      state: "complete",
-      motion
-    });
-    this.updateCeremony({
-      phase: "score",
-      state: "complete",
-      score
-    });
-  }
-
-  renderMotionMetrics(motion = {}) {
-    const bump = Boolean(motion.bump);
-    const beta = Number(motion.tilt?.beta || 0);
-    const gamma = Number(motion.tilt?.gamma || 0);
-    const degrees = Math.round(Math.max(Math.abs(beta), Math.abs(gamma)));
-    this.setMetricState(this.nodes.bumpMetric, bump ? "complete" : motion.samples ? "active" : "waiting");
-    this.setMetricState(this.nodes.tiltMetric, motion.tilted ? "complete" : motion.samples ? "active" : "waiting");
-    if (this.nodes.bumpValue) {
-      const bumpPoints = Number(motion.bumpScorePoints || BUMP_SCORE_POINTS);
-      this.nodes.bumpValue.textContent = bump ? `+${bumpPoints}` : Number(motion.maxAcceleration || 0).toFixed(1);
+  // Called after proximity:match: jump the ladder straight to the final
+  // "Connecting…" stage before the connected view takes over.
+  renderVerifiedCeremony({ score = 100 } = {}) {
+    if (Number.isFinite(score) && this.nodes.ceremonyScore) {
+      this.nodes.ceremonyScore.textContent = `${Math.round(score)} / 100`;
+      this.nodes.ceremonyScore.dataset.passed = String(score >= 55);
     }
-    if (this.nodes.tiltValue) this.nodes.tiltValue.textContent = `${degrees}°`;
-  }
-
-  setMetricState(node, state) {
-    if (node) node.dataset.status = state;
+    this.advanceCeremonyStage(CEREMONY_STAGES.connecting);
   }
 
   renderTransfer(transfer = {}) {
@@ -986,44 +999,6 @@ function renderAnonymousAvatar(node) {
   mark.setAttribute("aria-hidden", "true");
   mark.textContent = "?";
   node.replaceChildren(mark);
-}
-
-function formatAcousticStatus(acoustic = {}, { fallback, translate }) {
-  const mode = acoustic?.mode;
-  const slotLabel = formatAcousticSlot(acoustic);
-  const band = formatFrequencyBand(acoustic);
-  const margin = Number(acoustic?.marginDb);
-  const marginLabel = Number.isFinite(margin) && margin > 0 ? ` +${Math.round(margin)}dB` : "";
-  const emittedCount = Number(acoustic?.emittedCount);
-  const countLabel = Number.isFinite(emittedCount) && emittedCount > 0 ? ` x${emittedCount}` : "";
-  const keyByMode = {
-    emit: "ceremonyAudioEmitting",
-    emitted: "ceremonyAudioEmitted",
-    "emit-failed": "ceremonyAudioEmitFailed",
-    listen: "ceremonyAudioListening",
-    detected: "ceremonyDetected",
-    "energy-assisted": "ceremonyEnergyHeard",
-    missed: "ceremonyMissed"
-  };
-  const key = acoustic?.energyAssisted ? "ceremonyEnergyHeard" : keyByMode[mode];
-  if (!key) return fallback;
-  return `${translate(key)}${slotLabel}${countLabel}${marginLabel}${band}`;
-}
-
-function formatAcousticSlot(acoustic = {}) {
-  const missedCount = Number(acoustic?.missedCount);
-  const slot = Number(acoustic?.slot);
-  const slotCount = Number(acoustic?.slotCount);
-  if (Number.isFinite(missedCount) && missedCount > 1) return ` ${missedCount} slots`;
-  if (Number.isFinite(slot) && Number.isFinite(slotCount)) return ` ${slot}/${slotCount}`;
-  return "";
-}
-
-function formatFrequencyBand(acoustic = {}) {
-  const start = Number(acoustic?.startFrequencyHz);
-  const end = Number(acoustic?.endFrequencyHz);
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return "";
-  return ` ${Math.round(start / 100) / 10}-${Math.round(end / 100) / 10}kHz`;
 }
 
 function qrFinderColor(row, column, count, colors) {
