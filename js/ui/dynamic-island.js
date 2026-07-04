@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.107";
-import { Emitter } from "../utils/emitter.js?v=1.0.107";
-import { formatBytes } from "../utils/format.js?v=1.0.107";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.107";
-import { TileWave } from "./tile-wave.js?v=1.0.107";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.108";
+import { Emitter } from "../utils/emitter.js?v=1.0.108";
+import { formatBytes } from "../utils/format.js?v=1.0.108";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.108";
+import { TileWave } from "./tile-wave.js?v=1.0.108";
 
 // Monotonic ceremony stage ladder shown in the island during pairing. Replaces
 // the old permissions/audio/bump/tilt checklist with a single staged status line
@@ -664,28 +664,37 @@ export class DynamicIsland extends Emitter {
 
   animateTransferProgress(targetRatio) {
     const target = clampRatio(targetRatio);
-    if (this.transferAnimationFrame) cancelAnimationFrame(this.transferAnimationFrame);
-    const start = Number.isFinite(this.transferDisplayRatio) ? this.transferDisplayRatio : 0;
     this.transferTargetRatio = target;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const distance = Math.abs(target - start);
-    if (reduced || distance < 0.004 || target < start) {
+    // Backward jumps (retry/reset) snap — animating a regression reads as a glitch.
+    if (reduced || target < this.transferDisplayRatio) {
+      if (this.transferAnimationFrame) {
+        cancelAnimationFrame(this.transferAnimationFrame);
+        this.transferAnimationFrame = 0;
+      }
       this.paintTransferProgress(target);
       return;
     }
-    const duration = Math.min(760, Math.max(300, distance * 1000));
-    const startedAt = performance.now();
+    // One persistent follower loop glides the displayed value toward whatever
+    // the latest target is (exponential smoothing, ~180ms time constant). New
+    // progress events only move the target — the loop is never restarted, so
+    // the percent counts up evenly instead of in restart-tween bursts.
+    if (this.transferAnimationFrame) return;
+    let last = performance.now();
     const tick = (now) => {
-      const elapsed = Math.min(1, (now - startedAt) / duration);
-      const eased = 1 - Math.pow(1 - elapsed, 4);
-      const value = start + (target - start) * eased;
-      this.paintTransferProgress(value);
-      if (elapsed < 1 && this.transferTargetRatio === target) {
-        this.transferAnimationFrame = requestAnimationFrame(tick);
-      } else {
-        this.paintTransferProgress(target);
+      const dt = Math.min(100, Math.max(0, now - last));
+      last = now;
+      const current = this.transferDisplayRatio;
+      const goal = this.transferTargetRatio;
+      const alpha = 1 - Math.exp(-dt / 180);
+      let next = current + (goal - current) * alpha;
+      if (Math.abs(goal - next) < 0.0004) next = goal;
+      this.paintTransferProgress(next);
+      if (next === goal) {
         this.transferAnimationFrame = 0;
+        return;
       }
+      this.transferAnimationFrame = requestAnimationFrame(tick);
     };
     this.transferAnimationFrame = requestAnimationFrame(tick);
   }
@@ -697,7 +706,6 @@ export class DynamicIsland extends Emitter {
     this.wave?.setProgress(value);
     if (this.nodes.transferPercent) {
       this.nodes.transferPercent.textContent = `${Math.round(value * 100)}%`;
-      this.nodes.transferPercent.style.setProperty("--transfer-progress", value.toFixed(4));
     }
   }
 

@@ -410,15 +410,17 @@
 }
 
 .webdrop-island__transfer strong {
+  /* Fixed size + reserved width: the percent must not zoom with progress or
+     shift laterally as the digit count grows (1% → 10% → 100%). */
+  min-width: 3.5ch;
   color: var(--island-ink);
-  font-size: clamp(22px, 5vw, 34px);
+  font-size: 26px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   text-align: center;
   letter-spacing: 0;
   text-shadow: 0 1px 10px rgba(0, 0, 0, .6);
-  transform: translateZ(0) scale(calc(.992 + var(--transfer-progress, 0) * .008));
-  transition: transform 220ms var(--ease-out);
+  transform: translateZ(0);
 }
 
 .webdrop-island__qr {
