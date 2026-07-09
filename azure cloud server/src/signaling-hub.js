@@ -1275,13 +1275,21 @@ export class SignalingHub {
     return bumps;
   }
 
-  // True while another started, unexpired cohort whose telemetry window (endsAt
-  // + its matchSlop linger) is still open has participants that have not yet
-  // reported telemetry — i.e. bumps the cross-cohort veto still needs to see.
+  // True while bumps that could veto the current best pair are still en route:
+  // (a) members of THIS cohort that have not reported yet — a 3-device field
+  // case matched a sloppy 1.4s-delta pair two seconds before the third phone's
+  // bump (452ms from one member) arrived and would have vetoed it; costs
+  // nothing for 2-device cohorts (a pair needs both telemetries to be eligible
+  // anyway); (b) another started, unexpired cohort whose telemetry window
+  // (endsAt + matchSlop linger) is still open with participants yet to report.
   // Not-yet-started (open/joining) cohorts are ignored: they have no ceremony
   // window yet, and waiting on the whole join funnel would stall every match.
   shouldDeferProximityMatch(session) {
     const now = Date.now();
+    if ((session.telemetry?.size || 0) < (session.clients?.size || 0)) {
+      const ownSlop = Number(session.tuning?.timing?.matchSlopMs || this.proximityMatchSlopMs);
+      if (Number(session.endsAt) + ownSlop > now && Number(session.expiresAt) > now) return true;
+    }
     for (const other of this.proximitySessions.values()) {
       if (other.id === session.id || !other.started) continue;
       if (Number(other.expiresAt) <= now) continue;

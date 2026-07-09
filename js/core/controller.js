@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.110";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.110";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.110";
+import { formatBytes } from "../utils/format.js?v=1.0.111";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.111";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.111";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
@@ -1118,7 +1118,19 @@ export function createController({
     view.showIslandAnonymousConnectionProgress({ self: initialState.self });
     view.toast(view.translate("findingNearbyPeer"));
 
-    if (permissionPromise) await permissionPromise.catch(() => null);
+    if (permissionPromise) {
+      const permissions = await permissionPromise.catch(() => null);
+      // Abort BEFORE joining the cohort when a required permission is denied:
+      // the ceremony cannot pass without it, and joining would drag the partner
+      // phone into a session that is then guaranteed to fail for them too.
+      const blocked = runtime.realProximityCeremony && permissions
+        ? blockedProximityPermissionMessage(permissions)
+        : null;
+      if (blocked) {
+        await failAnonymousVerification({ score: 0, errors: [blocked] });
+        return;
+      }
+    }
     // Kick off the acoustic preflight now (do NOT await): it warms up / rebuilds
     // the emit→mic→capture loop concurrently with the server join window, so the
     // very first ceremony captures real audio instead of first-attempt silence.
@@ -1705,6 +1717,23 @@ export function createController({
         audioOutput: audioOutputPermission
       }
     });
+    {
+      const blocked = blockedProximityPermissionMessage({ microphone: microphonePermission, motion: motionPermission });
+      if (blocked) {
+        return {
+          passed: false,
+          score: 0,
+          metrics: {
+            peerId,
+            microphonePermission: microphonePermission.reason || (microphonePermission.granted ? "granted" : "denied"),
+            audioOutputPermission: audioOutputPermission.reason || (audioOutputPermission.granted ? "granted" : "denied"),
+            motionPermission: motionPermission.reason || (motionPermission.granted ? "granted" : "denied")
+          },
+          evidence: {},
+          reason: "permission-denied"
+        };
+      }
+    }
     proximity.resetMotionCapture();
     if (motionPermission.granted) proximity.startMotionCapture();
     // Warm up / prove the acoustic loop concurrently with the ready/start
@@ -1788,6 +1817,23 @@ export function createController({
         audioOutputPermission.granted ? null : `audioOutput:${audioOutputPermission.reason || "denied"}`
       ].filter(Boolean).join(",") || null
     });
+    {
+      const blocked = blockedProximityPermissionMessage({ microphone: microphonePermission, motion: motionPermission });
+      if (blocked) {
+        return {
+          passed: false,
+          score: 0,
+          metrics: {
+            sessionId: startPayload.sessionId,
+            microphonePermission: microphonePermission.reason || (microphonePermission.granted ? "granted" : "denied"),
+            audioOutputPermission: audioOutputPermission.reason || (audioOutputPermission.granted ? "granted" : "denied"),
+            motionPermission: motionPermission.reason || (motionPermission.granted ? "granted" : "denied")
+          },
+          evidence: {},
+          reason: "permission-denied"
+        };
+      }
+    }
     proximity.resetMotionCapture();
     if (motionPermission.granted) proximity.startMotionCapture();
     let motionTimer = 0;
@@ -2640,18 +2686,31 @@ export function createController({
     }
   }
 
+  function blockedProximityPermissionMessage(permissions) {
+    const blocked = blockedProximityPermissionKey(permissions);
+    return blocked ? view.translate(blocked.key, blocked.params) : null;
+  }
+
   function proximityFailureMessages(result, decision) {
     const messages = [];
     const metrics = result?.metrics || {};
     if (!["granted", undefined].includes(metrics.microphonePermission)) {
-      messages.push(view.translate("proximityErrorMicrophone", { reason: metrics.microphonePermission }));
+      messages.push(metrics.microphonePermission === "denied"
+        ? view.translate("proximityErrorMicrophoneDenied")
+        : view.translate("proximityErrorMicrophone", { reason: metrics.microphonePermission }));
     }
     if (!["running", "granted", undefined].includes(metrics.audioOutputPermission)) {
       messages.push(view.translate("proximityErrorAudioOutput", { reason: metrics.audioOutputPermission }));
     }
     if (!["granted", undefined].includes(metrics.motionPermission)) {
-      messages.push(view.translate("proximityErrorMotion", { reason: metrics.motionPermission }));
+      messages.push(metrics.motionPermission === "denied"
+        ? view.translate("proximityErrorMotionDenied")
+        : view.translate("proximityErrorMotion", { reason: metrics.motionPermission }));
     }
+    // When a denied permission aborted the ceremony, the missing acoustic/bump/
+    // tilt evidence and the low score are consequences of that one problem —
+    // don't bury the actionable line under them.
+    if (result?.reason === "permission-denied") return [...new Set(messages)];
     if (result?.reason === "ceremony-start-timeout") {
       messages.push(view.translate("proximityErrorSync"));
     }
@@ -2731,10 +2790,33 @@ function writeStoredPermissions(permissions) {
   }
 }
 
+// A denied hard-required permission dooms the ceremony before it begins: the
+// server's evidence gate demands ultrasound + bump + tilt, and once iOS sees a
+// denial it auto-rejects every further request for the rest of the page session
+// without showing a prompt — only a full page reload recovers. The 07:07 field
+// case had one phone bump through four doomed ceremonies with no hint. The
+// controller aborts up front (before joining a cohort) with the one actionable
+// instruction. "unsupported" is deliberately NOT blocked: those devices use the
+// existing QR-fallback flows.
+function blockedProximityPermissionKey({ microphone, motion } = {}) {
+  if (motion && !motion.granted && motion.reason !== "unsupported") {
+    return ["denied", "error"].includes(motion.reason)
+      ? { key: "proximityErrorMotionDenied", params: {} }
+      : { key: "proximityErrorMotion", params: { reason: motion.reason || "denied" } };
+  }
+  if (microphone && !microphone.granted && microphone.reason !== "unsupported") {
+    return ["denied", "error"].includes(microphone.reason)
+      ? { key: "proximityErrorMicrophoneDenied", params: {} }
+      : { key: "proximityErrorMicrophone", params: { reason: microphone.reason || "denied" } };
+  }
+  return null;
+}
+
 export const __controllerTest = Object.freeze({
   microphonePermissionState,
   permissionState,
-  readStoredPermissions
+  readStoredPermissions,
+  blockedProximityPermissionKey
 });
 
 function demoPdfItems() {

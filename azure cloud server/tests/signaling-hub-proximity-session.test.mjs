@@ -446,6 +446,59 @@ test("a deferred eligible pair is force-matched at its fail deadline, never fail
   hub.close();
 });
 
+test("a cohort pair is held until the remaining member's bump can veto it", () => {
+  const hub = createTestHub();
+  const a1 = addClient(hub, "hold-a-1");
+  const a2 = addClient(hub, "hold-a-2");
+  const c = addClient(hub, "hold-c");
+  const session = createSession(hub, [a1, a2, c]);
+  const now = Date.now();
+  session.createdAt = now - 8000;
+  session.startAt = now - 6000;
+  session.endsAt = now - 500;
+
+  // Field 3-device case: (a1,a2) look reciprocal with a sloppy 1406ms bump
+  // delta and previously matched the moment a2's telemetry landed — two
+  // seconds before c reported a bump only 452ms from a1's, which vetoes them.
+  hub.recordProximitySessionTelemetry(a1, sessionMessage(session, a1, verifiedMetrics(), now - 5000, a2));
+  hub.recordProximitySessionTelemetry(a2, sessionMessage(session, a2, verifiedMetrics(), now - 3594, a1));
+  assert.equal(a1.pairingId, null, "pair must wait for the cohort's remaining member");
+
+  hub.recordProximitySessionTelemetry(c, sessionMessage(session, c, { acoustic: true }, now - 4548, a1));
+  assert.equal(a1.pairingId, null);
+  hub.failUnmatchedProximitySession(session.id);
+  assert.equal(a1.pairingId, null);
+  assert.equal(messagesOf(a1, "proximity:match").length, 0);
+  assert.equal(messagesOf(a1, "proximity:session:failed")[0].payload.reason, "ambiguous_or_nonreciprocal_match");
+
+  hub.close();
+});
+
+test("a held cohort pair matches once the last member's distant bump arrives", () => {
+  const hub = createTestHub();
+  const a1 = addClient(hub, "release-a-1");
+  const a2 = addClient(hub, "release-a-2");
+  const c = addClient(hub, "release-c");
+  const session = createSession(hub, [a1, a2, c]);
+  const now = Date.now();
+  session.createdAt = now - 8000;
+  session.startAt = now - 6000;
+  session.endsAt = now - 500;
+
+  hub.recordProximitySessionTelemetry(a1, sessionMessage(session, a1, verifiedMetrics(), now - 5000, a2));
+  hub.recordProximitySessionTelemetry(a2, sessionMessage(session, a2, verifiedMetrics(), now - 4940, a1));
+  assert.equal(a1.pairingId, null, "held while the third member has not reported");
+
+  // c's bump is seconds away from both — no veto, the pair activates on this
+  // very telemetry (event-driven, no timer needed).
+  hub.recordProximitySessionTelemetry(c, sessionMessage(session, c, { acoustic: true }, now - 900, a1));
+  assert.ok(a1.pairingId);
+  assert.equal(a1.pairingId, a2.pairingId);
+  assert.equal(messagesOf(a1, "proximity:match")[0].payload.peerId, "release-a-2");
+
+  hub.close();
+});
+
 test("proximity session rejects telemetry with the wrong join nonce", () => {
   const hub = createTestHub();
   const clientA = addClient(hub, "client-a");
