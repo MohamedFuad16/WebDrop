@@ -231,6 +231,85 @@ test("proximity session keeps two simultaneous reciprocal signature pairs separa
   hub.close();
 });
 
+test("a stale already-paired best candidate does not block the remaining pair", () => {
+  const hub = createTestHub();
+  const clientA = addClient(hub, "client-a");
+  const clientB = addClient(hub, "client-b");
+  const clientC = addClient(hub, "client-c");
+  const clientD = addClient(hub, "client-d");
+  const session = createSession(hub, [clientA, clientB, clientC, clientD]);
+
+  hub.recordProximitySessionTelemetry(clientA, sessionMessage(session, clientA, verifiedMetrics(), 1000, clientB));
+  // A gives up and pairs via QR/invite before B's telemetry lands: the (A,B)
+  // pair is now unusable, but it has the smallest bump delta so it stays the
+  // "best" candidate forever. C and D must still match.
+  clientA.pairingId = "external-qr-pairing";
+  hub.recordProximitySessionTelemetry(clientB, sessionMessage(session, clientB, verifiedMetrics(), 1010, clientA));
+  hub.recordProximitySessionTelemetry(clientC, sessionMessage(session, clientC, verifiedMetrics(), 2400, clientD));
+  hub.recordProximitySessionTelemetry(clientD, sessionMessage(session, clientD, verifiedMetrics(), 2410, clientC));
+
+  assert.ok(clientC.pairingId);
+  assert.equal(clientC.pairingId, clientD.pairingId);
+  assert.equal(clientB.pairingId, null);
+  assert.equal(messagesOf(clientC, "proximity:match")[0].payload.peerId, "client-d");
+  assert.equal(messagesOf(clientD, "proximity:match")[0].payload.peerId, "client-c");
+
+  hub.close();
+});
+
+test("crossed acoustic decodes with distant bumps do not connect the wrong pair", () => {
+  const hub = createTestHub();
+  const a1 = addClient(hub, "pair-a-1");
+  const a2 = addClient(hub, "pair-a-2");
+  const b1 = addClient(hub, "pair-b-1");
+  const b2 = addClient(hub, "pair-b-2");
+  const session = createSession(hub, [a1, a2, b1, b2]);
+
+  // Each true pair has one phone with a weak/blocked speaker (the classic
+  // first-attempt failure), so the two WORKING phones across pairs hear each
+  // other as their top decode: (a1,b1) is formally reciprocal. Their bumps are
+  // 2s apart (within match slop) but each has a true partner whose bump landed
+  // ~150ms away — the veto must reject the cross pair instead of connecting
+  // two strangers.
+  hub.recordProximitySessionTelemetry(a1, sessionMessage(session, a1, verifiedMetrics(), 1000, b1));
+  hub.recordProximitySessionTelemetry(a2, sessionMessage(session, a2, { acoustic: true }, 1150, a1));
+  hub.recordProximitySessionTelemetry(b1, sessionMessage(session, b1, verifiedMetrics(), 3000, a1));
+  hub.recordProximitySessionTelemetry(b2, sessionMessage(session, b2, { acoustic: true }, 3150, b1));
+
+  assert.equal(a1.pairingId, null);
+  assert.equal(a2.pairingId, null);
+  assert.equal(b1.pairingId, null);
+  assert.equal(b2.pairingId, null);
+  assert.equal(messagesOf(a1, "proximity:match").length, 0);
+  assert.equal(messagesOf(b1, "proximity:match").length, 0);
+
+  hub.close();
+});
+
+test("two true pairs bumping at different moments both match in one cohort", () => {
+  const hub = createTestHub();
+  const a1 = addClient(hub, "pair-a-1");
+  const a2 = addClient(hub, "pair-a-2");
+  const b1 = addClient(hub, "pair-b-1");
+  const b2 = addClient(hub, "pair-b-2");
+  const session = createSession(hub, [a1, a2, b1, b2]);
+
+  hub.recordProximitySessionTelemetry(a1, sessionMessage(session, a1, verifiedMetrics(), 1000, a2));
+  hub.recordProximitySessionTelemetry(a2, sessionMessage(session, a2, verifiedMetrics(), 1100, a1));
+  hub.recordProximitySessionTelemetry(b1, sessionMessage(session, b1, verifiedMetrics(), 3000, b2));
+  hub.recordProximitySessionTelemetry(b2, sessionMessage(session, b2, verifiedMetrics(), 3050, b1));
+
+  assert.ok(a1.pairingId);
+  assert.equal(a1.pairingId, a2.pairingId);
+  assert.ok(b1.pairingId);
+  assert.equal(b1.pairingId, b2.pairingId);
+  assert.notEqual(a1.pairingId, b1.pairingId);
+  assert.equal(messagesOf(a1, "proximity:match")[0].payload.peerId, "pair-a-2");
+  assert.equal(messagesOf(b1, "proximity:match")[0].payload.peerId, "pair-b-2");
+
+  hub.close();
+});
+
 test("proximity session rejects telemetry with the wrong join nonce", () => {
   const hub = createTestHub();
   const clientA = addClient(hub, "client-a");

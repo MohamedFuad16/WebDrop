@@ -1164,51 +1164,65 @@ export class SignalingHub {
   }
 
   tryMatchProximitySession(session) {
+    const slopMs = Number(session.tuning?.timing?.matchSlopMs || this.proximityMatchSlopMs);
     const candidates = [...session.telemetry.values()]
       .filter((entry) => entry.analysis?.decision === "verified" && !session.matched.has(entry.clientId))
-      .sort((a, b) => Number(a.timing?.bumpAt || a.receivedAt) - Number(b.timing?.bumpAt || b.receivedAt));
-    let best = null;
+      .sort((a, b) => bumpTimeOf(a) - bumpTimeOf(b));
+    const eligible = [];
     for (let i = 0; i < candidates.length; i += 1) {
       for (let j = i + 1; j < candidates.length; j += 1) {
         const a = candidates[i];
         const b = candidates[j];
-        const delta = Math.abs(Number(a.timing?.bumpAt || a.receivedAt) - Number(b.timing?.bumpAt || b.receivedAt));
-        if (delta > Number(session.tuning?.timing?.matchSlopMs || this.proximityMatchSlopMs) || !hasReciprocalAcousticEvidence(session, a, b)) continue;
-        if (!best || delta < best.delta) best = { a, b, delta };
+        const delta = Math.abs(bumpTimeOf(a) - bumpTimeOf(b));
+        if (delta > slopMs || !hasReciprocalAcousticEvidence(session, a, b)) continue;
+        if (hasCloserBumpPartner(session, a, b, delta)) continue;
+        eligible.push({ a, b, delta });
       }
     }
-    if (!best) return;
-    const first = this.clients.get(best.a.clientId);
-    const second = this.clients.get(best.b.clientId);
-    if (!first || !second || first.pairingId || second.pairingId) return;
-    const pairingId = makePairingId(first.id, second.id);
-    this.activatePair(first, second, pairingId);
-    session.matched.add(first.id);
-    session.matched.add(second.id);
-    this.proximityDecisions.set(pairingId, new Map([
-      [first.id, "verified"],
-      [second.id, "verified"]
-    ]));
-    this.send(first.socket, "proximity:match", {
-      sessionId: session.id,
-      pairingId,
-      peerId: second.id,
-      peer: publicPeer(second),
-      score: best.a.analysis.score
-    });
-    this.send(second.socket, "proximity:match", {
-      sessionId: session.id,
-      pairingId,
-      peerId: first.id,
-      peer: publicPeer(first),
-      score: best.b.analysis.score
-    });
-    this.metrics?.recordEvent("proximity:session:matched", {
-      sessionId: session.id,
-      pairingId,
-      clientIds: [first.id, second.id],
-      score: Math.min(best.a.analysis.score, best.b.analysis.score)
-    });
+    // Smallest bump delta first, then match EVERY remaining disjoint pair. A
+    // 4+ device cohort legitimately holds several genuine pairs, and a stale
+    // best candidate (member disconnected, or already invite/QR-paired after
+    // giving up on the ceremony) must be skipped — previously a single early
+    // `return` here let one stale pair permanently block every other valid
+    // pair in the cohort.
+    eligible.sort((x, y) => x.delta - y.delta);
+    let matchedAny = false;
+    for (const { a, b } of eligible) {
+      if (session.matched.has(a.clientId) || session.matched.has(b.clientId)) continue;
+      const first = this.clients.get(a.clientId);
+      const second = this.clients.get(b.clientId);
+      if (!first || !second || first.pairingId || second.pairingId) continue;
+      const pairingId = makePairingId(first.id, second.id);
+      this.activatePair(first, second, pairingId);
+      session.matched.add(first.id);
+      session.matched.add(second.id);
+      matchedAny = true;
+      this.proximityDecisions.set(pairingId, new Map([
+        [first.id, "verified"],
+        [second.id, "verified"]
+      ]));
+      this.send(first.socket, "proximity:match", {
+        sessionId: session.id,
+        pairingId,
+        peerId: second.id,
+        peer: publicPeer(second),
+        score: a.analysis.score
+      });
+      this.send(second.socket, "proximity:match", {
+        sessionId: session.id,
+        pairingId,
+        peerId: first.id,
+        peer: publicPeer(first),
+        score: b.analysis.score
+      });
+      this.metrics?.recordEvent("proximity:session:matched", {
+        sessionId: session.id,
+        pairingId,
+        clientIds: [first.id, second.id],
+        score: Math.min(a.analysis.score, b.analysis.score)
+      });
+    }
+    if (!matchedAny) return;
     this.broadcast("peers", this.peerList());
     if ([...session.clients].every((clientId) => session.matched.has(clientId))) {
       clearTimeout(session.timer);
@@ -1788,6 +1802,36 @@ function telemetryTimingDiagnostics(session, timing = {}, matchSlopMs = DEFAULT_
     completedAfterBumpMs: Number.isFinite(completedAt) && Number.isFinite(bumpAt) ? Math.round(completedAt - bumpAt) : null,
     valid: Boolean(session && ceremonyTimingValid(session, timing, matchSlopMs))
   };
+}
+
+// A genuine bump is ONE physical event: the two partners' bumpAt land within
+// sensor/detection jitter of each other (well under this margin). If some other
+// unmatched cohort participant's bump sits this much closer to a candidate than
+// the candidate's supposed partner does, the candidate almost certainly bumped
+// that participant instead — even when crossed acoustic top-decodes (one weak or
+// blocked speaker in each true pair makes the two WORKING phones across pairs
+// hear each other loudest) produce formally reciprocal evidence. Veto rather
+// than guess: an honest retry beats connecting strangers. Tuning knob: raise to
+// be more permissive in chaotic same-instant multi-pair rooms, lower to reject
+// cross-pair matches more aggressively.
+const BUMP_PARTNER_VETO_MARGIN_MS = 700;
+
+function bumpTimeOf(entry) {
+  return Number(entry.timing?.bumpAt || entry.receivedAt);
+}
+
+function hasCloserBumpPartner(session, a, b, delta) {
+  for (const entry of session.telemetry.values()) {
+    if (entry.clientId === a.clientId || entry.clientId === b.clientId) continue;
+    if (session.matched.has(entry.clientId)) continue;
+    const bump = bumpTimeOf(entry);
+    if (!Number.isFinite(bump)) continue;
+    if (Math.abs(bumpTimeOf(a) - bump) + BUMP_PARTNER_VETO_MARGIN_MS <= delta
+      || Math.abs(bumpTimeOf(b) - bump) + BUMP_PARTNER_VETO_MARGIN_MS <= delta) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function hasReciprocalAcousticEvidence(session, first, second) {
