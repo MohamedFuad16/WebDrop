@@ -310,6 +310,142 @@ test("two true pairs bumping at different moments both match in one cohort", () 
   hub.close();
 });
 
+test("a 4-device cohort matches the reciprocal pair despite a collapsed winner margin", () => {
+  const hub = createTestHub();
+  const a1 = addClient(hub, "pair-a-1");
+  const a2 = addClient(hub, "pair-a-2");
+  const b1 = addClient(hub, "pair-b-1");
+  const b2 = addClient(hub, "pair-b-2");
+  const session = createSession(hub, [a1, a2, b1, b2]);
+
+  // Field-observed 4-device cohort: all four share ONE band, so the runner-up
+  // decode is the other pair's phone ~2m away and a1's winner margin collapses
+  // to 0.028 (0.352 vs 0.324) — below the 2-device ACOUSTIC_WINNER_MARGIN. The
+  // (a1,a2) pair is still the only reciprocal top-decode pair with a 58ms bump
+  // delta; it must match. b1/b2 decode crossed (b1 hears a1, b2 hears b1) and
+  // must fail honestly to retry, not drag the whole cohort down.
+  hub.recordProximitySessionTelemetry(a1, sessionMessage(session, a1, { ...verifiedMetrics(), acousticConfidenceMargin: 0.028 }, 1000, a2));
+  hub.recordProximitySessionTelemetry(a2, sessionMessage(session, a2, { ...verifiedMetrics(), acousticConfidenceMargin: 0.155 }, 1058, a1));
+  hub.recordProximitySessionTelemetry(b1, sessionMessage(session, b1, verifiedMetrics(), 1029, a1));
+  hub.recordProximitySessionTelemetry(b2, sessionMessage(session, b2, verifiedMetrics(), 2129, b1));
+
+  assert.ok(a1.pairingId);
+  assert.equal(a1.pairingId, a2.pairingId);
+  assert.equal(b1.pairingId, null);
+  assert.equal(b2.pairingId, null);
+  assert.equal(messagesOf(a1, "proximity:match")[0].payload.peerId, "pair-a-2");
+  assert.equal(messagesOf(b1, "proximity:match").length, 0);
+
+  hub.close();
+});
+
+test("a wrong pair split across two crossed cohorts is vetoed by the other cohort's bumps", () => {
+  const hub = createTestHub();
+  const w = addClient(hub, "cross-w");
+  const m = addClient(hub, "cross-m");
+  const k = addClient(hub, "cross-k");
+  const mai = addClient(hub, "cross-mai");
+  // Two true pairs (w,k) and (m,mai) tapped together but cohorts fill by
+  // arrival order, so the sessions came out CROSSED: (w,m) and (k,mai).
+  const s1 = createSession(hub, [w, m], "session-crossed-1");
+  const s2 = createSession(hub, [k, mai], "session-crossed-2");
+  const now = Date.now();
+  for (const s of [s1, s2]) {
+    s.createdAt = now - 8000;
+    s.startAt = now - 6000;
+    s.endsAt = now - 500;
+  }
+
+  // The crossed (w,m) session completes first: same room, so it is formally
+  // reciprocal, and the two independent bump events are 1681ms apart — inside
+  // matchSlop. Before the cross-cohort veto this MATCHED THE WRONG PAIR.
+  hub.recordProximitySessionTelemetry(m, sessionMessage(s1, m, verifiedMetrics(), now - 5000, w));
+  hub.recordProximitySessionTelemetry(w, sessionMessage(s1, w, verifiedMetrics(), now - 3319, m));
+
+  // Deferred, not matched: the concurrent cohort still owes telemetry.
+  assert.equal(w.pairingId, null);
+  assert.equal(m.pairingId, null);
+
+  // The other cohort reports: k bumped 71ms from w, mai bumped 68ms from m —
+  // each phone's TRUE partner is in the other session. Veto the cross pair.
+  hub.recordProximitySessionTelemetry(k, sessionMessage(s2, k, { acoustic: true }, now - 3248, mai));
+  hub.recordProximitySessionTelemetry(mai, sessionMessage(s2, mai, { acoustic: true }, now - 5068, k));
+
+  assert.equal(w.pairingId, null);
+  assert.equal(m.pairingId, null);
+  hub.failUnmatchedProximitySession(s1.id);
+  hub.failUnmatchedProximitySession(s2.id);
+  assert.equal(w.pairingId, null);
+  assert.equal(messagesOf(w, "proximity:match").length, 0);
+  assert.equal(messagesOf(m, "proximity:match").length, 0);
+  assert.equal(messagesOf(w, "proximity:session:failed")[0].payload.reason, "ambiguous_or_nonreciprocal_match");
+
+  hub.close();
+});
+
+test("a deferred match proceeds once the concurrent cohort's bumps prove no closer partner", () => {
+  const hub = createTestHub();
+  const a1 = addClient(hub, "defer-a-1");
+  const a2 = addClient(hub, "defer-a-2");
+  const c1 = addClient(hub, "defer-c-1");
+  const c2 = addClient(hub, "defer-c-2");
+  const s1 = createSession(hub, [a1, a2], "session-defer-1");
+  const s2 = createSession(hub, [c1, c2], "session-defer-2");
+  const now = Date.now();
+  for (const s of [s1, s2]) {
+    s.createdAt = now - 8000;
+    s.startAt = now - 6000;
+    s.endsAt = now - 500;
+  }
+
+  hub.recordProximitySessionTelemetry(a1, sessionMessage(s1, a1, verifiedMetrics(), now - 5000, a2));
+  hub.recordProximitySessionTelemetry(a2, sessionMessage(s1, a2, verifiedMetrics(), now - 4940, a1));
+  // Held while the other cohort's bumps are unknown…
+  assert.equal(a1.pairingId, null);
+
+  // …and activated by the telemetry that proves those bumps are 4s away.
+  hub.recordProximitySessionTelemetry(c1, sessionMessage(s2, c1, { acoustic: true }, now - 1000, c2));
+  hub.recordProximitySessionTelemetry(c2, sessionMessage(s2, c2, { acoustic: true }, now - 900, c1));
+
+  assert.ok(a1.pairingId);
+  assert.equal(a1.pairingId, a2.pairingId);
+  assert.equal(messagesOf(a1, "proximity:match")[0].payload.peerId, "defer-a-2");
+
+  hub.close();
+});
+
+test("a deferred eligible pair is force-matched at its fail deadline, never failed by deferral", () => {
+  const hub = createTestHub();
+  const a1 = addClient(hub, "deadline-a-1");
+  const a2 = addClient(hub, "deadline-a-2");
+  const z1 = addClient(hub, "deadline-z-1");
+  const z2 = addClient(hub, "deadline-z-2");
+  const s1 = createSession(hub, [a1, a2], "session-deadline-1");
+  const s2 = createSession(hub, [z1, z2], "session-deadline-2");
+  const now = Date.now();
+  for (const s of [s1, s2]) {
+    s.createdAt = now - 8000;
+    s.startAt = now - 6000;
+    s.endsAt = now - 500;
+  }
+
+  hub.recordProximitySessionTelemetry(a1, sessionMessage(s1, a1, verifiedMetrics(), now - 5000, a2));
+  hub.recordProximitySessionTelemetry(a2, sessionMessage(s1, a2, verifiedMetrics(), now - 4940, a1));
+  assert.equal(a1.pairingId, null);
+
+  // The other cohort's phones never report (app closed mid-ceremony). At s1's
+  // own fail deadline the pair must be matched with the bumps known then — the
+  // deferral may never convert an eligible pair into a failure.
+  hub.failUnmatchedProximitySession(s1.id);
+
+  assert.ok(a1.pairingId);
+  assert.equal(a1.pairingId, a2.pairingId);
+  assert.equal(messagesOf(a1, "proximity:session:failed").length, 0);
+  assert.equal(messagesOf(a2, "proximity:session:failed").length, 0);
+
+  hub.close();
+});
+
 test("proximity session rejects telemetry with the wrong join nonce", () => {
   const hub = createTestHub();
   const clientA = addClient(hub, "client-a");
@@ -704,9 +840,9 @@ function addClient(hub, id) {
   return client;
 }
 
-function createSession(hub, clients) {
+function createSession(hub, clients, id = "session-a") {
   const session = {
-    id: "session-a",
+    id,
     clients: new Set(clients.map((client) => client.id)),
     nonces: new Map(clients.map((client) => [client.id, `nonce-${client.id}`])),
     signatures: new Map(clients.map((client, index) => [client.id, `signature-${index}`])),

@@ -1113,7 +1113,10 @@ export class SignalingHub {
       telemetryCount: session.telemetry.size,
       policyRevision: session.tuning?.revision || 1
     });
-    this.tryMatchProximitySession(session);
+    // Try every started session, not just this one: a session whose match was
+    // deferred pending THIS session's telemetry (cross-cohort bump veto) must be
+    // re-evaluated the moment the awaited bumps become known.
+    this.tryMatchStartedProximitySessions();
   }
 
   rejectProximitySessionTelemetry(sender, message, reason, session = null) {
@@ -1163,11 +1166,12 @@ export class SignalingHub {
     });
   }
 
-  tryMatchProximitySession(session) {
+  tryMatchProximitySession(session, { force = false } = {}) {
     const slopMs = Number(session.tuning?.timing?.matchSlopMs || this.proximityMatchSlopMs);
     const candidates = [...session.telemetry.values()]
       .filter((entry) => entry.analysis?.decision === "verified" && !session.matched.has(entry.clientId))
       .sort((a, b) => bumpTimeOf(a) - bumpTimeOf(b));
+    const foreignBumps = this.foreignProximityBumpTimes(session);
     const eligible = [];
     for (let i = 0; i < candidates.length; i += 1) {
       for (let j = i + 1; j < candidates.length; j += 1) {
@@ -1175,10 +1179,22 @@ export class SignalingHub {
         const b = candidates[j];
         const delta = Math.abs(bumpTimeOf(a) - bumpTimeOf(b));
         if (delta > slopMs || !hasReciprocalAcousticEvidence(session, a, b)) continue;
-        if (hasCloserBumpPartner(session, a, b, delta)) continue;
+        if (hasCloserBumpPartner(session, a, b, delta, foreignBumps)) continue;
         eligible.push({ a, b, delta });
       }
     }
+    // Two pairs tapping around the same moment can be split across two cohorts
+    // in a CROSSED arrangement (cohorts fill by arrival order, blind to physical
+    // pairing) — and inside each crossed 2-device cohort the wrong pair looks
+    // formally reciprocal (18-19kHz carries meters indoors) with a bump delta
+    // inside matchSlop. The cross-cohort veto above is the defense, but it can
+    // only see bumps whose telemetry has ARRIVED — so while a concurrent
+    // overlapping cohort still owes telemetry, hold this session's eligible
+    // pairs instead of activating them. Re-evaluation is event-driven (every
+    // accepted telemetry and every foreign-session teardown re-runs this), and
+    // failUnmatchedProximitySession force-runs it at this session's own fail
+    // deadline, so deferral can delay a match but never starve one.
+    if (!force && eligible.length && this.shouldDeferProximityMatch(session)) return;
     // Smallest bump delta first, then match EVERY remaining disjoint pair. A
     // 4+ device cohort legitimately holds several genuine pairs, and a stale
     // best candidate (member disconnected, or already invite/QR-paired after
@@ -1232,9 +1248,59 @@ export class SignalingHub {
     }
   }
 
+  // Re-run matching for every started session. Cheap (the sessions map holds a
+  // handful of entries) and idempotent: matched pairs are guarded by
+  // session.matched + client.pairingId, so repeated calls cannot double-match.
+  tryMatchStartedProximitySessions() {
+    for (const session of [...this.proximitySessions.values()]) {
+      if (session.started) this.tryMatchProximitySession(session);
+    }
+  }
+
+  // Bump times reported by OTHER cohorts' participants (matched ones excluded,
+  // mirroring the intra-session veto). A bump is a physical event; which cohort
+  // the server happened to file the phone into does not change what it
+  // discriminates. Client clocks supply bumpAt in epoch ms on every device, so
+  // cross-session comparison is as valid as the intra-session one.
+  foreignProximityBumpTimes(session) {
+    const bumps = [];
+    for (const other of this.proximitySessions.values()) {
+      if (other.id === session.id || !other.started || !other.telemetry) continue;
+      for (const entry of other.telemetry.values()) {
+        if (other.matched?.has(entry.clientId)) continue;
+        const bump = bumpTimeOf(entry);
+        if (Number.isFinite(bump)) bumps.push(bump);
+      }
+    }
+    return bumps;
+  }
+
+  // True while another started, unexpired cohort whose telemetry window (endsAt
+  // + its matchSlop linger) is still open has participants that have not yet
+  // reported telemetry — i.e. bumps the cross-cohort veto still needs to see.
+  // Not-yet-started (open/joining) cohorts are ignored: they have no ceremony
+  // window yet, and waiting on the whole join funnel would stall every match.
+  shouldDeferProximityMatch(session) {
+    const now = Date.now();
+    for (const other of this.proximitySessions.values()) {
+      if (other.id === session.id || !other.started) continue;
+      if (Number(other.expiresAt) <= now) continue;
+      if ((other.telemetry?.size || 0) >= (other.clients?.size || 0)) continue;
+      const slop = Number(other.tuning?.timing?.matchSlopMs || this.proximityMatchSlopMs);
+      if (Number(other.endsAt) + slop <= now) continue;
+      return true;
+    }
+    return false;
+  }
+
   failUnmatchedProximitySession(sessionId) {
     const session = this.proximitySessions.get(sessionId);
     if (!session) return;
+    // Last-chance evaluation before failing anyone: a match deferred on another
+    // cohort's pending telemetry must either be vetoed by the bumps known now
+    // or activated — deferral may never convert an eligible pair into a fail.
+    this.tryMatchProximitySession(session, { force: true });
+    if (!this.proximitySessions.has(sessionId)) return;
     for (const clientId of session.clients) {
       if (session.matched.has(clientId)) continue;
       const client = this.clients.get(clientId);
@@ -1257,6 +1323,9 @@ export class SignalingHub {
     clearTimeout(session.failTimer);
     this.proximitySessions.delete(sessionId);
     this.openProximitySessionIds.delete(sessionId);
+    // This session's pending telemetry may have been the only thing deferring
+    // another cohort's match — re-evaluate the survivors.
+    this.tryMatchStartedProximitySessions();
   }
 
   cancelProximitySession(sender, message) {
@@ -1271,6 +1340,9 @@ export class SignalingHub {
       this.proximitySessions.delete(sessionId);
       this.openProximitySessionIds.delete(sessionId);
     }
+    // A departure can settle another cohort's deferred match (one fewer pending
+    // telemetry to wait for) — re-evaluate.
+    this.tryMatchStartedProximitySessions();
   }
 
   activatePair(sender, target, pairingId) {
@@ -1820,11 +1892,26 @@ function bumpTimeOf(entry) {
   return Number(entry.timing?.bumpAt || entry.receivedAt);
 }
 
-function hasCloserBumpPartner(session, a, b, delta) {
+function hasCloserBumpPartner(session, a, b, delta, foreignBumpTimes = []) {
   for (const entry of session.telemetry.values()) {
     if (entry.clientId === a.clientId || entry.clientId === b.clientId) continue;
     if (session.matched.has(entry.clientId)) continue;
     const bump = bumpTimeOf(entry);
+    if (!Number.isFinite(bump)) continue;
+    if (Math.abs(bumpTimeOf(a) - bump) + BUMP_PARTNER_VETO_MARGIN_MS <= delta
+      || Math.abs(bumpTimeOf(b) - bump) + BUMP_PARTNER_VETO_MARGIN_MS <= delta) {
+      return true;
+    }
+  }
+  // Bumps reported to OTHER concurrent cohorts veto exactly like same-cohort
+  // bumps. Two pairs tapping together can be split across cohorts CROSSED
+  // (cohorts fill by arrival order), and the crossed pair inside one cohort is
+  // formally reciprocal with a bump delta inside matchSlop — while each phone's
+  // TRUE partner, whose bump landed within jitter of it, is only visible in the
+  // other cohort's telemetry. A tight genuine pair (delta < margin) can never
+  // be vetoed by this: the foreign bump would have to be ≥700ms closer than an
+  // already sub-700ms delta.
+  for (const bump of foreignBumpTimes) {
     if (!Number.isFinite(bump)) continue;
     if (Math.abs(bumpTimeOf(a) - bump) + BUMP_PARTNER_VETO_MARGIN_MS <= delta
       || Math.abs(bumpTimeOf(b) - bump) + BUMP_PARTNER_VETO_MARGIN_MS <= delta) {
@@ -1839,6 +1926,16 @@ function hasReciprocalAcousticEvidence(session, first, second) {
   const secondSignature = session.signatures?.get(second.clientId);
   const firstDetection = acousticDetectionFor(first.analysis, secondSignature);
   const secondDetection = acousticDetectionFor(second.analysis, firstSignature);
+  // The winner-margin gate assumes the runner-up decode is noise or a relay
+  // artifact — true only in a 2-device session. In a bigger cohort every
+  // participant shares ONE band, so the runner-up is a REAL phone a couple of
+  // meters away and healthy top decodes routinely separate by less than the
+  // threshold (field, 4-device cohort: partner 0.352 vs other pair's phone
+  // 0.324 = margin 0.028 < 0.04 — it killed the only reciprocal true pair and
+  // failed the whole cohort). Partner identity in multi-device cohorts is
+  // carried by top-decode reciprocity plus the bump-partner veto, so the
+  // margin gate applies to 2-device cohorts only.
+  const requireWinnerMargin = proximityCohortSize(session) <= 2;
   return Boolean(firstSignature && secondSignature
     && first.analysis?.acousticSignatureId === firstSignature
     && second.analysis?.acousticSignatureId === secondSignature
@@ -1846,8 +1943,20 @@ function hasReciprocalAcousticEvidence(session, first, second) {
     && second.analysis?.heardAcousticSignatureId === firstSignature
     && hasUsableAcousticDetection(firstDetection)
     && hasUsableAcousticDetection(secondDetection)
-    && hasSufficientWinnerMargin(first.analysis)
-    && hasSufficientWinnerMargin(second.analysis));
+    && (!requireWinnerMargin
+      || (hasSufficientWinnerMargin(first.analysis) && hasSufficientWinnerMargin(second.analysis))));
+}
+
+// Cohort size at ceremony start: signatures is written once per participant at
+// start and never shrinks, so it stays correct even after mid-ceremony
+// disconnects temporarily shrink session.clients (a 4-phone recording made in a
+// 4-phone room keeps 4-phone margin physics no matter who left since).
+function proximityCohortSize(session) {
+  return Math.max(
+    Number(session.signatures?.size || 0),
+    Number(session.clients?.size || 0),
+    Number(session.telemetry?.size || 0)
+  );
 }
 
 // Fail safe: a missing or non-finite margin is treated as a failed winner-margin
