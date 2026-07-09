@@ -1,6 +1,6 @@
-import { AcousticProximitySensor, MIN_INAUDIBLE_FREQUENCY_HZ } from "./acoustic-proximity.js?v=1.0.109";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.109";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.109";
+import { AcousticProximitySensor, MIN_INAUDIBLE_FREQUENCY_HZ } from "./acoustic-proximity.js?v=1.0.110";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.110";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.110";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 export const BUMP_SCORE_POINTS = 20;
@@ -171,6 +171,19 @@ export class ProximityEngine {
       return Number(snapshot?.samples) > 0 ? Boolean(snapshot.bump) : true;
     };
     await waitUntil(startAt);
+    // Discard any motion accumulated BEFORE the ceremony window opened. The
+    // controller starts motion capture at permission-resolve time — well before
+    // startAt — and the snapshot LATCHES bump/tilt (`bump ||= …`). So tapping
+    // Connect, picking up, or repositioning the phone during the pre-ceremony /
+    // ready-start handshake window would otherwise stamp a false bump that
+    // survives to the end. On a fresh first connect a motion-permission prompt
+    // masks this (natural pause + a real bump); on the 2nd device or a reconnect
+    // permissions are cached, so the Connect-tap jolt lands right before the
+    // window and the pair "connected" with bump=true despite never bumping.
+    // Resetting exactly at startAt makes bump AND tilt require a real event
+    // DURING the guided window (the staged UI prompts "Bump now" here). The
+    // listener stays attached, so samples re-accumulate immediately.
+    this.motion.reset?.();
     onProgress({ phase: "audio", state: acoustic ? "active" : "unavailable" });
     const acousticResult = acoustic
       ? acousticPlan?.length && acousticSignatureId

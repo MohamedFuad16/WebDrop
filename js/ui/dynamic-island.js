@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.109";
-import { Emitter } from "../utils/emitter.js?v=1.0.109";
-import { formatBytes } from "../utils/format.js?v=1.0.109";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.109";
-import { TileWave } from "./tile-wave.js?v=1.0.109";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.110";
+import { Emitter } from "../utils/emitter.js?v=1.0.110";
+import { formatBytes } from "../utils/format.js?v=1.0.110";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.110";
+import { TileWave } from "./tile-wave.js?v=1.0.110";
 
 // Monotonic ceremony stage ladder shown in the island during pairing. Replaces
 // the old permissions/audio/bump/tilt checklist with a single staged status line

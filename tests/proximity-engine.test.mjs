@@ -117,6 +117,60 @@ test("a real ceremony passes once ultrasound, bump, and tilt are all present", a
   assert.equal(result.passed, true);
 });
 
+test("a bump latched before the window opens is discarded at startAt", async () => {
+  // Regression: motion capture starts at permission-resolve time (before
+  // startAt) and the snapshot latches bump. Handling the phone during the
+  // pre-ceremony / handshake window — the Connect tap on the 2nd device or on a
+  // reconnect — stamped a false bump that survived the whole ceremony, so pairs
+  // "connected" without ever bumping. The engine now resets motion at startAt,
+  // so only a bump DURING the guided window counts.
+  const acoustic = {
+    async emitChirp() {
+      return { emitted: true };
+    },
+    async detectChirp() {
+      return { detected: true, correlation: 0.84, band: { marginDb: 31 } };
+    }
+  };
+  const plan = [
+    { id: "self-signature", startFrequencyHz: 17800, endFrequencyHz: 18300 },
+    { id: "peer-signature", startFrequencyHz: 18300, endFrequencyHz: 18800 }
+  ];
+  // reset() flips the mock from its pre-window state to its in-window state,
+  // exactly as MotionProximitySensor.reset() clears the latch when the engine
+  // calls it at startAt. bumpBeforeReset = a phantom handling bump; bumpAfterReset
+  // = a real bump made during the window.
+  const windowedMotion = ({ bumpBeforeReset, bumpAfterReset }) => {
+    let didReset = false;
+    return {
+      reset() {
+        didReset = true;
+      },
+      stopCapture() {},
+      getSnapshot() {
+        const bump = didReset ? bumpAfterReset : bumpBeforeReset;
+        return { bump, tilted: true, samples: 4, bumpAt: bump ? Date.now() : null };
+      }
+    };
+  };
+  const run = (motionOpts) =>
+    new ProximityEngine({ enabled: true, acoustic, motion: windowedMotion(motionOpts) }).runRealCeremony({
+      acousticPlan: plan,
+      acousticSignatureId: "self-signature",
+      acousticOptions: { intervalMs: 500 },
+      startAt: Date.now() + 5,
+      ceremonyDurationMs: 840
+    });
+
+  const phantom = await run({ bumpBeforeReset: true, bumpAfterReset: false });
+  assert.equal(phantom.metrics.bump, false, "a bump latched before startAt must be discarded");
+  assert.equal(phantom.passed, false, "no real in-window bump → ceremony fails locally");
+
+  const real = await run({ bumpBeforeReset: true, bumpAfterReset: true });
+  assert.equal(real.metrics.bump, true, "a bump during the window is captured");
+  assert.equal(real.passed, true, "ultrasound + in-window bump + tilt → pass");
+});
+
 test("a ceremony on the low acoustic lanes (17.8-18.8kHz) still emits and passes", async () => {
   // Regression for the lane-0/1 filter fossil: normalizeAcousticPlan used to
   // drop every signature starting below 18_500Hz, silencing the two lowest of
