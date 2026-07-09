@@ -351,8 +351,14 @@
 }
 
 .webdrop-island__wave {
-  position: relative;
+  /* Absolutely bound to the flow box: as an in-flow grid child the canvas's
+     auto row was sized by the canvas's own intrinsic aspect-ratio, which
+     TileWave.resize() rewrites from the measured rect — a feedback loop that
+     let the canvas outgrow the 116px flow and paint the tile band down over
+     the transfer file name. */
+  position: absolute;
   z-index: 1;
+  inset: 0;
   width: 100%;
   height: 100%;
   opacity: 1;
@@ -375,7 +381,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  padding: 4px 6px 8px;
+  /* 4px bottom (was 8px): keeps the file name pushed low, clear of the tile
+     band that sweeps across the vertical middle of the flow. */
+  padding: 4px 6px 4px;
   opacity: 0;
   transform: translateY(8px) scale(.96);
   transition: opacity 240ms ease, transform 320ms var(--ease-out);

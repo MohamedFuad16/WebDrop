@@ -37,8 +37,16 @@ let sw = null
 let scope = ''
 
 function registerWorker() {
+  // WebDrop fix: getRegistration('./') also matches the app's root-scope
+  // service worker (registered on production hosts), which would swallow the
+  // download stream and leave the save silently dead. Only reuse a
+  // registration whose scope is exactly this directory; otherwise register
+  // StreamSaver's own worker.
+  const ownScope = new URL('./', location.href).href
   return navigator.serviceWorker.getRegistration('./').then(swReg => {
-    return swReg || navigator.serviceWorker.register('sw.js', { scope: './' })
+    return (swReg && swReg.scope === ownScope)
+      ? swReg
+      : navigator.serviceWorker.register('sw.js', { scope: './' })
   }).then(swReg => {
     const swRegTmp = swReg.installing || swReg.waiting
 
