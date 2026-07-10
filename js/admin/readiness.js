@@ -1,6 +1,6 @@
-import { createOperationsI18n } from "./operations-i18n.js?v=1.0.117";
-import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.117";
-import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.117";
+import { createOperationsI18n } from "./operations-i18n.js?v=1.0.118";
+import { DiagnosticsApi } from "./diagnostics-api.js?v=1.0.118";
+import { apiBaseFrom, escapeHtml, formatAge, formatFrequency, formatNumber } from "./shared.js?v=1.0.118";
 import {
   TEST_CASES,
   createTestRun,
@@ -8,9 +8,9 @@ import {
   stopTestRun,
   summarizeTestRun,
   validateAssignments
-} from "./test-runs.js?v=1.0.117";
+} from "./test-runs.js?v=1.0.118";
 
-const APP_VERSION = "1.0.117";
+const APP_VERSION = "1.0.118";
 const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
 const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
 const POLL_INTERVAL_MS = 1000;
@@ -22,7 +22,7 @@ const MONITOR_END_HZ = 19_800;
 // remote operators paste it once (kept only in sessionStorage, never committed).
 const ADMIN_TOKEN_STORAGE_KEY = "webdrop.adminToken";
 const TEST_RUN_STORAGE_KEY = "webdrop.adminTestRuns.v1";
-const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.117", import.meta.url);
+const LOCAL_ADMIN_TOKEN_URL = new URL("../config/local-admin-token.js?v=1.0.118", import.meta.url);
 
 const ADMIN_MESSAGES = {
   en: {

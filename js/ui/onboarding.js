@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.117";
+import { Emitter } from "../utils/emitter.js?v=1.0.118";
 
 // Keep in lockstep with the bump keyframes in onboarding.css: the cycle is
 // 2.8s and the avatars touch at 32% of it — that's when the thud plays.
@@ -78,6 +78,10 @@ export class OnboardingTour extends Emitter {
     this.root.getBoundingClientRect();
     this.root.dataset.open = "true";
     this.resetStartSwipe?.();
+    // A leaked loop from a previous open would otherwise survive here,
+    // because activeSlide is force-reset below and syncDots only toggles the
+    // loop on slide CHANGES.
+    this.stopBumpLoop();
     this.nodes.track.scrollTo({ left: 0, behavior: "instant" });
     this.activeSlide = 0;
     this.renderDots(0);
@@ -134,6 +138,10 @@ export class OnboardingTour extends Emitter {
   }
 
   syncDots() {
+    // A smooth dot-click scroll keeps emitting scroll events through the
+    // close outro; reacting to one after close would arm the bump loop on a
+    // hidden dialog with nothing left to ever stop it.
+    if (!this.root.dataset.open) return;
     const track = this.nodes.track;
     const width = track.clientWidth || 1;
     const index = Math.max(0, Math.min(this.slideCount - 1, Math.round(track.scrollLeft / width)));
