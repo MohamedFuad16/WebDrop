@@ -196,16 +196,21 @@
       <section class="onboarding" data-onboarding hidden role="dialog" aria-modal="true" aria-label="How to use WebDrop" data-i18n-aria="howToUse" tabindex="-1">
         <div class="onboarding__backdrop" data-onboarding-backdrop></div>
         <div class="onboarding__card" data-onboarding-card>
+          <span class="sheet-handle" aria-hidden="true"></span>
           <button class="onboarding__close" type="button" data-onboarding-close aria-label="Close guide" data-i18n-aria="onboardingClose">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg>
           </button>
           <div class="onboarding__track" data-onboarding-track>
             <article class="onboarding__slide">
               <div class="onboarding__scene onboarding__scene--welcome" aria-hidden="true">
-                <img class="onboarding__mark" src="assets/icons/webdrop-mark.svg" alt="">
-                <img class="onboarding__floater onboarding__floater--a" src="assets/icons/avatars/user-01.png" alt="">
-                <img class="onboarding__floater onboarding__floater--b" src="assets/icons/avatars/user-03.png" alt="">
-                <img class="onboarding__floater onboarding__floater--c" src="assets/icons/avatars/user-05.png" alt="">
+                <span class="onboarding__orbit">
+                  <svg class="onboarding__orbit-ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="57"></circle></svg>
+                  <svg class="onboarding__orbit-ring onboarding__orbit-ring--inner" viewBox="0 0 120 120"><circle cx="60" cy="60" r="57"></circle></svg>
+                  <img class="onboarding__orbit-self" src="assets/icons/avatars/user-07.png" alt="">
+                  <img class="onboarding__orbiter onboarding__orbiter--a" src="assets/icons/avatars/user-01.png" alt="">
+                  <img class="onboarding__orbiter onboarding__orbiter--b" src="assets/icons/avatars/user-03.png" alt="">
+                  <img class="onboarding__orbiter onboarding__orbiter--c" src="assets/icons/avatars/user-05.png" alt="">
+                </span>
               </div>
               <h2 data-i18n="onboardingWelcomeTitle">Welcome to WebDrop</h2>
               <p data-i18n="onboardingWelcomeCopy">Share files with the phones around you — no accounts, no cables, no cloud.</p>
@@ -214,6 +219,7 @@
             <article class="onboarding__slide">
               <div class="onboarding__scene onboarding__scene--bump" aria-hidden="true">
                 <span class="onboarding__ripple"></span>
+                <span class="onboarding__ripple onboarding__ripple--echo"></span>
                 <img class="onboarding__bumper onboarding__bumper--left" src="assets/icons/avatars/user-02.png" alt="">
                 <img class="onboarding__bumper onboarding__bumper--right" src="assets/icons/avatars/user-04.png" alt="">
               </div>
@@ -224,23 +230,26 @@
               <div class="onboarding__scene onboarding__scene--qr" aria-hidden="true">
                 <span class="onboarding__qr">
                   <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                  <img class="onboarding__qr-avatar" src="assets/icons/avatars/user-06.png" alt="">
                 </span>
                 <span class="onboarding__beam"></span>
               </div>
               <h2 data-i18n="onboardingQrTitle">Or scan a QR</h2>
-              <p data-i18n="onboardingQrCopy">No bump handy? Show a QR code on one phone and scan it with the other — same secure connection.</p>
+              <p data-i18n="onboardingQrCopy">No bump handy? Show a QR code on one phone and scan it with the other — every code is unique to you, same secure connection.</p>
             </article>
             <article class="onboarding__slide">
               <div class="onboarding__scene onboarding__scene--send" aria-hidden="true">
-                <span class="onboarding__file"><i></i><i></i><i></i></span>
+                <span class="onboarding__file onboarding__file--left"><i></i><i></i><i></i></span>
+                <span class="onboarding__file onboarding__file--right"><i></i><i></i><i></i></span>
                 <span class="onboarding__tiles"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+                <span class="onboarding__send-pct">100%</span>
               </div>
               <h2 data-i18n="onboardingSendTitle">Send anything</h2>
-              <p data-i18n="onboardingSendCopy">Pick your files and swipe up to send. Watch the tiles fill as they fly across — and chat while you wait.</p>
+              <p data-i18n="onboardingSendCopy">Pick your files, swipe up, and watch them race to 100% — phone to phone, encrypted, never through a cloud.</p>
             </article>
             <article class="onboarding__slide onboarding__slide--start">
               <div class="onboarding__scene onboarding__scene--start" aria-hidden="true">
-                <img class="onboarding__mark onboarding__mark--glow" src="assets/icons/webdrop-mark.svg" alt="">
+                <img class="onboarding__mark onboarding__mark--glow" src="assets/icons/webdrop-icon.webp" alt="">
               </div>
               <h2 data-i18n="onboardingReadyTitle">You're ready</h2>
               <p data-i18n="onboardingReadyCopy">Grab a friend, tap Connect, and bump.</p>
@@ -408,7 +417,7 @@
         </button>
         <div class="app-version">
           <span data-i18n="appVersion">App version</span>
-          <strong>1.0.116</strong>
+          <strong>1.0.117</strong>
         </div>
       </section>
 
@@ -508,8 +517,8 @@
       <input data-file-input type="file" multiple hidden>
     </div>
 
-    <script src="js/vendor/jsqr.js?v=1.0.116"></script>
-    <script src="js/config/runtime-config.js?v=1.0.116"></script>
-    <script type="module" src="js/app.js?v=1.0.116"></script>
+    <script src="js/vendor/jsqr.js?v=1.0.117"></script>
+    <script src="js/config/runtime-config.js?v=1.0.117"></script>
+    <script type="module" src="js/app.js?v=1.0.117"></script>
   </body>
 </html>

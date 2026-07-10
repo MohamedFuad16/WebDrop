@@ -1,6 +1,6 @@
-/* "How to use WebDrop" tour: how-to FAB + swipeable card carousel.
-   Never auto-shown — opened only from the FAB. Matches the bottom-sheet
-   design language (panel tokens, 22-28px radii, --card-shadow). */
+/* "How to use WebDrop" tour: how-to FAB + swipeable card carousel presented
+   as a bottom sheet (same tokens/motion as .bottom-sheet in sheets.css).
+   Never auto-shown — opened only from the FAB. */
 
 .howto-fab {
   position: fixed;
@@ -43,9 +43,10 @@
   inset: 0;
   z-index: 80;
   display: grid;
-  place-items: center;
-  padding: 18px;
-  padding-bottom: calc(18px + var(--safe-bottom));
+  align-items: end;
+  justify-items: center;
+  padding: 16px;
+  padding-bottom: calc(16px + var(--safe-bottom));
 }
 
 .onboarding__backdrop {
@@ -53,19 +54,57 @@
   inset: 0;
   background: color-mix(in srgb, var(--shadow-ink) 46%, transparent);
   backdrop-filter: blur(10px);
+  opacity: 0;
+  transition: opacity var(--motion-backdrop-out) linear;
 }
 
+.onboarding[data-open="true"] .onboarding__backdrop {
+  opacity: 1;
+  transition-duration: var(--motion-backdrop-in);
+}
+
+/* Slides up from the bottom edge exactly like .bottom-sheet: same offsets,
+   radii, blur, and motion tokens, so the tour reads as one of the app's
+   sheets rather than a centered dialog. */
 .onboarding__card {
   position: relative;
-  width: min(420px, 100%);
+  width: min(430px, 100%);
   display: grid;
   gap: 10px;
-  padding: 18px 0 16px;
-  border: 1px solid var(--line);
-  border-radius: 28px;
-  background: var(--panel-solid);
-  box-shadow: var(--card-shadow);
+  padding: 14px 0 16px;
+  border: 1px solid var(--composer-border);
+  border-radius: 34px;
+  background: var(--composer);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(30px);
   overflow: hidden;
+  transform: translateY(calc(100% + 40px));
+  transform-origin: 50% 100%;
+  transition: transform var(--motion-sheet-out) var(--ease-in);
+}
+
+.onboarding[data-open="true"] .onboarding__card {
+  transform: translateY(0);
+  transition: transform var(--motion-sheet-in) var(--ease-out);
+}
+
+.onboarding__card .sheet-handle {
+  margin-bottom: 0;
+}
+
+@media (max-width: 759px) {
+  .onboarding {
+    padding: 0;
+  }
+
+  .onboarding__card {
+    width: 100%;
+    padding-bottom: calc(18px + var(--safe-bottom));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 30px 30px 0 0;
+  }
 }
 
 .onboarding__close {
@@ -156,25 +195,77 @@
 }
 
 .onboarding__mark {
-  width: 74px;
-  height: 74px;
+  width: 88px;
+  height: 88px;
 }
 
 .onboarding__mark--glow {
   filter: drop-shadow(0 10px 26px color-mix(in srgb, var(--blue) 44%, transparent));
 }
 
-.onboarding__floater {
-  position: absolute;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  box-shadow: 0 10px 20px color-mix(in srgb, var(--shadow-ink) 22%, transparent);
+/* Welcome: a miniature of the real orbit UI — dashed rings, "you" in the
+   middle, nearby peers riding the rings (same rotate/counter-rotate trick
+   as .peer-node in orbit.css so avatars stay upright). */
+.onboarding__orbit {
+  position: relative;
+  width: 136px;
+  height: 136px;
+  display: grid;
+  place-items: center;
 }
 
-.onboarding__floater--a { top: 12px; left: 18%; }
-.onboarding__floater--b { top: 64px; right: 14%; width: 52px; height: 52px; }
-.onboarding__floater--c { bottom: 4px; left: 30%; width: 38px; height: 38px; }
+.onboarding__orbit-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  border-radius: 999px;
+  opacity: .78;
+}
+
+.onboarding__orbit-ring circle {
+  fill: none;
+  stroke: color-mix(in srgb, var(--purple) 56%, var(--ink) 8%);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-dasharray: 10 6 3 5 8 6;
+}
+
+.onboarding__orbit-ring--inner {
+  inset: 21%;
+  width: 58%;
+  height: 58%;
+}
+
+.onboarding__orbit-ring--inner circle {
+  stroke: color-mix(in srgb, var(--mint) 66%, var(--ink) 8%);
+  stroke-dasharray: 7 5 12 6;
+}
+
+.onboarding__orbit-self {
+  position: relative;
+  z-index: 2;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--shadow-ink) 24%, transparent);
+}
+
+.onboarding__orbiter {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow-ink) 22%, transparent);
+  transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(var(--orbit-r) * -1)) rotate(calc(var(--angle) * -1));
+}
+
+.onboarding__orbiter--a { --angle: -35deg; --orbit-r: 68px; }
+.onboarding__orbiter--b { --angle: 130deg; --orbit-r: 68px; }
+.onboarding__orbiter--c { --angle: 235deg; --orbit-r: 40px; width: 29px; height: 29px; }
 
 .onboarding__bumper {
   position: absolute;
@@ -201,7 +292,12 @@
   transform: translate(-50%, -50%);
 }
 
+.onboarding__ripple--echo {
+  border-width: 1.5px;
+}
+
 .onboarding__qr {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, 26px);
   gap: 7px;
@@ -225,6 +321,18 @@
   background: var(--blue);
 }
 
+/* Your profile sits at the QR's center — each code is unique to its owner. */
+.onboarding__qr-avatar {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2.5px solid var(--panel-solid);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--shadow-ink) 26%, transparent);
+}
+
 .onboarding__beam {
   position: absolute;
   left: 50%;
@@ -236,18 +344,19 @@
   transform: translateX(-50%);
 }
 
+/* Send: a file on each side, the tiles-as-progress-bar racing 0→100%
+   between them, and a "100%" chip that pops when the run completes. */
 .onboarding__file {
   position: absolute;
-  top: 22px;
-  left: 50%;
-  width: 78px;
+  top: 50%;
+  width: 68px;
   display: grid;
   gap: 7px;
   padding: 13px 12px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: color-mix(in srgb, var(--ink) 4%, transparent);
-  transform: translateX(-50%);
+  transform: translateY(-50%);
 }
 
 .onboarding__file i {
@@ -261,21 +370,40 @@
   background: var(--blue);
 }
 
+.onboarding__file--left { left: 6%; }
+.onboarding__file--right { right: 6%; }
+
+.onboarding__file--right i:first-child {
+  background: var(--mint);
+}
+
 .onboarding__tiles {
   position: absolute;
-  bottom: 26px;
+  top: calc(50% - 6px);
   left: 50%;
   display: grid;
   grid-auto-flow: column;
-  gap: 6px;
+  gap: 5px;
   transform: translateX(-50%);
 }
 
 .onboarding__tiles i {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 5px;
   background: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+.onboarding__send-pct {
+  position: absolute;
+  top: calc(50% + 16px);
+  left: 50%;
+  transform: translateX(-50%) scale(.7);
+  color: var(--mint);
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  opacity: 0;
 }
 
 /* --- Start swipe + dots -------------------------------------------------- */
@@ -311,71 +439,113 @@
 /* --- Motion -------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: no-preference) {
-  .onboarding__floater {
-    animation: onboardingFloat 4.2s ease-in-out infinite;
+  .onboarding__orbiter {
+    animation: onboardingOrbit 20s linear infinite;
   }
 
-  .onboarding__floater--b { animation-delay: -1.4s; }
-  .onboarding__floater--c { animation-delay: -2.6s; }
+  .onboarding__orbiter--c {
+    animation-duration: 14s;
+    animation-direction: reverse;
+  }
 
+  .onboarding__orbit-ring {
+    animation: onboardingRingDrift 46s linear infinite;
+  }
+
+  .onboarding__orbit-ring--inner {
+    animation-direction: reverse;
+  }
+
+  /* Bump cycle is 2.8s with contact at ~32% — onboarding.js schedules the
+     bump sound off these numbers, so keep them in lockstep. */
   .onboarding__bumper--left {
-    animation: onboardingBumpLeft 2.6s var(--ease-out) infinite;
+    animation: onboardingBumpLeft 2.8s ease-in-out infinite;
   }
 
   .onboarding__bumper--right {
-    animation: onboardingBumpRight 2.6s var(--ease-out) infinite;
+    animation: onboardingBumpRight 2.8s ease-in-out infinite;
   }
 
   .onboarding__ripple {
-    animation: onboardingRipple 2.6s ease-out infinite;
+    animation: onboardingRipple 2.8s cubic-bezier(.2, .55, .3, 1) infinite;
+  }
+
+  .onboarding__ripple--echo {
+    animation-name: onboardingRippleEcho;
   }
 
   .onboarding__beam {
     animation: onboardingBeam 2.4s ease-in-out infinite;
   }
 
-  .onboarding__file {
-    animation: onboardingFileDrop 3s var(--ease-out) infinite;
+  .onboarding__file--left {
+    animation: onboardingFileSend 3s var(--ease) infinite;
+  }
+
+  .onboarding__file--right {
+    animation: onboardingFileReceive 3s var(--ease) infinite;
   }
 
   .onboarding__tiles i {
     animation: onboardingTileFill 3s ease-in-out infinite;
   }
 
-  .onboarding__tiles i:nth-child(2) { animation-delay: .12s; }
-  .onboarding__tiles i:nth-child(3) { animation-delay: .24s; }
-  .onboarding__tiles i:nth-child(4) { animation-delay: .36s; }
-  .onboarding__tiles i:nth-child(5) { animation-delay: .48s; }
-  .onboarding__tiles i:nth-child(6) { animation-delay: .6s; }
-  .onboarding__tiles i:nth-child(7) { animation-delay: .72s; }
-  .onboarding__tiles i:nth-child(8) { animation-delay: .84s; }
+  .onboarding__tiles i:nth-child(2) { animation-delay: .05s; }
+  .onboarding__tiles i:nth-child(3) { animation-delay: .1s; }
+  .onboarding__tiles i:nth-child(4) { animation-delay: .15s; }
+  .onboarding__tiles i:nth-child(5) { animation-delay: .2s; }
+  .onboarding__tiles i:nth-child(6) { animation-delay: .25s; }
+  .onboarding__tiles i:nth-child(7) { animation-delay: .3s; }
+  .onboarding__tiles i:nth-child(8) { animation-delay: .35s; }
+
+  .onboarding__send-pct {
+    animation: onboardingSendPct 3s var(--ease-out) infinite;
+  }
 
   .onboarding__mark--glow {
     animation: onboardingGlow 2.8s ease-in-out infinite;
   }
 }
 
-@keyframes onboardingFloat {
-  0%, 100% { translate: 0 0; }
-  50% { translate: 0 -10px; }
+@keyframes onboardingOrbit {
+  from {
+    transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(var(--orbit-r) * -1)) rotate(calc(var(--angle) * -1));
+  }
+
+  to {
+    transform: translate(-50%, -50%) rotate(calc(var(--angle) + 360deg)) translateY(calc(var(--orbit-r) * -1)) rotate(calc((var(--angle) + 360deg) * -1));
+  }
 }
 
+@keyframes onboardingRingDrift {
+  to { rotate: 360deg; }
+}
+
+/* Approach, kiss at 32%, a soft recoil, then an unhurried glide home. */
 @keyframes onboardingBumpLeft {
-  0%, 18% { transform: translateY(-50%) translateX(-26px); }
-  38%, 46% { transform: translateY(-50%) translateX(24px) rotate(6deg); }
-  60%, 100% { transform: translateY(-50%) translateX(-26px); }
+  0%, 14% { transform: translateY(-50%) translateX(-28px); }
+  32% { transform: translateY(-50%) translateX(23px) rotate(5deg); }
+  42% { transform: translateY(-50%) translateX(13px) rotate(2deg); }
+  72%, 100% { transform: translateY(-50%) translateX(-28px); }
 }
 
 @keyframes onboardingBumpRight {
-  0%, 18% { transform: translateY(-50%) translateX(26px); }
-  38%, 46% { transform: translateY(-50%) translateX(-24px) rotate(-6deg); }
-  60%, 100% { transform: translateY(-50%) translateX(26px); }
+  0%, 14% { transform: translateY(-50%) translateX(28px); }
+  32% { transform: translateY(-50%) translateX(-23px) rotate(-5deg); }
+  42% { transform: translateY(-50%) translateX(-13px) rotate(-2deg); }
+  72%, 100% { transform: translateY(-50%) translateX(28px); }
 }
 
 @keyframes onboardingRipple {
-  0%, 36% { opacity: 0; transform: translate(-50%, -50%) scale(.4); }
-  44% { opacity: .9; }
-  74%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(5.4); }
+  0%, 32% { opacity: 0; transform: translate(-50%, -50%) scale(.3); }
+  38% { opacity: .85; }
+  82%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(4.8); }
+}
+
+@keyframes onboardingRippleEcho {
+  0%, 36% { opacity: 0; transform: translate(-50%, -50%) scale(.3); }
+  43% { opacity: .5; }
+  88%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(4); }
 }
 
 @keyframes onboardingBeam {
@@ -384,16 +554,30 @@
   50% { top: 118px; }
 }
 
-@keyframes onboardingFileDrop {
-  0%, 12% { transform: translateX(-50%) translateY(0); opacity: 1; }
-  46%, 58% { transform: translateX(-50%) translateY(56px) scale(.92); opacity: .35; }
-  76%, 100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+@keyframes onboardingFileSend {
+  0%, 8% { transform: translateY(-50%) translateX(0); }
+  20% { transform: translateY(-50%) translateX(9px) scale(.96); }
+  46%, 100% { transform: translateY(-50%) translateX(0); }
 }
 
+@keyframes onboardingFileReceive {
+  0%, 38% { transform: translateY(-50%) scale(1); }
+  50% { transform: translateY(-50%) scale(1.08); }
+  64%, 100% { transform: translateY(-50%) scale(1); }
+}
+
+/* Tiles sprint to full in ~.5s (plus the .35s stagger), hold, then reset —
+   the whole 0→100% run reads in under a second. */
 @keyframes onboardingTileFill {
-  0%, 30% { background: color-mix(in srgb, var(--ink) 14%, transparent); }
-  55%, 80% { background: var(--blue); }
-  100% { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+  0%, 8% { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+  16%, 74% { background: var(--blue); }
+  86%, 100% { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+}
+
+@keyframes onboardingSendPct {
+  0%, 26% { opacity: 0; transform: translateX(-50%) scale(.7); }
+  36%, 68% { opacity: 1; transform: translateX(-50%) scale(1); }
+  80%, 100% { opacity: 0; transform: translateX(-50%) scale(.9); }
 }
 
 @keyframes onboardingGlow {
@@ -404,4 +588,9 @@
 @media (max-width: 360px) {
   .onboarding__scene { height: 128px; }
   .onboarding__slide h2 { font-size: 18px; }
+  .onboarding__file { width: 58px; padding: 11px 10px; }
+  .onboarding__file--left { left: 2%; }
+  .onboarding__file--right { right: 2%; }
+  .onboarding__tiles { gap: 4px; }
+  .onboarding__tiles i { width: 10px; height: 10px; }
 }

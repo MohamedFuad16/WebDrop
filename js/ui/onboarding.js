@@ -1,11 +1,17 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.116";
+import { Emitter } from "../utils/emitter.js?v=1.0.117";
 
-// "How to use WebDrop" guided tour: a swipeable card carousel in the app's
-// sheet design language. NEVER auto-shown — it opens only from the how-to FAB
-// (bottom-left), so the feature ships disabled by default. The final slide
-// deliberately reuses the app's swipe-control gesture (with a synthesized
-// start chime) instead of a plain button: finishing the guide rehearses the
-// same muscle memory the send flow uses.
+// Keep in lockstep with the bump keyframes in onboarding.css: the cycle is
+// 2.8s and the avatars touch at 32% of it — that's when the thud plays.
+const BUMP_CYCLE_MS = 2800;
+const BUMP_CONTACT_MS = Math.round(BUMP_CYCLE_MS * 0.32);
+
+// "How to use WebDrop" guided tour: a swipeable card carousel presented as a
+// bottom sheet (same slide-up motion as the app's other sheets). NEVER
+// auto-shown — it opens only from the how-to FAB (bottom-left), so the
+// feature ships disabled by default. The final slide deliberately reuses the
+// app's swipe-control gesture (with a synthesized start chime) instead of a
+// plain button: finishing the guide rehearses the same muscle memory the
+// send flow uses.
 export class OnboardingTour extends Emitter {
   constructor(document, { translate, bindSwipe } = {}) {
     super();
@@ -18,15 +24,20 @@ export class OnboardingTour extends Emitter {
       dots: this.root?.querySelector("[data-onboarding-dots]"),
       close: this.root?.querySelector("[data-onboarding-close]"),
       backdrop: this.root?.querySelector("[data-onboarding-backdrop]"),
+      bumpScene: this.root?.querySelector(".onboarding__scene--bump"),
       swipeControl: this.root?.querySelector("[data-onboarding-swipe]"),
       swipeThumb: this.root?.querySelector("[data-onboarding-swipe-thumb]"),
       swipeText: this.root?.querySelector("[data-onboarding-swipe-text]")
     };
     this.previousFocus = null;
     this.audioContext = null;
+    this.activeSlide = 0;
     this.dotSyncFrame = 0;
     this.dotSyncTimer = 0;
     this.finishTimer = 0;
+    this.hideTimer = 0;
+    this.bumpTimer = 0;
+    this.bumpInterval = 0;
     if (!this.root || !this.nodes.track) return;
     this.slideCount = this.nodes.track.children.length;
     this.renderDots(0);
@@ -55,11 +66,20 @@ export class OnboardingTour extends Emitter {
   open() {
     if (!this.root) return;
     globalThis.clearTimeout(this.finishTimer);
+    globalThis.clearTimeout(this.hideTimer);
     this.previousFocus = this.document.activeElement;
     this.root.hidden = false;
+    // The FAB tap is a user gesture — unlock audio now so the bump thud on
+    // slide 2 (reached by scrolling, which is not always an activation) and
+    // the finish chime are both allowed to play.
+    this.ensureAudioContext();
+    // Force a style flush between un-hiding and data-open so the card
+    // actually transitions up from the bottom instead of popping in place.
+    this.root.getBoundingClientRect();
     this.root.dataset.open = "true";
     this.resetStartSwipe?.();
     this.nodes.track.scrollTo({ left: 0, behavior: "instant" });
+    this.activeSlide = 0;
     this.renderDots(0);
     // Scroll events can be throttled or swallowed entirely (embedded webviews,
     // backgrounded tabs), so a low-rate poll keeps the dots honest while open;
@@ -70,12 +90,18 @@ export class OnboardingTour extends Emitter {
   }
 
   close() {
-    if (!this.root || this.root.hidden) return;
+    if (!this.root || this.root.hidden || !this.root.dataset.open) return;
     globalThis.clearTimeout(this.finishTimer);
     globalThis.clearInterval(this.dotSyncTimer);
     this.dotSyncTimer = 0;
+    this.stopBumpLoop();
+    // Dropping data-open slides the card back down and fades the backdrop;
+    // hide the dialog only after that outro has played.
     delete this.root.dataset.open;
-    this.root.hidden = true;
+    globalThis.clearTimeout(this.hideTimer);
+    this.hideTimer = globalThis.setTimeout(() => {
+      this.root.hidden = true;
+    }, 320);
     if (this.previousFocus?.focus && this.document.contains(this.previousFocus)) {
       this.previousFocus.focus({ preventScroll: true });
     }
@@ -83,7 +109,8 @@ export class OnboardingTour extends Emitter {
   }
 
   // Called when the final slide's swipe completes: reward the gesture (chime +
-  // haptic), let the filled track read for a beat, then dismiss.
+  // haptic), let the filled "Let's go!" track read for a beat, then glide the
+  // sheet away (close() animates the outro, so the whole exit is one motion).
   finish() {
     this.playStartChime();
     try {
@@ -92,7 +119,7 @@ export class OnboardingTour extends Emitter {
       // Haptics are a garnish.
     }
     globalThis.clearTimeout(this.finishTimer);
-    this.finishTimer = globalThis.setTimeout(() => this.close(), 650);
+    this.finishTimer = globalThis.setTimeout(() => this.close(), 420);
   }
 
   // rAF only COALESCES bursty scroll events; the open() poll calls syncDots()
@@ -109,7 +136,13 @@ export class OnboardingTour extends Emitter {
   syncDots() {
     const track = this.nodes.track;
     const width = track.clientWidth || 1;
-    this.renderDots(Math.max(0, Math.min(this.slideCount - 1, Math.round(track.scrollLeft / width))));
+    const index = Math.max(0, Math.min(this.slideCount - 1, Math.round(track.scrollLeft / width)));
+    if (index !== this.activeSlide) {
+      this.activeSlide = index;
+      if (index === 1) this.startBumpLoop();
+      else this.stopBumpLoop();
+    }
+    this.renderDots(index);
   }
 
   renderDots(activeIndex) {
@@ -132,15 +165,94 @@ export class OnboardingTour extends Emitter {
     });
   }
 
+  // While the bump slide is front and center, play the thud each time the
+  // avatars touch. The CSS animations are rewound to phase zero first so the
+  // sound and the collision stay in sync no matter when the slide is reached.
+  startBumpLoop() {
+    this.stopBumpLoop();
+    if (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    try {
+      this.nodes.bumpScene?.getAnimations?.({ subtree: true }).forEach((animation) => {
+        animation.currentTime = 0;
+      });
+    } catch {
+      // If the animations can't be rewound the loop just plays slightly
+      // out of phase — not worth breaking the slide over.
+    }
+    const thud = () => {
+      if (!this.document.hidden) this.playBumpThud();
+    };
+    this.bumpTimer = globalThis.setTimeout(() => {
+      thud();
+      this.bumpInterval = globalThis.setInterval(thud, BUMP_CYCLE_MS);
+    }, BUMP_CONTACT_MS);
+  }
+
+  stopBumpLoop() {
+    globalThis.clearTimeout(this.bumpTimer);
+    globalThis.clearInterval(this.bumpInterval);
+    this.bumpTimer = 0;
+    this.bumpInterval = 0;
+  }
+
+  ensureAudioContext() {
+    try {
+      const Ctx = globalThis.AudioContext || globalThis.webkitAudioContext;
+      if (!Ctx) return null;
+      this.audioContext ||= new Ctx();
+      if (this.audioContext.state === "suspended") this.audioContext.resume?.();
+      return this.audioContext;
+    } catch {
+      return null;
+    }
+  }
+
+  // The bump's signature sound: a low felt-mallet thud (the phones touching)
+  // followed by a tiny rising water-drop "bloop" (the ripple spreading).
+  // Synthesized on the spot and kept quiet — it plays on a loop.
+  playBumpThud() {
+    const ctx = this.ensureAudioContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const master = ctx.createGain();
+      master.gain.value = 0.09;
+      master.connect(ctx.destination);
+      const thud = ctx.createOscillator();
+      thud.type = "sine";
+      thud.frequency.setValueAtTime(150, now);
+      thud.frequency.exponentialRampToValueAtTime(58, now + 0.14);
+      const thudGain = ctx.createGain();
+      thudGain.gain.setValueAtTime(0, now);
+      thudGain.gain.linearRampToValueAtTime(1, now + 0.008);
+      thudGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+      thud.connect(thudGain);
+      thudGain.connect(master);
+      thud.start(now);
+      thud.stop(now + 0.24);
+      const drop = ctx.createOscillator();
+      drop.type = "sine";
+      drop.frequency.setValueAtTime(430, now + 0.05);
+      drop.frequency.exponentialRampToValueAtTime(980, now + 0.22);
+      const dropGain = ctx.createGain();
+      dropGain.gain.setValueAtTime(0, now + 0.05);
+      dropGain.gain.linearRampToValueAtTime(0.4, now + 0.08);
+      dropGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      drop.connect(dropGain);
+      dropGain.connect(master);
+      drop.start(now + 0.05);
+      drop.stop(now + 0.34);
+    } catch {
+      // Sound is a garnish — never let it break the flow.
+    }
+  }
+
   // A soft two-note rise (E5 -> B5) synthesized on the spot — no audio asset,
   // and it runs inside the swipe's user gesture so autoplay policies allow it.
   playStartChime() {
+    const ctx = this.ensureAudioContext();
+    if (!ctx) return;
     try {
-      const Ctx = globalThis.AudioContext || globalThis.webkitAudioContext;
-      if (!Ctx) return;
-      this.audioContext ||= new Ctx();
-      const ctx = this.audioContext;
-      if (ctx.state === "suspended") ctx.resume?.();
       const now = ctx.currentTime;
       const master = ctx.createGain();
       master.gain.value = 0.14;
