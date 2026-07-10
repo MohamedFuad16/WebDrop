@@ -16,6 +16,7 @@
   color: var(--purple);
   background: var(--composer);
   box-shadow: var(--card-shadow);
+  -webkit-backdrop-filter: blur(28px);
   backdrop-filter: blur(28px);
   cursor: pointer;
 }
@@ -34,7 +35,8 @@
   stroke-width: 1.9;
 }
 
-.app-shell[data-mode="connected"] .howto-fab {
+.app-shell[data-mode="connected"] .howto-fab,
+.app-shell[data-mode="disconnecting"] .howto-fab {
   display: none;
 }
 
@@ -53,6 +55,7 @@
   position: absolute;
   inset: 0;
   background: color-mix(in srgb, var(--shadow-ink) 46%, transparent);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   opacity: 0;
   transition: opacity var(--motion-backdrop-out) linear;
@@ -69,6 +72,10 @@
 .onboarding__card {
   position: relative;
   width: min(430px, 100%);
+  /* Landscape phones are shorter than the card's content; cap the height and
+     let the card scroll vertically (like .bottom-sheet) instead of clipping
+     the handle and close button past the top of the screen. */
+  max-height: calc(100dvh - 32px - var(--safe-top) - var(--safe-bottom));
   display: grid;
   gap: 10px;
   padding: 14px 0 16px;
@@ -76,11 +83,20 @@
   border-radius: 34px;
   background: var(--composer);
   box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(30px);
   backdrop-filter: blur(30px);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
   transform: translateY(calc(100% + 40px));
   transform-origin: 50% 100%;
   transition: transform var(--motion-sheet-out) var(--ease-in);
+}
+
+.onboarding__card::-webkit-scrollbar {
+  display: none;
 }
 
 .onboarding[data-open="true"] .onboarding__card {
@@ -99,6 +115,11 @@
 
   .onboarding__card {
     width: 100%;
+    max-height: calc(100dvh - max(12px, var(--safe-top)));
+    /* Slides pad 26px horizontally; add the notch insets on top so landscape
+       text clears the rounded corners/housing (mirrors .bottom-sheet). */
+    padding-left: var(--safe-left);
+    padding-right: var(--safe-right);
     padding-bottom: calc(18px + var(--safe-bottom));
     border-right: 0;
     border-bottom: 0;
@@ -110,14 +131,15 @@
 .onboarding__close {
   position: absolute;
   z-index: 2;
-  top: 12px;
-  right: 12px;
-  width: 34px;
-  height: 34px;
+  top: 10px;
+  right: 10px;
+  /* 44px hit target, matching .sheet-close-icon and the iOS HIG minimum. */
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 12px;
+  border-radius: 15px;
   color: var(--ink-soft);
   background: color-mix(in srgb, var(--ink) 7%, transparent);
   cursor: pointer;
@@ -588,9 +610,45 @@
   50% { transform: scale(1.06); }
 }
 
-@media (max-width: 360px) {
-  /* Shrink the orbit with the scene so orbiters never clip on small phones:
-     ring radius 56px + half a 28px avatar = 70px from center → 140px + room. */
+/* The in-app Settings motion toggle ([data-motion="paused"]) stills the tour
+   like it stills the orbit and island; onboarding.js also skips the bump
+   sound while paused. */
+.app-shell[data-motion="paused"] .onboarding__orbiter,
+.app-shell[data-motion="paused"] .onboarding__orbit-ring,
+.app-shell[data-motion="paused"] .onboarding__bumper--left,
+.app-shell[data-motion="paused"] .onboarding__bumper--right,
+.app-shell[data-motion="paused"] .onboarding__ripple,
+.app-shell[data-motion="paused"] .onboarding__beam,
+.app-shell[data-motion="paused"] .onboarding__file--left,
+.app-shell[data-motion="paused"] .onboarding__file--right,
+.app-shell[data-motion="paused"] .onboarding__tiles i,
+.app-shell[data-motion="paused"] .onboarding__send-pct,
+.app-shell[data-motion="paused"] .onboarding__mark--glow {
+  animation: none !important;
+}
+
+/* Match the bottom sheets' reduced-motion behavior (responsive.css): the
+   card fades instead of sliding. Scene animations are already gated behind
+   the no-preference block above. */
+@media (prefers-reduced-motion: reduce) {
+  .onboarding__card {
+    opacity: 0;
+    transform: none;
+    transition: opacity 80ms linear;
+  }
+
+  .onboarding[data-open="true"] .onboarding__card {
+    opacity: 1;
+    transform: none;
+    transition: opacity 80ms linear;
+  }
+}
+
+/* Small phones AND short (landscape) viewports: shrink the orbit with the
+   scene so orbiters never clip — ring radius 56px + half a 28px avatar =
+   70px from center → 140px + room. On short screens this also keeps the
+   card compact enough that little or no vertical scrolling is needed. */
+@media (max-width: 360px), (max-height: 520px) {
   .onboarding__scene { height: 150px; }
   .onboarding__orbit { width: 112px; height: 112px; }
   .onboarding__orbiter { width: 28px; height: 28px; }

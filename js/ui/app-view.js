@@ -1,10 +1,10 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.120";
-import { formatBytes } from "../utils/format.js?v=1.0.120";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.120";
-import { translate } from "../config/i18n.js?v=1.0.120";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.120";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.120";
-import { OnboardingTour } from "./onboarding.js?v=1.0.120";
+import { Emitter } from "../utils/emitter.js?v=1.0.121";
+import { formatBytes } from "../utils/format.js?v=1.0.121";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.121";
+import { translate } from "../config/i18n.js?v=1.0.121";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.121";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.121";
+import { OnboardingTour } from "./onboarding.js?v=1.0.121";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;
@@ -106,6 +106,7 @@ export class AppView extends Emitter {
       document.querySelector(".main-stage"),
       document.querySelector(".nearby-fab"),
       document.querySelector(".connect-fab"),
+      document.querySelector(".howto-fab"),
       document.querySelector("[data-connection-tray]"),
       document.querySelector("[data-dynamic-island]")
     ].filter(Boolean);
@@ -134,7 +135,14 @@ export class AppView extends Emitter {
     // this view's bindSwipe so the start gesture feels exactly like send.
     this.onboarding = new OnboardingTour(document, {
       translate: (key, params) => this.translate(key, params),
-      bindSwipe: (options) => this.bindSwipe(options)
+      bindSwipe: (options) => this.bindSwipe(options),
+      // Reuse the bottom sheets' inert plumbing so the tour is truly modal
+      // (aria-modal alone doesn't stop Tab from reaching the page behind).
+      // On release, leave the background inert if a real sheet is still open.
+      setBackgroundInert: (active) => {
+        if (active) this.setSheetBackgroundInert(true);
+        else if (!this.visibleSheet()) this.setSheetBackgroundInert(false);
+      }
     });
     document.querySelector("[data-howto-fab]")?.addEventListener("click", () => this.onboarding.open());
     this.on("onboarding-start", () => this.onboarding.finish());

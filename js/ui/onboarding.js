@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.120";
+import { Emitter } from "../utils/emitter.js?v=1.0.121";
 
 // Keep in lockstep with the bump keyframes in onboarding.css: the cycle is
 // 2.8s and the avatars touch at 32% of it — that's when the thud plays.
@@ -13,10 +13,11 @@ const BUMP_CONTACT_MS = Math.round(BUMP_CYCLE_MS * 0.32);
 // plain button: finishing the guide rehearses the same muscle memory the
 // send flow uses.
 export class OnboardingTour extends Emitter {
-  constructor(document, { translate, bindSwipe } = {}) {
+  constructor(document, { translate, bindSwipe, setBackgroundInert } = {}) {
     super();
     this.document = document;
     this.translate = translate || ((key) => key);
+    this.setBackgroundInert = setBackgroundInert || (() => {});
     this.root = document.querySelector("[data-onboarding]");
     this.nodes = {
       card: this.root?.querySelector("[data-onboarding-card]"),
@@ -47,6 +48,12 @@ export class OnboardingTour extends Emitter {
       if (event.key === "Escape" && !this.root.hidden) this.close();
     });
     this.nodes.track.addEventListener("scroll", () => this.scheduleDotSync(), { passive: true });
+    // Background-tab throttling lets the thud timers drift from the CSS
+    // animation clock (which never pauses); restarting the loop on return
+    // rewinds the animations and re-anchors the timers in one move.
+    this.document.addEventListener("visibilitychange", () => {
+      if (!this.document.hidden && this.root.dataset.open && this.activeSlide === 1) this.startBumpLoop();
+    });
     if (this.nodes.swipeControl && typeof bindSwipe === "function") {
       // Same binder as "Swipe up to send" — identical drag physics, keyboard
       // path, and completion threshold. Completion emits "onboarding-start" on
@@ -77,12 +84,16 @@ export class OnboardingTour extends Emitter {
     // actually transitions up from the bottom instead of popping in place.
     this.root.getBoundingClientRect();
     this.root.dataset.open = "true";
+    this.setBackgroundInert(true);
     this.resetStartSwipe?.();
     // A leaked loop from a previous open would otherwise survive here,
     // because activeSlide is force-reset below and syncDots only toggles the
     // loop on slide CHANGES.
     this.stopBumpLoop();
-    this.nodes.track.scrollTo({ left: 0, behavior: "instant" });
+    // Plain scrollLeft, not scrollTo({behavior:"instant"}): older WebKit
+    // rejects the enum value and the resulting throw would abort open()
+    // half-initialized.
+    this.nodes.track.scrollLeft = 0;
     this.activeSlide = 0;
     this.renderDots(0);
     // Scroll events can be throttled or swallowed entirely (embedded webviews,
@@ -100,8 +111,11 @@ export class OnboardingTour extends Emitter {
     this.dotSyncTimer = 0;
     this.stopBumpLoop();
     // Dropping data-open slides the card back down and fades the backdrop;
-    // hide the dialog only after that outro has played.
+    // hide the dialog only after that outro has played. The 320ms delay must
+    // stay >= --motion-sheet-out (240ms) in base.css or the card vanishes
+    // mid-slide.
     delete this.root.dataset.open;
+    this.setBackgroundInert(false);
     globalThis.clearTimeout(this.hideTimer);
     this.hideTimer = globalThis.setTimeout(() => {
       this.root.hidden = true;
@@ -161,7 +175,6 @@ export class OnboardingTour extends Emitter {
         const dot = this.document.createElement("button");
         dot.type = "button";
         dot.className = "onboarding__dot";
-        dot.setAttribute("aria-label", this.translate("onboardingGoToSlide", { number: index + 1 }));
         dot.addEventListener("click", () => {
           this.nodes.track.scrollTo({ left: index * this.nodes.track.clientWidth, behavior: "smooth" });
         });
@@ -169,7 +182,13 @@ export class OnboardingTour extends Emitter {
       }));
     }
     [...dots.children].forEach((dot, index) => {
-      dot.dataset.active = String(index === activeIndex);
+      const active = index === activeIndex;
+      dot.dataset.active = String(active);
+      if (active) dot.setAttribute("aria-current", "true");
+      else dot.removeAttribute("aria-current");
+      // Refreshed on every render so a Settings language switch reaches the
+      // labels — these buttons carry no data-i18n-aria for the global sweep.
+      dot.setAttribute("aria-label", this.translate("onboardingGoToSlide", { number: index + 1 }));
     });
   }
 
@@ -179,6 +198,9 @@ export class OnboardingTour extends Emitter {
   startBumpLoop() {
     this.stopBumpLoop();
     if (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    // The in-app Settings motion toggle pauses all scene animation via
+    // [data-motion="paused"] on the app shell — no animation, no thud.
+    if (this.root.closest('[data-motion="paused"]')) return;
     try {
       this.nodes.bumpScene?.getAnimations?.({ subtree: true }).forEach((animation) => {
         animation.currentTime = 0;
@@ -208,7 +230,9 @@ export class OnboardingTour extends Emitter {
       const Ctx = globalThis.AudioContext || globalThis.webkitAudioContext;
       if (!Ctx) return null;
       this.audioContext ||= new Ctx();
-      if (this.audioContext.state === "suspended") this.audioContext.resume?.();
+      // resume() is async — a rejection would escape this try/catch as an
+      // unhandled promise, so swallow it explicitly.
+      if (this.audioContext.state === "suspended") this.audioContext.resume?.()?.catch?.(() => {});
       return this.audioContext;
     } catch {
       return null;

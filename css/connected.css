@@ -53,6 +53,7 @@
   color: var(--mint);
   background: var(--composer);
   box-shadow: var(--card-shadow);
+  -webkit-backdrop-filter: blur(28px);
   backdrop-filter: blur(28px);
   cursor: pointer;
 }
@@ -102,6 +103,7 @@
   border-radius: 28px;
   background: var(--composer);
   box-shadow: var(--card-shadow);
+  -webkit-backdrop-filter: blur(28px);
   backdrop-filter: blur(28px);
   pointer-events: auto;
 }
