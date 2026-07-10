@@ -1,0 +1,407 @@
+/* "How to use WebDrop" tour: how-to FAB + swipeable card carousel.
+   Never auto-shown — opened only from the FAB. Matches the bottom-sheet
+   design language (panel tokens, 22-28px radii, --card-shadow). */
+
+.howto-fab {
+  position: fixed;
+  z-index: 18;
+  left: 18px;
+  bottom: calc(18px + var(--safe-bottom));
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--composer-border);
+  border-radius: 20px;
+  color: var(--purple);
+  background: var(--composer);
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(28px);
+  cursor: pointer;
+}
+
+.howto-fab svg {
+  width: 26px;
+  height: 26px;
+}
+
+.howto-fab circle,
+.howto-fab path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
+}
+
+.app-shell[data-mode="connected"] .howto-fab {
+  display: none;
+}
+
+.onboarding {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  padding-bottom: calc(18px + var(--safe-bottom));
+}
+
+.onboarding__backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--shadow-ink) 46%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.onboarding__card {
+  position: relative;
+  width: min(420px, 100%);
+  display: grid;
+  gap: 10px;
+  padding: 18px 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--panel-solid);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.onboarding__close {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  cursor: pointer;
+}
+
+.onboarding__close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.onboarding__close path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
+
+.onboarding__track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.onboarding__track::-webkit-scrollbar {
+  display: none;
+}
+
+.onboarding__slide {
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 8px;
+  padding: 6px 26px 4px;
+  text-align: center;
+}
+
+.onboarding__slide h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+}
+
+.onboarding__slide p {
+  margin: 0;
+  max-width: 300px;
+  color: color-mix(in srgb, var(--ink) 62%, transparent);
+  font-size: 13.5px;
+  font-weight: 560;
+  line-height: 1.5;
+}
+
+.onboarding__hint {
+  margin-top: 4px;
+  color: color-mix(in srgb, var(--ink) 40%, transparent);
+  font-size: 11.5px;
+  font-weight: 680;
+}
+
+/* --- Scenes ------------------------------------------------------------- */
+
+.onboarding__scene {
+  position: relative;
+  width: 100%;
+  height: 148px;
+  display: grid;
+  place-items: center;
+}
+
+.onboarding__mark {
+  width: 74px;
+  height: 74px;
+}
+
+.onboarding__mark--glow {
+  filter: drop-shadow(0 10px 26px color-mix(in srgb, var(--blue) 44%, transparent));
+}
+
+.onboarding__floater {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--shadow-ink) 22%, transparent);
+}
+
+.onboarding__floater--a { top: 12px; left: 18%; }
+.onboarding__floater--b { top: 64px; right: 14%; width: 52px; height: 52px; }
+.onboarding__floater--c { bottom: 4px; left: 30%; width: 38px; height: 38px; }
+
+.onboarding__bumper {
+  position: absolute;
+  top: 50%;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--shadow-ink) 24%, transparent);
+  transform: translateY(-50%);
+}
+
+.onboarding__bumper--left { left: calc(50% - 82px); }
+.onboarding__bumper--right { right: calc(50% - 82px); }
+
+.onboarding__ripple {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--blue);
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.onboarding__qr {
+  display: grid;
+  grid-template-columns: repeat(3, 26px);
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+.onboarding__qr i {
+  height: 26px;
+  border-radius: 7px;
+  background: var(--ink);
+}
+
+.onboarding__qr i:nth-child(2n) {
+  background: color-mix(in srgb, var(--ink) 26%, transparent);
+}
+
+.onboarding__qr i:nth-child(5) {
+  background: var(--blue);
+}
+
+.onboarding__beam {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  width: 132px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--mint), transparent);
+  transform: translateX(-50%);
+}
+
+.onboarding__file {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  width: 78px;
+  display: grid;
+  gap: 7px;
+  padding: 13px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  transform: translateX(-50%);
+}
+
+.onboarding__file i {
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 26%, transparent);
+}
+
+.onboarding__file i:first-child {
+  width: 62%;
+  background: var(--blue);
+}
+
+.onboarding__tiles {
+  position: absolute;
+  bottom: 26px;
+  left: 50%;
+  display: grid;
+  grid-auto-flow: column;
+  gap: 6px;
+  transform: translateX(-50%);
+}
+
+.onboarding__tiles i {
+  width: 14px;
+  height: 14px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+/* --- Start swipe + dots -------------------------------------------------- */
+
+.onboarding__start-swipe {
+  width: min(280px, 100%);
+  margin-top: 10px;
+}
+
+.onboarding__dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  padding-top: 2px;
+}
+
+.onboarding__dot {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  cursor: pointer;
+  transition: background var(--motion-control) ease, transform var(--motion-control) var(--ease-out);
+}
+
+.onboarding__dot[data-active="true"] {
+  background: var(--blue);
+  transform: scale(1.25);
+}
+
+/* --- Motion -------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .onboarding__floater {
+    animation: onboardingFloat 4.2s ease-in-out infinite;
+  }
+
+  .onboarding__floater--b { animation-delay: -1.4s; }
+  .onboarding__floater--c { animation-delay: -2.6s; }
+
+  .onboarding__bumper--left {
+    animation: onboardingBumpLeft 2.6s var(--ease-out) infinite;
+  }
+
+  .onboarding__bumper--right {
+    animation: onboardingBumpRight 2.6s var(--ease-out) infinite;
+  }
+
+  .onboarding__ripple {
+    animation: onboardingRipple 2.6s ease-out infinite;
+  }
+
+  .onboarding__beam {
+    animation: onboardingBeam 2.4s ease-in-out infinite;
+  }
+
+  .onboarding__file {
+    animation: onboardingFileDrop 3s var(--ease-out) infinite;
+  }
+
+  .onboarding__tiles i {
+    animation: onboardingTileFill 3s ease-in-out infinite;
+  }
+
+  .onboarding__tiles i:nth-child(2) { animation-delay: .12s; }
+  .onboarding__tiles i:nth-child(3) { animation-delay: .24s; }
+  .onboarding__tiles i:nth-child(4) { animation-delay: .36s; }
+  .onboarding__tiles i:nth-child(5) { animation-delay: .48s; }
+  .onboarding__tiles i:nth-child(6) { animation-delay: .6s; }
+  .onboarding__tiles i:nth-child(7) { animation-delay: .72s; }
+  .onboarding__tiles i:nth-child(8) { animation-delay: .84s; }
+
+  .onboarding__mark--glow {
+    animation: onboardingGlow 2.8s ease-in-out infinite;
+  }
+}
+
+@keyframes onboardingFloat {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -10px; }
+}
+
+@keyframes onboardingBumpLeft {
+  0%, 18% { transform: translateY(-50%) translateX(-26px); }
+  38%, 46% { transform: translateY(-50%) translateX(24px) rotate(6deg); }
+  60%, 100% { transform: translateY(-50%) translateX(-26px); }
+}
+
+@keyframes onboardingBumpRight {
+  0%, 18% { transform: translateY(-50%) translateX(26px); }
+  38%, 46% { transform: translateY(-50%) translateX(-24px) rotate(-6deg); }
+  60%, 100% { transform: translateY(-50%) translateX(26px); }
+}
+
+@keyframes onboardingRipple {
+  0%, 36% { opacity: 0; transform: translate(-50%, -50%) scale(.4); }
+  44% { opacity: .9; }
+  74%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(5.4); }
+}
+
+@keyframes onboardingBeam {
+  0%, 100% { top: 18px; opacity: 0; }
+  12%, 88% { opacity: 1; }
+  50% { top: 118px; }
+}
+
+@keyframes onboardingFileDrop {
+  0%, 12% { transform: translateX(-50%) translateY(0); opacity: 1; }
+  46%, 58% { transform: translateX(-50%) translateY(56px) scale(.92); opacity: .35; }
+  76%, 100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+@keyframes onboardingTileFill {
+  0%, 30% { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+  55%, 80% { background: var(--blue); }
+  100% { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+}
+
+@keyframes onboardingGlow {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+@media (max-width: 360px) {
+  .onboarding__scene { height: 128px; }
+  .onboarding__slide h2 { font-size: 18px; }
+}

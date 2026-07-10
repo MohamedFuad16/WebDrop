@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.115";
+const APP_VERSION = "1.0.116";
 const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [
@@ -13,6 +13,7 @@ const ASSETS = [
   "./css/connected.css",
   "./css/dynamic-island.css",
   "./css/sheets.css",
+  "./css/onboarding.css",
   "./css/responsive.css",
   "./js/app.js",
   "./js/admin/readiness.js",
@@ -39,6 +40,7 @@ const ASSETS = [
   "./js/storage/storage-client.js",
   "./js/ui/app-view.js",
   "./js/ui/dynamic-island.js",
+  "./js/ui/onboarding.js",
   "./js/ui/siri-wave.js",
   "./js/ui/tile-wave.js",
   "./js/vendor/jsqr.js",

@@ -1,9 +1,10 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.115";
-import { formatBytes } from "../utils/format.js?v=1.0.115";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.115";
-import { translate } from "../config/i18n.js?v=1.0.115";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.115";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.115";
+import { Emitter } from "../utils/emitter.js?v=1.0.116";
+import { formatBytes } from "../utils/format.js?v=1.0.116";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.116";
+import { translate } from "../config/i18n.js?v=1.0.116";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.116";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.116";
+import { OnboardingTour } from "./onboarding.js?v=1.0.116";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;
@@ -128,6 +129,15 @@ export class AppView extends Emitter {
     this.bindCustomAvatarCrop();
     this.bindViewportEvents();
     this.bindSwipeControls();
+    // "How to use WebDrop" tour — disabled by default: never auto-shown,
+    // reachable only from the how-to FAB (bottom-left). Its final slide reuses
+    // this view's bindSwipe so the start gesture feels exactly like send.
+    this.onboarding = new OnboardingTour(document, {
+      translate: (key, params) => this.translate(key, params),
+      bindSwipe: (options) => this.bindSwipe(options)
+    });
+    document.querySelector("[data-howto-fab]")?.addEventListener("click", () => this.onboarding.open());
+    this.on("onboarding-start", () => this.onboarding.finish());
     store.subscribe((state) => this.render(state));
   }
 

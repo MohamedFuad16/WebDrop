@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="css/connected.css">
     <link rel="stylesheet" href="css/dynamic-island.css">
     <link rel="stylesheet" href="css/sheets.css">
+    <link rel="stylesheet" href="css/onboarding.css">
     <link rel="stylesheet" href="css/responsive.css">
   </head>
   <body>
@@ -184,6 +185,79 @@
         </svg>
       </button>
 
+      <button class="howto-fab" type="button" data-howto-fab aria-label="How to use WebDrop" data-i18n-aria="howToUse">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="8.6"></circle>
+          <path d="M12 11.2v5"></path>
+          <path d="M12 7.7v.01"></path>
+        </svg>
+      </button>
+
+      <section class="onboarding" data-onboarding hidden role="dialog" aria-modal="true" aria-label="How to use WebDrop" data-i18n-aria="howToUse" tabindex="-1">
+        <div class="onboarding__backdrop" data-onboarding-backdrop></div>
+        <div class="onboarding__card" data-onboarding-card>
+          <button class="onboarding__close" type="button" data-onboarding-close aria-label="Close guide" data-i18n-aria="onboardingClose">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg>
+          </button>
+          <div class="onboarding__track" data-onboarding-track>
+            <article class="onboarding__slide">
+              <div class="onboarding__scene onboarding__scene--welcome" aria-hidden="true">
+                <img class="onboarding__mark" src="assets/icons/webdrop-mark.svg" alt="">
+                <img class="onboarding__floater onboarding__floater--a" src="assets/icons/avatars/user-01.png" alt="">
+                <img class="onboarding__floater onboarding__floater--b" src="assets/icons/avatars/user-03.png" alt="">
+                <img class="onboarding__floater onboarding__floater--c" src="assets/icons/avatars/user-05.png" alt="">
+              </div>
+              <h2 data-i18n="onboardingWelcomeTitle">Welcome to WebDrop</h2>
+              <p data-i18n="onboardingWelcomeCopy">Share files with the phones around you — no accounts, no cables, no cloud.</p>
+              <span class="onboarding__hint" data-i18n="onboardingHint">Swipe to explore →</span>
+            </article>
+            <article class="onboarding__slide">
+              <div class="onboarding__scene onboarding__scene--bump" aria-hidden="true">
+                <span class="onboarding__ripple"></span>
+                <img class="onboarding__bumper onboarding__bumper--left" src="assets/icons/avatars/user-02.png" alt="">
+                <img class="onboarding__bumper onboarding__bumper--right" src="assets/icons/avatars/user-04.png" alt="">
+              </div>
+              <h2 data-i18n="onboardingBumpTitle">Bump to connect</h2>
+              <p data-i18n="onboardingBumpCopy">Tap Connect on both phones, then gently bump them together. An inaudible chime and the bump itself prove you are really side by side.</p>
+            </article>
+            <article class="onboarding__slide">
+              <div class="onboarding__scene onboarding__scene--qr" aria-hidden="true">
+                <span class="onboarding__qr">
+                  <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                </span>
+                <span class="onboarding__beam"></span>
+              </div>
+              <h2 data-i18n="onboardingQrTitle">Or scan a QR</h2>
+              <p data-i18n="onboardingQrCopy">No bump handy? Show a QR code on one phone and scan it with the other — same secure connection.</p>
+            </article>
+            <article class="onboarding__slide">
+              <div class="onboarding__scene onboarding__scene--send" aria-hidden="true">
+                <span class="onboarding__file"><i></i><i></i><i></i></span>
+                <span class="onboarding__tiles"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              </div>
+              <h2 data-i18n="onboardingSendTitle">Send anything</h2>
+              <p data-i18n="onboardingSendCopy">Pick your files and swipe up to send. Watch the tiles fill as they fly across — and chat while you wait.</p>
+            </article>
+            <article class="onboarding__slide onboarding__slide--start">
+              <div class="onboarding__scene onboarding__scene--start" aria-hidden="true">
+                <img class="onboarding__mark onboarding__mark--glow" src="assets/icons/webdrop-mark.svg" alt="">
+              </div>
+              <h2 data-i18n="onboardingReadyTitle">You're ready</h2>
+              <p data-i18n="onboardingReadyCopy">Grab a friend, tap Connect, and bump.</p>
+              <div class="swipe-control onboarding__start-swipe" data-onboarding-swipe role="group" aria-label="Swipe to start" data-i18n-aria="onboardingSwipeStart">
+                <span class="swipe-text" data-onboarding-swipe-text data-i18n="onboardingSwipeStart">Swipe to start</span>
+                <button class="swipe-thumb" type="button" data-onboarding-swipe-thumb aria-label="Swipe to start" data-i18n-aria="onboardingSwipeStart">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 12h13M13 6l6 6-6 6"></path>
+                  </svg>
+                </button>
+              </div>
+            </article>
+          </div>
+          <div class="onboarding__dots" data-onboarding-dots aria-hidden="true"></div>
+        </div>
+      </section>
+
       <div class="tab-replaced-overlay" data-tab-replaced role="alertdialog" aria-modal="true" aria-labelledby="tab-replaced-title" hidden>
         <div class="tab-replaced-card">
           <h2 id="tab-replaced-title" data-i18n="tabReplacedTitle">WebDrop is open in another tab</h2>
@@ -334,7 +408,7 @@
         </button>
         <div class="app-version">
           <span data-i18n="appVersion">App version</span>
-          <strong>1.0.115</strong>
+          <strong>1.0.116</strong>
         </div>
       </section>
 
@@ -434,8 +508,8 @@
       <input data-file-input type="file" multiple hidden>
     </div>
 
-    <script src="js/vendor/jsqr.js?v=1.0.115"></script>
-    <script src="js/config/runtime-config.js?v=1.0.115"></script>
-    <script type="module" src="js/app.js?v=1.0.115"></script>
+    <script src="js/vendor/jsqr.js?v=1.0.116"></script>
+    <script src="js/config/runtime-config.js?v=1.0.116"></script>
+    <script type="module" src="js/app.js?v=1.0.116"></script>
   </body>
 </html>
