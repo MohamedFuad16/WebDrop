@@ -18,6 +18,7 @@
 | Where keys/URLs/config live (pointers only) | `agent/secrets.md` |
 | Why decisions were made (ADRs) | `agent/decisions.md` |
 | Current status + recent changes | `agent/state.md` |
+| Open issues, roadmaps, deferred defects | `agent/backlog.md` |
 | Module dependency/impact graph | `agent/graph/graph.md` |
 
 **Impact analysis:** before changing a module, check `agent/graph/` (graph.md + dependencies.json/.dot + architecture.svg) to see what depends on it.
