@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.118";
+import { Emitter } from "../utils/emitter.js?v=1.0.119";
 
 export class TransferEngine extends Emitter {
   constructor({ transport, storage, enabled = false }) {

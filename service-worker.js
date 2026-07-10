@@ -1,4 +1,4 @@
-const APP_VERSION = "1.0.118";
+const APP_VERSION = "1.0.119";
 const CACHE_NAME = `webdrop-v2-static-${APP_VERSION}`;
 const RUNTIME_CACHE_NAME = `webdrop-v2-runtime-${APP_VERSION}`;
 const ASSETS = [
@@ -54,7 +54,16 @@ const ASSETS = [
   "./vendor/streamsaver/sw.js",
   "./assets/fonts/SourceHanSansJP-Normal-static.ttf",
   "./assets/icons/webdrop-mark.svg",
-  "./assets/icons/webdrop-icon.webp"
+  "./assets/icons/webdrop-icon.webp",
+  "./assets/icons/avatars/user-01.png",
+  "./assets/icons/avatars/user-02.png",
+  "./assets/icons/avatars/user-03.png",
+  "./assets/icons/avatars/user-04.png",
+  "./assets/icons/avatars/user-05.png",
+  "./assets/icons/avatars/user-06.png",
+  "./assets/icons/avatars/user-07.png",
+  "./assets/icons/avatars/user-08.png",
+  "./assets/icons/avatars/user-09.png"
 ];
 
 const RUNTIME_ASSET_PREFIXES = [
