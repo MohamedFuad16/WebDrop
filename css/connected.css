@@ -204,7 +204,7 @@
 }
 
 .chat-badge {
-  background: #347cff;
+  background: var(--blue);
 }
 
 .selected-files,

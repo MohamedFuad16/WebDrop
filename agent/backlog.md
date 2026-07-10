@@ -93,8 +93,17 @@ first-crossing bumpAt. Remaining steps, in order:
 
 ## P4 — Pending audits
 
-- **UI-doctor audit** — first run died on a session limit; rerun launched
-  2026-07-10 ~20:38 JST; findings to be triaged into this file.
+- **UI-doctor audit** — COMPLETED 2026-07-10 (rerun). 10 findings, ALL fixed in
+  v1.0.115: transfer-state cancel X breaking app state (CSS hide + mode guard);
+  stale tilt readout in the failure dialog; tilt meter churning the atomic
+  aria-live region (now aria-hidden); ja QR titles always truncating (2-line
+  clamp); "QR verification cancelled" toast after bump cancels (new
+  `connectionCancelled` key); dead `[data-sheet]` inert selector + missing FABs;
+  `showQrDisplay` focus; light theme-color seam (#f3f3f1 → #e8e8e6 =
+  --page-soft, e2e assertion updated); `#347cff`/hardcoded blues → `var(--blue)`;
+  ja `diagnosticTapConnect` naming an English button. Verified clean by the
+  audit: en/ja key parity (251/251), ceremony reset completeness, island
+  contrast ratios, tap targets.
 - **Field experiments** (pairing research, exact telemetry listed in
   ADR-0028/session): near-field level vs correlation; ToF accuracy in bump
   pose; 60Hz accel waveform discrimination AUC; clock-skew share of the

@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.114";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.114";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.114";
+import { formatBytes } from "../utils/format.js?v=1.0.115";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.115";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.115";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
@@ -1691,6 +1691,11 @@ export function createController({
 
   view.on("island-cancel", async () => {
     const current = store.getState();
+    // The X is hidden in the connected/transfer island states, but guard here
+    // too: cancelling while connected used to hide the transfer HUD and patch
+    // the app back to lobby while the transfer kept running with the peer
+    // still attached and no visible disconnect control.
+    if (current.mode === "connected") return;
     // Mark any in-flight ceremony stale and stop the sensors NOW: the engine's
     // acoustic window runs several more seconds after a cancel, and without
     // this its finally block would later kill the sensors of the attempt the
@@ -1713,8 +1718,11 @@ export function createController({
       pairingId: null
     });
     activePeerId = null;
+    const cancelledQr = activeConnectionMethod === "qr" || activeQrRole;
     activeQrRole = null;
-    view.toast(view.translate("qrCancelled"));
+    // One handler serves every island state — a cancelled bump ceremony must
+    // not claim "QR verification cancelled".
+    view.toast(view.translate(cancelledQr ? "qrCancelled" : "connectionCancelled"));
   });
 
   view.on("island-fallback", async () => {

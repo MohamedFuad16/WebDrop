@@ -1,9 +1,9 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.114";
-import { formatBytes } from "../utils/format.js?v=1.0.114";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.114";
-import { translate } from "../config/i18n.js?v=1.0.114";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.114";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.114";
+import { Emitter } from "../utils/emitter.js?v=1.0.115";
+import { formatBytes } from "../utils/format.js?v=1.0.115";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.115";
+import { translate } from "../config/i18n.js?v=1.0.115";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.115";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.115";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;
@@ -104,6 +104,7 @@ export class AppView extends Emitter {
       document.querySelector(".topbar"),
       document.querySelector(".main-stage"),
       document.querySelector(".nearby-fab"),
+      document.querySelector(".connect-fab"),
       document.querySelector("[data-connection-tray]"),
       document.querySelector("[data-dynamic-island]")
     ].filter(Boolean);
@@ -468,7 +469,9 @@ export class AppView extends Emitter {
   syncThemeColor(theme) {
     const islandState = this.document.querySelector("[data-dynamic-island]")?.dataset.state;
     const islandExpanded = islandState && !["closed", "closing"].includes(islandState);
-    const themeColor = islandExpanded ? "#000000" : theme === "dark" ? "#171818" : "#f3f3f1";
+    // Light must match the shell gradient's TOP (--page-soft #e8e8e6), not
+    // --page — a mismatch shows as a seam under translucent status bars.
+    const themeColor = islandExpanded ? "#000000" : theme === "dark" ? "#171818" : "#e8e8e6";
     const meta = this.document.querySelector('meta[name="theme-color"]');
     if (meta && meta.getAttribute("content") !== themeColor) {
       meta.setAttribute("content", themeColor);

@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.114";
-import { Emitter } from "../utils/emitter.js?v=1.0.114";
-import { formatBytes } from "../utils/format.js?v=1.0.114";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.114";
-import { TileWave } from "./tile-wave.js?v=1.0.114";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.115";
+import { Emitter } from "../utils/emitter.js?v=1.0.115";
+import { formatBytes } from "../utils/format.js?v=1.0.115";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.115";
+import { TileWave } from "./tile-wave.js?v=1.0.115";
 
 // Monotonic ceremony stage ladder shown in the island during pairing. Replaces
 // the old permissions/audio/bump/tilt checklist with a single staged status line
@@ -95,7 +95,10 @@ export class DynamicIsland extends Emitter {
     this.transferTargetRatio = 0;
     this.transferAnimationFrame = 0;
     this.failureScrollFrame = 0;
-    this.backgroundNodes = [...document.querySelectorAll(".topbar, .main-stage, .connection-tray, [data-backdrop], [data-sheet]")];
+    // ".bottom-sheet" (the real sheet class — "[data-sheet]" matched nothing)
+    // and the FABs must be inerted too, or they stay tappable/in the a11y tree
+    // behind the island's aria-modal states.
+    this.backgroundNodes = [...document.querySelectorAll(".topbar, .main-stage, .connection-tray, [data-backdrop], .bottom-sheet, .connect-fab, .nearby-fab")];
     this.nodes.camera?.addEventListener("click", () => this.startCamera());
     this.nodes.cancel?.addEventListener("click", () => this.emit("cancel"));
     this.nodes.retry?.addEventListener("click", () => this.emit("retry"));
@@ -211,6 +214,9 @@ export class DynamicIsland extends Emitter {
     this.setState("qr-display");
     this.setCopy("qrShowTitle", "qrShowStatus");
     this.drawQr(token, self?.avatar);
+    // Mirror showQrScanner: inerting the background blurred the triggering
+    // button to <body>; move focus into the aria-modal dialog.
+    this.nodes.cancel?.focus({ preventScroll: true });
   }
 
   showQrScanner({ self, peer, autoStartCamera = true }) {
@@ -254,6 +260,11 @@ export class DynamicIsland extends Emitter {
       if (phase === "score" && state === "failed" && this.nodes.ceremonyStage) {
         this.nodes.ceremonyStage.textContent = this.translate("ceremonyScoreFailed");
       }
+      // A locally failed ceremony never reaches stage 5 (the only other path
+      // that hides the tilt readout) — without this, the failure dialog kept
+      // the last-painted meter, up to a contradictory green "Tilt OK ✓" next
+      // to a "Tilt was not detected" error.
+      if (this.nodes.ceremonyTilt) this.nodes.ceremonyTilt.hidden = true;
       return;
     }
     const target = this.ceremonyStageForEvent({ phase, motion });
@@ -444,7 +455,9 @@ export class DynamicIsland extends Emitter {
     if (!meta) return;
     const expanded = !["closed", "closing"].includes(state);
     const theme = this.root?.closest(".app-shell")?.dataset.theme || "light";
-    const color = expanded ? "#000000" : theme === "dark" ? "#171818" : "#f3f3f1";
+    // Light must match the shell gradient's TOP (--page-soft #e8e8e6), not
+    // --page — a mismatch shows as a seam under translucent status bars.
+    const color = expanded ? "#000000" : theme === "dark" ? "#171818" : "#e8e8e6";
     if (meta.getAttribute("content") !== color) meta.setAttribute("content", color);
   }
 

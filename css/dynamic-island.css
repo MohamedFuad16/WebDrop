@@ -127,7 +127,10 @@
   stroke-width: 1.8;
 }
 
-.webdrop-island[data-state="connected"] .webdrop-island__cancel {
+/* No X during transfer either: it closed the HUD and patched the app back to
+   lobby while the transfer kept running with no visible controls. */
+.webdrop-island[data-state="connected"] .webdrop-island__cancel,
+.webdrop-island[data-state="transfer"] .webdrop-island__cancel {
   display: none;
 }
 
@@ -236,7 +239,7 @@
 }
 
 .webdrop-island[data-ceremony-stage="3"] .webdrop-island__ceremony-head strong {
-  color: #347df5;
+  color: var(--blue);
   font-weight: 820;
 }
 
@@ -477,8 +480,15 @@
   overflow: hidden;
   font-size: clamp(17px, 4.4vw, 25px);
   line-height: 1.08;
+  /* Wrap to two lines instead of ellipsizing: the ja titles (12+ CJK glyphs)
+     never fit one ~180px line on phone widths, and this text is the flow's
+     primary instruction — truncating it loses the verb. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .webdrop-island__qr-copy span {

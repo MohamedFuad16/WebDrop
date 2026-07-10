@@ -821,7 +821,8 @@ test("uses black browser chrome while the Dynamic Island is expanded", async ({ 
   });
 
   expect(colors.expanded).toBe("#000000");
-  expect(colors.closed).toBe("#f3f3f1");
+  // Light chrome matches the shell gradient's TOP (--page-soft), not --page.
+  expect(colors.closed).toBe("#e8e8e6");
 });
 
 test("defers desktop receive chunks in IndexedDB until Download", async ({ page }, testInfo) => {
