@@ -499,6 +499,66 @@ test("a held cohort pair matches once the last member's distant bump arrives", (
   hub.close();
 });
 
+test("tearing down one crossed cohort must not un-veto the other (bump tombstones)", () => {
+  const hub = createTestHub();
+  const w = addClient(hub, "tomb-w");
+  const m = addClient(hub, "tomb-m");
+  const k = addClient(hub, "tomb-k");
+  const mai = addClient(hub, "tomb-mai");
+  const s1 = createSession(hub, [w, m], "session-tomb-1");
+  const s2 = createSession(hub, [k, mai], "session-tomb-2");
+  const now = Date.now();
+  for (const s of [s1, s2]) {
+    s.createdAt = now - 8000;
+    s.startAt = now - 6000;
+    s.endsAt = now - 500;
+  }
+
+  // Crossed geometry: (w,m) formally reciprocal, 1681ms delta, vetoed by k/mai's
+  // bumps 71/68ms away — but those live in s2's telemetry. s2's failTimer fires
+  // first; its teardown deletes that telemetry and immediately re-evaluates the
+  // survivors. Without tombstones the veto evidence is gone and (w,m) — two
+  // strangers — get matched by the very teardown retry.
+  hub.recordProximitySessionTelemetry(m, sessionMessage(s1, m, verifiedMetrics(), now - 5000, w));
+  hub.recordProximitySessionTelemetry(w, sessionMessage(s1, w, verifiedMetrics(), now - 3319, m));
+  hub.recordProximitySessionTelemetry(k, sessionMessage(s2, k, { acoustic: true }, now - 3248, mai));
+  hub.recordProximitySessionTelemetry(mai, sessionMessage(s2, mai, { acoustic: true }, now - 5068, k));
+  assert.equal(w.pairingId, null, "vetoed while s2 is alive");
+
+  hub.failUnmatchedProximitySession(s2.id);
+  assert.equal(hub.proximitySessions.has(s2.id), false, "s2 torn down");
+  assert.equal(w.pairingId, null, "tombstoned bumps must keep vetoing after s2's teardown");
+  assert.equal(m.pairingId, null);
+  assert.equal(messagesOf(w, "proximity:match").length, 0);
+
+  hub.failUnmatchedProximitySession(s1.id);
+  assert.equal(messagesOf(w, "proximity:session:failed")[0].payload.reason, "ambiguous_or_nonreciprocal_match");
+
+  hub.close();
+});
+
+test("re-joining while a member of a started session evicts the ghost membership", () => {
+  const hub = createTestHub();
+  const a1 = addClient(hub, "ghost-a-1");
+  const a2 = addClient(hub, "ghost-a-2");
+  const session = createSession(hub, [a1, a2], "session-ghost");
+
+  // a1's ceremony failed client-side and the user re-taps Connect while the old
+  // started session still lives. Without eviction a1 is counted twice against
+  // capacity, every concurrent cohort defers on the old session's never-coming
+  // telemetry, and a1 later gets a spurious failed for the abandoned session.
+  hub.joinProximitySession(a1, { payload: { clientNonce: "fresh-nonce" } });
+
+  const joined = messagesOf(a1, "proximity:session:joined");
+  assert.equal(joined.length, 1);
+  assert.notEqual(joined[0].payload.sessionId, "session-ghost", "admitted to a NEW cohort");
+  assert.equal(session.clients.has(a1.id), false, "evicted from the started session");
+  assert.equal(session.nonces.has(a1.id), false);
+  assert.equal(hub.totalProximityParticipants(), 2, "a2 in the old cohort + a1 in the new one — no double count");
+
+  hub.close();
+});
+
 test("proximity session rejects telemetry with the wrong join nonce", () => {
   const hub = createTestHub();
   const clientA = addClient(hub, "client-a");

@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.111";
-import { Emitter } from "../utils/emitter.js?v=1.0.111";
-import { formatBytes } from "../utils/format.js?v=1.0.111";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.111";
-import { TileWave } from "./tile-wave.js?v=1.0.111";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.112";
+import { Emitter } from "../utils/emitter.js?v=1.0.112";
+import { formatBytes } from "../utils/format.js?v=1.0.112";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.112";
+import { TileWave } from "./tile-wave.js?v=1.0.112";
 
 // Monotonic ceremony stage ladder shown in the island during pairing. Replaces
 // the old permissions/audio/bump/tilt checklist with a single staged status line
@@ -46,6 +46,7 @@ export class DynamicIsland extends Emitter {
       content: this.root?.querySelector(".webdrop-island__content"),
       ceremony: this.root?.querySelector("[data-island-ceremony]"),
       ceremonyStage: this.root?.querySelector("[data-island-ceremony-stage]"),
+      ceremonyTilt: this.root?.querySelector("[data-island-ceremony-tilt]"),
       ceremonyScore: this.root?.querySelector("[data-island-ceremony-score]"),
       ceremonyError: this.root?.querySelector("[data-island-ceremony-error]"),
       failureActions: this.root?.querySelector("[data-island-failure-actions]"),
@@ -257,6 +258,7 @@ export class DynamicIsland extends Emitter {
     }
     const target = this.ceremonyStageForEvent({ phase, motion });
     if (target) this.advanceCeremonyStage(target);
+    if (phase === "motion") this.paintCeremonyTilt(motion);
   }
 
   // Map a ceremony progress event to its monotonic stage index (or null if the
@@ -288,6 +290,10 @@ export class DynamicIsland extends Emitter {
       this.nodes.ceremonyStage.textContent = this.translate(CEREMONY_STAGE_KEYS[target]);
     }
     this.paintCeremonySteps(target);
+    // Past the bump/tilt stages the readout is stale guidance — hide it.
+    if (target >= CEREMONY_STAGES.verifying && this.nodes.ceremonyTilt) {
+      this.nodes.ceremonyTilt.hidden = true;
+    }
   }
 
   paintCeremonySteps(stage = this.ceremonyStage) {
@@ -297,6 +303,32 @@ export class DynamicIsland extends Emitter {
       const position = index + 1;
       steps[index].dataset.status = position < stage ? "done" : position === stage ? "active" : "pending";
     }
+  }
+
+  // Live tilt readout during the bump/tilt stages: without it users can't tell
+  // whether they're tilting far enough (the pass needs > ~30° from flat), so a
+  // tilt_not_detected failure feels random. Hidden outside stages 3-4, on
+  // devices with no motion samples, and once verification starts. Motion polls
+  // arrive only from startAt onward (the controller gates them), so the angle
+  // shown is always in-window.
+  paintCeremonyTilt(motion) {
+    const node = this.nodes.ceremonyTilt;
+    if (!node) return;
+    const inTiltStages = this.ceremonyStage === CEREMONY_STAGES.bump || this.ceremonyStage === CEREMONY_STAGES.tilt;
+    if (!motion || !inTiltStages || !Number(motion.samples)) {
+      node.hidden = true;
+      return;
+    }
+    const deg = Math.round(Math.max(
+      Math.abs(Number(motion.tilt?.beta) || 0),
+      Math.abs(Number(motion.tilt?.gamma) || 0)
+    ));
+    const required = Math.round(Number(motion.tiltThresholdDeg) || 30);
+    node.dataset.ok = String(Boolean(motion.tilted));
+    node.textContent = motion.tilted
+      ? this.translate("ceremonyTiltOk")
+      : this.translate("ceremonyTiltMeter", { deg, required });
+    node.hidden = false;
   }
 
   async showVerificationFailure({ score = 0, errors = [] } = {}) {
@@ -616,6 +648,7 @@ export class DynamicIsland extends Emitter {
     this.ceremonyStageEnteredAt = this.now();
     if (this.root) this.root.dataset.ceremonyStage = "1";
     if (this.nodes.ceremonyStage) this.nodes.ceremonyStage.textContent = this.translate("ceremonyStagePreparing");
+    if (this.nodes.ceremonyTilt) this.nodes.ceremonyTilt.hidden = true;
     if (this.nodes.ceremonyScore) {
       this.nodes.ceremonyScore.textContent = `0 / 100`;
       this.nodes.ceremonyScore.hidden = true;

@@ -152,6 +152,7 @@ export class SignalingHub {
     this.proximityDecisions = new Map();
     this.proximityReady = new Map();
     this.proximitySessions = new Map();
+    this.proximityBumpTombstones = [];
     this.adminMonitors = new Map();
     // Multiple sessions can be open (accepting joiners) at once. New joiners are
     // routed into any open cohort that still has room; when none has room a new
@@ -347,7 +348,7 @@ export class SignalingHub {
     const existing = this.clients.get(hello.id);
     if (existing && ![WebSocket.CLOSING, WebSocket.CLOSED].includes(existing.socket.readyState)) {
       this.logger?.warn("Replacing stale signaling session with the same client id.", { id: hello.id });
-      this.removeClient(existing.socket, "replaced_by_new_connection");
+      this.removeClient(existing.socket, "replaced_by_new_connection", { preserveProximitySessions: true });
       existing.socket.close(4001, "replaced_by_new_connection");
     }
     for (const candidate of this.clients.values()) {
@@ -762,6 +763,16 @@ export class SignalingHub {
       });
       return;
     }
+    // A member of a STARTED (or expired) session tapping Connect again is
+    // abandoning that ceremony. Evict them from it before admitting them to a
+    // new cohort — ghost dual membership double-counts them against capacity,
+    // makes every concurrent cohort defer on telemetry that will never come,
+    // and sends a spurious late proximity:session:failed for the old session
+    // in the middle of the new ceremony.
+    if (existing) {
+      this.evictProximitySessionMember(existing, sender.id);
+      this.tryMatchStartedProximitySessions();
+    }
 
     // Enforce the global participant cap before admitting a NEW participant into
     // any cohort (existing-open or freshly-opened). Rejections are clean: the
@@ -1045,6 +1056,16 @@ export class SignalingHub {
       session.acousticCapabilities?.delete(removeId);
       session.telemetry.delete(removeId);
       session.matched.delete(removeId);
+      // Tell the losing duplicate it is out — it received session:joined
+      // earlier and would otherwise run the whole ceremony against a session
+      // it is no longer in, discovering it only via session_not_available.
+      const removed = this.clients.get(removeId);
+      if (removed?.socket) {
+        this.send(removed.socket, "proximity:session:failed", {
+          sessionId: session.id,
+          reason: "replaced_by_same_device"
+        });
+      }
     }
   }
 
@@ -1272,7 +1293,53 @@ export class SignalingHub {
         if (Number.isFinite(bump)) bumps.push(bump);
       }
     }
+    // Tombstoned bumps from telemetry that was already destroyed. The veto
+    // reads LIVE sessions only, so without these, failing one crossed cohort
+    // deletes exactly the bumps that were vetoing the other crossed cohort an
+    // instant before the teardown retry re-evaluates it — deterministically
+    // matching two strangers (the ADR-0025 geometry, reintroduced by teardown).
+    const now = Date.now();
+    this.proximityBumpTombstones = this.proximityBumpTombstones.filter((t) => t.expiresAt > now);
+    for (const tombstone of this.proximityBumpTombstones) bumps.push(tombstone.bumpAt);
     return bumps;
+  }
+
+  // Preserve the bump times of telemetry that is about to be destroyed (failed
+  // session teardown, cancel, disconnect, re-join eviction) so they keep
+  // vetoing overlapping cohorts for BUMP_TOMBSTONE_TTL_MS. Matched entries are
+  // excluded, mirroring the live veto's semantics.
+  recordProximityBumpTombstones(session, { onlyClientId = null } = {}) {
+    const now = Date.now();
+    for (const entry of session.telemetry.values()) {
+      if (onlyClientId && entry.clientId !== onlyClientId) continue;
+      if (session.matched.has(entry.clientId)) continue;
+      const bump = bumpTimeOf(entry);
+      if (!Number.isFinite(bump)) continue;
+      this.proximityBumpTombstones.push({ bumpAt: bump, expiresAt: now + BUMP_TOMBSTONE_TTL_MS });
+    }
+    if (this.proximityBumpTombstones.length > MAX_BUMP_TOMBSTONES) {
+      this.proximityBumpTombstones.splice(0, this.proximityBumpTombstones.length - MAX_BUMP_TOMBSTONES);
+    }
+  }
+
+  // Remove ONE member from a session (cancel, disconnect, or re-join eviction):
+  // tombstone their bump first, clear every per-member structure (a stale
+  // acousticCapabilities entry would keep capping the cohort's band; a stale
+  // nonce/matched entry is a leak), and tear the session down when it empties.
+  evictProximitySessionMember(session, clientId) {
+    if (!session.clients.has(clientId) && !session.telemetry.has(clientId)) return;
+    this.recordProximityBumpTombstones(session, { onlyClientId: clientId });
+    session.clients.delete(clientId);
+    session.telemetry.delete(clientId);
+    session.matched.delete(clientId);
+    session.nonces?.delete(clientId);
+    session.acousticCapabilities?.delete(clientId);
+    if (!session.clients.size) {
+      clearTimeout(session.timer);
+      clearTimeout(session.failTimer);
+      this.proximitySessions.delete(session.id);
+      this.openProximitySessionIds.delete(session.id);
+    }
   }
 
   // True while bumps that could veto the current best pair are still en route:
@@ -1327,6 +1394,10 @@ export class SignalingHub {
         score: entry?.analysis?.score ?? null
       });
     }
+    // Tombstone the dying cohort's bumps BEFORE deleting it: the teardown
+    // retry below re-evaluates surviving cohorts, and a crossed pair in one of
+    // them must stay vetoed by these bumps even though the telemetry is gone.
+    this.recordProximityBumpTombstones(session);
     clearTimeout(session.timer);
     clearTimeout(session.failTimer);
     this.proximitySessions.delete(sessionId);
@@ -1340,14 +1411,7 @@ export class SignalingHub {
     const sessionId = message.payload.sessionId;
     const session = this.proximitySessions.get(sessionId);
     if (!session) return;
-    session.clients.delete(sender.id);
-    session.telemetry.delete(sender.id);
-    if (!session.clients.size) {
-      clearTimeout(session.timer);
-      clearTimeout(session.failTimer);
-      this.proximitySessions.delete(sessionId);
-      this.openProximitySessionIds.delete(sessionId);
-    }
+    this.evictProximitySessionMember(session, sender.id);
     // A departure can settle another cohort's deferred match (one fewer pending
     // telemetry to wait for) — re-evaluate.
     this.tryMatchStartedProximitySessions();
@@ -1661,7 +1725,12 @@ export class SignalingHub {
     }
   }
 
-  removeClient(socket, reason) {
+  // preserveProximitySessions: an in-page reconnect re-registers the SAME
+  // client id on a new socket. Its proximity-session membership (clients/
+  // nonces/telemetry, all keyed by that id) stays valid — purging it silently
+  // evicted the device mid-ceremony, and its final telemetry then bounced with
+  // session_not_available while the partner one-sidedly failed.
+  removeClient(socket, reason, { preserveProximitySessions = false } = {}) {
     const client = this.socketToClient.get(socket);
     if (!client) return;
     if (this.turnTokens.get(client.turnAccessToken) === client) {
@@ -1679,15 +1748,12 @@ export class SignalingHub {
       reason
     });
     this.logger?.info("Client left signaling.", { id: client.id, reason });
-    for (const [sessionId, session] of this.proximitySessions) {
-      if (!session.clients.delete(client.id)) continue;
-      session.telemetry.delete(client.id);
-      session.matched.delete(client.id);
-      if (!session.clients.size) {
-        clearTimeout(session.timer);
-        clearTimeout(session.failTimer);
-        this.proximitySessions.delete(sessionId);
-        this.openProximitySessionIds.delete(sessionId);
+    let proximityMutated = false;
+    if (!preserveProximitySessions) {
+      for (const session of [...this.proximitySessions.values()]) {
+        if (!session.clients.has(client.id) && !session.telemetry.has(client.id)) continue;
+        this.evictProximitySessionMember(session, client.id);
+        proximityMutated = true;
       }
     }
     if (client.pairingId) {
@@ -1717,6 +1783,12 @@ export class SignalingHub {
       this.adminMonitors.delete(monitorId);
     }
     this.broadcast("peers", this.peerList());
+    // The departure may have been the only thing deferring another cohort's
+    // match (fewer pending telemetries / a blocker session torn down) — this
+    // was the one lifecycle transition without a re-evaluation hook, stalling
+    // eligible pairs until their fail deadline. The evicted bumps still veto
+    // via their tombstones.
+    if (proximityMutated) this.tryMatchStartedProximitySessions();
   }
 
   heartbeat() {
@@ -1895,6 +1967,12 @@ function telemetryTimingDiagnostics(session, timing = {}, matchSlopMs = DEFAULT_
 // be more permissive in chaotic same-instant multi-pair rooms, lower to reject
 // cross-pair matches more aggressively.
 const BUMP_PARTNER_VETO_MARGIN_MS = 700;
+
+// How long a departed/failed participant's bump time keeps vetoing after its
+// telemetry is destroyed. Covers the longest window in which an overlapping
+// cohort can still activate a pair (its endsAt + matchSlop linger).
+const BUMP_TOMBSTONE_TTL_MS = 15_000;
+const MAX_BUMP_TOMBSTONES = 256;
 
 function bumpTimeOf(entry) {
   return Number(entry.timing?.bumpAt || entry.receivedAt);

@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.111";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.111";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.111";
+import { formatBytes } from "../utils/format.js?v=1.0.112";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.112";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.112";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
@@ -42,7 +42,16 @@ export function createController({
   let receivePresentationTimer = 0;
   let permissionRequestPromise = null;
   let acousticPreflight = null;
-  let suppressDisconnectToast = false;
+  // One-shot with a deadline, NOT a boolean: it is set right before a
+  // fire-and-forget disconnectPeer whose peer:disconnected echo clears it. If
+  // that echo is lost (socket flap, peer already gone) a boolean would stay
+  // stuck and silently swallow the NEXT genuine disconnect's toast/cleanup.
+  let suppressDisconnectToastUntil = 0;
+  // Monotonic ceremony attempt counter. A cancelled/abandoned ceremony's
+  // acoustic window outlives the cancel by several seconds; its finally block
+  // must not stop the shared singleton sensors out from under the attempt that
+  // replaced it ("retry right after cancel always fails").
+  let ceremonyGeneration = 0;
   let adminMonitor = null;
   let pendingAdminMonitor = null;
   let adminMonitorRetryTimer = 0;
@@ -84,6 +93,7 @@ export function createController({
 
   signaling.on("disconnected", () => {
     if (!runtime.productionSignaling) return;
+    ceremonyGeneration += 1;
     stopAdminAcousticMonitor();
     pendingAdminMonitor = null;
     const wasOnline = store.getState().signalingStatus === "online";
@@ -425,12 +435,13 @@ export function createController({
     activePeerId = null;
     resolveQrCancellation();
     clearVerificationWaiters();
-    if (!suppressDisconnectToast) view.closeDynamicIsland();
-    if (!suppressDisconnectToast) {
+    const suppressDisconnect = Date.now() < suppressDisconnectToastUntil;
+    if (!suppressDisconnect) view.closeDynamicIsland();
+    if (!suppressDisconnect) {
       view.toast(view.translate("disconnected"));
     }
-    if (suppressDisconnectToast && failedProximityPeerId) activePeerId = failedProximityPeerId;
-    suppressDisconnectToast = false;
+    if (suppressDisconnect && failedProximityPeerId) activePeerId = failedProximityPeerId;
+    suppressDisconnectToastUntil = 0;
   });
 
   function armAdminAcousticMonitor(payload) {
@@ -1212,7 +1223,13 @@ export function createController({
         reason: error?.name || "exception",
         message: error?.message || "Ceremony failed before telemetry."
       });
-      const motion = proximity.getSnapshot?.().motion || {};
+      // An exception BEFORE startAt means the engine never cleared the motion
+      // latch (the ADR-0024 reset happens AT startAt) — the snapshot may still
+      // hold a pre-window handling jolt. Never report that as bump/tilt
+      // evidence: a phantom bump timestamp would pollute the server's
+      // closer-bump-partner veto for whatever cohort is pairing right then.
+      const windowOpened = Date.now() >= Number(startPayload.startAt || 0);
+      const motion = windowOpened ? (proximity.getSnapshot?.().motion || {}) : {};
       result = {
         passed: false,
         score: 0,
@@ -1408,7 +1425,7 @@ export function createController({
         failedProximityPeerId = null;
       }
       if (runtime.productionSignaling && pairingId) {
-        suppressDisconnectToast = true;
+        suppressDisconnectToastUntil = Date.now() + 3000;
         await signaling.disconnectPeer?.(peerId, pairingId);
       }
       store.patch({
@@ -1656,6 +1673,12 @@ export function createController({
 
   view.on("island-cancel", async () => {
     const current = store.getState();
+    // Mark any in-flight ceremony stale and stop the sensors NOW: the engine's
+    // acoustic window runs several more seconds after a cancel, and without
+    // this its finally block would later kill the sensors of the attempt the
+    // user starts next.
+    ceremonyGeneration += 1;
+    stopProximitySensors();
     resolveQrCancellation();
     clearProximitySessionWaiters();
     if (proximitySessionId) await signaling.cancelProximitySession?.(proximitySessionId);
@@ -1700,6 +1723,7 @@ export function createController({
   });
 
   async function runRealProximityCeremony(peerId, permissionPromise) {
+    const ceremonyAttempt = ++ceremonyGeneration;
     view.updateIslandCeremony({ phase: "permissions", state: "active" });
     const {
       microphone: microphonePermission,
@@ -1759,6 +1783,14 @@ export function createController({
         };
       }
       motionTimer = globalThis.setInterval(() => {
+        // The motion latch is only cleared AT startAt (ADR-0024): until then the
+        // snapshot may still hold the Connect-tap jolt from THIS attempt, and a
+        // single bump:true poll advances the island's monotonic ladder straight
+        // to "Bump detected" with no real bump — near-guaranteed when another
+        // cohort connects concurrently, since the stagger widens the pre-window
+        // gap. Feed the island only from startAt onward, when snapshot bumps
+        // are genuinely in-window.
+        if (Date.now() < start.startAt) return;
         view.updateIslandCeremony({
           phase: "motion",
           state: "active",
@@ -1786,11 +1818,16 @@ export function createController({
       };
     } finally {
       globalThis.clearInterval(motionTimer);
-      stopProximitySensors();
+      // Only the CURRENT attempt may stop the shared singleton sensors: a
+      // cancelled/abandoned ceremony's window outlives the cancel, and its
+      // cleanup would otherwise kill the replacing attempt's motion listener
+      // and mic capture mid-window.
+      if (ceremonyAttempt === ceremonyGeneration) stopProximitySensors();
     }
   }
 
   async function runRealProximitySessionCeremony(startPayload, permissionPromise, emitDiagnostic = () => {}) {
+    const ceremonyAttempt = ++ceremonyGeneration;
     view.updateIslandCeremony({ phase: "permissions", state: "active" });
     emitDiagnostic("permissions:request", { state: "active" });
     const {
@@ -1902,6 +1939,9 @@ export function createController({
         }
       }
       motionTimer = globalThis.setInterval(() => {
+        // Same pre-startAt gate as the direct path above: don't surface the
+        // still-latched Connect-tap jolt as "Bump detected" before the window.
+        if (Date.now() < startPayload.startAt) return;
         view.updateIslandCeremony({
           phase: "motion",
           state: "active",
@@ -1954,7 +1994,11 @@ export function createController({
       };
     } finally {
       globalThis.clearInterval(motionTimer);
-      stopProximitySensors();
+      // Only the CURRENT attempt may stop the shared singleton sensors: a
+      // cancelled/abandoned ceremony's window outlives the cancel, and its
+      // cleanup would otherwise kill the replacing attempt's motion listener
+      // and mic capture mid-window.
+      if (ceremonyAttempt === ceremonyGeneration) stopProximitySensors();
     }
   }
 

@@ -94,7 +94,10 @@ export class MotionProximitySensor {
   getSnapshot() {
     return {
       ...this.snapshot,
-      tilt: { ...this.snapshot.tilt }
+      tilt: { ...this.snapshot.tilt },
+      // Exposed so the ceremony UI can render a live "tilt X° / need Y°"
+      // readout — without it users can't tell whether they tilted far enough.
+      tiltThresholdDeg: this.tiltThreshold
     };
   }
 
