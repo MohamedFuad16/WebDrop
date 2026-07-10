@@ -1,10 +1,10 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.119";
-import { formatBytes } from "../utils/format.js?v=1.0.119";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.119";
-import { translate } from "../config/i18n.js?v=1.0.119";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.119";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.119";
-import { OnboardingTour } from "./onboarding.js?v=1.0.119";
+import { Emitter } from "../utils/emitter.js?v=1.0.120";
+import { formatBytes } from "../utils/format.js?v=1.0.120";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.120";
+import { translate } from "../config/i18n.js?v=1.0.120";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.120";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.120";
+import { OnboardingTour } from "./onboarding.js?v=1.0.120";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;

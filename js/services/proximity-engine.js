@@ -1,6 +1,6 @@
-import { AcousticProximitySensor, MIN_INAUDIBLE_FREQUENCY_HZ } from "./acoustic-proximity.js?v=1.0.119";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.119";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.119";
+import { AcousticProximitySensor, MIN_INAUDIBLE_FREQUENCY_HZ } from "./acoustic-proximity.js?v=1.0.120";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.120";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.120";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 export const BUMP_SCORE_POINTS = 20;

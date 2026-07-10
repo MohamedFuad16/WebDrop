@@ -189,7 +189,10 @@
 .onboarding__scene {
   position: relative;
   width: 100%;
-  height: 148px;
+  /* Tall enough for the welcome orbit: orbiters ride a 68px-radius ring and
+     stick out half an avatar (17px) past it, so they need 170px + shadow room.
+     All scenes share the height so every slide's card is the same size. */
+  height: 176px;
   display: grid;
   place-items: center;
 }
@@ -586,7 +589,15 @@
 }
 
 @media (max-width: 360px) {
-  .onboarding__scene { height: 128px; }
+  /* Shrink the orbit with the scene so orbiters never clip on small phones:
+     ring radius 56px + half a 28px avatar = 70px from center → 140px + room. */
+  .onboarding__scene { height: 150px; }
+  .onboarding__orbit { width: 112px; height: 112px; }
+  .onboarding__orbiter { width: 28px; height: 28px; }
+  .onboarding__orbiter--a { --orbit-r: 56px; }
+  .onboarding__orbiter--b { --orbit-r: 56px; }
+  .onboarding__orbiter--c { --orbit-r: 33px; width: 24px; height: 24px; }
+  .onboarding__orbit-self { width: 40px; height: 40px; }
   .onboarding__slide h2 { font-size: 18px; }
   .onboarding__file { width: 58px; padding: 11px 10px; }
   .onboarding__file--left { left: 2%; }
