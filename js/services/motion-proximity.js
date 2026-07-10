@@ -119,7 +119,10 @@ export class MotionProximitySensor {
       acceleration,
       maxAcceleration: Math.max(this.snapshot.maxAcceleration, acceleration),
       bump: this.snapshot.bump || bump,
-      bumpAt: bump ? this.now() : this.snapshot.bumpAt,
+      // Stamp the FIRST threshold crossing, not the last: a real impact rings
+      // across several 60Hz samples and overwriting on each one added up to
+      // ~100ms of jitter to the timestamp the server matches pairs by.
+      bumpAt: bump && !this.snapshot.bump ? this.now() : this.snapshot.bumpAt,
       tilt,
       tilted: this.snapshot.tilted || tilted
     };

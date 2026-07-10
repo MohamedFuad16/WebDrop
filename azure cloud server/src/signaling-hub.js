@@ -81,7 +81,13 @@ const ACOUSTIC_MIN_BANDWIDTH_HZ = 420;
 // splitting is a no-op until the band is widened via ACOUSTIC_BAND_END_HZ; the
 // start stagger spreads concurrent cohorts across a few time phases so cohorts
 // that fill at the same instant do not all begin chirping simultaneously.
-const DEFAULT_ACOUSTIC_SESSION_STAGGER_MS = 300;
+// Concurrent cohorts' "Bump now" cues fire at their startAt — with a 300ms
+// stagger, two pairs tapping together bumped on effectively the SAME beat
+// (well inside the 700ms BUMP_PARTNER_VETO_MARGIN_MS), so the system
+// manufactured the exact same-beat collision the veto then rejects into an
+// honest retry. 1200ms puts adjacent cohorts' cues safely outside the veto
+// margin; the failTimer math already includes staggerMs.
+const DEFAULT_ACOUSTIC_SESSION_STAGGER_MS = 1200;
 const DEFAULT_ACOUSTIC_SESSION_STAGGER_PHASES = 3;
 const DEFAULT_ACOUSTIC_MAX_CONCURRENT_SUBBANDS = 4;
 // Minimum separation (correlation units, 0..1) the strongest heard signature must
@@ -1289,6 +1295,11 @@ export class SignalingHub {
       if (other.id === session.id || !other.started || !other.telemetry) continue;
       for (const entry of other.telemetry.values()) {
         if (other.matched?.has(entry.clientId)) continue;
+        // Only telemetry with REAL bump evidence may veto: an entry whose bump
+        // never fired carries the client's Date.now() fallback (or the server's
+        // receivedAt fallback) as its "bump time", and that arbitrary timestamp
+        // could falsely veto a genuine sloppy-delta pair in another cohort.
+        if (!entry.analysis?.physicalEvidence?.bump) continue;
         const bump = bumpTimeOf(entry);
         if (Number.isFinite(bump)) bumps.push(bump);
       }
@@ -1313,6 +1324,8 @@ export class SignalingHub {
     for (const entry of session.telemetry.values()) {
       if (onlyClientId && entry.clientId !== onlyClientId) continue;
       if (session.matched.has(entry.clientId)) continue;
+      // Same rule as the live veto: no real bump evidence → no veto power.
+      if (!entry.analysis?.physicalEvidence?.bump) continue;
       const bump = bumpTimeOf(entry);
       if (!Number.isFinite(bump)) continue;
       this.proximityBumpTombstones.push({ bumpAt: bump, expiresAt: now + BUMP_TOMBSTONE_TTL_MS });
@@ -1982,6 +1995,9 @@ function hasCloserBumpPartner(session, a, b, delta, foreignBumpTimes = []) {
   for (const entry of session.telemetry.values()) {
     if (entry.clientId === a.clientId || entry.clientId === b.clientId) continue;
     if (session.matched.has(entry.clientId)) continue;
+    // Entries without real bump evidence carry fallback timestamps (client
+    // Date.now() / server receivedAt) — arbitrary times must not veto.
+    if (!entry.analysis?.physicalEvidence?.bump) continue;
     const bump = bumpTimeOf(entry);
     if (!Number.isFinite(bump)) continue;
     if (Math.abs(bumpTimeOf(a) - bump) + BUMP_PARTNER_VETO_MARGIN_MS <= delta

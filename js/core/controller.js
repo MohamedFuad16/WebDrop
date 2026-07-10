@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.113";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.113";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.113";
+import { formatBytes } from "../utils/format.js?v=1.0.114";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.114";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.114";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
@@ -354,29 +354,43 @@ export function createController({
     view.closeDynamicIsland();
   });
 
+  // The session waiters filter frames by sessionId, but the SLOT must only be
+  // cleared when the waiter actually CONSUMED the frame. Resolvers return true
+  // on consumption; a stale session's late frame (cancel → fast retry race)
+  // returns false and leaves the new attempt's waiter armed. Previously the
+  // handlers nulled unconditionally, so a rejected stale frame destroyed the
+  // waiter and the real frame later arrived to nothing — the attempt hung the
+  // full timeout and failed with proximityErrorSync ("works on retry").
   signaling.on("proximity:session:joined", (payload = {}) => {
-    proximitySessionId = payload.sessionId || proximitySessionId;
-    proximitySessionJoinedResolver?.(payload);
-    proximitySessionJoinedResolver = null;
+    if (proximitySessionJoinedResolver?.(payload)) {
+      proximitySessionId = payload.sessionId || proximitySessionId;
+      proximitySessionJoinedResolver = null;
+    }
   });
 
   signaling.on("proximity:session:start", (payload = {}) => {
-    proximitySessionId = payload.sessionId || proximitySessionId;
-    proximitySessionStartResolver?.(payload);
-    proximitySessionStartResolver = null;
+    if (proximitySessionStartResolver?.(payload)) {
+      proximitySessionId = payload.sessionId || proximitySessionId;
+      proximitySessionStartResolver = null;
+    }
   });
 
   signaling.on("proximity:match", (payload = {}) => {
-    proximityMatchResolver?.(payload);
-    proximityMatchResolver = null;
+    if (proximityMatchResolver?.(payload)) proximityMatchResolver = null;
   });
 
   signaling.on("proximity:session:telemetry:accepted", (payload = {}) => {
-    proximityTelemetryAckResolver?.(payload);
-    proximityTelemetryAckResolver = null;
+    if (proximityTelemetryAckResolver?.(payload)) proximityTelemetryAckResolver = null;
   });
 
   signaling.on("proximity:session:failed", (payload = {}) => {
+    // Only a failure for the CURRENT attempt's session may abort its waiters.
+    // A late frame from a previous session (a lingering failTimer of an
+    // abandoned cohort, a replaced_by_same_device notice) used to resolve them
+    // with an explicit null — bypassing their sessionId guards — and overwrite
+    // the failure reason shown to the user. Pre-join failures (capacity_reached,
+    // already_connected) carry no sessionId and still apply.
+    if (payload.sessionId && proximitySessionId && payload.sessionId !== proximitySessionId) return;
     // The server decides the authoritative failure reason (bump vs ultrasound vs
     // non-reciprocal match). Hold onto it so the UI can report the REAL cause
     // instead of the generic "no matching bump" string — critical when this
@@ -1375,9 +1389,13 @@ export function createController({
       view.toast(view.translate("proximityPrompt"));
     }
     if (runtime.productionSignaling) {
+      const attemptGeneration = ceremonyGeneration;
       const pairing = await establishProductionPairing(peerId);
       if (!pairing || !isCurrentVerification(peerId)) {
-        stopProximitySensors();
+        // This continuation can resume up to 30s later (waitForPairing timeout).
+        // If a newer attempt has started meanwhile, its sensors are not ours to
+        // stop — same rule as the ceremony finally blocks.
+        if (attemptGeneration === ceremonyGeneration) stopProximitySensors();
         store.patch({ mode: "lobby", pendingInviteId: null, incomingInvite: null, pairingId: null });
         return;
       }
@@ -2403,6 +2421,10 @@ export function createController({
     clearProximitySessionWaiters();
   }
 
+  // Resolver contract: return true when the payload was consumed (the handler
+  // then clears the slot), false when it belongs to another session (the slot
+  // stays armed for the real frame). A null payload — timeout/clear/abort — is
+  // always consumed.
   function waitForProximitySessionJoined(timeoutMs) {
     return new Promise((resolve) => {
       const timer = setTimeout(() => {
@@ -2412,6 +2434,7 @@ export function createController({
       proximitySessionJoinedResolver = (payload) => {
         clearTimeout(timer);
         resolve(payload);
+        return true;
       };
     });
   }
@@ -2423,9 +2446,10 @@ export function createController({
         resolve(null);
       }, timeoutMs);
       proximitySessionStartResolver = (payload) => {
-        if (payload && payload.sessionId !== sessionId) return;
+        if (payload && payload.sessionId !== sessionId) return false;
         clearTimeout(timer);
         resolve(payload);
+        return true;
       };
     });
   }
@@ -2437,9 +2461,10 @@ export function createController({
         resolve(null);
       }, timeoutMs);
       proximityMatchResolver = (payload) => {
-        if (payload && payload.sessionId !== sessionId) return;
+        if (payload && payload.sessionId !== sessionId) return false;
         clearTimeout(timer);
         resolve(payload);
+        return true;
       };
     });
   }
@@ -2451,9 +2476,10 @@ export function createController({
         resolve(null);
       }, timeoutMs);
       proximityTelemetryAckResolver = (payload) => {
-        if (payload && payload.sessionId !== sessionId) return;
+        if (payload && payload.sessionId !== sessionId) return false;
         clearTimeout(timer);
         resolve(payload);
+        return true;
       };
     });
   }

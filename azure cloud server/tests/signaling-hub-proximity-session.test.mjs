@@ -272,9 +272,9 @@ test("crossed acoustic decodes with distant bumps do not connect the wrong pair"
   // ~150ms away — the veto must reject the cross pair instead of connecting
   // two strangers.
   hub.recordProximitySessionTelemetry(a1, sessionMessage(session, a1, verifiedMetrics(), 1000, b1));
-  hub.recordProximitySessionTelemetry(a2, sessionMessage(session, a2, { acoustic: true }, 1150, a1));
+  hub.recordProximitySessionTelemetry(a2, sessionMessage(session, a2, bumpedInsufficientMetrics(), 1150, a1));
   hub.recordProximitySessionTelemetry(b1, sessionMessage(session, b1, verifiedMetrics(), 3000, a1));
-  hub.recordProximitySessionTelemetry(b2, sessionMessage(session, b2, { acoustic: true }, 3150, b1));
+  hub.recordProximitySessionTelemetry(b2, sessionMessage(session, b2, bumpedInsufficientMetrics(), 3150, b1));
 
   assert.equal(a1.pairingId, null);
   assert.equal(a2.pairingId, null);
@@ -368,8 +368,8 @@ test("a wrong pair split across two crossed cohorts is vetoed by the other cohor
 
   // The other cohort reports: k bumped 71ms from w, mai bumped 68ms from m —
   // each phone's TRUE partner is in the other session. Veto the cross pair.
-  hub.recordProximitySessionTelemetry(k, sessionMessage(s2, k, { acoustic: true }, now - 3248, mai));
-  hub.recordProximitySessionTelemetry(mai, sessionMessage(s2, mai, { acoustic: true }, now - 5068, k));
+  hub.recordProximitySessionTelemetry(k, sessionMessage(s2, k, bumpedInsufficientMetrics(), now - 3248, mai));
+  hub.recordProximitySessionTelemetry(mai, sessionMessage(s2, mai, bumpedInsufficientMetrics(), now - 5068, k));
 
   assert.equal(w.pairingId, null);
   assert.equal(m.pairingId, null);
@@ -464,7 +464,7 @@ test("a cohort pair is held until the remaining member's bump can veto it", () =
   hub.recordProximitySessionTelemetry(a2, sessionMessage(session, a2, verifiedMetrics(), now - 3594, a1));
   assert.equal(a1.pairingId, null, "pair must wait for the cohort's remaining member");
 
-  hub.recordProximitySessionTelemetry(c, sessionMessage(session, c, { acoustic: true }, now - 4548, a1));
+  hub.recordProximitySessionTelemetry(c, sessionMessage(session, c, bumpedInsufficientMetrics(), now - 4548, a1));
   assert.equal(a1.pairingId, null);
   hub.failUnmatchedProximitySession(session.id);
   assert.equal(a1.pairingId, null);
@@ -521,8 +521,8 @@ test("tearing down one crossed cohort must not un-veto the other (bump tombstone
   // strangers — get matched by the very teardown retry.
   hub.recordProximitySessionTelemetry(m, sessionMessage(s1, m, verifiedMetrics(), now - 5000, w));
   hub.recordProximitySessionTelemetry(w, sessionMessage(s1, w, verifiedMetrics(), now - 3319, m));
-  hub.recordProximitySessionTelemetry(k, sessionMessage(s2, k, { acoustic: true }, now - 3248, mai));
-  hub.recordProximitySessionTelemetry(mai, sessionMessage(s2, mai, { acoustic: true }, now - 5068, k));
+  hub.recordProximitySessionTelemetry(k, sessionMessage(s2, k, bumpedInsufficientMetrics(), now - 3248, mai));
+  hub.recordProximitySessionTelemetry(mai, sessionMessage(s2, mai, bumpedInsufficientMetrics(), now - 5068, k));
   assert.equal(w.pairingId, null, "vetoed while s2 is alive");
 
   hub.failUnmatchedProximitySession(s2.id);
@@ -555,6 +555,34 @@ test("re-joining while a member of a started session evicts the ghost membership
   assert.equal(session.clients.has(a1.id), false, "evicted from the started session");
   assert.equal(session.nonces.has(a1.id), false);
   assert.equal(hub.totalProximityParticipants(), 2, "a2 in the old cohort + a1 in the new one — no double count");
+
+  hub.close();
+});
+
+test("telemetry without real bump evidence cannot veto a genuine pair", () => {
+  const hub = createTestHub();
+  const a1 = addClient(hub, "noveto-a-1");
+  const a2 = addClient(hub, "noveto-a-2");
+  const c = addClient(hub, "noveto-c");
+  const session = createSession(hub, [a1, a2, c]);
+  const now = Date.now();
+  session.createdAt = now - 8000;
+  session.startAt = now - 6000;
+  session.endsAt = now - 500;
+
+  // (a1,a2) are a genuine but sloppy pair (1500ms delta — one phone detected
+  // its bump late). c's ceremony errored before any bump: its telemetry
+  // carries only a FALLBACK timestamp as "bump time", which happens to land
+  // 100ms from a1's. An arbitrary clock value must not veto a real pair.
+  hub.recordProximitySessionTelemetry(a1, sessionMessage(session, a1, verifiedMetrics(), now - 5000, a2));
+  hub.recordProximitySessionTelemetry(a2, sessionMessage(session, a2, verifiedMetrics(), now - 3500, a1));
+  assert.equal(a1.pairingId, null, "held for the cohort's remaining member");
+
+  hub.recordProximitySessionTelemetry(c, sessionMessage(session, c, { acoustic: true }, now - 4900, a1));
+
+  assert.ok(a1.pairingId, "bump-less telemetry must not veto the genuine pair");
+  assert.equal(a1.pairingId, a2.pairingId);
+  assert.equal(messagesOf(a1, "proximity:match")[0].payload.peerId, "noveto-a-2");
 
   hub.close();
 });
@@ -1002,6 +1030,18 @@ function verifiedMetrics() {
     bump: true,
     tilt: true,
     acousticConfidenceMargin: 0.5
+  };
+}
+
+// A REAL bump + tilt but no acoustic detection — the classic weak-emitter
+// partner (score 0.58, decision insufficient). Its bump evidence is genuine,
+// so it may veto; contrast { acoustic: true } alone, whose bump never fired
+// and whose "bump time" is just a fallback timestamp with no veto power.
+function bumpedInsufficientMetrics() {
+  return {
+    ...verifiedMetrics(),
+    acoustic: false,
+    soundCorrelation: 0
   };
 }
 
