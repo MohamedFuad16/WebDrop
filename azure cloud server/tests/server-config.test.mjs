@@ -99,7 +99,11 @@ test("consolidated diagnostics endpoint rejects un-tokened reads and serves the 
     assert.deepEqual(body.signaling.pairs, []);
     assert.deepEqual(body.signaling.proximitySessions, []);
     assert.equal(body.signaling.protocol.scoreMinimum, 0.55);
-    assert.equal(body.signaling.protocol.maxClients, 6);
+    // The runtime policy raises the ceremony window to 6000ms (server.js
+    // defaults), so an unconfigured cohort cap follows the slot-floor
+    // ceiling: floor(6000/600) = 10. It was previously latched at the
+    // constructor-time ceiling (6) — that was the bug, not the spec.
+    assert.equal(body.signaling.protocol.maxClients, 10);
     assert.equal(body.signaling.protocol.acousticSlotCorrelationMin, 0.2);
     assert.equal(body.signaling.protocol.acousticBandStartHz, 17800);
     assert.equal(body.signaling.protocol.acousticBandEndHz, 19800);

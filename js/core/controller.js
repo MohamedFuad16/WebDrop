@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.121";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.121";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.121";
+import { formatBytes } from "../utils/format.js?v=1.0.122";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.122";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.122";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
@@ -37,6 +37,11 @@ export function createController({
   let proximitySessionFailedResolver = null;
   let proximityTelemetryAckResolver = null;
   let lastProximityFailure = null;
+  // Silent split-pair recovery budget: when the server hints that this device's
+  // bump coincided with one in ANOTHER cohort (true pair split by arrival-order
+  // grouping), the client re-joins automatically instead of surfacing a
+  // failure card. Bounded so a pathological hint can never loop forever.
+  let proximityAutoRegroups = 0;
   let pendingTransferPatch = null;
   let transferPatchFrame = 0;
   let receivePresentationTimer = 0;
@@ -398,6 +403,14 @@ export function createController({
     lastProximityFailure = payload;
     proximitySessionFailedResolver?.(payload);
     proximitySessionFailedResolver = null;
+    // Pre-join rejections (capacity_reached, already_connected) arrive with no
+    // sessionId while the client is still awaiting proximity:session:joined —
+    // without resolving that waiter too, the attempt hung its full 10s timeout
+    // and reported a misleading "did not start together" sync error.
+    if (!payload.sessionId) {
+      proximitySessionJoinedResolver?.(null);
+      proximitySessionJoinedResolver = null;
+    }
     proximitySessionStartResolver?.(null);
     proximitySessionStartResolver = null;
     proximityMatchResolver?.(null);
@@ -959,6 +972,7 @@ export function createController({
     }
     activePeerId = null;
     activeConnectionMethod = "proximity";
+    proximityAutoRegroups = 0;
     const permissionPromise = runtime.realProximityCeremony
       ? ensureProximityPermissions()
       : null;
@@ -1180,7 +1194,12 @@ export function createController({
     const joinedPayload = await joined;
     const sessionId = joinedPayload?.sessionId;
     if (!sessionId || !isCurrentAnonymousVerification()) {
-      await failAnonymousVerification({ score: 0, errors: [view.translate("proximityErrorSync")] });
+      // A pre-join rejection carries the real reason (capacity, duplicate tab)
+      // — surface that instead of the generic sync error.
+      const rejectionKey = lastProximityFailure?.reason && !lastProximityFailure.sessionId
+        ? proximityServerReasonKey(lastProximityFailure.reason)
+        : "proximityErrorSync";
+      await failAnonymousVerification({ score: 0, errors: [view.translate(rejectionKey)] });
       return;
     }
     proximitySessionId = sessionId;
@@ -1191,6 +1210,11 @@ export function createController({
     }
     if (!runtime.realProximityCeremony) {
       await wait(Math.max(0, Number(startPayload.startAt) - Date.now() + 50));
+    }
+    // A staggered start means another group's ceremony is in flight — say so
+    // instead of sitting silently on "Getting ready…".
+    if (Number(startPayload.startAt) - Date.now() > 1600) {
+      view.updateIslandCeremony({ phase: "sync", queuedUntil: Number(startPayload.startAt) });
     }
 
     let result;
@@ -1291,8 +1315,35 @@ export function createController({
       motion: result.evidence?.motion
     });
     await sendProximityTelemetryWithAck(startPayload, clientNonce, result);
+    // Matching can legitimately hold while other overlapping groups finish
+    // reporting (server-side deferral) — after a beat, say so instead of
+    // sitting silently on "Verifying proximity…".
+    const deferHintTimer = globalThis.setTimeout(() => {
+      if (isCurrentProximitySession(sessionId)) view.updateIslandCeremony({ phase: "deferred" });
+    }, 2600);
     const matchPayload = await match;
+    globalThis.clearTimeout(deferHintTimer);
     if (!matchPayload?.peerId || !matchPayload?.pairingId || !isCurrentProximitySession(sessionId)) {
+      // Split-pair regroup: the server saw this device's bump coincide with a
+      // bump in another cohort — the true partner was split away by
+      // arrival-order grouping and can never match in THIS session. Re-join
+      // silently (both sides get the same hint, so they land in one fresh
+      // cohort together) instead of surfacing a failure card.
+      if (lastProximityFailure?.regroup && isCurrentProximitySession(sessionId) && proximityAutoRegroups < 2) {
+        proximityAutoRegroups += 1;
+        view.updateIslandCeremony({ phase: "regroup" });
+        stopProximitySensors();
+        clearProximitySessionWaiters();
+        proximitySessionId = null;
+        await wait(Number(lastProximityFailure.retryAfterMs) || 700);
+        if (isCurrentAnonymousVerification()) {
+          // Leave "verifying" so beginAnonymousProximityConnection's re-entry
+          // guard lets the fresh attempt through, then restart the whole flow.
+          store.patch({ mode: "lobby" });
+          beginAnonymousProximityConnection(permissionPromise);
+        }
+        return;
+      }
       await failAnonymousVerification({
         score: result?.score || 0,
         errors: proximityFailureMessages(result, { analysis: { score: (result?.score || 0) / 100 } }),
@@ -1300,6 +1351,7 @@ export function createController({
       });
       return;
     }
+    proximityAutoRegroups = 0;
 
     const peer = normalizePeer(matchPayload.peer || { id: matchPayload.peerId, name: view.translate("anonymousNearbyPeer") });
     activePeerId = peer.id;
@@ -1971,7 +2023,11 @@ export function createController({
         view.updateIslandCeremony({
           phase: "motion",
           state: "active",
-          motion: proximity.getSnapshot().motion
+          motion: proximity.getSnapshot().motion,
+          // Turn-taking cohorts: the island gates "Bump now" on this device's
+          // server-assigned cue so different pairs bump on different beats.
+          bumpCueAt: startPayload.bumpCueAt,
+          bumpCueSpacingMs: startPayload.bumpCueSpacingMs
         });
       }, 120);
       const result = await proximity.runRealCeremony({
@@ -1983,7 +2039,11 @@ export function createController({
         tuning: startPayload.tuning,
         tokenFresh: Boolean(startPayload.sessionId),
         onProgress: (progress) => {
-          view.updateIslandCeremony(progress);
+          view.updateIslandCeremony({
+            ...progress,
+            bumpCueAt: startPayload.bumpCueAt,
+            bumpCueSpacingMs: startPayload.bumpCueSpacingMs
+          });
           if (progress?.phase === "audio") {
             emitDiagnostic(`audio:${progress.acoustic?.mode || "progress"}`, {
               state: progress.state || "active",
@@ -2746,6 +2806,8 @@ export function createController({
 
   function proximityServerReasonKey(reason) {
     switch (reason) {
+      case "capacity_reached":
+        return "proximityErrorBusy";
       case "acoustic_not_detected":
         return "proximityErrorUltrasound";
       case "bump_not_detected":

@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.121";
-import { Emitter } from "../utils/emitter.js?v=1.0.121";
-import { formatBytes } from "../utils/format.js?v=1.0.121";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.121";
-import { TileWave } from "./tile-wave.js?v=1.0.121";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.122";
+import { Emitter } from "../utils/emitter.js?v=1.0.122";
+import { formatBytes } from "../utils/format.js?v=1.0.122";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.122";
+import { TileWave } from "./tile-wave.js?v=1.0.122";
 
 // Monotonic ceremony stage ladder shown in the island during pairing. Replaces
 // the old permissions/audio/bump/tilt checklist with a single staged status line
@@ -90,6 +90,9 @@ export class DynamicIsland extends Emitter {
     this.previousFocus = null;
     this.ceremonyStage = 1;
     this.ceremonyStageEnteredAt = 0;
+    this.ceremonyBumpCueAt = null;
+    this.ceremonyBumpCueSpacingMs = 0;
+    this.ceremonyQueuedUntil = null;
     this.copyKeys = { title: null, status: null };
     this.transferDisplayRatio = 0;
     this.transferTargetRatio = 0;
@@ -246,8 +249,14 @@ export class DynamicIsland extends Emitter {
     this.setStatus("qrConnected");
   }
 
-  updateCeremony({ phase, state, motion, score } = {}) {
+  updateCeremony({ phase, state, motion, score, bumpCueAt, bumpCueSpacingMs, queuedUntil } = {}) {
     if (!this.nodes.ceremony || !["connecting", "verification-failed"].includes(this.state)) return;
+    // Turn-taking metadata from the server (cohorts above 2 bump in turns):
+    // remember this device's personal cue so the ladder can gate "Bump now" on
+    // it and show a "wait for your turn" line until then.
+    if (Number.isFinite(bumpCueAt)) this.ceremonyBumpCueAt = bumpCueAt;
+    if (Number.isFinite(bumpCueSpacingMs)) this.ceremonyBumpCueSpacingMs = bumpCueSpacingMs;
+    if (Number.isFinite(queuedUntil)) this.ceremonyQueuedUntil = queuedUntil;
     // The score span stays hidden during a healthy ceremony and is revealed only
     // on failure (by showVerificationFailure). Keep its value current regardless.
     if (Number.isFinite(score) && this.nodes.ceremonyScore) {
@@ -267,9 +276,35 @@ export class DynamicIsland extends Emitter {
       if (this.nodes.ceremonyTilt) this.nodes.ceremonyTilt.hidden = true;
       return;
     }
+    // Multi-group coordination states. These only OVERRIDE the headline text —
+    // the monotonic ladder itself never moves for them.
+    if (phase === "deferred") {
+      if (this.ceremonyStage === CEREMONY_STAGES.verifying && this.nodes.ceremonyStage) {
+        this.nodes.ceremonyStage.textContent = this.translate("ceremonyStageWaitingOthers");
+      }
+      return;
+    }
+    if (phase === "regroup") {
+      if (this.nodes.ceremonyStage) {
+        this.nodes.ceremonyStage.textContent = this.translate("ceremonyStageRegroup");
+      }
+      return;
+    }
     const target = this.ceremonyStageForEvent({ phase, motion });
     if (target) this.advanceCeremonyStage(target);
     if (phase === "motion") this.paintCeremonyTilt(motion);
+    // Headline refinements on top of the ladder: a queued cohort explains the
+    // wait before startAt; a turn-taking cohort tells the user to hold their
+    // bump until this phone's own cue moment.
+    if (this.nodes.ceremonyStage && this.ceremonyStage === CEREMONY_STAGES.preparing
+      && Number(this.ceremonyQueuedUntil) - this.now() > 1200) {
+      this.nodes.ceremonyStage.textContent = this.translate("ceremonyStageQueued");
+    }
+    if (this.nodes.ceremonyStage && this.ceremonyStage === CEREMONY_STAGES.exchanging
+      && (this.ceremonyBumpCueSpacingMs || 0) > 0
+      && this.ceremonyBumpCueAt - this.now() > 350) {
+      this.nodes.ceremonyStage.textContent = this.translate("ceremonyStageAwaitTurn");
+    }
   }
 
   // Map a ceremony progress event to its monotonic stage index (or null if the
@@ -279,11 +314,18 @@ export class DynamicIsland extends Emitter {
     if (phase === "audio") return CEREMONY_STAGES.exchanging;
     if (phase === "motion") {
       if (motion?.bump) return CEREMONY_STAGES.tilt;
-      // Hold "Exchanging ultrasonic waves…" briefly before surfacing the bump
-      // cue, so the actionable instruction doesn't flash in immediately. Motion
-      // polls repeat (~120ms), so a later poll advances once the hold elapses.
-      if (this.ceremonyStage >= CEREMONY_STAGES.exchanging
-        && this.now() - this.ceremonyStageEnteredAt >= 900) {
+      if (this.ceremonyStage < CEREMONY_STAGES.exchanging) return null;
+      // Turn-taking cohorts: "Bump now" appears exactly at this device's
+      // server-assigned cue, so different pairs bump on different beats and
+      // the matcher's closer-bump veto can discriminate between them.
+      if (Number.isFinite(this.ceremonyBumpCueAt)) {
+        return this.now() >= this.ceremonyBumpCueAt ? CEREMONY_STAGES.bump : null;
+      }
+      // Legacy shared beat: hold "Exchanging ultrasonic waves…" briefly before
+      // surfacing the bump cue, so the actionable instruction doesn't flash in
+      // immediately. Motion polls repeat (~120ms), so a later poll advances
+      // once the hold elapses.
+      if (this.now() - this.ceremonyStageEnteredAt >= 900) {
         return CEREMONY_STAGES.bump;
       }
       return null;
@@ -659,6 +701,9 @@ export class DynamicIsland extends Emitter {
   resetCeremony() {
     this.ceremonyStage = 1;
     this.ceremonyStageEnteredAt = this.now();
+    this.ceremonyBumpCueAt = null;
+    this.ceremonyBumpCueSpacingMs = 0;
+    this.ceremonyQueuedUntil = null;
     if (this.root) this.root.dataset.ceremonyStage = "1";
     if (this.nodes.ceremonyStage) this.nodes.ceremonyStage.textContent = this.translate("ceremonyStagePreparing");
     if (this.nodes.ceremonyTilt) this.nodes.ceremonyTilt.hidden = true;

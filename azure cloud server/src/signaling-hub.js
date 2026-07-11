@@ -52,6 +52,31 @@ const ACOUSTIC_MIN_SLOT_MS = 520;
 const ACOUSTIC_SLOT_GUARD_MS = 80;
 const ACOUSTIC_CEREMONY_SLOT_FLOOR_MS = ACOUSTIC_MIN_SLOT_MS + ACOUSTIC_SLOT_GUARD_MS; // 600ms
 
+// Per-device "Bump now" cue schedule (ADR-0028 Step 2). One shared cue per
+// cohort manufactured same-beat bumps: with 2-3 pairs bumping on one beat the
+// 700ms closer-bump veto is mathematically unable to discriminate (all deltas
+// land inside the margin), so identity degraded to amplitude-blind decode
+// reciprocity. Instead, each slot's cue fires BASE + slot*SPACING after
+// startAt; a pair bumps when the FIRST of its two phones says go, and two
+// different pairs' first-cues are ≥ SPACING apart by construction — putting
+// inter-pair bump deltas safely outside the veto margin. Cohorts of 2 keep a
+// single shared cue (no ambiguity to separate). The ceremony window stretches
+// to cover the last cue plus a human-reaction tail.
+const BUMP_CUE_BASE_MS = 900;
+const BUMP_CUE_SPACING_MS = 1500;
+const BUMP_CUE_TAIL_MS = 2600;
+
+// Split-pair regroup: when a failing member's bump sits within this epsilon of
+// a bump in ANOTHER cohort (live or tombstoned), the two phones almost
+// certainly shared one physical bump but were split across cohorts by
+// arrival-order grouping — a geometry that can never match (members only pair
+// within their own session). The failed frame then carries a regroup hint so
+// both clients silently re-join after RETRY_AFTER instead of surfacing a
+// failure card; the singleton late-tap grace (6s) bridges their different
+// cohorts' fail times so they land in one fresh fast-start session together.
+const REGROUP_BUMP_EPSILON_MS = 300;
+const REGROUP_RETRY_AFTER_MS = 700;
+
 // Capacity defaults. The per-session cohort default is derived from the slot
 // floor below (clamped in the constructor); the global cap defaults to 100 for
 // the physical test and is the only knob that needs raising toward 10,000 (the
@@ -183,8 +208,15 @@ export class SignalingHub {
     // can never schedule sub-floor slots. Raising the cohort requires extending
     // the ceremony window (proximitySessionDurationMs), not just the cap.
     this.proximityCohortCeiling = Math.max(2, Math.floor(this.proximityDurationMs / ACOUSTIC_CEREMONY_SLOT_FLOOR_MS));
-    const requestedCohort = configuredPositive(maxProximitySessionClients, this.proximityCohortCeiling);
-    this.requestedMaxProximitySessionClients = Math.max(2, Math.floor(requestedCohort));
+    // Remember whether the operator explicitly configured a cohort cap. When
+    // they did not, the cap must FOLLOW the ceiling as the runtime policy
+    // retunes the ceremony window — previously the constructor-time ceiling
+    // (window 3600 → 6) was latched as the "requested" cap, so a policy that
+    // raised the window to 6000 (ceiling 10) stayed clamped to 6 forever and a
+    // 10-person burst was needlessly split into two cohorts.
+    const explicitCohortCap = configuredPositive(maxProximitySessionClients, 0);
+    this.configuredProximityCohortCap = explicitCohortCap > 0 ? Math.max(2, Math.floor(explicitCohortCap)) : null;
+    this.requestedMaxProximitySessionClients = this.configuredProximityCohortCap ?? this.proximityCohortCeiling;
     this.maxProximitySessionClients = Math.max(2, Math.min(this.proximityCohortCeiling, this.requestedMaxProximitySessionClients));
     if (this.requestedMaxProximitySessionClients > this.proximityCohortCeiling) {
       this.logger?.warn("Clamping per-session acoustic cohort to the slot-floor ceiling.", {
@@ -273,6 +305,9 @@ export class SignalingHub {
     this.proximityDurationMs = this.runtimeProximityPolicy.timing.acousticWindowMs;
     this.proximityMatchSlopMs = this.runtimeProximityPolicy.timing.matchSlopMs;
     this.proximityCohortCeiling = Math.max(2, Math.floor(this.proximityDurationMs / ACOUSTIC_CEREMONY_SLOT_FLOOR_MS));
+    // An unconfigured cap tracks the (possibly retuned) ceiling; an explicit
+    // operator cap stays fixed and is merely re-clamped.
+    this.requestedMaxProximitySessionClients = this.configuredProximityCohortCap ?? this.proximityCohortCeiling;
     this.maxProximitySessionClients = Math.max(
       2,
       Math.min(this.proximityCohortCeiling, this.requestedMaxProximitySessionClients)
@@ -920,11 +955,17 @@ export class SignalingHub {
     // Stagger concurrent cohorts across a few time phases so cohorts that fill
     // at the same instant do not all begin chirping simultaneously. Phase 0 has
     // no offset, so the first/only cohort is unaffected.
-    const staggerMs = this.nextProximityStaggerMs();
+    const staggerMs = this.nextProximityStaggerMs(session);
     session.staggerMs = staggerMs;
     const startAt = Date.now() + this.proximityStartDelayMs + staggerMs;
     session.startAt = startAt;
-    const durationMs = Number(session.tuning?.timing?.acousticWindowMs || this.proximityDurationMs);
+    let durationMs = Number(session.tuning?.timing?.acousticWindowMs || this.proximityDurationMs);
+    // Cohorts above 2 take bump turns (per-device cues below); the window must
+    // cover the last slot's cue plus a human-reaction tail or the final pair
+    // would be told to bump after the ceremony already ended.
+    if (session.clients.size > 2) {
+      durationMs = Math.max(durationMs, BUMP_CUE_BASE_MS + (session.clients.size - 1) * BUMP_CUE_SPACING_MS + BUMP_CUE_TAIL_MS);
+    }
     const matchSlopMs = Number(session.tuning?.timing?.matchSlopMs || this.proximityMatchSlopMs);
     session.endsAt = startAt + durationMs;
     // The ceremony legally outlives the join-time TTL: the failTimer keeps the
@@ -953,10 +994,17 @@ export class SignalingHub {
     for (const clientId of session.clients) {
       const client = this.clients.get(clientId);
       if (!client) continue;
+      // Per-device bump cue: shared beat for a lone pair, slot-spaced turns
+      // for bigger cohorts (see BUMP_CUE_* rationale above).
+      const bumpCueAt = session.clients.size > 2
+        ? startAt + BUMP_CUE_BASE_MS + slot * BUMP_CUE_SPACING_MS
+        : startAt + BUMP_CUE_BASE_MS;
       this.send(client.socket, "proximity:session:start", {
         sessionId,
         startAt,
         durationMs,
+        bumpCueAt,
+        bumpCueSpacingMs: session.clients.size > 2 ? BUMP_CUE_SPACING_MS : 0,
         acousticSlot: slot,
         acousticSignatureId: acousticPlan[slot]?.id,
         acousticPlan,
@@ -989,11 +1037,28 @@ export class SignalingHub {
     session.failTimer.unref?.();
   }
 
-  nextProximityStaggerMs() {
+  // Stagger is proportional to how many ceremonies are actually in flight
+  // RIGHT NOW, capped at (phases-1) steps. The old server-lifetime
+  // counter-mod-phases scheme had two defects: a lone pair could draw a
+  // pointless 1.2-2.4s offset depending on how many sessions the server had
+  // ever started, and cohorts k and k+phases wrapped onto the same phase —
+  // recreating the same-beat cross-cohort collision the stagger exists to
+  // prevent as soon as 4+ cohorts overlapped.
+  nextProximityStaggerMs(session = null) {
     if (this.acousticSessionStaggerMs <= 0 || this.acousticSessionStaggerPhases <= 1) return 0;
-    const phase = this.proximityStartCounter % this.acousticSessionStaggerPhases;
+    const now = Date.now();
+    let inFlight = 0;
+    for (const other of this.proximitySessions.values()) {
+      // The caller is flagged started before its stagger is computed — it must
+      // not count itself as an in-flight ceremony.
+      if (other === session || !other.started) continue;
+      if (Number(other.expiresAt) <= now) continue;
+      const slop = Number(other.tuning?.timing?.matchSlopMs || this.proximityMatchSlopMs);
+      if (Number(other.endsAt) + slop <= now) continue;
+      inFlight += 1;
+    }
     this.proximityStartCounter += 1;
-    return phase * this.acousticSessionStaggerMs;
+    return Math.min(inFlight, this.acousticSessionStaggerPhases - 1) * this.acousticSessionStaggerMs;
   }
 
   // Pick the acoustic band for one cohort. All participants in a cohort share
@@ -1389,22 +1454,32 @@ export class SignalingHub {
     // or activated — deferral may never convert an eligible pair into a fail.
     this.tryMatchProximitySession(session, { force: true });
     if (!this.proximitySessions.has(sessionId)) return;
+    // A failing member whose bump coincides (±epsilon) with a bump in another
+    // cohort was almost certainly split from their true partner by
+    // arrival-order grouping — hint the client to regroup silently.
+    const foreignBumps = this.foreignProximityBumpTimes(session);
     for (const clientId of session.clients) {
       if (session.matched.has(clientId)) continue;
       const client = this.clients.get(clientId);
       const entry = session.telemetry.get(clientId);
       if (!client || client.pairingId) continue;
+      const ownBump = entry?.analysis?.physicalEvidence?.bump ? bumpTimeOf(entry) : null;
+      const regroup = Number.isFinite(ownBump)
+        && foreignBumps.some((bump) => Math.abs(bump - ownBump) <= REGROUP_BUMP_EPSILON_MS);
       this.send(client.socket, "proximity:session:failed", {
         sessionId,
         reason: proximityFailureReason(entry?.analysis, session.tuning?.scoring?.minimum),
         score: entry?.analysis?.score ?? null,
-        analysis: entry?.analysis || null
+        analysis: entry?.analysis || null,
+        regroup,
+        retryAfterMs: regroup ? REGROUP_RETRY_AFTER_MS : null
       });
       this.metrics?.recordEvent("proximity:session:failed", {
         sessionId,
         clientId,
         reason: proximityFailureReason(entry?.analysis, session.tuning?.scoring?.minimum),
-        score: entry?.analysis?.score ?? null
+        score: entry?.analysis?.score ?? null,
+        regroup
       });
     }
     // Tombstone the dying cohort's bumps BEFORE deleting it: the teardown
