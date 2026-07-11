@@ -33,6 +33,14 @@ handshake, but the actual file bytes travel device-to-device.
   connecting, using a coordinated **ultrasonic Web Audio handshake** (~17.8–19.8 kHz,
   4 concurrent lanes) plus **bump + tilt** detection via `DeviceMotion`. The gate
   requires ultrasound **and** bump **and** tilt to pass — resistant to remote relay.
+- **Crowd-safe simultaneous connect** — up to **10 devices tapping Connect at
+  once** land in one server-coordinated cohort. Groups above a single pair take
+  **turn-taking bump cues** ("Get ready — bump when your phone says NOW"), so
+  different pairs bump on separate beats and the matcher's closer-bump veto can
+  tell them apart; concurrent cohorts are staggered, waiting states are always
+  visible ("Another group is connecting — hold on…"), and a true pair split
+  across cohorts by arrival order **regroups automatically** instead of failing
+  into a manual retry.
 - **QR pairing fallback** — scan a short-lived personalized QR code (with the
   sender's avatar composited in) when acoustic pairing isn't available.
 - **Direct P2P transfer** — files stream over two ordered WebRTC data channels
@@ -44,6 +52,11 @@ handshake, but the actual file bytes travel device-to-device.
   ladder, QR display/scanner, and a smooth frame-rate transfer progress meter.
 - **Orbital peer radar** — nearby devices render as avatars orbiting your own,
   with swipe-to-send, bottom sheets, avatar cropping, chat, and live profile sync.
+- **Guided tour** — an ⓘ button opens a five-slide swipeable bottom-sheet
+  walkthrough (a miniature orbit, an animated bump with a synthesized thud, QR
+  and transfer scenes) ending in the app's signature slide-to-start gesture.
+  Bilingual, theme-aware, and accessible (true modal focus containment,
+  reduced-motion and in-app motion-pause support).
 - **Installable PWA** — service-worker precache, offline shell, and an
   in-browser **mock mode** (15 simulated peers) so the entire UI works offline
   with no server.
@@ -62,6 +75,13 @@ handshake, but the actual file bytes travel device-to-device.
 4. Connect     WebRTC SDP/ICE is exchanged over the signaling channel; two data channels open.
 5. Transfer    Files stream directly peer-to-peer. The server is no longer in the data path.
 ```
+
+When several groups connect at once, the server groups arrivals into **acoustic
+cohorts** (one shared frequency lane per cohort, time-sliced chirp slots, and a
+per-device bump cue), staggers overlapping cohorts, defers matching until every
+overlapping group has reported, and vetoes any candidate pair whose bump sits
+closer to a third device's — so strangers are never paired just because they
+bumped on the same beat.
 
 - **Control plane** (WebSocket JSON): presence, invites, pairing, proximity
   telemetry, SDP/ICE relay, chat — small messages only.
