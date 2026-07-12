@@ -438,11 +438,58 @@
   margin-top: 10px;
 }
 
+.onboarding__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding-top: 2px;
+}
+
 .onboarding__dots {
   display: flex;
   justify-content: center;
   gap: 7px;
-  padding-top: 2px;
+}
+
+/* Prev/next pagination for pointer devices: mice can't swipe the carousel, so
+   desktop gets clickable chevrons flanking the dots. Touch devices keep the
+   swipe-only footer (display:none also removes these from the tab order). */
+.onboarding__nav {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .onboarding__nav {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    color: var(--ink-soft);
+    background: color-mix(in srgb, var(--ink) 7%, transparent);
+    cursor: pointer;
+  }
+
+  .onboarding__nav:disabled {
+    opacity: .35;
+    cursor: default;
+  }
+
+  .onboarding__nav svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .onboarding__nav path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
 }
 
 .onboarding__dot {

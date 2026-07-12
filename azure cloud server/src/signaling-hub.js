@@ -84,10 +84,13 @@ const REGROUP_RETRY_AFTER_MS = 700;
 // "10,000-user readiness" for the Redis/shared-presence multi-node path).
 const DEFAULT_MAX_TOTAL_PROXIMITY_PARTICIPANTS = 100;
 
-// Defensive cap on how many per-peer acoustic detections we retain/echo. It is
-// bounded by the cohort but kept as its own constant so detection plumbing does
-// not silently change when the cohort cap is tuned.
-const MAX_ACOUSTIC_DETECTIONS = 8;
+// Defensive cap on how many per-peer acoustic detections we retain/echo. Must
+// stay >= (cohort ceiling - 1) so a full cohort's telemetry keeps every foreign
+// signature's detection entry: the reciprocity check is rescued by the
+// heard-signature fallback in acousticDetectionFor, but diagnostics and any
+// future non-top-decode evidence read from this list. 12 covers the ceiling of
+// 10 (9 foreign) with headroom. (Was 8 — safe at the old cohort cap of 6.)
+const MAX_ACOUSTIC_DETECTIONS = 12;
 
 // Expanded from 18.6-19.4kHz to 17.8-19.8kHz (2000Hz). Phone speakers radiate
 // far more energy toward the lower edge, fixing weak/silent reception, and the
@@ -1458,6 +1461,25 @@ export class SignalingHub {
     // cohort was almost certainly split from their true partner by
     // arrival-order grouping — hint the client to regroup silently.
     const foreignBumps = this.foreignProximityBumpTimes(session);
+    // Align the regroup rejoin with the LATEST overlapping cohort's fail
+    // moment: the partner can only re-join after THEIR cohort fails, and
+    // cohorts fail at different times (stagger + window offsets). Without
+    // alignment, both members of the earlier cohort rejoin first, re-form a
+    // 2-member session with each other (strangers), and burn the regroup
+    // budget — the reunion needs every crossed member arriving in one window.
+    const now = Date.now();
+    let regroupRetryAfterMs = REGROUP_RETRY_AFTER_MS;
+    for (const other of this.proximitySessions.values()) {
+      if (other.id === session.id || !other.started) continue;
+      if (Number(other.expiresAt) <= now) continue;
+      const slop = Number(other.tuning?.timing?.matchSlopMs || this.proximityMatchSlopMs);
+      const failAt = Number(other.endsAt) + slop;
+      if (failAt <= now) continue;
+      regroupRetryAfterMs = Math.max(
+        regroupRetryAfterMs,
+        Math.min(failAt - now + REGROUP_RETRY_AFTER_MS, 12000)
+      );
+    }
     for (const clientId of session.clients) {
       if (session.matched.has(clientId)) continue;
       const client = this.clients.get(clientId);
@@ -1472,7 +1494,7 @@ export class SignalingHub {
         score: entry?.analysis?.score ?? null,
         analysis: entry?.analysis || null,
         regroup,
-        retryAfterMs: regroup ? REGROUP_RETRY_AFTER_MS : null
+        retryAfterMs: regroup ? regroupRetryAfterMs : null
       });
       this.metrics?.recordEvent("proximity:session:failed", {
         sessionId,

@@ -1,6 +1,6 @@
-import { AcousticProximitySensor, MIN_INAUDIBLE_FREQUENCY_HZ } from "./acoustic-proximity.js?v=1.0.122";
-import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.122";
-import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.122";
+import { AcousticProximitySensor, MIN_INAUDIBLE_FREQUENCY_HZ } from "./acoustic-proximity.js?v=1.0.123";
+import { MotionProximitySensor } from "./motion-proximity.js?v=1.0.123";
+import { createQrToken, validateQrToken } from "./proximity-token.js?v=1.0.123";
 
 export const PROXIMITY_SCORE_MINIMUM = 55;
 export const BUMP_SCORE_POINTS = 20;
@@ -511,7 +511,13 @@ async function exchangeCapturedSignatureChirps(acoustic, {
   // unchanged full-window decode below.
   const windowEndAt = Number(startAt) + durationMs;
   let earlyFinish = false;
-  if (typeof acoustic.peekCeremonyCapture === "function" && emittedCount > 0) {
+  // Early finish is a LONE-PAIR optimization only. In cohorts above 2 the
+  // poll starts near the final slot (the loop above waits through every slot
+  // boundary), so the savings are one slot at best — while a clean decode of
+  // any EARLIER slot's stranger plus an already-latched bump could truncate
+  // the final slot mid-chirp, cutting off exactly the partner who was
+  // assigned last. Not worth it: big cohorts always listen to the end.
+  if (typeof acoustic.peekCeremonyCapture === "function" && emittedCount > 0 && signatures.length <= 2) {
     while (Date.now() < windowEndAt - 300) {
       await waitUntil(Math.min(windowEndAt - 300, Date.now() + 600));
       if (Date.now() >= windowEndAt - 300) break;

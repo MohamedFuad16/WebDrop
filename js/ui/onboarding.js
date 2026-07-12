@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.122";
+import { Emitter } from "../utils/emitter.js?v=1.0.123";
 
 // Keep in lockstep with the bump keyframes in onboarding.css: the cycle is
 // 2.8s and the avatars touch at 32% of it — that's when the thud plays.
@@ -25,6 +25,8 @@ export class OnboardingTour extends Emitter {
       dots: this.root?.querySelector("[data-onboarding-dots]"),
       close: this.root?.querySelector("[data-onboarding-close]"),
       backdrop: this.root?.querySelector("[data-onboarding-backdrop]"),
+      prev: this.root?.querySelector("[data-onboarding-prev]"),
+      next: this.root?.querySelector("[data-onboarding-next]"),
       bumpScene: this.root?.querySelector(".onboarding__scene--bump"),
       swipeControl: this.root?.querySelector("[data-onboarding-swipe]"),
       swipeThumb: this.root?.querySelector("[data-onboarding-swipe-thumb]"),
@@ -44,6 +46,10 @@ export class OnboardingTour extends Emitter {
     this.renderDots(0);
     this.nodes.close?.addEventListener("click", () => this.close());
     this.nodes.backdrop?.addEventListener("click", () => this.close());
+    // Pointer-device pagination (mice can't swipe): chevrons beside the dots,
+    // shown by CSS only on hover-capable fine pointers.
+    this.nodes.prev?.addEventListener("click", () => this.scrollToSlide(this.activeSlide - 1));
+    this.nodes.next?.addEventListener("click", () => this.scrollToSlide(this.activeSlide + 1));
     this.document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !this.root.hidden) this.close();
     });
@@ -151,6 +157,11 @@ export class OnboardingTour extends Emitter {
     });
   }
 
+  scrollToSlide(index) {
+    const clamped = Math.max(0, Math.min(this.slideCount - 1, index));
+    this.nodes.track.scrollTo({ left: clamped * this.nodes.track.clientWidth, behavior: "smooth" });
+  }
+
   syncDots() {
     // A smooth dot-click scroll keeps emitting scroll events through the
     // close outro; reacting to one after close would arm the bump loop on a
@@ -181,6 +192,8 @@ export class OnboardingTour extends Emitter {
         return dot;
       }));
     }
+    if (this.nodes.prev) this.nodes.prev.disabled = activeIndex <= 0;
+    if (this.nodes.next) this.nodes.next.disabled = activeIndex >= this.slideCount - 1;
     [...dots.children].forEach((dot, index) => {
       const active = index === activeIndex;
       dot.dataset.active = String(active);

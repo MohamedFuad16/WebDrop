@@ -1,6 +1,6 @@
-import { formatBytes } from "../utils/format.js?v=1.0.122";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.122";
-import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.122";
+import { formatBytes } from "../utils/format.js?v=1.0.123";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.123";
+import { BUMP_SCORE_POINTS } from "../services/proximity-engine.js?v=1.0.123";
 
 const TRANSFER_SESSION_CAP_BYTES = 500 * 1024 * 1024;
 const PROXIMITY_PERMISSION_KEY = "webdrop.proximityPermissions";
@@ -970,6 +970,19 @@ export function createController({
       view.toast(view.translate("alreadyConnected", { name: connectedPeer.name }));
       return;
     }
+    // Computers get QR directly: a desktop has no practical bump ceremony
+    // (nothing to bump, often no motion sensors), and joining an acoustic
+    // cohort would only queue real phones behind a device that can never
+    // pass. Show this device's QR code immediately for a phone to scan.
+    // Mock/e2e runtimes keep the ceremony path so the demo stays explorable.
+    if (runtime.realProximityCeremony
+      && store.getState().capabilities?.platform?.family === "desktop") {
+      activePeerId = null;
+      activeConnectionMethod = "qr";
+      activeQrRole = "show";
+      beginPeerlessQrConnection("show");
+      return;
+    }
     activePeerId = null;
     activeConnectionMethod = "proximity";
     proximityAutoRegroups = 0;
@@ -1335,7 +1348,10 @@ export function createController({
         stopProximitySensors();
         clearProximitySessionWaiters();
         proximitySessionId = null;
-        await wait(Number(lastProximityFailure.retryAfterMs) || 700);
+        // The server aligns this delay with the latest overlapping cohort's
+        // fail moment so every crossed member rejoins in one window; clamp
+        // defensively so a bad payload can never park the UI for minutes.
+        await wait(Math.min(Number(lastProximityFailure.retryAfterMs) || 700, 15000));
         if (isCurrentAnonymousVerification()) {
           // Leave "verifying" so beginAnonymousProximityConnection's re-entry
           // guard lets the fresh attempt through, then restart the whole flow.

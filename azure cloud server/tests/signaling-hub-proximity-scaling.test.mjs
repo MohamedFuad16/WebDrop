@@ -267,15 +267,22 @@ test("split pairs get a regroup hint on failure — live foreign bumps and tombs
   for (const client of [a1, a2]) {
     const failed = messagesOf(client, "proximity:session:failed").at(-1).payload;
     assert.equal(failed.regroup, true, `${client.id} should be told to regroup`);
-    assert.equal(failed.retryAfterMs, 700);
+    // Cohort B is still in flight, so A's rejoin must be ALIGNED past B's fail
+    // moment (endsAt + slop from now) — not the bare 700ms base, which would
+    // let A's two stranger-members re-pair with each other before B's members
+    // ever arrive.
+    assert.ok(failed.retryAfterMs > 4000, `aligned rejoin, got ${failed.retryAfterMs}`);
+    assert.ok(failed.retryAfterMs <= 12000);
   }
 
   // Cohort B fails after A was torn down: A's bumps survive only as
-  // tombstones, and the hint must still fire off them.
+  // tombstones, the hint must still fire off them, and with no other cohort
+  // in flight the rejoin delay is the plain base.
   hub.failUnmatchedProximitySession(sessionB.id);
   for (const client of [b1, b2]) {
     const failed = messagesOf(client, "proximity:session:failed").at(-1).payload;
     assert.equal(failed.regroup, true, `${client.id} should regroup via tombstones`);
+    assert.equal(failed.retryAfterMs, 700);
   }
 
   // Control: a failing cohort whose bump coincides with NO foreign bump gets
@@ -290,6 +297,33 @@ test("split pairs get a regroup hint on failure — live foreign bumps and tombs
   const failedC = messagesOf(c1, "proximity:session:failed").at(-1).payload;
   assert.equal(failedC.regroup, false);
   assert.equal(failedC.retryAfterMs, null);
+
+  hub.close();
+});
+
+test("a full 10-cohort's telemetry keeps every foreign detection entry", () => {
+  const hub = createHub();
+  hub.updateRuntimeProximityPolicy({ timing: { acousticWindowMs: 6000 } });
+  const clients = joinMany(hub, 10);
+  const session = hub.findProximitySessionForClient("client-0");
+  assert.equal(session.clients.size, 10);
+  startAndAnchor(hub, session);
+
+  const sender = clients[0];
+  const message = bumpedMessage(session, sender, clients[1], session.startAt + 500);
+  // One detection per foreign signature — 9 entries at the full cohort. The
+  // old MAX_ACOUSTIC_DETECTIONS of 8 (safe at cohort cap 6) silently dropped
+  // the last one from the stored diagnostics (matching itself reads the
+  // unsliced analysis list, so this is observability, not correctness).
+  message.payload.metrics.acousticDetections = [...session.signatures.entries()]
+    .filter(([clientId]) => clientId !== sender.id)
+    .map(([, signatureId]) => ({ signatureId, correlation: 0.4, marginDb: 3, detectionMethod: "correlation" }));
+  assert.equal(message.payload.metrics.acousticDetections.length, 9);
+  hub.recordProximitySessionTelemetry(sender, message);
+  const entry = session.telemetry.get(sender.id);
+  assert.ok(entry, "telemetry accepted");
+  assert.equal(entry.acoustic.detections.length, 9);
+  assert.equal(entry.analysis.acousticDetections.length, 9);
 
   hub.close();
 });
