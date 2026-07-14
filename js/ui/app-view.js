@@ -1,10 +1,10 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.123";
-import { formatBytes } from "../utils/format.js?v=1.0.123";
-import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.123";
-import { translate } from "../config/i18n.js?v=1.0.123";
-import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.123";
-import { DynamicIsland } from "./dynamic-island.js?v=1.0.123";
-import { OnboardingTour } from "./onboarding.js?v=1.0.123";
+import { Emitter } from "../utils/emitter.js?v=1.0.124";
+import { formatBytes } from "../utils/format.js?v=1.0.124";
+import { AVATAR_OPTIONS, animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.124";
+import { translate } from "../config/i18n.js?v=1.0.124";
+import { isPreviewableReceivedItem } from "../utils/received-files.js?v=1.0.124";
+import { DynamicIsland } from "./dynamic-island.js?v=1.0.124";
+import { OnboardingTour } from "./onboarding.js?v=1.0.124";
 
 const ORBIT_RADII = [".4324", ".3478", ".2632", ".1786"];
 const ORBIT_PEER_LIMIT = 12;
@@ -145,6 +145,13 @@ export class AppView extends Emitter {
       }
     });
     document.querySelector("[data-howto-fab]")?.addEventListener("click", () => this.onboarding.open());
+    // First launch only: open the guide unprompted, then remember it was shown so it
+    // never reappears (the how-to FAB stays the way back in). Deferred a frame because
+    // open() measures slide geometry, which is only correct after the first render.
+    if (!localStorage.getItem("webdrop.onboardingSeen")) {
+      localStorage.setItem("webdrop.onboardingSeen", "true");
+      globalThis.requestAnimationFrame(() => this.onboarding.open());
+    }
     this.on("onboarding-start", () => this.onboarding.finish());
     store.subscribe((state) => this.render(state));
   }
