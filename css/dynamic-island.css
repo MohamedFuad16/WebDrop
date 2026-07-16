@@ -238,9 +238,48 @@
   transition: color 200ms ease;
 }
 
+/* Bump is the ONE moment the user must physically act, and a 12px tinted line
+   was too quiet to notice mid-ceremony (field reports: "it doesn't even show us
+   to bump"). Stage 3 turns the status line into an unmissable, pulsing call to
+   action shown on both phones at the same beat. UX only — detection, scoring,
+   and the physical-evidence gate are unchanged. */
 .webdrop-island[data-ceremony-stage="3"] .webdrop-island__ceremony-head strong {
   color: var(--blue);
-  font-weight: 820;
+  font-size: 16px;
+  font-weight: 860;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: normal;            /* let the full instruction wrap, not ellipsize */
+  line-height: 1.15;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .webdrop-island[data-ceremony-stage="3"] .webdrop-island__ceremony-head strong {
+    animation: islandBumpNudge 0.7s ease-in-out infinite;
+  }
+  /* A synchronized attention pulse on the whole pill so the cue reads even in
+     peripheral vision while the user is lining the phones up. */
+  .webdrop-island[data-ceremony-stage="3"] {
+    animation: islandBumpGlow 0.7s ease-in-out infinite;
+  }
+}
+
+@keyframes islandBumpNudge {
+  0%, 100% { transform: translateX(0); }
+  30% { transform: translateX(-2.5px); }
+  70% { transform: translateX(2.5px); }
+}
+
+/* Keep the pill's base shadow (line ~22) in every frame so only the outer ring
+   pulses — animating box-shadow bare would drop the drop-shadow + inner highlight
+   and flatten the island on each beat. */
+@keyframes islandBumpGlow {
+  0%, 100% {
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .38), inset 0 1px rgba(255, 255, 255, .14), 0 0 0 0 rgba(52, 125, 245, 0);
+  }
+  50% {
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .38), inset 0 1px rgba(255, 255, 255, .14), 0 0 0 4px rgba(52, 125, 245, 0.28);
+  }
 }
 
 .webdrop-island__ceremony-steps {

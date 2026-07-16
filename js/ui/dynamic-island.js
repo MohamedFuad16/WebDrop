@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.124";
-import { Emitter } from "../utils/emitter.js?v=1.0.124";
-import { formatBytes } from "../utils/format.js?v=1.0.124";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.124";
-import { TileWave } from "./tile-wave.js?v=1.0.124";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.125";
+import { Emitter } from "../utils/emitter.js?v=1.0.125";
+import { formatBytes } from "../utils/format.js?v=1.0.125";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.125";
+import { TileWave } from "./tile-wave.js?v=1.0.125";
 
 // Monotonic ceremony stage ladder shown in the island during pairing. Replaces
 // the old permissions/audio/bump/tilt checklist with a single staged status line
@@ -254,9 +254,17 @@ export class DynamicIsland extends Emitter {
     // Turn-taking metadata from the server (cohorts above 2 bump in turns):
     // remember this device's personal cue so the ladder can gate "Bump now" on
     // it and show a "wait for your turn" line until then.
-    if (Number.isFinite(bumpCueAt)) this.ceremonyBumpCueAt = bumpCueAt;
+    // bumpCueAt/queuedUntil arrive as server EPOCH ms (Date.now() base), but every
+    // comparison below uses this.now() === performance.now() (ms since page load).
+    // Comparing the two clocks made "performance.now() >= epoch" permanently false,
+    // so "Bump now" never surfaced and the ladder hung on "Exchanging" until the
+    // score failed (field bug since bumpCueAt was introduced for lone pairs too,
+    // ADR-0030). Convert into the local monotonic base once, here, so stages 3-4
+    // gate correctly. this.now() - Date.now() is a stable offset, so this is
+    // idempotent across the repeated 120ms motion polls.
+    if (Number.isFinite(bumpCueAt)) this.ceremonyBumpCueAt = this.now() + (bumpCueAt - Date.now());
     if (Number.isFinite(bumpCueSpacingMs)) this.ceremonyBumpCueSpacingMs = bumpCueSpacingMs;
-    if (Number.isFinite(queuedUntil)) this.ceremonyQueuedUntil = queuedUntil;
+    if (Number.isFinite(queuedUntil)) this.ceremonyQueuedUntil = this.now() + (queuedUntil - Date.now());
     // The score span stays hidden during a healthy ceremony and is revealed only
     // on failure (by showVerificationFailure). Keep its value current regardless.
     if (Number.isFinite(score) && this.nodes.ceremonyScore) {
