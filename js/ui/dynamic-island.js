@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.126";
-import { Emitter } from "../utils/emitter.js?v=1.0.126";
-import { formatBytes } from "../utils/format.js?v=1.0.126";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.126";
-import { TileWave } from "./tile-wave.js?v=1.0.126";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.127";
+import { Emitter } from "../utils/emitter.js?v=1.0.127";
+import { formatBytes } from "../utils/format.js?v=1.0.127";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.127";
+import { TileWave } from "./tile-wave.js?v=1.0.127";
 
 // Monotonic ceremony stage ladder shown in the island during pairing. Replaces
 // the old permissions/audio/bump/tilt checklist with a single staged status line
@@ -93,6 +93,7 @@ export class DynamicIsland extends Emitter {
     this.ceremonyBumpCueAt = null;
     this.ceremonyBumpCueSpacingMs = 0;
     this.ceremonyQueuedUntil = null;
+    this.ceremonyTiltPeakDeg = 0;
     this.copyKeys = { title: null, status: null };
     this.transferDisplayRatio = 0;
     this.transferTargetRatio = 0;
@@ -386,11 +387,16 @@ export class DynamicIsland extends Emitter {
     ));
     const required = Math.round(Number(motion.tiltThresholdDeg) || 30);
     node.dataset.ok = String(Boolean(motion.tilted));
-    // Always keep the live degree on screen — even once tilted latches true — so
-    // the user can actually verify the angle rather than seeing a bare "OK".
-    node.textContent = motion.tilted
-      ? this.translate("ceremonyTiltOk", { deg })
-      : this.translate("ceremonyTiltMeter", { deg, required });
+    // Live meter while working toward the threshold; once tilted LATCHES true,
+    // freeze the confirmation at the PEAK angle reached. motion.tilted stays true
+    // even after the phone returns toward flat, so showing the live degree there
+    // would read "Tilt 5° ✓" — a pass marker next to a sub-threshold angle.
+    if (motion.tilted) {
+      this.ceremonyTiltPeakDeg = Math.max(this.ceremonyTiltPeakDeg || 0, deg);
+      node.textContent = this.translate("ceremonyTiltOk", { deg: this.ceremonyTiltPeakDeg });
+    } else {
+      node.textContent = this.translate("ceremonyTiltMeter", { deg, required });
+    }
     node.hidden = false;
   }
 
@@ -714,6 +720,7 @@ export class DynamicIsland extends Emitter {
     this.ceremonyBumpCueAt = null;
     this.ceremonyBumpCueSpacingMs = 0;
     this.ceremonyQueuedUntil = null;
+    this.ceremonyTiltPeakDeg = 0;
     if (this.root) this.root.dataset.ceremonyStage = "1";
     if (this.nodes.ceremonyStage) this.nodes.ceremonyStage.textContent = this.translate("ceremonyStagePreparing");
     if (this.nodes.ceremonyTilt) this.nodes.ceremonyTilt.hidden = true;
