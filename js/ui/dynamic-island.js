@@ -1,8 +1,8 @@
-import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.125";
-import { Emitter } from "../utils/emitter.js?v=1.0.125";
-import { formatBytes } from "../utils/format.js?v=1.0.125";
-import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.125";
-import { TileWave } from "./tile-wave.js?v=1.0.125";
+import qrcode from "../vendor/qrcode-generator.mjs?v=1.0.126";
+import { Emitter } from "../utils/emitter.js?v=1.0.126";
+import { formatBytes } from "../utils/format.js?v=1.0.126";
+import { animatedFramesForAvatar, normalizeAvatarChoice } from "../config/avatar-options.js?v=1.0.126";
+import { TileWave } from "./tile-wave.js?v=1.0.126";
 
 // Monotonic ceremony stage ladder shown in the island during pairing. Replaces
 // the old permissions/audio/bump/tilt checklist with a single staged status line
@@ -386,8 +386,10 @@ export class DynamicIsland extends Emitter {
     ));
     const required = Math.round(Number(motion.tiltThresholdDeg) || 30);
     node.dataset.ok = String(Boolean(motion.tilted));
+    // Always keep the live degree on screen — even once tilted latches true — so
+    // the user can actually verify the angle rather than seeing a bare "OK".
     node.textContent = motion.tilted
-      ? this.translate("ceremonyTiltOk")
+      ? this.translate("ceremonyTiltOk", { deg })
       : this.translate("ceremonyTiltMeter", { deg, required });
     node.hidden = false;
   }

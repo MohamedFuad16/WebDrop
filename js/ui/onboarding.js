@@ -1,4 +1,4 @@
-import { Emitter } from "../utils/emitter.js?v=1.0.125";
+import { Emitter } from "../utils/emitter.js?v=1.0.126";
 
 // Keep in lockstep with the bump keyframes in onboarding.css: the cycle is
 // 2.8s and the avatars touch at 32% of it — that's when the thud plays.
