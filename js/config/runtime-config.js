@@ -3,6 +3,6 @@ globalThis.WEBDROP_RUNTIME_CONFIG = Object.freeze({
   realProximityCeremony: true,
   realTransfer: true,
   qrPairing: true,
-  signalingUrl: "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws",
-  turnConfigUrl: "https://webdrop-wss-0618.japaneast.cloudapp.azure.com/api/ice-servers"
+  signalingUrl: "wss://16-76-107-155.nip.io/ws",
+  turnConfigUrl: "https://16-76-107-155.nip.io/api/ice-servers"
 });

@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DOMAIN="${DOMAIN:-signal.webdrop.example.com}"
+# NOTE: production signaling now runs on AWS EC2 (ap-northeast-1) behind Caddy,
+# which obtains TLS automatically and proxies WebSocket upgrades natively — the
+# nginx/certbot flow below is only needed on the legacy Azure VM. On the AWS
+# host only the rsync + npm + systemd steps of this script apply; Caddy is
+# configured once in /etc/caddy/Caddyfile (reverse_proxy 127.0.0.1:8080).
+DOMAIN="${DOMAIN:-16-76-107-155.nip.io}"
 APP_DIR="${APP_DIR:-/opt/webdrop/azure-cloud-server}"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
