@@ -3,6 +3,6 @@ globalThis.WEBDROP_RUNTIME_CONFIG = Object.freeze({
   realProximityCeremony: true,
   realTransfer: true,
   qrPairing: true,
-  signalingUrl: "wss://16-76-107-155.nip.io/ws",
-  turnConfigUrl: "https://16-76-107-155.nip.io/api/ice-servers"
+  signalingUrl: "wss://signal.mohamedfuad.com/ws",
+  turnConfigUrl: "https://signal.mohamedfuad.com/api/ice-servers"
 });
