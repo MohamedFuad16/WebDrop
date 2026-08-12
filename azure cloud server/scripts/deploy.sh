@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DOMAIN="${DOMAIN:-signal.webdrop.example.com}"
+DOMAIN="${DOMAIN:-16-76-107-155.nip.io}"
 APP_DIR="${APP_DIR:-/opt/webdrop/azure-cloud-server}"
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 

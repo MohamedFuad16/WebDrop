@@ -11,8 +11,8 @@ import {
 } from "./test-runs.js?v=1.0.127";
 
 const APP_VERSION = "1.0.127";
-const DEFAULT_HTTP_BASE = "https://webdrop-wss-0618.japaneast.cloudapp.azure.com";
-const DEFAULT_WS_URL = "wss://webdrop-wss-0618.japaneast.cloudapp.azure.com/ws";
+const DEFAULT_HTTP_BASE = "https://16-76-107-155.nip.io";
+const DEFAULT_WS_URL = "wss://16-76-107-155.nip.io/ws";
 const POLL_INTERVAL_MS = 1000;
 const MONITOR_INTERVAL_MS = 1000;
 const MONITOR_START_HZ = 17_800;

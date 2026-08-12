@@ -1007,7 +1007,7 @@ test("admin readiness auto-sends the local operations token without manual entry
       body: `globalThis.WEBDROP_ADMIN_TOKEN = "local-ops-token";`
     });
   });
-  await page.route("https://webdrop-wss-0618.japaneast.cloudapp.azure.com/readyz", async (route) => {
+  await page.route("https://16-76-107-155.nip.io/readyz", async (route) => {
     readinessRequest = {
       method: route.request().method(),
       authorization: await route.request().headerValue("authorization")
@@ -1022,7 +1022,7 @@ test("admin readiness auto-sends the local operations token without manual entry
       })
     });
   });
-  await page.route("https://webdrop-wss-0618.japaneast.cloudapp.azure.com/api/diagnostics-public", async (route) => {
+  await page.route("https://16-76-107-155.nip.io/api/diagnostics-public", async (route) => {
     diagnosticsRequest = {
       method: route.request().method(),
       authorization: await route.request().headerValue("authorization")
