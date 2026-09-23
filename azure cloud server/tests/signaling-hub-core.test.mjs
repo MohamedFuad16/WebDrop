@@ -85,6 +85,42 @@ test("close clears pending proximity session timers and state", () => {
   assert.equal(hub.openProximitySessionIds.size, 0);
 });
 
+test("client:profile updates presentation fields and rebroadcasts peers without a protocol error", () => {
+  const hub = createHub();
+  const a = mockSocket();
+  const b = mockSocket();
+  a.ip = b.ip = "127.0.0.1";
+  hub.registerClient(a, hello("client-a"));
+  hub.registerClient(b, hello("client-b"));
+  for (const socket of [a, b]) socket.messages.length = 0;
+
+  const send = (message) => hub.handleMessage(a, Buffer.from(JSON.stringify(message)), false);
+  send({ type: "client:profile", payload: { self: { id: "spoofed", name: "Renamed", ringColor: "teal" } } });
+
+  const client = hub.clients.get("client-a");
+  assert.equal(client.deviceName, "Renamed");
+  assert.equal(client.ringColor, "teal");
+  assert.equal(client.id, "client-a", "profile edits cannot change the client id");
+  assert.equal(received(a, "protocol:error").length, 0);
+  const peersForB = received(b, "peers").at(-1).payload;
+  assert.equal(peersForB.find((peer) => peer.id === "client-a").name, "Renamed");
+
+  // Older clients re-send client:hello; that is also a profile edit now.
+  for (const socket of [a, b]) socket.messages.length = 0;
+  send({ type: "client:hello", payload: { self: { id: "client-a", deviceName: "Via hello" } } });
+  assert.equal(client.deviceName, "Via hello");
+  assert.equal(client.ringColor, null);
+  assert.equal(received(a, "protocol:error").length, 0);
+  assert.equal(received(a, "connected").length, 0, "no re-registration");
+
+  // An unchanged profile does not rebroadcast.
+  for (const socket of [a, b]) socket.messages.length = 0;
+  send({ type: "client:profile", payload: { self: { name: "Via hello" } } });
+  assert.equal(received(b, "peers").length, 0);
+
+  hub.close();
+});
+
 function createHub() {
   return new SignalingHub({
     server: { on() {} },

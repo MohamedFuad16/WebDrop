@@ -120,6 +120,26 @@ test("a forced reclaim with no payload re-sends the original client:hello identi
   assert.equal(adapter.selfId, "device-1-abc");
 });
 
+test("profile edits after the handshake send client:profile, not a second client:hello", async () => {
+  const adapter = new WebSocketSignalingAdapter({
+    url: "wss://signal.example.test/ws",
+    WebSocketImpl: FakeWebSocket
+  });
+  const original = { self: { id: "device-1", name: "Old" }, capabilities: { microphone: true } };
+  adapter.connect(original);
+  const socket = adapter.socket;
+  socket.readyState = FakeWebSocket.OPEN;
+  socket.dispatch("open");
+
+  const edited = { id: "device-1", name: "New", avatarId: "assets/icons/avatars/cat.svg" };
+  adapter.updateProfile(edited);
+  const frames = socket.sent.map((raw) => JSON.parse(raw));
+  assert.deepEqual(frames.map((frame) => frame.type), ["client:hello", "client:profile"]);
+  assert.deepEqual(frames[1].payload, { self: edited });
+  // A later reconnect hello must carry the edited profile.
+  assert.deepEqual(adapter.lastConnectPayload, { ...original, self: edited });
+});
+
 class FakeWebSocket {
   static OPEN = 1;
 

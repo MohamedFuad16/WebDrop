@@ -161,13 +161,14 @@ export class WebSocketSignalingAdapter extends Emitter {
   }
 
   // Best-effort presence re-announce so nearby (non-connected) devices can pick
-  // up an updated avatar/name/ring. Reuses the cached capabilities from connect()
-  // and no-ops when the socket is closed.
+  // up an updated avatar/name/ring. The server accepts client:hello only as the
+  // first frame, so edits go out as client:profile. The cached connect payload
+  // is updated too, so a reconnect's hello carries the new profile.
   updateProfile(self) {
     if (!self || !this.lastConnectPayload) return false;
     this.lastConnectPayload = { ...this.lastConnectPayload, self };
     this.selfId = self.id || this.selfId;
-    return this.send({ type: "client:hello", payload: this.lastConnectPayload });
+    return this.send({ type: "client:profile", payload: { self } });
   }
 
   async sendInvite(targetId, { method = "proximity", qrRole = null } = {}) {

@@ -92,6 +92,21 @@ export function validateClientHello(message) {
   };
 }
 
+// Profile edits after the handshake. Only the presentational fields can change;
+// id and deviceId stay fixed for the socket's lifetime. A missing name keeps the
+// current one instead of falling back to the hello default.
+export function validateClientProfile(message) {
+  const payload = objectPayload(message.payload);
+  const self = objectPayload(payload.self || payload);
+  const avatarId = cleanAvatar(self.avatarId || self.avatar);
+  return {
+    deviceName: cleanString(self.deviceName || self.name, 80) || null,
+    avatarId,
+    avatar: avatarId,
+    ringColor: cleanString(self.ringColor, 40) || null
+  };
+}
+
 export function validateRoutedMessage(message) {
   if (!ROUTED_TYPES.has(message.type)) {
     throw new ProtocolError("unsupported_type", `Unsupported message type: ${message.type}`);

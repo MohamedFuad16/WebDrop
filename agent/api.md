@@ -11,6 +11,7 @@ Client side: `js/services/websocket-signaling.js`. Server side: `azure cloud ser
 | Type | Purpose |
 |---|---|
 | `client:hello`, `client:ping` | handshake / heartbeat |
+| `client:profile` | post-handshake profile edit `{ payload:{ self:{ name\|deviceName, avatarId, ringColor } } }`; server updates the presentational fields (never `id`/`deviceId`) and rebroadcasts `peers`. A repeated `client:hello` on a registered socket is treated the same way (older clients). |
 | `invite`, `invite:accept`, `invite:reject` | pairing handshake (`targetId`, `pairingId`, `payload.method`=`proximity`\|`qr`) |
 | `proximity:ready`, `proximity:telemetry` | per-peer ceremony sync + metrics |
 | `proximity:session:join` / `:telemetry` / `:diagnostic` / `:cancel` | anonymous "who's nearby" cohort flow |

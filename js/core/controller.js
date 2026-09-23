@@ -214,6 +214,13 @@ export function createController({
       view.toast(view.translate("signalingLost"));
       return;
     }
+    // unsupported_type means client and server builds disagree on a message
+    // (e.g. client:profile before the server knows it). No pairing was
+    // attempted, so "connection could not be confirmed" would be false.
+    if (payload.code === "unsupported_type") {
+      console.warn("WebDrop signaling rejected a message type.", payload.message);
+      return;
+    }
     view.toast(view.translate("connectionRejected"));
   });
 

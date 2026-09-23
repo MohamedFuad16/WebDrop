@@ -6,6 +6,7 @@ import {
   parseJsonMessage,
   publicPeer,
   validateClientHello,
+  validateClientProfile,
   validateRoutedMessage
 } from "./message-schema.js";
 
@@ -380,6 +381,13 @@ export class SignalingHub {
         return;
       }
 
+      // A repeated client:hello on a registered socket comes from clients built
+      // before client:profile existed; treat it as a profile edit, not a rejoin.
+      if (message.type === "client:profile" || message.type === "client:hello") {
+        this.updateClientProfile(client, validateClientProfile(message));
+        return;
+      }
+
       const routed = validateRoutedMessage(message);
       if (!DETAILED_METRIC_TYPES.has(routed.type)) this.metrics?.recordEvent(routed.type);
       this.route(client, routed);
@@ -441,6 +449,18 @@ export class SignalingHub {
     this.send(socket, "peers", this.peerList(client.id));
     this.broadcast("peers", this.peerList(), { exceptId: client.id });
     this.logger?.info("Client joined signaling.", { id: client.id, deviceName: client.deviceName });
+  }
+
+  updateClientProfile(client, profile) {
+    const next = {
+      deviceName: profile.deviceName || client.deviceName,
+      avatarId: profile.avatarId,
+      avatar: profile.avatar,
+      ringColor: profile.ringColor
+    };
+    if (Object.keys(next).every((key) => client[key] === next[key])) return;
+    Object.assign(client, next);
+    this.broadcast("peers", this.peerList());
   }
 
   route(sender, message) {
