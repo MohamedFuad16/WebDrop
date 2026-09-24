@@ -4,10 +4,12 @@
 
 **AirDrop for the open web — proximity-verified, peer-to-peer file transfer that runs in any modern browser.**
 
-[![Live App](https://img.shields.io/badge/Live-web--drop--lyart.vercel.app-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://web-drop-lyart.vercel.app)
-[![PWA](https://img.shields.io/badge/PWA-Installable-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white)](https://web-drop-lyart.vercel.app)
+[![Live App](https://img.shields.io/badge/Live-webdrop.mohamedfuad.com-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://webdrop.mohamedfuad.com)
+[![PWA](https://img.shields.io/badge/PWA-Installable-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white)](https://webdrop.mohamedfuad.com)
 [![WebRTC](https://img.shields.io/badge/WebRTC-P2P-333333?style=for-the-badge&logo=webrtc&logoColor=white)](https://webrtc.org/)
 [![No Build](https://img.shields.io/badge/Build-Zero_(vanilla_ESM)-brightgreen?style=for-the-badge)](#tech-stack)
+
+<img src="https://raw.githubusercontent.com/MohamedFuad16/portfolio-mine/32d8ec630d54e703e65db9dafb3224bcf7648e3c/public/media/projects/webdrop-en.png" alt="WebDrop orbit radar with the Connect button" width="100%" />
 
 </div>
 
@@ -21,7 +23,7 @@ Two phones discover each other, **prove they are physically close** (an
 ultrasonic + bump/tilt "ceremony", or a QR scan), then stream files **directly
 peer-to-peer over WebRTC data channels**. Files never touch a server.
 
-**Live:** <https://web-drop-lyart.vercel.app>
+**Live:** <https://webdrop.mohamedfuad.com>
 
 The only backend is a lightweight Node **WebSocket signaling + TURN-credential
 server** (`azure cloud server/`); it brokers presence, pairing, and the WebRTC
@@ -144,12 +146,14 @@ cp .env.example .env   # configure signaling + TURN credentials
 npm start
 ```
 
-By default the frontend runs in **mock mode** (15 simulated peers) so you can
-explore the full UI offline; production signaling is gated behind runtime flags.
+The committed `js/config/runtime-config.js` points the app at the production
+signaling server. To explore the UI offline with **mock mode** (15 simulated
+peers), open `http://127.0.0.1:4178/?runtime=mock`; the flag works on localhost only.
 
 ## Deployment
 
-- **Frontend:** static deploy on **Vercel** (`web-drop-lyart.vercel.app`).
+- **Frontend:** static deploy on **Vercel** (`webdrop.mohamedfuad.com`, also
+  reachable at `web-drop-lyart.vercel.app`).
 - **Signaling server:** Node service on an **Azure VM** (`azure cloud server/`),
   providing WebSocket signaling and brokered TURN credentials.
 
