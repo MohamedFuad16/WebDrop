@@ -1,7 +1,7 @@
 # Project State
 
 ## Current state summary (≤200 words)
-Client **v1.0.127** is live at `webdrop.mohamedfuad.com` (Vercel). Signaling is at `signal.mohamedfuad.com`. Per the 2026-10-14 entry, that name now resolves to the Azure VM `vm-apps-small` (52.246.184.110, japaneast, Caddy, signaling on 127.0.0.1:8081). It no longer points at the AWS host in ADR-0033. No ADR records the move yet, so treat the ADR-0033 host details as stale.
+Client **v1.0.127** is live at `webdrop.mohamedfuad.com` (Vercel). Signaling is at `signal.mohamedfuad.com`. Per the 2026-10-14 entry, that name now resolves to the Azure VM `vm-apps-small` (52.246.184.110, japaneast, Caddy, signaling on 127.0.0.1:8081). It no longer points at the AWS host in ADR-0033. ADR-0035 records the move (AWS credit ran out) and supersedes ADR-0033's host details.
 
 Every new frontend domain needs its own entry in `ALLOWED_ORIGINS` in `/etc/webdrop/signaling.env`. A refused origin leaves no server log (see errors.md).
 
@@ -16,6 +16,7 @@ Older history: `agent/archive/state-history.md` holds the full pre-trim text of 
 Older entries, one line each. Full text is in `agent/archive/state-history.md`.
 
 - 2026-10-14: Memory trim pass 2: agent.md cut under 200 words, dead paths fixed in architecture.md and backlog.md.
+- 2026-10-14: ADR-0035 records the 2026-10-04 move of signaling from AWS EC2 back to the shared Azure VM `vm-apps-small`, because the AWS credit ran out. The owner reports the EC2 instance is terminated (not checked: AWS CLI session expired). The `aws-ec2-*.sh` scripts are history only.
 - 2026-09-24: Profile edits no longer trigger "connection could not be confirmed" (client + server, ADR-0034, BOTH DEPLOYED)
 - 2026-08-12: Custom domain: signaling now at signal.mohamedfuad.com (follow-up to ADR-0033)
 - 2026-08-12: Production signaling repointed to AWS EC2 (infra, ADR-0033). The archived text of this entry also contains, merged in by an old edit, the v1.0.125 ceremony clock-base bug write-up (ADR-0032).

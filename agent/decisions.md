@@ -4,7 +4,7 @@ Append-only. Newest at the bottom. Format: ID · date · title · status · cont
 
 ---
 
-Trimmed on 2026-10-14. The index lists every ADR. Full text of ADR-0033 and ADR-0034 is below. All other ADRs, unchanged, are in `agent/archive/decisions-full.md`. ADR-0033's host details are stale in practice: see the 2026-10-14 entry in state.md.
+Trimmed on 2026-10-14. The index lists every ADR. Full text of ADR-0033 and ADR-0034 is below. All other ADRs, unchanged, are in `agent/archive/decisions-full.md`. ADR-0035 (added after the trim) supersedes ADR-0033's host details.
 
 ## Index
 - ADR-0001 · 2026-06-29 · Use WebRTC data channels for file transfer
@@ -38,9 +38,10 @@ Trimmed on 2026-10-14. The index lists every ADR. Full text of ADR-0033 and ADR-
 - ADR-0029 · 2026-07-11 · Guided tour presents as a bottom sheet; new WebDrop brand icon asset (v1.0.117)
 - ADR-0030 · 2026-07-12 · Simultaneous multi-pair connect: cap fix, turn-taking bump cues, overlap stagger, split-pair regroup, wait-state UX (client v1.0.122 + server)
 - ADR-0031 · 2026-07-14 · Monaca as a second host: per-project origin allowlisting, and a Monaca-only `.mjs`→`.js` rewrite (v1.0.124)
-- ADR-0033 · 2026-08-12 · Production signaling host: Azure VM → AWS EC2, Caddy replaces nginx+certbot (infra, no version bump)
+- ADR-0033 · 2026-08-12 · Production signaling host: Azure VM → AWS EC2, Caddy replaces nginx+certbot (infra, no version bump) · superseded by ADR-0035
 - ADR-0032 · 2026-07-16 · Ceremony island: convert server epoch cue timestamps into the local monotonic clock (v1.0.125)
 - ADR-0034 · 2026-09-24 · Post-handshake profile edits use `client:profile`; `unsupported_type` is not a pairing failure
+- ADR-0035 · 2026-10-14 · Production signaling host: AWS EC2 → shared Azure VM `vm-apps-small` (infra, no version bump) · supersedes ADR-0033
 
 ---
 
@@ -59,3 +60,18 @@ Trimmed on 2026-10-14. The index lists every ADR. Full text of ADR-0033 and ADR-
 **Decision.** Add a `client:profile` message. The server validates only presentational fields (`deviceName`, `avatarId`/`avatar`, `ringColor`), never changes `id`/`deviceId`, and rebroadcasts `peers` only when a field changed. A repeated `client:hello` from an already-registered socket takes the same path so clients cached before this change stop erroring once the server is deployed; it does not re-register, issue a new TURN token, or send `connected`. The controller treats `unsupported_type` as client/server version skew and logs it instead of toasting `connectionRejected`. Reconnecting the socket to push a new hello was rejected because `removeClient` tears down active pairings.
 
 **Consequences.** Deploy order does not matter for the toast: a new client on the old server stays quiet but its profile edits do not propagate over signaling until the server is deployed (the data-channel `profile:update` to a connected peer is unaffected). Per-client rate limiting covers profile spam; the controller already debounces broadcasts by 250 ms.
+
+## ADR-0035 · 2026-10-14 · Production signaling host: AWS EC2 → shared Azure VM `vm-apps-small` (infra, no version bump)
+
+Status: accepted. Supersedes the host details of ADR-0033. The move happened on 2026-10-04 and was recorded on 2026-10-14.
+
+**Context.** ADR-0033 moved signaling to AWS EC2 `i-033324ec6baf53aca` on a $100 AWS credit. That credit ran out (owner). The owner's Azure for Students subscription still has credit, so signaling went back to Azure. The owner reports that the EC2 instance is terminated. This was not checked here because the AWS CLI session had expired.
+
+**Decision.** Run the hub on Azure VM `vm-apps-small` (RG `rg-mfuad-apps`, japaneast, Standard_B2pts_v2, Ubuntu 24.04 arm64, public IP `52.246.184.110`, created 2026-10-04). The VM is shared with other backends. One Caddy serves `signal.mohamedfuad.com` and the fallback `signal.52-246-184-110.sslip.io` with `reverse_proxy 127.0.0.1:8081`, next to `api.`, `ledger-api.` and `tutorsystem.mohamedfuad.com`. The hub runs as systemd `webdrop-signaling` with `/etc/webdrop/signaling.env`. Only the `signal.mohamedfuad.com` A record changed. Client config already used that name, so no client or server code changed.
+
+**Consequences.**
+- One process on one VM, as ADR-0033 required. The single in-memory matcher still holds.
+- The VM is shared. A noisy neighbour (CPU, the 950 MB of RAM, a Caddy reload) can affect signaling. The hub and the other apps restart independently.
+- The 2026-10-04 rebuild reset `ALLOWED_ORIGINS` without `https://webdrop.mohamedfuad.com`. That caused the 2026-10-14 outage (state.md, errors.md). After any rebuild, compare the live env with `azure cloud server/.env.example`.
+- `16-76-107-155.nip.io` is dead. The sslip.io name is the new fallback.
+- `azure cloud server/scripts/aws-ec2-start.sh` and `aws-ec2-stop.sh` now target a terminated instance. They are kept for history only and must not be run.
