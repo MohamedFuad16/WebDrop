@@ -47,7 +47,7 @@ first-crossing bumpAt. Remaining steps, in order:
   stale-continuation bug class. First step (~60 lines): move the five
   resolvers + proximitySessionId + lastProximityFailure into a
   `currentAttempt` object.
-- **R2 version-bump script + gate (S)** — `scripts/bump-version.mjs` rewriting
+- **R2 version-bump script + gate (S)** — a new script, bump-version.mjs (proposed, not yet created) in `scripts/`, rewriting
   every `?v=`, both `APP_VERSION`s, package.json/lock; assertion in
   `scripts/check-js.mjs` (already in `npm run verify`) that all of them equal
   `package.json.version`. Kills the mixed-version double-module-instance class.
@@ -58,7 +58,7 @@ first-crossing bumpAt. Remaining steps, in order:
   `evictProximitySessionMember`; later promote to a `ProximitySession` class.
   Every wrong-pair ADR was a missed hook at a hand-maintained teardown site.
 - **R4 extract admin acoustic monitor (S)** — controller lines ~447-643 + 3
-  state fields → `js/services/admin-monitor.js` with explicit pause/resume;
+  state fields → a new admin-monitor.js (proposed, not yet created) in `js/services/` with explicit pause/resume;
   removes the hidden `stopProximitySensors → setTimeout(tryStartAdminAcousticMonitor, 180)`
   mic re-acquisition during ceremony retries.
 - **R5 pure ceremony-stage reducer + controller harness test (S/M)** — extract

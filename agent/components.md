@@ -1,6 +1,6 @@
 # Components & Modules
 
-Each module's responsibility, key file(s), and dependencies. Most classes extend `Emitter` (`js/utils/emitter.js`) and communicate via events rather than direct calls. See `graph/graph.md` for the full impact graph.
+Each module's responsibility, key file(s), and dependencies. Most classes extend `Emitter` (`js/utils/emitter.js`) and communicate via events rather than direct calls. See `agent/graph/graph.md` for the full impact graph.
 
 ## UI components
 | Component | File | Responsibility | Depends on | Used by |

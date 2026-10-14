@@ -1,12 +1,12 @@
 # Architecture
 
-WebDrop v2 is a **static, no-build single-page PWA** served from the repo root (`index.html` + `js/` ES modules + `css/`). All application logic runs in the browser. The only backend is a separate Node WebSocket signaling + TURN-credential server in `azure cloud server/` (documented in `api.md`). Diagram: [`graph/architecture.svg`](graph/architecture.svg) (source [`graph/architecture.d2`](graph/architecture.d2)).
+WebDrop v2 is a **static, no-build single-page PWA** served from the repo root (`index.html` + `js/` ES modules + `css/`). All application logic runs in the browser. The only backend is a separate Node WebSocket signaling + TURN-credential server in `azure cloud server/` (documented in `api.md`). Diagram: [`agent/graph/architecture.svg`](graph/architecture.svg) (source [`agent/graph/architecture.d2`](graph/architecture.d2)).
 
 ## Layers and major modules
 
 ### Bootstrap — `js/app.js`
 The entry module (loaded via `<script type="module">`). It builds the singleton object graph and wires it together:
-- Creates the observable `store` (`core/state.js`) with the initial UI state (self identity, peers, mode, theme, locale, …).
+- Creates the observable `store` (`js/core/state.js`) with the initial UI state (self identity, peers, mode, theme, locale, …).
 - Instantiates both signaling adapters (`MockSignalingAdapter`, `WebSocketSignalingAdapter`) and picks one based on runtime flags.
 - Instantiates `TurnConfigProvider`, `ProximityEngine`, `WebRtcTransport`, `TransferEngine`, `StorageClient`, and `AppView`.
 - Calls `createController(...)` to connect everything, then detects capabilities and connects signaling.
@@ -63,4 +63,4 @@ Handles quota estimation, session/file lifecycle, export, and cleanup.
 - **Data plane** (WebRTC data channel, large/binary): file manifest + chunks + acks. Never traverses the WebSocket (the server rejects binary frames).
 - **Runtime flags** gate whether production signaling, real proximity, real transfer, and QR pairing are active; mock paths keep the UI fully functional offline.
 
-See `components.md` for per-module responsibilities/dependencies, `data.md` for exact message/packet shapes, and `graph/graph.md` for impact analysis.
+See `components.md` for per-module responsibilities/dependencies, `data.md` for exact message/packet shapes, and `agent/graph/graph.md` for impact analysis.
